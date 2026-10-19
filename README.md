@@ -15,7 +15,12 @@ If `config.js` still has `APPS_SCRIPT_URL = 'PASTE'`, the app runs in **sample m
 (pretend students and staff, saved in this browser only).
 
 ## Files to upload to GitHub
-index.html, styles.css, app.js, config.js, defaults.js, store.js, sheets.js
+index.html, styles.css, app.js, config.js, defaults.js, store.js, sheets.js, manifest.json,
+logo.png, favicon-32.png, icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png
+
+Keep the CNAME file GitHub made (it's what makes admin.elevateemsacademy.com work).
+After changing a .js or .css file, bump the ?v= number on it in index.html so browsers load the new one.
+To swap the logo: replace logo.png and the icon PNGs (same names).
 
 (firestore.rules, firebase.json, .firebaserc and README.md stay on the computer. The rules
 are deployed with the Firebase CLI.)
