@@ -183,8 +183,7 @@ async function buildPlan(how) {
 function scenBox() {
   const items = planItems();
   if (!items.length) return `<p class="muted small">Let the app pick about ${planSize()} scenarios from your library that cover every summative skill on the Skills Tracking sheet. Each build is a different mix.</p>
-    <div class="plan-btns"><button class="btn primary small" data-act="planBuild">Build a new mix</button><button class="btn small" data-act="planNick">Use Nick’s set</button></div>
-    <p class="plan-foot"><button class="link" data-act="libOpen">Scenario Library</button></p>`;
+    <div class="plan-btns one-row"><button class="btn primary small" data-act="planBuild">Build a new mix</button><button class="btn small" data-act="planNick">Use Nick’s set</button><button class="btn small" data-act="libOpen">Scenario Library</button></div>`;
   const lib = libById(), { miss } = planStatus(items);
   const byDay = [1, 2, 3, 4, 5].map(d => [d, items.filter(x => (x.day || 1) === d)]).filter(([, l]) => l.length);
   return `${coverLine(miss)}
@@ -192,7 +191,7 @@ function scenBox() {
       const sc = lib[x.id];
       return `<span class="${sc && sc.cat === 'trauma' ? 'tr' : ''}">${esc(sc ? sc.name : 'Missing Doc')}${x.addons.length ? ' +' : ''}</span>`;
     }).join(' · ')}</span></li>`).join('')}</ul>
-    <div class="plan-btns"><button class="btn primary small" data-act="planOpen">Open the plan</button><button class="link" data-act="libOpen">Scenario Library</button></div>`;
+    <div class="plan-btns one-row"><button class="btn primary small" data-act="planOpen">Open the plan</button><button class="btn small" data-act="planNick">Use Nick’s set</button><button class="btn small" data-act="libOpen">Scenario Library</button></div>`;
 }
 
 function planModal() {

@@ -618,3 +618,7 @@ mark.hl { background: #f1dca6; color: inherit; border-radius: 3px; padding: 0 1p
 .hl-pop { position: fixed; z-index: 60; transform: translate(-50%, -100%); background: var(--ink); color: #fff; border: 0; border-radius: 999px; padding: 5px 13px; font-size: 13px; box-shadow: 0 6px 18px rgba(61, 50, 44, .25); cursor: pointer; display: none; }
 .hl-pop.show { display: block; }
 .hl-pop::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: #f1dca6; margin-right: 7px; vertical-align: 0; }
+.plan-btns.one-row { flex-wrap: nowrap; }
+.plan-btns.one-row .btn { white-space: nowrap; }
+/* The resize bar stays on the bottom edge of a box even while its contents scroll. */
+.box > .resize { position: sticky; bottom: -16px; left: auto; right: auto; flex: 0 0 10px; margin: auto -18px -16px; z-index: 2; }
