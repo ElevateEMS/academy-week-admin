@@ -369,7 +369,7 @@ function libScenarios() {
   const none = tagged.filter(k => !have[k]), one = tagged.filter(k => have[k] === 1 && !always[k]);
   const chip = (k, l) => `<button class="chip small ${f === k ? 'on' : ''}" data-act="libFilter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
   const statusTag = s => s.gone ? '<span class="tag red">Doc missing</span>'
-    : s.status === 'checked' ? '<span class="tag ok">✓ Checked</span>'
+    : s.status === 'checked' ? '' // once you've saved it, the "Suggested" tag just goes away
     : s.status === 'suggested' ? '<span class="tag">Suggested</span>' : '<span class="tag warn">New: needs tags</span>';
 
   return `
