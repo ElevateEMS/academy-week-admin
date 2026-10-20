@@ -658,7 +658,6 @@ function scheduleView() {
         <input id="${k('sn')}" data-draft="${k('sn')}" data-sch="stationNote" value="${dv(k('sn'), d.stationNote)}" placeholder="e.g. Stations with two topics: split into 30 minute segments."></label>
     </section>
     <section class="box"><div class="box-head static"><h2>Instructor Notes/Reminders</h2></div>
-      <p class="muted small">One per line. Start a line with “- ” for a sub-bullet, or type *** for a divider.</p>
       <textarea id="${k('notes')}" class="sched-notes" data-draft="${k('notes')}" data-sch="notes" data-grow rows="8">${dv(k('notes'), d.notes)}</textarea>
     </section>
     </div>
