@@ -13,15 +13,22 @@ const Sched = (() => {
   const contentHtml = text => String(text || '').split('\n').filter(l => l.trim())
     .map(l => /^note:/i.test(l.trim()) ? `<p class="p-note">${esc(l.trim())}</p>` : `<p>${esc(l.trim())}</p>`).join('');
 
-  // Instructor notes: one bullet per line, "- " for a sub-bullet, "***" for a divider.
+  // Instructor notes: plain lines are headings/sentences (no bullet), "- " lines are
+  // bullets under them, "***" is a divider.
   function notesHtml(text) {
     const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) return '<p class="p-empty">No notes.</p>';
-    return '<ul class="p-notes">' + lines.map(l => {
-      if (/^\*{3,}$/.test(l)) return '<li class="p-divider" aria-hidden="true"></li>';
-      if (/^[-–•]\s*/.test(l)) return `<li class="p-sub">${esc(l.replace(/^[-–•]\s*/, ''))}</li>`;
-      return `<li>${esc(l)}</li>`;
-    }).join('') + '</ul>';
+    let out = '', inList = false;
+    const close = () => { if (inList) { out += '</ul>'; inList = false; } };
+    lines.forEach(l => {
+      if (/^\*{3,}$/.test(l)) { close(); out += '<hr class="p-divider">'; }
+      else if (/^[-–•]\s*/.test(l)) {
+        if (!inList) { out += '<ul class="p-bullets">'; inList = true; }
+        out += `<li>${esc(l.replace(/^[-–•]\s*/, ''))}</li>`;
+      } else { close(); out += `<p class="p-line">${esc(l)}</p>`; }
+    });
+    close();
+    return '<div class="p-notes">' + out + '</div>';
   }
 
   function squadsHtml(sq) {

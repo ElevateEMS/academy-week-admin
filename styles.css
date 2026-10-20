@@ -385,10 +385,10 @@ a.btn { text-decoration: none; color: inherit; }
 .p-stations td:first-child { width: 30%; font-weight: 600; }
 .p-stations p { margin: 0 0 3px; }
 .p-note { font-style: italic; color: #555; }
-.p-notes { margin: 0; padding-left: 18px; }
-.p-notes li { margin: 2px 0; }
-.p-notes li.p-sub { margin-left: 18px; list-style: circle; }
-.p-notes li.p-divider { list-style: none; border-top: 1px solid #bbb; margin: 8px 0; }
+.p-notes .p-line { margin: 4px 0 2px; }
+.p-notes .p-bullets { margin: 0 0 4px; padding-left: 22px; list-style: disc; }
+.p-notes .p-bullets li { margin: 1px 0; }
+.p-notes .p-divider { border: 0; border-top: 1px solid #bbb; margin: 8px 0; }
 .p-empty { color: #888; font-style: italic; }
 .p-squad-line { margin: 16px 0 6px; font-size: 12px; }
 .p-squads { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -403,7 +403,9 @@ a.btn { text-decoration: none; color: inherit; }
 .viewer-pages .p-page { width: min(820px, 100%); padding: 32px 40px; border-radius: 6px; box-shadow: var(--shadow); }
 
 @media print {
-  @page { size: letter; margin: 0.5in; }
+  /* No page margin = Chrome leaves off its date/title header and URL footer; the margin is padding instead. */
+  @page { size: letter; margin: 0; }
+  #print-root .p-page { padding: 0.5in; }
   body { background: #fff; }
   body > *:not(#print-root) { display: none !important; }
   #print-root { display: block !important; }
