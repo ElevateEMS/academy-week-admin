@@ -299,6 +299,10 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .log-form input.circle:checked { border-color: var(--taupe-dark); }
 .row2 > .chip { align-self: end; margin-bottom: 6px; }
 .check-inline.muted { opacity: .5; }
+.pc-num { cursor: pointer; border-radius: 6px; padding: 0 4px; }
+.pc-num:hover { background: var(--blush-soft); }
+.show-all { display: block; margin: 14px auto 0; }
+.drawer-body > section:first-child { padding-top: 6px; }
 .check-inline { display: flex !important; align-items: center; gap: 8px; color: var(--ink) !important; padding-bottom: 8px; cursor: pointer; }
 .log { list-style: none; padding: 0; margin: 10px 0 0; }
 .log li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dotted var(--line); }

@@ -948,14 +948,14 @@ function studentsView() {
   </section>` : ''}
   <section class="box table-box">
     <table class="roster">
-      <thead><tr><th>#</th><th>Student</th><th>Skills</th><th class="c">Patient contacts</th><th class="c">To fix</th><th class="c">Attendance</th></tr></thead>
+      <thead><tr><th>#</th><th>Student</th><th class="c">Skills</th><th class="c">Patient contacts</th><th class="c">To fix</th><th class="c">Attendance</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
-        <td><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
-        <td class="c">${pcStepper(s)}</td>
-        <td class="c">${s.fixes ? `<span class="badge warn">${s.fixes}</span>` : '<span class="muted">–</span>'}</td>
-        <td class="c">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
+        <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
+        <td class="c">${pcStepper(s, { row: true })}</td>
+        <td class="c" data-part="fix">${s.fixes ? `<span class="badge warn">${s.fixes}</span>` : '<span class="muted">–</span>'}</td>
+        <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
       </tr>`).join('') || '<tr><td colspan="6" class="empty">No students match.</td></tr>'}</tbody>
     </table>
   </section>`;
@@ -967,10 +967,11 @@ function firstName(name) {
   return name.includes(',') ? name.split(',')[1].trim().split(/\s+/)[0] : name.split(/\s+/)[0];
 }
 
-function pcStepper(s) {
+// On the Students page the number itself opens just their Patient Contacts.
+function pcStepper(s, { row = false } = {}) {
   return `<span class="stepper ${S.pcBusy[s.sid] ? 'busy' : ''}" data-stop>
     <button data-act="pc" data-sid="${s.sid}" data-by="-1" aria-label="One less">−</button>
-    <b>${s.contacts}</b>
+    <b ${row ? `class="pc-num" data-act="openStudent" data-sid="${s.sid}" data-part="contacts" title="Patient contacts"` : ''}>${s.contacts}</b>
     <button data-act="pc" data-sid="${s.sid}" data-by="1" aria-label="One more">+</button></span>`;
 }
 
@@ -990,7 +991,10 @@ async function changePc(sid, by) {
 function drawer() {
   const s = studentBySid(S.open);
   if (!s) return '';
-  const contacts = S.contacts.filter(c => c.sid === s.sid).sort((a, b) => b.created - a.created);
+  const part = S.openPart, show = p => !part || part === p || (p === 'contacts' && part === 'fix');
+  // From "To fix": notes still waiting on a fix go first.
+  const contacts = S.contacts.filter(c => c.sid === s.sid)
+    .sort((a, b) => (part === 'fix' ? (!!(a.fixed || !a.fix) - !!(b.fixed || !b.fix)) : 0) || b.created - a.created);
   const warns = S.warnings.filter(w => w.sid === s.sid).sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created);
   const dk = k => k + '-' + s.sid;
   const note = S.drafts[dk('note')] ?? s.note;
@@ -999,10 +1003,10 @@ function drawer() {
     <div class="drawer-head"><h2>${esc(s.name)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
 
-      <label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
-        ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>
+      ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
+        ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>`}
 
-      <section>
+      ${show('skills') ? `<section>
         <h3>Skills</h3>
         <div class="seg wide">${[['on', 'On track'], ['behind', 'Behind'], ['done', 'Done']].map(([k, l]) =>
           `<button class="${s.skill === k ? 'on ' + k : ''}" data-act="skill" data-sid="${s.sid}" data-v="${k}">${l}</button>`).join('')}</div>
@@ -1010,9 +1014,9 @@ function drawer() {
           ${DEFAULTS.skills.map(g => `<div class="skill-group"><span>${esc(g.group)}</span><div>${g.items.map(k =>
             `<button class="chip small ${s.behind.includes(k) ? 'on warn' : ''}" data-act="behind" data-sid="${s.sid}" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>`).join('')}` : ''}
         <textarea id="${dk('note')}" data-draft="${dk('note')}" data-change="note" data-sid="${s.sid}" rows="2" placeholder="Skills note (optional)">${esc(note)}</textarea>
-      </section>
+      </section>` : ''}
 
-      <section>
+      ${show('contacts') ? `<section>
         <h3>Patient Contacts</h3>
         <div class="pc-big">${pcStepper(s)}<span class="muted small">in the Google Sheet (column P)</span></div>
         <div class="log-form">
@@ -1029,9 +1033,9 @@ function drawer() {
             ${c.fix ? `<p>${esc(c.fix)}</p>` : '<p class="muted">No fixes needed.</p>'}</div>
           ${c.fix ? `<label class="fixed">${circle(c.fixed, `data-act="fixed" data-id="${c.id}"`)} Fixed</label>` : ''}
           <button class="x" data-act="delContact" data-id="${c.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">No contact notes yet.</li>'}</ul>
-      </section>
+      </section>` : ''}
 
-      <section>
+      ${show('attendance') ? `<section>
         <h3>Attendance & Warnings</h3>
         <div class="log-form">
           <div class="row2">
@@ -1045,7 +1049,8 @@ function drawer() {
           <div><span class="tag ${/warning/i.test(w.type) ? 'red' : ''}">${esc(w.type)}</span> <span class="muted small">${monthDay(w.date)}</span>
             ${w.note ? `<p>${esc(w.note)}</p>` : ''}</div>
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
-      </section>
+      </section>` : ''}
+      ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : ''}
     </div>
   </aside></div>`;
 }
@@ -1464,8 +1469,13 @@ async function act(a, el = {}, e) {
         render(); break;
       }
 
-      case 'openStudent': S.open = d.sid; render(); break;
-      case 'closeStudent': S.open = null; render(); break;
+      case 'openStudent': {
+        // Clicking Skills / the contact number / To fix / Attendance opens just that part.
+        const cell = e && e.target.closest && e.target.closest('[data-part]');
+        S.open = d.sid; S.openPart = d.part || (cell && cell.dataset.part) || null; render(); break;
+      }
+      case 'openAll': S.openPart = null; render(); break;
+      case 'closeStudent': S.open = null; S.openPart = null; render(); break;
       case 'pc': await changePc(d.sid, Number(d.by)); break;
       case 'skill': await Store.set(P('students/' + d.sid), { skill: d.v }); break;
       case 'behind': {
