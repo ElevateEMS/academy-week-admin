@@ -306,7 +306,7 @@ async function selectCohort(key) {
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null });
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
-  w(base, d => { S.cohortDoc = d; });
+  w(base, d => { S.cohortDoc = d; if (S.sheet) shareHousekeeping(); });
   w(base + '/students', list => { S.studentsDoc = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/contacts', list => { S.contacts = list; });
   w(base + '/warnings', list => { S.warnings = list; });
@@ -331,6 +331,7 @@ async function loadSheet() {
     }
     rollOver();
     seedRepeats();
+    shareHousekeeping();
   } catch (e) {
     S.sheetErr = e.message;
   }
@@ -730,12 +731,37 @@ async function saveSquads(n, sq) {
 const shareUrl = token => new URL('view.html?t=' + token, location.href).href;
 let publishTimer;
 function publishSoon() { clearTimeout(publishTimer); publishTimer = setTimeout(publish, 1200); }
+// The link stops working 7 days after Day 5 (Firebase refuses to open it after that).
+// A link made later than that still gets 7 days from when it was made.
+function shareExpires() {
+  const days = weekDays().filter(d => d.iso);
+  if (!days.length) return null;
+  const end = parseIso(days[days.length - 1].iso); end.setDate(end.getDate() + 7); end.setHours(23, 59, 59, 0);
+  const made = S.cohortDoc && S.cohortDoc.shareMade;
+  if (made) { const m = new Date(made); m.setDate(m.getDate() + 7); m.setHours(23, 59, 59, 0); if (m > end) return m; }
+  return end;
+}
 async function publish() {
   const token = S.cohortDoc && S.cohortDoc.shareToken;
   if (!token || !S.sheet) return;
   const days = {};
   weekDays().forEach(d => { days[d.n] = { ...printDay(d.n), iso: d.iso || '' }; });
-  await Store.set('shared/' + token, { cohort: S.cohortKey, updated: Date.now(), days }, false);
+  await Store.set('shared/' + token, { cohort: S.cohortKey, updated: Date.now(), expires: shareExpires(), days }, false);
+}
+// On opening a cohort: an expired link's shared copy (with student names) is deleted;
+// otherwise it's refreshed so it carries its expiry date.
+let housekeptFor = null;
+async function shareHousekeeping() {
+  const key = S.cohortKey;
+  if (housekeptFor === key || !S.cohortDoc || !S.cohortDoc.shareToken || !Store.configured) return;
+  housekeptFor = key;
+  const exp = shareExpires();
+  try {
+    if (exp && exp < new Date()) {
+      await Store.del('shared/' + S.cohortDoc.shareToken);
+      await Store.set('cohorts/' + key, { shareToken: null });
+    } else publishSoon();
+  } catch (e) { console.warn('Instructor link check:', e.message); }
 }
 const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, '0')).join('');
 
@@ -768,7 +794,7 @@ function shareModal() {
             <button class="btn primary" data-act="shareCopy">Copy link</button>
             <a class="btn" href="${esc(shareUrl(token))}" target="_blank" rel="noopener">Open it</a>
           </div>
-          <p class="muted small">Anyone with this link can see the schedule, including squad names. The QR code is also printed on each Day page.</p>
+          <p class="muted small">Anyone with this link can see the schedule, including squad names. The QR code is also printed on each Day page.${shareExpires() ? ` <b>It works until ${shareExpires().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</b>, then shuts off by itself.` : ''}</p>
           <div class="share-btns">
             <button class="link" data-act="shareNew">Make a new link (the old one stops working)</button>
             <button class="link" data-act="shareOff">Turn the link off</button>
@@ -1657,14 +1683,14 @@ async function act(a, el = {}, e) {
       case 'shareClose': S.shareOpen = false; render(); break;
       case 'shareMake': {
         if (!Store.configured) { toast('The instructor link works once you’re signed in for real (not in sample mode).'); return; }
-        await Store.set('cohorts/' + S.cohortKey, { shareToken: newToken() });
+        await Store.set('cohorts/' + S.cohortKey, { shareToken: newToken(), shareMade: Date.now() });
         await new Promise(r => setTimeout(r, 300)); await publish(); render(); setTimeout(showShareQr, 30); break;
       }
       case 'shareNew': case 'shareOff': {
         const old = S.cohortDoc && S.cohortDoc.shareToken;
         if (!confirm(a === 'shareOff' ? 'Turn the link off? Anyone using it (or the printed QR code) won’t be able to open it.' : 'Make a new link? The old link and any printed QR codes stop working.')) return;
         if (old) await Store.del('shared/' + old);
-        await Store.set('cohorts/' + S.cohortKey, { shareToken: a === 'shareOff' ? null : newToken() });
+        await Store.set('cohorts/' + S.cohortKey, a === 'shareOff' ? { shareToken: null } : { shareToken: newToken(), shareMade: Date.now() });
         await new Promise(r => setTimeout(r, 300));
         if (a === 'shareNew') { await publish(); setTimeout(showShareQr, 30); }
         render(); break;

@@ -37,7 +37,11 @@ const Sched = (() => {
     const nums = Array.from({ length: count }, (_, i) => i + 1);
     const team = (s, t) => ((sq.s && sq.s[s] && sq.s[s][t]) || []);
     const total = nums.reduce((a, s) => a + team(s, 'A').length + team(s, 'B').length, 0);
+    // The table is for paper; on a phone the same squads show as a stacked list instead.
+    const list = `<div class="p-squad-list">${nums.map(s => `<div><b>Squad ${s}</b>${['A', 'B'].map(t =>
+      `<p><span>Team ${t}:</span> ${team(s, t).map(esc).join(' · ') || '–'}</p>`).join('')}</div>`).join('')}</div>`;
     return `<p class="p-squad-line"><b>SQUAD ASSIGNMENTS:</b> ${total} students · ${count} squads · Teams of 2–3 form within each squad for scenarios.</p>
+      ${list}
       <table class="p-squads"><thead><tr><th></th>${nums.map(s => `<th>Squad ${s}</th>`).join('')}</tr></thead>
       <tbody>${['A', 'B'].map(t => `<tr><th>Team ${t}</th>${nums.map(s => `<td>${team(s, t).map(esc).join('<br>')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   }

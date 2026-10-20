@@ -439,7 +439,14 @@ a.btn { text-decoration: none; color: inherit; }
 .p-empty { color: #888; font-style: italic; }
 .p-squad-line { margin: 16px 0 6px; font-size: 12px; }
 .p-squads { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.p-squads th, .p-squads td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; font-size: 12px; }
+.p-squads th, .p-squads td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; font-size: 12px; overflow-wrap: anywhere; }
+.p-squad-list { display: none; }
+.p-squad-list > div { border-top: 1px solid #ddd; padding: 8px 0; }
+.p-squad-list b { font-family: var(--serif); font-size: 17px; }
+.p-squad-list p { margin: 2px 0 0; }
+.p-squad-list span { color: #777; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
+/* (after the rules above so it wins) */
+@media screen and (max-width: 720px) { .p-squads { display: none; } .p-squad-list { display: block; } }
 .p-squads thead th { background: #f3eee9; }
 .p-squads tbody th { width: 64px; background: #f3eee9; }
 .p-lines span { display: block; border-bottom: 1px solid #ccc; height: 26px; }

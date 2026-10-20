@@ -6,12 +6,12 @@
 <title>Academy Week Schedule</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#f3ece6">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=38">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=36">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=39">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=39">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=19">
+<link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body class="viewer">
 <!-- Read-only schedule for instructors (the QR code link). No sign-in: it can only
@@ -29,8 +29,8 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="config.js?v=19"></script>
-<script src="schedule.js?v=19"></script>
+<script src="config.js?v=39"></script>
+<script src="schedule.js?v=39"></script>
 <script>
 (() => {
   const token = new URLSearchParams(location.search).get('t') || '';
@@ -41,13 +41,18 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
-  let data = null, day = null;
+  let data = null, day = null, picked = false; // picked = they tapped a day themselves
 
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
   function show() {
     const nums = Object.keys(data.days).map(Number).sort((a, b) => a - b);
-    if (!day) day = nums.find(n => data.days[n].iso === iso(new Date())) || nums[0];
+    // Opens on today; before the week on Day 1, after it on the last day.
+    if (!picked) {
+      const t = iso(new Date()), dated = nums.filter(n => data.days[n].iso);
+      day = nums.find(n => data.days[n].iso === t)
+        || (dated.length && t > data.days[dated[dated.length - 1]].iso ? dated[dated.length - 1] : nums[0]);
+    }
     document.getElementById('updated').textContent = (data.cohort ? data.cohort + ' · ' : '') + 'Updated ' + new Date(data.updated).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     daysEl.innerHTML = '<div class="daystrip">' + nums.map(n => {
       const d = data.days[n];
@@ -60,17 +65,23 @@
 
   daysEl.addEventListener('click', e => {
     const b = e.target.closest('[data-n]');
-    if (b) { day = Number(b.dataset.n); show(); }
+    if (b) { day = Number(b.dataset.n); picked = true; show(); }
   });
   document.getElementById('printBtn').addEventListener('click', () => {
     document.getElementById('print-root').innerHTML = Sched.pages(data.days[day]);
     window.print();
   });
 
+  // Left open overnight: when they come back to it, jump to the new today (unless they picked a day).
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && data && !picked) show(); });
+
+  const expired = () => stop('This schedule link has expired. Ask Bella for a new one.');
   db.doc('shared/' + token).onSnapshot(snap => {
     if (!snap.exists) return stop('This link has been turned off. Ask Bella for the new one.');
-    data = snap.data(); show();
-  }, () => stop('This link has been turned off. Ask Bella for the new one.'));
+    data = snap.data();
+    if (data.expires && data.expires.toDate() < new Date()) return expired();
+    show();
+  }, () => stop('This link has expired or been turned off. Ask Bella for a new one.'));
 })();
 </script>
 </body>
