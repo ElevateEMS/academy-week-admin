@@ -2,7 +2,7 @@
    Pages: Day (planner boxes you can drag around), Week (Day 1-5 side by side; drag
    to-dos between days), Students (skills status, patient contacts + fix notes,
    attendance/warnings), Settings. Saving: store.js. Google Sheets: sheets.js.
-   Scenarios (library, week plan, Find a Scenario): scenario-ui.js + matcher.js. */
+   Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js. */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1141,7 +1141,7 @@ function studentsView() {
     <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Conduct notes')}</div>
     <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">
   </div>
-  ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">Find scenarios</button></span></div>
+  ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
   <section class="box table-box">
@@ -1312,7 +1312,7 @@ function settingsView() {
 }
 
 /* ---------- Schedule template (Setup → Schedule Template) ---------- */
-// Scenario lines added from the week plan or Find a Scenario belong to that cohort,
+// Scenario lines added from the week plan or Additional Scenarios belong to that cohort,
 // so they're left out of the template (and squads never go in it).
 function stripScenarios(day) {
   const lib = libById();

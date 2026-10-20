@@ -1,4 +1,4 @@
-/* Phase 3: Scenario Library, Academy Week Scenarios (the week plan) and Find a Scenario.
+/* Phase 3: Scenario Library, Academy Week Scenarios (the week plan) and Additional Scenarios (the matcher).
 
    Loaded before app.js; everything here runs only when app.js calls it, so it can use
    app.js's S, Store, esc, render, schedFor, saveSched and so on.
@@ -207,10 +207,10 @@ function stationScen(n, i, st) {
     const sc = lib[id];
     return `<span class="scen-chip"><a href="${esc(sc ? sc.url : docUrl(id))}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc ? sc.name : 'Scenario')}</a><button class="x" data-act="stScenDel" data-i="${i}" data-id="${id}" title="Take it off this station" aria-label="Remove">×</button></span>`;
   }).join('');
-  // "Find a scenario" only on Medical / Trauma Scenarios stations (not skills, OB or CPR ones).
+  // "+ Additional Scenarios" only on Medical / Trauma Scenarios stations (not skills, OB or CPR ones).
   const find = ['medical', 'trauma'].includes(stationKind(st.topic));
   if (!chips && !find) return '';
-  return `<div class="st-scen">${chips}${find ? `<button class="link" data-act="matchOpen" data-i="${i}">Find a scenario</button>` : ''}</div>`;
+  return `<div class="st-scen">${chips}${find ? `<button class="link" data-act="matchOpen" data-i="${i}">+ Additional Scenarios</button>` : ''}</div>`;
 }
 
 /* ---------- The week plan (Prep page) ---------- */
@@ -317,7 +317,7 @@ function planModal() {
   </div></div>`;
 }
 
-// Picking the station for a scenario from the plan (or from Find a Scenario without a station).
+// Picking the station for a scenario from the plan (or from Additional Scenarios without a station).
 function placeModal() {
   const p = S.place, lib = libById();
   const n = p.day, stations = schedFor(n).stations;
@@ -335,7 +335,7 @@ function placeModal() {
   </div></div>`;
 }
 
-/* ---------- Find a Scenario ---------- */
+/* ---------- Additional Scenarios (the matcher) ---------- */
 // Who's behind on what (attending students; one squad if picked): { skill: how many students }.
 function behindCounts(m) {
   const sq = squadsFor(m.n);
@@ -375,7 +375,7 @@ function matchModal() {
   const section = (title, list) => list.length ? `<p class="mini-head">${title}</p><div class="match-cards">${list.map(card).join('')}</div>` : '';
 
   return `<div class="overlay" data-act="matchClose"><div class="modal match" data-stop>
-    <div class="modal-head"><h2>Find a Scenario</h2><button class="x big" data-act="matchClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Additional Scenarios</h2><button class="x big" data-act="matchClose" aria-label="Close">×</button></div>
     <div class="modal-body" data-keep-scroll="match">
       <p class="muted small">${st ? `Day ${m.n} · <b>${esc(st.topic || 'Station')}</b>` : 'Pick skills, then add the scenario to a station.'}</p>
       ${st && (st.scen || []).length ? `<div class="st-scen at">At this station: ${(st.scen || []).map(id => `<span class="scen-chip">${esc((lib[id] || {}).name || 'Scenario')}<button class="x" data-act="stScenDel" data-i="${m.i}" data-id="${id}" data-n="${m.n}" title="Take it off (to swap it for another)" aria-label="Remove">×</button></span>`).join('')}</div>` : ''}
@@ -403,7 +403,7 @@ function libModal() {
   const tab = S.libTab;
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="libTab" data-t="${t}">${label}</button>`;
   const body = tab === 'addons' ? libAddons() : tab === 'req' ? libReq() : libScenarios();
-  const foot = tab === 'addons' ? '<span class="muted small">Add-ons are twists you add to a scenario for a skill it doesn’t have. The builder and Find a Scenario use them.</span><button class="btn primary" data-act="addonSave">Save add-ons</button>'
+  const foot = tab === 'addons' ? '<span class="muted small">Add-ons are twists you add to a scenario for a skill it doesn’t have. The builder and Additional Scenarios use them.</span><button class="btn primary" data-act="addonSave">Save add-ons</button>'
     : tab === 'req' ? '<span class="muted small">Summative sign-offs each student needs.</span><button class="btn primary" data-act="reqSave">Save</button>'
     : '<span class="muted small">Shared by you and Nick. Tags are what each scenario lets a student get signed off.</span>';
   return `<div class="overlay" data-act="libClose"><div class="modal lib" data-stop>
@@ -457,7 +457,7 @@ function libEditor(s) {
     <p class="muted small">Tap the skills a student can get signed off in this scenario. Tap again for ×2, again to clear.</p>
     ${skillPicker(dr.skills, 'libSkill')}
     <button class="link extras-toggle" data-act="libExtrasToggle">${S.libExtrasOpen ? '▾' : '▸'} Could also include (optional)${Object.keys(dr.extras).length ? ': ' + esc(skillText(dr.extras)) : ''}</button>
-    ${S.libExtrasOpen ? `<div class="extras"><p class="muted small">Skills that could be worked into this scenario if needed. The builder and Find a Scenario use these before the general add-ons.</p>${skillPicker(dr.extras, 'libExtra')}</div>` : ''}
+    ${S.libExtrasOpen ? `<div class="extras"><p class="muted small">Skills that could be worked into this scenario if needed. The builder and Additional Scenarios use these before the general add-ons.</p>${skillPicker(dr.extras, 'libExtra')}</div>` : ''}
     <div class="skill-group"><span>Patient</span><div>${SCEN.TRAITS.map(([t, l]) => `<button class="chip small ${dr.traits[t] ? 'on' : ''}" data-act="libTrait" data-t="${t}">${l}</button>`).join('')}
       <span class="muted small">for add-ons like “nitro on any chest pain”</span></div></div>
     <div class="skill-group"><span>Every week</span><div><select data-change="libEvery">${[0, 1, 2, 3, 4, 5].map(d => `<option value="${d}" ${dr.every === d ? 'selected' : ''}>${d ? 'Yes, on Day ' + d : 'No'}</option>`).join('')}</select>
