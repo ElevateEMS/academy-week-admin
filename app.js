@@ -1042,7 +1042,7 @@ function drawer() {
             <button class="chip small ${allC ? 'on' : ''}" data-act="callToggle" data-sid="${s.sid}" title="A note about all of their contacts, not one">All contacts</button>
             <label class="grow check-inline ${allC ? 'muted' : ''}"><input type="checkbox" class="circle" id="${dk('cadd')}" ${!allC && S.drafts[dk('cadd')] !== false ? 'checked' : ''} ${allC ? 'disabled' : ''} data-act="cadd" data-sid="${s.sid}"> New simulated contact (adds 1 to their count)</label>
           </div>
-          <textarea id="${dk('cfix')}" data-draft="${dk('cfix')}" rows="2" placeholder="What needs fixed? (e.g. missing vitals times, narrative too short)">${esc(S.drafts[dk('cfix')] || '')}</textarea>
+          <textarea id="${dk('cfix')}" data-draft="${dk('cfix')}" rows="2" placeholder="What needs fixed?">${esc(S.drafts[dk('cfix')] || '')}</textarea>
           <button class="btn primary" data-act="logContact" data-sid="${s.sid}">Save contact</button>
         </div>
         <ul class="log">${contacts.map(c => `<li class="${c.fixed ? 'done' : ''}">
