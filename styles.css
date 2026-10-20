@@ -121,6 +121,17 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
 /* ---------- Boxes (planner sections) ---------- */
 .board { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 18px; align-items: stretch; }
 .board-col { display: flex; flex-direction: column; gap: 18px; min-height: 120px; border-radius: 16px; transition: background .15s; }
+/* Finalize: narrow left column (To Do, Notes), wide right one (Documentation Checklist). */
+.board.wide { grid-template-columns: 1fr 2.15fr; }
+.box-head h2 .count { font-family: Jost, sans-serif; font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.docs-sub { text-align: center; font-size: 13px; color: var(--muted); margin: -4px 0 6px; line-height: 1.5; }
+.docs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin-bottom: 4px; }
+.docs-skills { font-size: 13px; color: var(--muted); margin: 12px 0 2px; }
+.docs-skills span { font-style: italic; }
+.box-docs > .docs-grid, .box-docs > .docs-sub, .box-docs > .mini-head { flex-shrink: 0; }
+.box-docs .mini-head { display: block; }
+.box.box-docs { flex: 1 0 auto; } /* tall enough for the whole list unless you drag it shorter */
+.tpl-group { font-family: var(--serif); font-size: 18px; font-weight: 600; margin: 6px 0 6px; }
 .board-col.drop-here { background: rgba(230, 211, 200, .35); }
 .box { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 16px; box-shadow: var(--shadow);
   flex: 1 1 0; display: flex; flex-direction: column; position: relative; overflow: auto; }
@@ -300,7 +311,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 #toast.show { opacity: 1; transform: translateX(-50%); }
 
 @media (max-width: 1100px) {
-  .board { grid-template-columns: 1fr 1fr; }
+  .board, .board.wide { grid-template-columns: 1fr 1fr; }
   .top { grid-template-columns: auto 1fr auto; }
 }
 @media (max-width: 720px) {
@@ -310,7 +321,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
   .page-title { grid-column: 1 / -1; grid-row: 2; }
   .page-title h1 { font-size: 30px; }
   .daystrip button { padding: 6px 12px; }
-  .board { grid-template-columns: 1fr; }
+  .board, .board.wide, .docs-grid { grid-template-columns: 1fr; }
   .bag-items { grid-template-columns: 1fr; }
   .modal-foot { flex-wrap: wrap; }
 }
@@ -402,6 +413,20 @@ a.btn { text-decoration: none; color: inherit; }
 .viewer-pages { display: grid; gap: 18px; justify-items: center; }
 .viewer-pages .p-page { width: min(820px, 100%); padding: 32px 40px; border-radius: 6px; box-shadow: var(--shadow); }
 
+/* Documentation Checklist printout (looks like the PDF). */
+.d-page { background: #fff; color: #000; font-family: Georgia, 'Times New Roman', serif; font-size: 12.5pt; line-height: 1.35; }
+.d-page h1, .d-page h2 { color: #000; }
+.d-page h1 { font-family: Georgia, serif; font-size: 20pt; font-weight: 400; text-align: center; margin: 0; }
+.d-sub { text-align: center; font-size: 11pt; margin: 2px 0 18px; }
+.d-table { width: 100%; border-collapse: collapse; }
+.d-table td { width: 50%; border: 1px solid #bbb; vertical-align: top; padding: 8px 10px 10px; }
+.d-page h2 { font-family: Georgia, serif; font-size: 12.5pt; font-weight: 700; margin: 0 0 4px; }
+.d-final { margin-top: 26px !important; }
+.d-page ul { list-style: none; margin: 0; padding: 0 0 0 30px; }
+.d-page li { display: flex; gap: 10px; align-items: flex-start; margin: 5px 0; }
+.d-box { flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid #333; margin-top: 3px; font-size: 11px; line-height: 11px; text-align: center; font-family: system-ui, sans-serif; }
+.d-skills { margin: 16px 0 2px; }
+
 /* Binder covers (printed one per page; hidden on screen like the schedule pages). */
 .b-page { background: #fff; color: #000; font-family: Georgia, 'Times New Roman', serif; text-align: center; }
 .b-first { margin: 0; line-height: 1.2; }
@@ -420,6 +445,8 @@ a.btn { text-decoration: none; color: inherit; }
   @page { size: letter; margin: 0; }
   #print-root .p-page { padding: 0.5in; }
   #print-root .b-page { height: 11in; box-sizing: border-box; padding: 2.83in 0.5in 0; overflow: hidden; break-after: page; page-break-after: always; }
+  #print-root .d-page { padding: 0.75in 0.9in; }
+  #print-root .d-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   #print-root .b-page:last-child { break-after: auto; page-break-after: auto; }
   body { background: #fff; }
   body > *:not(#print-root) { display: none !important; }

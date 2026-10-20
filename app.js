@@ -58,13 +58,15 @@ function currentWeekDay() {
 }
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
-const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List' };
-// Prep has its own boxes and its own saved layout; every other day shares one.
+const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist' };
+// Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
+// Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing'], def: [['shopping', 'notes'], ['todo'], ['packing']] },
+  final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
 };
-const boardOf = n => BOARDS[n === PREP ? 'prep' : 'day'];
+const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
 function cfg() {
   const s = S.settings || {};
@@ -73,6 +75,7 @@ function cfg() {
     checklist: s.checklist || DEFAULTS.checklist,
     dayNotes: s.dayNotes || {},
     packing: s.packingList || DEFAULTS.packingList || [],
+    docs: { ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) },
     weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
     someBags: s.someBags || {},
@@ -87,7 +90,7 @@ function cfg() {
 // { v, c0: [...], c1: [...], c2: [...], h: { box: heightInPx } }.
 function validLayout(l, board) {
   if (!l || l.v !== LAYOUT_VERSION) return null;
-  const cols = [l.c0 || [], l.c1 || [], l.c2 || []].map(c => c.filter(b => board.boxes.includes(b)));
+  const cols = [l.c0 || [], l.c1 || [], l.c2 || []].slice(0, board.def.length).map(c => c.filter(b => board.boxes.includes(b)));
   const seen = new Set(cols.flat());
   board.boxes.forEach(b => { if (!seen.has(b)) cols[0].push(b); }); // a box added later still shows up
   return cols;
@@ -487,7 +490,7 @@ function dayView() {
     ${behind ? `<button class="pill" data-act="goStudents" data-f="behind">${behind} behind on skills</button>` : ''}
     ${fixes ? `<button class="pill" data-act="goStudents" data-f="fixes">${fixes} contact${fixes === 1 ? '' : 's'} waiting on fixes</button>` : ''}
   </div>` : ''}
-  <div class="board">
+  <div class="board ${cfg().board.wide ? 'wide' : ''}">
     ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, n)).join('')}</div>`).join('')}
   </div>`;
 }
@@ -509,7 +512,7 @@ function dayStrip({ phases = true } = {}) {
 
 function box(b, n) {
   const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing';
-  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
+  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
   let body = '';
@@ -532,6 +535,19 @@ function box(b, n) {
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL ? 'Notes' : 'Notes for today');
+  } else if (b === 'docs') {
+    const all = docItems(), done = all.filter(x => x.on).length;
+    const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
+      <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label></li>`).join('')}</ul>`;
+    body = head(`Documentation Checklist <span class="count">${done}/${all.length}</span>`,
+      (done ? hideToggle('docs') : '') + '<button class="btn tiny" data-act="printDocs">Print</button>')
+      + `<p class="docs-sub">2 copies of each: External hard drive and Admin Google Drive<br><em>Note: physical copies received at Academy Week stay in Course Binder</em></p>
+      <div class="docs-grid">
+        <div><p class="mini-head">Records for the Class</p>${list('class')}</div>
+        <div><p class="mini-head">Records for <em>each</em> Student</p>${list('student')}
+          <p class="docs-skills">The following skills sheets: <span>(physical copies only)</span></p>${list('skills')}</div>
+      </div>
+      <p class="mini-head">Final Steps</p>${list('final')}`;
   } else if (b === 'packing') {
     // Unpacked first; packed ones drop to the bottom (or hide).
     const byOrder = (a, c) => orderOf(a) - orderOf(c);
@@ -743,6 +759,36 @@ async function printDays(list) {
     catch { root.querySelectorAll('.p-qr').forEach(el => el.remove()); }
     await new Promise(r => setTimeout(r, 150)); // let the QR images finish drawing
   }
+  window.print();
+}
+
+/* ---------- Documentation Checklist (Finalize page) ---------- */
+// Items come from Setup → Day Templates → Finalize; checks are per cohort in cohorts/{key}.docChecks.
+const DOC_SECTIONS = ['class', 'student', 'skills', 'final'];
+function docItems(sec) {
+  const checks = (S.cohortDoc && S.cohortDoc.docChecks) || {};
+  return (sec ? [sec] : DOC_SECTIONS).flatMap(k => (cfg().docs[k] || []).map(text => {
+    const id = k + '-' + slug(text);
+    return { id, text, on: !!checks[id] };
+  }));
+}
+// One page like the PDF, with whatever is already checked printed as checked.
+function docPageHtml() {
+  const box = x => `<li><span class="d-box">${x.on ? '✓' : ''}</span><span>${esc(x.text)}</span></li>`;
+  const list = sec => `<ul>${docItems(sec).map(box).join('')}</ul>`;
+  return `<section class="d-page">
+    <h1>${esc(S.cohortKey)} Documentation Checklist</h1>
+    <p class="d-sub">2 copies of each - External hard drive and Admin Google Drive<br><em>Note: physical copies received at Academy Week stay in Course Binder</em></p>
+    <table class="d-table"><tr>
+      <td><h2>Records for the Class</h2>${list('class')}</td>
+      <td><h2>Records for <em>each</em> Student</h2>${list('student')}
+        <p class="d-skills">The following skills sheets:<br>(physical copies only)</p>${list('skills')}</td>
+    </tr></table>
+    <h2 class="d-final">Final Steps</h2>${list('final')}
+  </section>`;
+}
+function printDocs() {
+  document.getElementById('print-root').innerHTML = docPageHtml();
   window.print();
 }
 
@@ -1015,7 +1061,7 @@ function settingsView() {
 }
 
 /* ---------- Day Templates pop-up ---------- */
-const TPL_KEYS = ['tpl-every', 'tpl-pack', ...ALL_DAYS.flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
+const TPL_KEYS = ['tpl-every', 'tpl-pack', 'tpl-doc-class', 'tpl-doc-student', 'tpl-doc-skills', 'tpl-doc-final', ...ALL_DAYS.flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
 function templatesModal() {
   const c = cfg(), tab = S.tplTab;
   const dv = (k, v) => esc(S.drafts[k] ?? v);
@@ -1027,6 +1073,9 @@ function templatesModal() {
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>
        ${tab === '0' ? `<label class="field">Packing list <span class="small">(one per line)</span>
          <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>` : ''}
+       ${tab === '6' ? `<p class="tpl-group">Documentation Checklist <span class="muted small">(one per line)</span></p>
+         <div class="day-fields">${[['class', 'Records for the Class'], ['student', 'Records for each Student'], ['skills', 'Skills sheets (physical copies only)'], ['final', 'Final Steps']].map(([k2, label]) =>
+           `<label class="field">${label}<textarea id="tpl-doc-${k2}" data-draft="tpl-doc-${k2}" rows="7">${dv('tpl-doc-' + k2, (c.docs[k2] || []).join('\n'))}</textarea></label>`).join('')}</div>` : ''}
        <label class="field">${dayName(Number(tab))} notes <span class="small">(what the Notes box starts with)</span>
          <textarea id="tpl-notes-${tab}" data-draft="tpl-notes-${tab}" rows="8">${dv('tpl-notes-' + tab, c.dayNotes[tab] || '')}</textarea></label>`;
   return `<div class="overlay" data-act="tplClose"><div class="modal tpl" data-stop>
@@ -1331,6 +1380,11 @@ async function act(a, el = {}, e) {
         await Store.set(P('staff/' + d.key), { name: d.name, paid: !cur }); break;
       }
 
+      case 'doc': {
+        const on = !!((S.cohortDoc && S.cohortDoc.docChecks) || {})[d.id];
+        await Store.set('cohorts/' + S.cohortKey, { docChecks: { [d.id]: !on } }); break;
+      }
+      case 'printDocs': printDocs(); break;
       case 'binderOpen': S.binderOpen = d.id; render(); break;
       case 'binderClose': S.binderOpen = null; render(); break;
       case 'attend': {
@@ -1415,11 +1469,12 @@ async function act(a, el = {}, e) {
         const everyDay = lines(S.drafts['tpl-every'] ?? (c.checklist.everyDay || []).join('\n'));
         const days = {}, dayNotes = {};
         const packingList = lines(S.drafts['tpl-pack'] ?? c.packing.join('\n'));
+        const docChecklist = Object.fromEntries(DOC_SECTIONS.map(k2 => [k2, lines(S.drafts['tpl-doc-' + k2] ?? (c.docs[k2] || []).join('\n'))]));
         ALL_DAYS.forEach(x => {
           days[x] = lines(S.drafts['tpl-todo-' + x] ?? ((c.checklist.days || {})[x] || []).join('\n'));
           dayNotes[x] = String(S.drafts['tpl-notes-' + x] ?? (c.dayNotes[x] || '')).replace(/\s+$/, '');
         });
-        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList });
+        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList, docChecklist });
         TPL_KEYS.forEach(k => delete S.drafts[k]);
         S.tplOpen = false; render();
         // The open cohort already has its lists; offer to add any new items to it.
@@ -1518,7 +1573,7 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'resetLayout':
-        await Store.set('meta/settings', { layout: null, prepLayout: null });
+        await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null });
         S.view = 'day'; pref('view', 'day');
         toast('Layout reset.'); break;
     }
