@@ -14,7 +14,7 @@ const S = {
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
-  menuOpen: false, schMenu: false, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, schMenu: false, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -109,6 +109,7 @@ function bagCarries(item, bagNo) {
 }
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
 const isBagItem = text => /bag check/i.test(text);
+const isBinderItem = text => /binder cover/i.test(text);
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
 const MAX_PRIORITIES = 3;
@@ -182,15 +183,19 @@ async function rollOver() {
 }
 
 /* ---------- Students ---------- */
+// "Not attending" (unchecked in the binder covers pop-up or a student's panel) is saved
+// as cohorts/{key}.notAttending = { sid: true }. They stay on the roster but are left
+// out of covers, squads and the counts.
 function students() {
   if (!S.sheet) return [];
+  const notAttending = (S.cohortDoc && S.cohortDoc.notAttending) || {};
   return S.sheet.students
     .filter(s => !/^blocked$/i.test(s.status))
     .map(s => {
       const sid = slug(s.name);
       const doc = S.studentsDoc[sid] || {};
       return {
-        ...s, sid,
+        ...s, sid, out: !!notAttending[sid],
         skill: doc.skill || 'on', behind: doc.behind || [], note: doc.note || '',
         fixes: S.contacts.filter(c => c.sid === sid && !c.fixed).length,
         warns: S.warnings.filter(w => w.sid === sid).length,
@@ -198,6 +203,7 @@ function students() {
     });
 }
 const studentBySid = sid => students().find(s => s.sid === sid);
+const attending = () => students().filter(s => !s.out);
 
 /* ---------- Staff ---------- */
 function isSkipped(name) {
@@ -373,12 +379,16 @@ function shell() {
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
-  ${S.tplOpen ? templatesModal() : ''}`;
+  ${S.tplOpen ? templatesModal() : ''}
+  ${S.binderOpen ? binderModal() : ''}`;
 }
 
 function pageTitle() {
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
-  if (S.view === 'students') return `<h1>Students</h1><p>${S.sheet ? students().length + ' students' : ''}</p>`;
+  if (S.view === 'students') {
+    const out = students().filter(s => s.out).length;
+    return `<h1>Students</h1><p>${S.sheet ? attending().length + ' students' + (out ? ` · ${out} not attending` : '') : ''}</p>`;
+  }
   if (S.view === 'settings') return '<h1>Setup</h1><p>Shared by you and Nick</p>';
   if (S.view === 'schedule') {
     const d = weekDays().find(x => x.n === schedDay()) || {};
@@ -423,6 +433,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       const bag = kind === 'todo' && isBagItem(t.text);
       const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
+      if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -465,7 +476,7 @@ function dayView() {
   const n = curDay();
   const today = currentWeekDay();
   const days = weekDays();
-  const list = students();
+  const list = attending();
   const behind = list.filter(s => s.skill === 'behind').length;
   const fixes = list.reduce((a, s) => a + s.fixes, 0);
 
@@ -614,7 +625,7 @@ function scheduleView() {
     </div>`).join('');
 
   // Squads: pick students from the roster into Team A / Team B.
-  const names = students().map(s => s.name);
+  const names = attending().map(s => s.name);
   const placed = new Set();
   for (let s = 1; s <= sq.count; s++) ['A', 'B'].forEach(t => ((sq.s[s] || {})[t] || []).forEach(x => placed.add(x)));
   const free = names.filter(x => !placed.has(x));
@@ -735,6 +746,46 @@ async function printDays(list) {
   window.print();
 }
 
+/* ---------- Binder covers (from a "binder cover" to-do) ---------- */
+// One page per attending student: first name, last name bigger under it, laptop logo.
+function coverName(name) {
+  const nick = (name.match(/\(([^)]+)\)/) || [])[1];
+  const clean = name.replace(/\s*\([^)]*\)/g, '').trim();
+  let first, last;
+  if (clean.includes(',')) { [last, first] = clean.split(',').map(x => x.trim()); }
+  else { const w = clean.split(/\s+/); last = w.pop(); first = w.join(' '); }
+  return { first: nick || first, last };
+}
+// Shrink a long name so it stays on one line (about 7.5 inches across).
+const fitPt = (text, base) => Math.min(base, Math.floor(540 / (Math.max(1, text.length) * 0.6)));
+function coverHtml(s) {
+  const { first, last } = coverName(s.name);
+  return `<section class="b-page">
+    <p class="b-first" style="font-size:${fitPt(first, 36)}pt">${esc(first)}</p>
+    <p class="b-last" style="font-size:${fitPt(last, 66)}pt">${esc(last)}</p>
+    <img class="b-logo" src="logo-full.png" alt="Elevate EMS">
+  </section>`;
+}
+function binderModal() {
+  const list = students(), count = list.filter(s => !s.out).length;
+  return `<div class="overlay" data-act="binderClose"><div class="modal binder" data-stop>
+    <div class="modal-head"><h2>Binder Covers</h2><button class="x big" data-act="binderClose" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <p class="muted small">Uncheck anyone who isn’t coming to academy week. They stay on the roster (the sheet isn’t changed), but they’re left off the covers, squads and counts.</p>
+      <div class="binder-list">${list.map(s => `<label class="${s.out ? 'off' : ''}">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)}<span>${esc(s.name)}</span></label>`).join('')}</div>
+    </div>
+    <div class="modal-foot"><span class="muted small">${count} cover${count === 1 ? '' : 's'}, one page each</span>
+      <button class="btn primary" data-act="binderPrint" ${count ? '' : 'disabled'}>Print ${count} cover${count === 1 ? '' : 's'}</button></div>
+  </div></div>`;
+}
+async function printBinders() {
+  const root = document.getElementById('print-root');
+  root.innerHTML = attending().map(coverHtml).join('');
+  const img = root.querySelector('img');
+  if (img && !img.complete) await new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 3000); }); // the logo has to be loaded before printing
+  window.print();
+}
+
 /* ---------- Bag check ---------- */
 const bagState = (n, b) => ((S.days[n] && S.days[n].bags) || {})[b] || {};
 function bagDone(n, b) {
@@ -792,7 +843,8 @@ async function setBagItem(n, b, it, s) {
 /* ---------- Students ---------- */
 function studentsView() {
   if (!S.sheet) return loadingView();
-  const all = students();
+  const everyone = students();
+  const all = everyone.filter(s => !s.out); // counts and "behind" leave out students not attending
   const counts = {
     all: all.length,
     behind: all.filter(s => s.skill === 'behind').length,
@@ -800,7 +852,7 @@ function studentsView() {
     warnings: all.filter(s => s.warns).length,
   };
   const q = S.search.trim().toLowerCase();
-  const shown = all.filter(s =>
+  const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
     (S.filter === 'all' || (S.filter === 'behind' && s.skill === 'behind') || (S.filter === 'fixes' && s.fixes) || (S.filter === 'warnings' && s.warns))
     && (!q || s.name.toLowerCase().includes(q)));
 
@@ -824,9 +876,9 @@ function studentsView() {
   <section class="box table-box">
     <table class="roster">
       <thead><tr><th>#</th><th>Student</th><th>Skills</th><th class="c">Patient contacts</th><th class="c">To fix</th><th class="c">Attendance</th></tr></thead>
-      <tbody>${shown.map(s => `<tr data-act="openStudent" data-sid="${s.sid}">
-        <td class="muted">${all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}</td>
+      <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
+        <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
+        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ' <span class="tag">Not attending</span>' : ''}</td>
         <td><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
         <td class="c">${pcStepper(s)}</td>
         <td class="c">${s.fixes ? `<span class="badge warn">${s.fixes}</span>` : '<span class="muted">–</span>'}</td>
@@ -872,6 +924,9 @@ function drawer() {
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer" data-stop>
     <div class="drawer-head"><h2>${esc(s.name)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
+
+      <label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
+        ${s.out ? '<span class="muted small">(left off binder covers, squads and counts)</span>' : ''}</label>
 
       <section>
         <h3>Skills</h3>
@@ -1186,7 +1241,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen !== false) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1276,6 +1331,19 @@ async function act(a, el = {}, e) {
         await Store.set(P('staff/' + d.key), { name: d.name, paid: !cur }); break;
       }
 
+      case 'binderOpen': S.binderOpen = d.id; render(); break;
+      case 'binderClose': S.binderOpen = null; render(); break;
+      case 'attend': {
+        const s = studentBySid(d.sid);
+        await Store.set('cohorts/' + S.cohortKey, { notAttending: { [d.sid]: !s.out } }); break;
+      }
+      case 'binderPrint': {
+        const id = S.binderOpen;
+        S.binderOpen = null; render();
+        await printBinders();
+        if (id && S.todos.some(t => t.id === id)) await Store.set(P('todos/' + id), { done: true });
+        break;
+      }
       case 'openBag': S.bagOpen = d.d != null ? Number(d.d) : curDay(); render(); break;
       case 'closeBag': S.bagOpen = false; render(); break;
       case 'bagTab': S.bagTab = Number(d.b); render(); break;
