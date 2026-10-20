@@ -628,3 +628,10 @@ mark.hl { background: #f1dca6; color: inherit; border-radius: 3px; padding: 0 1p
 .star-btn:hover, .star-btn.on { color: var(--honey); }
 span.star-btn { cursor: default; }
 .star-on { color: var(--honey); }
+
+/* Prep: the scenarios summary stays compact so it fits in half a column */
+.box-scenarios .cover-line { margin: 0 0 4px; font-size: 12.5px; padding: 3px 10px; border-radius: 8px; }
+.box-scenarios .plan-mini { font-size: 13px; margin-bottom: 4px; }
+.box-scenarios .plan-mini li { padding: 3px 0; line-height: 1.35; }
+.box-scenarios .plan-btns { margin-top: 4px; gap: 8px; }
+.box-scenarios .btn.small { padding: 3px 10px; font-size: 12.5px; }

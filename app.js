@@ -70,11 +70,12 @@ const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping Lis
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
-  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['notes', 'shopping'], ['todo', 'scenarios'], ['packing']] },
+  prep: { key: 'prepLayout', v: 3, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['notes', 'shopping'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
+const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v3 = 50/50 heights)
 function cfg() {
   const s = S.settings || {};
   const board = boardOf(curDay()), saved = s[board.key];
@@ -96,7 +97,7 @@ function cfg() {
 // Firestore can't store nested arrays, so the layout is saved as
 // { v, c0: [...], c1: [...], c2: [...], h: { box: heightInPx } }.
 function validLayout(l, board) {
-  if (!l || l.v !== LAYOUT_VERSION) return null;
+  if (!l || l.v !== layoutV(board)) return null;
   const cols = [l.c0 || [], l.c1 || [], l.c2 || []].slice(0, board.def.length).map(c => c.filter(b => board.boxes.includes(b)));
   const seen = new Set(cols.flat());
   // A box added later still shows up, in the column it starts in.
@@ -1496,7 +1497,7 @@ document.addEventListener('dragend', async () => {
 function saveLayout(heights = cfg().heights) {
   const board = cfg().board; // Prep's layout is saved apart from the other days'
   // Every box is listed (null = no set height) because a merge-save never removes old keys.
-  const layout = { v: LAYOUT_VERSION, h: Object.fromEntries(board.boxes.map(b => [b, heights[b] || null])) };
+  const layout = { v: layoutV(board), h: Object.fromEntries(board.boxes.map(b => [b, heights[b] || null])) };
   document.querySelectorAll('[data-drop="boxes"]').forEach(col => {
     layout['c' + col.dataset.col] = [...col.querySelectorAll(':scope > .box')].map(b => b.dataset.boxId);
   });
