@@ -605,3 +605,7 @@ a.btn { text-decoration: none; color: inherit; }
 .ad-rule .lbl { color: var(--muted); width: 160px; flex: none; }
 .ad-rule select { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--paper); font-size: 13px; max-width: 260px; }
 .lib-edit select { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--paper); font-size: 13px; }
+#libNoteIn::placeholder { font-style: italic; }
+.extras-toggle { display: block; margin: 8px 0 4px; text-decoration: none; font-size: 14px; color: var(--taupe-dark); }
+.extras-toggle:hover { text-decoration: underline; }
+.extras { border-left: 2px solid var(--line); padding-left: 10px; margin-bottom: 6px; }

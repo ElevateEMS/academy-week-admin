@@ -126,6 +126,14 @@ const SCEN = (() => {
   SEED.forEach(x => {
     x.traits = Object.fromEntries(Object.keys(TRAIT_SEED).filter(t => TRAIT_SEED[t].includes(x.title)).map(t => [t, true]));
   });
+  // Optional extras: skills a Doc itself mentions as possible ("CPAP if appropriate"). Checked in the Library.
+  const EXTRA_SEED = {
+    'Medical - Asthma unstable': { 'CPAP': 1 },
+    'Trauma - pedestrian struck unstable': { 'BVM': 1 },
+    'Medical - Sepsis/UTI unstable': { 'BVM': 1 },
+    'Medical - Hypoglycemia': { 'NC': 1 },
+  };
+  SEED.forEach(x => { x.extras = EXTRA_SEED[x.title] || {}; });
   // In every week, on that day: Nick's cardiac arrest station (its own station every cohort).
   SEED.find(x => x.title === 'Medical - cardiac arrest unstable').every = 4;
 

@@ -4,7 +4,8 @@
    app.js's S, Store, esc, render, schedFor, saveSched and so on.
 
    Saved in Firebase:
-     scenarios/{driveDocId}   { title, cat, skills: { skill: count }, traits: { chest, breathing, alert },
+     scenarios/{driveDocId}   { title, cat, skills: { skill: count }, extras: { skill: count } (could also include),
+                              traits: { chest, breathing, alert },
                               every: day it's in every week (0 = no), note, checked, removed }  (your edits)
      meta/settings            scenTargets, scenAddons, planSize, lastPlan { cohort, ids }
      cohorts/{key}.weekPlan   { items: [{ id, addons: [text], day }], how, updated }
@@ -49,6 +50,7 @@ function scenLib() {
       cat: d.cat || (sd && sd.cat) || (lv && lv.cat) || 'medical',
       skills, note: d.note ?? (sd ? sd.note : ''), removed: !!d.removed,
       traits: d.traits || (sd && sd.traits) || {}, every: d.every ?? (sd && sd.every) ?? 0,
+      extras: d.extras || (sd && sd.extras) || {},
       status: d.checked ? 'checked' : skills ? 'suggested' : 'new',
       gone: !!live && !lv, // in the library but not in the folders anymore
       fresh: !!lv && !sd && !d.skills, // a Doc added to the folders since the tagging pass
@@ -60,7 +62,18 @@ function scenLib() {
 }
 const libById = () => Object.fromEntries(scenLib().map(s => [s.id, s]));
 const usableScen = () => scenLib().filter(s => s.skills && !s.gone);
-const addonsByText = () => Object.fromEntries(scenAddons().map(a => [a.text, a]));
+// Each scenario's optional extras work like add-ons that only go on that scenario (and are tried first).
+function extraAddons() {
+  const by = {};
+  usableScen().forEach(s => Object.entries(s.extras || {}).forEach(([k, n]) => {
+    if (!n) return;
+    const text = k + (n > 1 ? ' ×' + n : '') + ' (optional extra)';
+    (by[text] = by[text] || { text, cat: 'any', skills: { [k]: n }, only: [], pref: true }).only.push(s.id);
+  }));
+  return Object.values(by);
+}
+const allAddons = () => [...extraAddons(), ...scenAddons()];
+const addonsByText = () => Object.fromEntries(allAddons().map(a => [a.text, a]));
 const fitsAddon = (a, sc) => Match.fits(a, sc);
 // "Only on: Tourniquet or Chest pain"
 const needsText = a => (a.needs || []).map(n => n.startsWith('trait:') ? TRAIT_NAME[n.slice(6)] || n : n).join(' or ');
@@ -156,7 +169,7 @@ async function buildPlan(how) {
   } else {
     const last = S.settings && S.settings.lastPlan;
     const avoid = last && last.cohort !== S.cohortKey ? last.ids || [] : planItems().map(x => x.id);
-    items = Match.build({ lib: usableScen(), addons: scenAddons(), targets: scenTargets(), size: planSize(), avoid, pinned });
+    items = Match.build({ lib: usableScen(), addons: allAddons(), targets: scenTargets(), size: planSize(), avoid, pinned });
     await Store.set('meta/settings', { lastPlan: { cohort: S.cohortKey, ids: items.map(x => x.id) } });
   }
   await savePlan(items, { how });
@@ -180,7 +193,7 @@ function scenBox() {
 }
 
 function planModal() {
-  const items = planItems(), lib = libById(), addons = scenAddons(), targets = scenTargets();
+  const items = planItems(), lib = libById(), addons = allAddons(), targets = scenTargets();
   const { have, miss } = planStatus(items);
   const med = items.filter(x => (lib[x.id] || {}).cat !== 'trauma').length;
   const missSet = Object.fromEntries(miss.map(m => [m.skill, m.short]));
@@ -283,7 +296,7 @@ function matchModal() {
   const sq = squadsFor(m.n);
   const everyBehind = Object.keys(counts).filter(k => Match.isEvery(k));
   const obBehind = Object.keys(counts).filter(k => OB_SKILLS().includes(k));
-  const r = Object.keys(want).length ? Match.find({ lib: usableScen(), addons: scenAddons(), want, cat: m.cat }) : null;
+  const r = Object.keys(want).length ? Match.find({ lib: usableScen(), addons: allAddons(), want, cat: m.cat }) : null;
   const planned = Object.fromEntries(planItems().map(x => [x.id, x.day || 1]));
 
   const card = res => {
@@ -366,7 +379,7 @@ function libScenarios() {
       <input id="libSearchIn" class="search" data-draft="libSearch" placeholder="Find a scenario or skill" value="${esc(S.drafts.libSearch || '')}"></div>
     <ul class="lib-list">${shown.map(s => `<li class="${S.libSel === s.id ? 'open' : ''}">
       <button class="lib-row" data-act="libSel" data-id="${s.id}">
-        <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}${s.every ? `<span class="tag ok">Every week · Day ${s.every}</span>` : ''}${Object.keys(s.traits).filter(t => s.traits[t]).map(t => `<span class="trait">${esc(TRAIT_NAME[t])}</span>`).join('')}
+        <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}${s.every ? `<span class="tag ok">Every week · Day ${s.every}</span>` : ''}${Object.keys(s.extras).length ? `<span class="trait">+${Object.keys(s.extras).length} optional</span>` : ''}${Object.keys(s.traits).filter(t => s.traits[t]).map(t => `<span class="trait">${esc(TRAIT_NAME[t])}</span>`).join('')}
         <span class="lr-skills">${s.skills ? esc(skillText(s.skills)) : '<em>no tags yet</em>'}</span></button>
       ${S.libSel === s.id ? libEditor(s) : ''}</li>`).join('') || '<li class="empty">No scenarios match.</li>'}</ul>`;
 }
@@ -378,11 +391,13 @@ function libEditor(s) {
       <a class="btn small" href="${esc(s.url)}" target="_blank" rel="noopener">Open the Doc</a></div>
     <p class="muted small">Tap the skills a student can get signed off in this scenario. Tap again for ×2, again to clear.</p>
     ${skillPicker(dr.skills, 'libSkill')}
+    <button class="link extras-toggle" data-act="libExtrasToggle">${S.libExtrasOpen ? '▾' : '▸'} Could also include (optional)${Object.keys(dr.extras).length ? ': ' + esc(skillText(dr.extras)) : ''}</button>
+    ${S.libExtrasOpen ? `<div class="extras"><p class="muted small">Skills that could be worked into this scenario if needed. The builder and Find a Scenario use these before the general add-ons.</p>${skillPicker(dr.extras, 'libExtra')}</div>` : ''}
     <div class="skill-group"><span>Patient</span><div>${SCEN.TRAITS.map(([t, l]) => `<button class="chip small ${dr.traits[t] ? 'on' : ''}" data-act="libTrait" data-t="${t}">${l}</button>`).join('')}
       <span class="muted small">for add-ons like “nitro on any chest pain”</span></div></div>
     <div class="skill-group"><span>Every week</span><div><select data-change="libEvery">${[0, 1, 2, 3, 4, 5].map(d => `<option value="${d}" ${dr.every === d ? 'selected' : ''}>${d ? 'Yes, on Day ' + d : 'No'}</option>`).join('')}</select>
       <span class="muted small">its own station every cohort, so every plan includes it</span></div></div>
-    <label class="field">Note <input id="libNoteIn" data-draft="libNote" value="${esc(S.drafts.libNote ?? dr.note ?? '')}" placeholder="e.g. Needs the CPAP rewrite"></label>
+    <label class="field">Note <input id="libNoteIn" data-draft="libNote" value="${esc(S.drafts.libNote ?? dr.note ?? '')}" placeholder="Optional: Note"></label>
     <div class="le-btns">
       <button class="btn primary small" data-act="libSave" data-id="${s.id}">Save · looks right</button>
       ${S.scenDocs[s.id] && SCEN.SEED.some(x => x.id === s.id) ? `<button class="link" data-act="libReset" data-id="${s.id}">Go back to the suggested tags</button>` : ''}
@@ -426,7 +441,7 @@ function libReq() {
 
 /* ---------- Clicks for all of the above (app.js's act() hands them over) ---------- */
 const cycle = n => (n >= 2 ? 0 : n + 1);
-const libDraftOf = s => ({ skills: { ...(s.skills || {}) }, cat: s.cat, note: s.note || '', traits: { ...(s.traits || {}) }, every: s.every || 0 });
+const libDraftOf = s => ({ skills: { ...(s.skills || {}) }, extras: { ...(s.extras || {}) }, cat: s.cat, note: s.note || '', traits: { ...(s.traits || {}) }, every: s.every || 0 });
 async function scenAct(a, el, e) {
   const d = el.dataset || {};
   switch (a) {
@@ -439,24 +454,26 @@ async function scenAct(a, el, e) {
     case 'libSel': {
       if (S.libSel === d.id) { S.libSel = null; render(); return true; }
       const s = libById()[d.id];
-      S.libSel = d.id; S.libDraft = libDraftOf(s); delete S.drafts.libNote;
+      S.libSel = d.id; S.libDraft = libDraftOf(s); S.libExtrasOpen = false; delete S.drafts.libNote;
       render(); return true;
     }
     case 'libCat': S.libDraft.cat = d.c; render(); return true;
+    case 'libExtrasToggle': S.libExtrasOpen = !S.libExtrasOpen; render(); return true;
+    case 'libExtra': { const sk = S.libDraft.extras; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
     case 'libTrait': { const t = S.libDraft.traits; if (t[d.t]) delete t[d.t]; else t[d.t] = true; render(); return true; }
     case 'addonNeedDel': S.addonDraft[Number(d.i)].needs.splice(Number(d.j), 1); render(); return true;
     case 'libSkill': { const sk = S.libDraft.skills; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
     case 'libSave': {
       const s = libById()[d.id];
       const dr = S.libDraft;
-      await Store.set('scenarios/' + d.id, { title: s.title, cat: dr.cat, skills: dr.skills, traits: dr.traits, every: dr.every || 0,
+      await Store.set('scenarios/' + d.id, { title: s.title, cat: dr.cat, skills: dr.skills, extras: dr.extras, traits: dr.traits, every: dr.every || 0,
         note: (S.drafts.libNote ?? dr.note ?? '').trim(), checked: true, saved: Date.now() }, false);
       delete S.drafts.libNote;
       // On to the next one that hasn't been checked, so you can go down the list.
       const list = scenLib(), i = list.findIndex(x => x.id === d.id);
       const next = list.slice(i + 1).find(x => x.status !== 'checked' && x.id !== d.id);
       S.libSel = null;
-      if (next && S.libFilter === 'check') { S.libSel = next.id; S.libDraft = libDraftOf(next); }
+      if (next && S.libFilter === 'check') { S.libSel = next.id; S.libDraft = libDraftOf(next); S.libExtrasOpen = false; }
       toast('Saved.'); render(); return true;
     }
     case 'libReset':

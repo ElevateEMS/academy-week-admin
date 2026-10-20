@@ -4,7 +4,8 @@
                    traits: { chest, breathing, alert }, every: day it's in every week (or 0) }.
    An add-on is   { text, cat: 'any'|'medical'|'trauma', skills: {...},
                    needs: ['Tourniquet', 'trait:chest', ...] (only on a scenario with ANY of these),
-                   minus: {...} (a swap: the scenario loses these) }.
+                   minus: {...} (a swap: the scenario loses these),
+                   only: [scenario ids] + pref: true (a scenario's own optional extras, used before general add-ons) }.
    A week plan is a list of items { id, addons: [addon text], day, fixed (an every-week one) }.
 
    Vital signs and patient transport happen in every scenario, so each scenario in a plan
@@ -43,6 +44,7 @@ const Match = (() => {
   // Can this add-on go on this scenario? Right kind, and it has one of the things the add-on needs.
   function fits(addon, sc) {
     if (!sc) return false;
+    if (addon.only && !addon.only.includes(sc.id)) return false;
     if (addon.cat && addon.cat !== 'any' && addon.cat !== sc.cat) return false;
     const needs = addon.needs || [];
     return !needs.length || needs.some(n => n.startsWith('trait:') ? !!(sc.traits || {})[n.slice(6)] : !!(sc.skills || {})[n]);
@@ -77,7 +79,7 @@ const Match = (() => {
       const gainOf = skills => Object.entries(skills).reduce((g, [k, n]) => g + Math.min(n, Math.max(0, need[k] || 0)) * weight(k), 0);
       const take = (skills, times = 1) => Object.entries(skills || {}).forEach(([k, n]) => { if (k in need) need[k] -= n * times; });
       // A swap that would take away something still needed isn't worth anything.
-      const addonGain = a => Object.keys(a.minus || {}).some(k => need[k] > 0) ? 0 : gainOf(a.skills);
+      const addonGain = a => Object.keys(a.minus || {}).some(k => need[k] > 0) ? 0 : gainOf(a.skills) * (a.pref ? 1.4 : 1);
       const useAddon = (host, a) => { host.addons.push(a.text); take(a.skills); take(a.minus, -1); };
       pinned.forEach(p => { if (byId[p.id] && !used.has(p.id)) { items.push({ id: p.id, addons: [], day: p.day, fixed: true }); used.add(p.id); take(byId[p.id].skills); } });
 
@@ -235,7 +237,7 @@ const Match = (() => {
       while (left.length && picked.length < 2) {
         const a = addons.filter(x => fits(x, sc) && !picked.includes(x.text) && !Object.keys(x.minus || {}).some(k => want[k]))
           .map(x => ({ x, g: left.filter(k => x.skills[k]).reduce((s, k) => s + want[k], 0) }))
-          .filter(o => o.g > 0).sort((p, q) => q.g - p.g)[0];
+          .filter(o => o.g > 0).sort((p, q) => q.g - p.g || !!q.x.pref - !!p.x.pref)[0];
         if (!a) break;
         picked.push(a.x.text); addSkills(extra, a.x.skills); addSkills(extra, a.x.minus, -1);
         left = left.filter(k => !a.x.skills[k]);
