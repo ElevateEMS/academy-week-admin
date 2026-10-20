@@ -14,7 +14,7 @@ const S = {
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
-  menuOpen: false, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, schMenu: false, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -624,18 +624,33 @@ function scheduleView() {
     </div>`;
 
   return `
-  ${dayStrip({ phases: false })}
-  <div class="sched-tools">
-    <button class="btn" data-act="printDay">Print Day ${n}</button>
-    <button class="btn" data-act="printAll">Print all 5 days</button>
-    <button class="btn" data-act="shareOpen">${token ? 'Instructor link & QR' : 'Make instructor link'}</button>
-    <button class="link" data-act="saveTemplate" title="New cohorts will start from this week's schedule">Save this week as the template</button>
+  <div class="sched-top">
+    <span></span>
+    ${dayStrip({ phases: false })}
+    <div class="sched-more">
+      <button class="icon-btn ${S.schMenu ? 'on' : ''}" data-act="schMenu" title="Print, instructor link, template" aria-label="More">⋯</button>
+      ${S.schMenu ? `<div class="menu" data-stop>
+        <button class="menu-item" data-act="printDay">Print Day ${n}</button>
+        <button class="menu-item" data-act="printAll">Print all 5 days</button>
+        <button class="menu-item" data-act="shareOpen">${token ? 'Instructor link & QR' : 'Make instructor link'}</button>
+        <button class="menu-item" data-act="saveTemplate">Save this week as the template <span class="muted small">New cohorts start from this schedule</span></button>
+      </div>` : ''}
+    </div>
   </div>
   <div class="sched-grid">
+    <div class="sched-col">
     <section class="box"><div class="box-head static"><h2>Class Schedule</h2></div>
       <div class="sched-rows">${blockRows || '<p class="empty">No times yet.</p>'}</div>
       <button class="link add-link" data-act="schAdd" data-list="blocks">+ Add a time</button>
     </section>
+    <section class="box"><div class="box-head static"><h2>Squads</h2>
+        <label class="squad-count">Squads <select data-change="squadCount">${[0, 2, 3, 4, 5, 6].map(c => `<option value="${c}" ${sq.count === c ? 'selected' : ''}>${c || 'none'}</option>`).join('')}</select></label></div>
+      ${sq.from && sq.from !== n ? `<p class="muted small">Same squads as Day ${sq.from}. Changing them here changes Day ${n} and the days after it.</p>` : sq.count ? '<p class="muted small">These carry forward to the following days until you change them.</p>' : ''}
+      ${sq.count ? `<div class="squads">${Array.from({ length: sq.count }, (_, i) => i + 1).map(s => `<div class="squad"><h3>Squad ${s}</h3>${team(s, 'A')}${team(s, 'B')}</div>`).join('')}</div>
+        <p class="muted small">${free.length ? free.length + ' student' + (free.length === 1 ? '' : 's') + ' not in a squad yet.' : 'Everyone is in a squad.'}</p>` : '<p class="empty">Pick how many squads to set them up.</p>'}
+    </section>
+    </div>
+    <div class="sched-col">
     <section class="box"><div class="box-head static"><h2>Station Content</h2></div>
       ${stationRows || '<p class="empty">No stations this day.</p>'}
       <button class="link add-link" data-act="schAdd" data-list="stations">+ Add a station</button>
@@ -646,12 +661,7 @@ function scheduleView() {
       <p class="muted small">One per line. Start a line with “- ” for a sub-bullet, or type *** for a divider.</p>
       <textarea id="${k('notes')}" class="sched-notes" data-draft="${k('notes')}" data-sch="notes" data-grow rows="8">${dv(k('notes'), d.notes)}</textarea>
     </section>
-    <section class="box"><div class="box-head static"><h2>Squads</h2>
-        <label class="squad-count">Squads <select data-change="squadCount">${[0, 2, 3, 4, 5, 6].map(c => `<option value="${c}" ${sq.count === c ? 'selected' : ''}>${c || 'none'}</option>`).join('')}</select></label></div>
-      ${sq.from && sq.from !== n ? `<p class="muted small">Same squads as Day ${sq.from}. Changing them here changes Day ${n} and the days after it.</p>` : sq.count ? '<p class="muted small">These carry forward to the following days until you change them.</p>' : ''}
-      ${sq.count ? `<div class="squads">${Array.from({ length: sq.count }, (_, i) => i + 1).map(s => `<div class="squad"><h3>Squad ${s}</h3>${team(s, 'A')}${team(s, 'B')}</div>`).join('')}</div>
-        <p class="muted small">${free.length ? free.length + ' student' + (free.length === 1 ? '' : 's') + ' not in a squad yet.' : 'Everyone is in a squad.'}</p>` : '<p class="empty">Pick how many squads to set them up.</p>'}
-    </section>
+    </div>
   </div>`;
 }
 
@@ -1166,7 +1176,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen !== false) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
+    if (S.bagOpen !== false) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1179,8 +1189,10 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('click', e => {
   if (S.menuOpen && !e.target.closest('.menu-wrap')) { S.menuOpen = false; render(); }
+  if (S.schMenu && !e.target.closest('.sched-more')) { S.schMenu = false; render(); }
   const el = e.target.closest('[data-act]');
   if (!el) return;
+  if (el.closest('.sched-more .menu')) { S.schMenu = false; render(); } // picking something closes the ⋯ menu
   // Only the backdrop itself closes a pop-up, and the +/− box doesn't open the student.
   if (el.classList.contains('overlay') && e.target !== el) return;
   if (el.tagName === 'TR' && e.target.closest('[data-stop]')) return;
@@ -1195,6 +1207,7 @@ async function act(a, el = {}, e) {
       case 'signin': await Store.signIn(); break;
       case 'signout': S.menuOpen = false; await Store.signOut(); break;
       case 'menu': S.menuOpen = !S.menuOpen; render(); break;
+      case 'schMenu': S.schMenu = !S.schMenu; render(); break;
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
       case 'view': S.view = d.v; pref('view', d.v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
       case 'day':

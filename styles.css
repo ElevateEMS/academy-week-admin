@@ -314,8 +314,14 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 }
 
 /* ---------- Schedule editor ---------- */
-.sched-tools { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; margin: -4px 0 16px; }
+/* Day strip centered, the ⋯ menu (print, instructor link, template) at the right end. */
+.sched-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 12px; }
+.sched-more { position: relative; justify-self: end; }
+.sched-more .icon-btn { font-size: 22px; line-height: 1; }
+.sched-more .menu { top: 46px; }
+/* Left: Class Schedule + Squads. Right: Station Content + Instructor Notes. */
 .sched-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; align-items: start; }
+.sched-col { display: grid; gap: 18px; align-content: start; }
 .sched-grid .box { overflow: visible; }
 .sched-rows { display: grid; gap: 2px; }
 .sched-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; }
