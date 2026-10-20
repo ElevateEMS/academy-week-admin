@@ -486,7 +486,7 @@ function dayStrip({ phases = true } = {}) {
   const n = phases ? curDay() : schedDay(), today = currentWeekDay();
   const days = weekDays();
   const first = days.find(x => x.iso), last = [...days].reverse().find(x => x.iso);
-  const phase = (p, top, date) => `<button class="phase ${n === p ? 'on' : ''} ${phaseDay() === p ? 'today' : ''}" data-act="day" data-n="${p}">
+  const phase = (p, top, date) => `<button class="phase ${p === FINAL ? 'final' : ''} ${n === p ? 'on' : ''} ${phaseDay() === p ? 'today' : ''}" data-act="day" data-n="${p}">
       <small>${top}</small><b>${dayName(p)}</b><small>${date}</small></button>`;
   return `<div class="daystrip">
     ${phases ? phase(PREP, 'Before', first ? 'by ' + shortDate(first.iso) : '') : ''}
