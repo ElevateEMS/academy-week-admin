@@ -401,7 +401,7 @@ function shell() {
     </button>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${icon('day', 'Day')}${icon('week', 'Week')}${icon('schedule', 'Schedule')}${icon('students', 'Students')}
+      ${icon('day', 'Day')}${icon('schedule', 'Schedule')}${icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -529,7 +529,11 @@ function dayView() {
   const fixes = list.reduce((a, s) => a + s.fixes, 0);
 
   return `
-  ${dayStrip()}
+  <div class="sched-top">
+    <span></span>
+    ${dayStrip()}
+    <div class="sched-more"><button class="icon-btn" data-act="view" data-v="week" title="The Week" aria-label="The Week">${ICONS.week}</button></div>
+  </div>
   ${!S.sheet.academyStart ? '<p class="muted small center">Tip: fill in “Academy Week Start” on the cohort’s Student Roster tab (cell AG8) and the app will open on the right day by itself.</p>' : ''}
   ${behind || fixes ? `<div class="pills">
     ${behind ? `<button class="pill" data-act="goStudents" data-f="behind">${behind} behind on skills</button>` : ''}

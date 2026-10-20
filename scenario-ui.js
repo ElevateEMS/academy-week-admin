@@ -140,7 +140,10 @@ function stationScen(n, i, st) {
     const sc = lib[id];
     return `<span class="scen-chip"><a href="${esc(sc ? sc.url : docUrl(id))}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc ? sc.name : 'Scenario')}</a><button class="x" data-act="stScenDel" data-i="${i}" data-id="${id}" title="Take it off this station" aria-label="Remove">×</button></span>`;
   }).join('');
-  return `<div class="st-scen">${chips}<button class="link" data-act="matchOpen" data-i="${i}">Find a scenario</button></div>`;
+  // "Find a scenario" only on Medical / Trauma Scenarios stations (not skills, OB or CPR ones).
+  const find = /\b(medical|trauma)\b.*\bscenarios?\b/i.test(st.topic || '');
+  if (!chips && !find) return '';
+  return `<div class="st-scen">${chips}${find ? `<button class="link" data-act="matchOpen" data-i="${i}">Find a scenario</button>` : ''}</div>`;
 }
 
 /* ---------- The week plan (Prep page) ---------- */
