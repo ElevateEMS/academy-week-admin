@@ -156,6 +156,7 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .checks li[draggable="true"] { cursor: grab; }
 .checks li.moving { opacity: .45; background: var(--blush-soft); border-radius: 6px; }
 .drop-list { min-height: 26px; border-radius: 8px; transition: background .15s; }
+.box-priorities .drop-list.is-empty { min-height: 6px; }
 .drop-list.drop-here { background: rgba(255, 255, 255, .45); }
 .add-row { margin: 2px 0 6px; }
 .add-row input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 6px 2px; outline: none; }
@@ -293,4 +294,88 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
   .board { grid-template-columns: 1fr; }
   .bag-items { grid-template-columns: 1fr; }
   .modal-foot { flex-wrap: wrap; }
+}
+
+/* ---------- Schedule editor ---------- */
+.sched-tools { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; margin: -4px 0 16px; }
+.sched-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; align-items: start; }
+.sched-grid .box { overflow: visible; }
+.sched-rows { display: grid; gap: 2px; }
+.sched-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; }
+.sched-row input, .sched-station input, .sched-station textarea, .sched-notes, .sched-foot input {
+  width: 100%; border: 0; border-bottom: 1px dotted var(--line); background: transparent; padding: 7px 2px; outline: none; }
+.sched-row input:focus, .sched-station input:focus, .sched-station textarea:focus, .sched-foot input:focus { border-bottom: 1px solid var(--taupe-dark); }
+.sched-station { padding: 6px 0 10px; border-bottom: 1px solid var(--line-soft); }
+.sched-station-top { display: flex; align-items: center; gap: 8px; }
+.sched-station-top input { font-family: var(--serif); font-size: 18px; font-weight: 600; }
+.sched-station textarea { resize: none; overflow: hidden; font-size: 14px; color: var(--ink); border-bottom: 0; }
+.sched-notes { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: none; overflow: hidden; line-height: 1.55; }
+.row-tools { display: flex; gap: 0; }
+.row-tools .x { opacity: .35; font-size: 15px; }
+.sched-row:hover .x, .sched-station:hover .x { opacity: .8; }
+.add-link { margin-top: 10px; align-self: start; }
+.sched-foot { margin: 12px 0 0; }
+.squad-count { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.squad-count select, .team select { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); padding: 3px 6px; }
+.squads { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin: 8px 0; }
+.squad { background: var(--blush-soft); border-radius: 12px; padding: 8px 10px 10px; }
+.squad h3 { margin: 0 0 4px; font-size: 18px; }
+.team { padding: 4px 0; }
+.team p { margin: 0 0 3px; font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.team select { width: 100%; margin-top: 3px; font-size: 13px; color: var(--muted); }
+.name-chip { display: flex; justify-content: space-between; align-items: center; background: var(--paper); border-radius: 8px; padding: 2px 4px 2px 8px; margin-bottom: 3px; font-size: 13px; }
+.name-chip .x { opacity: .5; font-size: 15px; }
+.share .pad p { margin-top: 0; }
+.share-body { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
+.share-qr { width: 180px; height: 180px; background: #fff; padding: 0; border-radius: 8px; }
+.share-qr img, .share-qr canvas { display: block; }
+.share-url { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); font-size: 13px; margin-bottom: 10px; }
+.share-btns { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+a.btn { text-decoration: none; color: inherit; }
+.modal.share { width: min(640px, 100%); }
+@media (max-width: 900px) { .sched-grid { grid-template-columns: 1fr; } .share-body { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .viewer-pages .p-page { padding: 20px 16px; } .p-page h1 { font-size: 24px; } .p-blocks td:first-child { width: auto; } }
+
+/* ---------- The printed / shared day pages ---------- */
+#print-root { display: none; }
+.p-page { background: #fff; color: #222; font-family: Jost, system-ui, sans-serif; font-size: 12.5px; line-height: 1.4; }
+.p-page h1 { font-family: var(--serif); font-size: 30px; margin: 0; color: #222; }
+.p-page h2 { font-family: var(--serif); font-size: 19px; margin: 16px 0 6px; color: #222; }
+.p-head { display: flex; align-items: center; gap: 14px; border-bottom: 1.5px solid #222; padding-bottom: 6px; }
+.p-date { color: #666; font-size: 14px; }
+.p-qr { margin-left: auto; width: 84px; height: 84px; }
+.p-qr img, .p-qr canvas { width: 84px !important; height: 84px !important; }
+.p-table { width: 100%; border-collapse: collapse; }
+.p-table th { text-align: left; font-weight: 600; border-bottom: 1.5px solid #222; padding: 4px 8px; }
+.p-table td { border-bottom: 1px solid #ccc; padding: 4px 8px; vertical-align: top; }
+.p-blocks td:first-child { width: 120px; white-space: nowrap; }
+.p-lunch td { background: #f3eee9; font-weight: 600; }
+.p-stations td:first-child { width: 30%; font-weight: 600; }
+.p-stations p { margin: 0 0 3px; }
+.p-note { font-style: italic; color: #555; }
+.p-notes { margin: 0; padding-left: 18px; }
+.p-notes li { margin: 2px 0; }
+.p-notes li.p-sub { margin-left: 18px; list-style: circle; }
+.p-notes li.p-divider { list-style: none; border-top: 1px solid #bbb; margin: 8px 0; }
+.p-empty { color: #888; font-style: italic; }
+.p-squad-line { margin: 16px 0 6px; font-size: 12px; }
+.p-squads { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.p-squads th, .p-squads td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; font-size: 12px; }
+.p-squads thead th { background: #f3eee9; }
+.p-squads tbody th { width: 64px; background: #f3eee9; }
+.p-lines span { display: block; border-bottom: 1px solid #ccc; height: 26px; }
+
+/* The instructor link page shows the pages on screen like sheets of paper. */
+.viewer .daystrip { margin-top: 0; }
+.viewer-pages { display: grid; gap: 18px; justify-items: center; }
+.viewer-pages .p-page { width: min(820px, 100%); padding: 32px 40px; border-radius: 6px; box-shadow: var(--shadow); }
+
+@media print {
+  @page { size: letter; margin: 0.5in; }
+  body { background: #fff; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
+  #print-root .p-page { break-after: page; page-break-after: always; }
+  #print-root .p-page:last-child { break-after: auto; page-break-after: auto; }
+  .p-lunch td, .p-squads thead th, .p-squads tbody th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

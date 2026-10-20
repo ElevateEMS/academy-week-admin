@@ -8,13 +8,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
-const VIEWS = ['day', 'week', 'students', 'settings'];
+const VIEWS = ['day', 'week', 'schedule', 'students', 'settings'];
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null,
-  menuOpen: false, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, shareOpen: false, schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -193,7 +193,7 @@ Store.onUser(async user => {
 async function selectCohort(key) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
-  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], open: null, day: null });
+  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], schedule: {}, open: null, day: null });
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
   w(base, d => { S.cohortDoc = d; });
@@ -203,6 +203,7 @@ async function selectCohort(key) {
   w(base + '/days', list => { S.days = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/staff', list => { S.staff = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/todos', list => { S.todos = list; if (S.sheet) rollOver(); });
+  w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
   await loadSheet();
 }
 
@@ -241,6 +242,8 @@ function render() {
       if (el) { el.focus(); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
     }
     fitBoard();
+    document.querySelectorAll('textarea[data-grow]').forEach(grow);
+    if (S.shareOpen) showShareQr();
   }, 0);
 }
 
@@ -249,6 +252,7 @@ const ICONS = {
   week: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M9 10v10M15 10v10"/></svg>',
   students: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.8 14.2c2.2.2 4 1.7 4.6 4.8"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  schedule: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 9h6M9 13h6M9 17h4"/></svg>',
   grip: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
 };
 
@@ -273,7 +277,7 @@ function shell() {
     </button>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${icon('day', 'Day')}${icon('week', 'Week')}${icon('students', 'Students')}
+      ${icon('day', 'Day')}${icon('week', 'Week')}${icon('schedule', 'Schedule')}${icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -282,9 +286,10 @@ function shell() {
   </header>
   <main class="wrap">
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ day: dayView, week: weekView, students: studentsView, settings: settingsView }[S.view]()}
+    ${{ day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
+  ${S.shareOpen ? shareModal() : ''}
   ${S.bagOpen ? bagModal() : ''}`;
 }
 
@@ -292,6 +297,10 @@ function pageTitle() {
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
   if (S.view === 'students') return `<h1>Students</h1><p>${S.sheet ? students().length + ' students' : ''}</p>`;
   if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
+  if (S.view === 'schedule') {
+    const d = weekDays().find(x => x.n === (S.day || 1)) || {};
+    return `<h1>Schedule</h1><p>Day ${S.day || 1}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
+  }
   const n = S.day || 1;
   const d = weekDays().find(x => x.n === n) || {};
   const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
@@ -318,7 +327,7 @@ function circle(checked, attrs, extra = '') {
 function itemList(n, kind, { compact = false } = {}) {
   const items = itemsFor(n, kind);
   const empty = kind === 'priority' ? '' : '<li class="empty">Nothing yet.</li>';
-  return `<ul class="checks drop-list" data-drop="items" data-day="${n}" data-kind="${kind}">
+  return `<ul class="checks drop-list ${items.length ? '' : 'is-empty'}" data-drop="items" data-day="${n}" data-kind="${kind}">
     ${items.map(t => `<li class="${t.done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
       <label>${circle(t.done, `data-act="todo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span>${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
       ${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
@@ -371,10 +380,7 @@ function dayView() {
   const fixes = list.reduce((a, s) => a + s.fixes, 0);
 
   return `
-  <div class="daystrip">
-    ${days.map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
-      <small>${esc(x.label || 'Day')}</small><b>${x.n}</b><small>${x.iso ? shortDate(x.iso) : ''}</small></button>`).join('')}
-  </div>
+  ${dayStrip()}
   ${!S.sheet.academyStart ? '<p class="muted small center">Tip: fill in “Academy Week Start” on the cohort’s Student Roster tab (cell AG8) and the app will open on the right day by itself.</p>' : ''}
   ${behind || fixes ? `<div class="pills">
     ${behind ? `<button class="pill" data-act="goStudents" data-f="behind">${behind} behind on skills</button>` : ''}
@@ -382,6 +388,14 @@ function dayView() {
   </div>` : ''}
   <div class="board">
     ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, n)).join('')}</div>`).join('')}
+  </div>`;
+}
+
+function dayStrip() {
+  const n = S.day || 1, today = currentWeekDay();
+  return `<div class="daystrip">
+    ${weekDays().map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
+      <small>${esc(x.label || 'Day')}</small><b>${x.n}</b><small>${x.iso ? shortDate(x.iso) : ''}</small></button>`).join('')}
   </div>`;
 }
 
@@ -430,6 +444,181 @@ function weekView() {
       <div class="week-part shaded"><p class="mini-head">Notes</p>${notesArea(d.n, 'Notes')}</div>
     </section>`).join('')}
   </div>`;
+}
+
+/* ---------- Schedule (Phase 2) ---------- */
+// A day's schedule: what's saved for this cohort, else the saved template, else defaults.js.
+function schedTemplate(n) {
+  const t = S.settings && S.settings.scheduleTemplate && S.settings.scheduleTemplate[n];
+  return t || DEFAULTS.schedule[n] || { blocks: [], stations: [], stationNote: '', notes: '' };
+}
+function schedFor(n) {
+  const saved = S.schedule[n] || {};
+  const t = schedTemplate(n);
+  const pick = k => saved[k] !== undefined ? saved[k] : t[k];
+  return { blocks: pick('blocks') || [], stations: pick('stations') || [], stationNote: pick('stationNote') || '', notes: pick('notes') || '' };
+}
+// Squads carry forward: a day without its own squads uses the closest earlier day's.
+function squadsFor(n) {
+  for (let d = n; d >= 1; d--) {
+    const sq = S.schedule[d] && S.schedule[d].squads;
+    if (sq) return { ...sq, from: d };
+  }
+  return { count: 0, s: {}, from: null };
+}
+function dayHeading(n) {
+  const d = weekDays().find(x => x.n === n) || {};
+  const name = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long' }) : '';
+  return { heading: `Day ${n}${name ? ' - ' + name : ''}`, date: d.iso ? shortDate(d.iso) : '' };
+}
+function printDay(n) {
+  const d = schedFor(n);
+  return { n, ...dayHeading(n), ...d, squads: squadsFor(n), // blank rows don't print
+    blocks: d.blocks.filter(b => (b.time || '').trim() || (b.activity || '').trim()),
+    stations: d.stations.filter(st => (st.topic || '').trim() || (st.content || '').trim()) };
+}
+
+async function saveSched(n, patch) {
+  await Store.set(P('schedule/' + n), { ...schedFor(n), ...patch });
+  publishSoon();
+}
+
+function scheduleView() {
+  if (!S.sheet) return loadingView();
+  const n = S.day || 1;
+  const d = schedFor(n);
+  const k = (...parts) => ['sch', n, ...parts].join('-');
+  const dv = (key, v) => esc(S.drafts[key] ?? v);
+  const sq = squadsFor(n);
+  const token = S.cohortDoc && S.cohortDoc.shareToken;
+
+  const blockRows = d.blocks.map((b, i) => `<div class="sched-row">
+      <input id="${k('bt', i)}" data-draft="${k('bt', i)}" data-sch="blocks" data-i="${i}" data-f="time" value="${dv(k('bt', i), b.time)}" placeholder="Time">
+      <input id="${k('ba', i)}" data-draft="${k('ba', i)}" data-sch="blocks" data-i="${i}" data-f="activity" value="${dv(k('ba', i), b.activity)}" placeholder="Activity">
+      <span class="row-tools"><button class="x" data-act="schMove" data-list="blocks" data-i="${i}" data-dir="-1" title="Move up">↑</button><button class="x" data-act="schMove" data-list="blocks" data-i="${i}" data-dir="1" title="Move down">↓</button><button class="x" data-act="schDel" data-list="blocks" data-i="${i}" title="Remove">×</button></span>
+    </div>`).join('');
+
+  const stationRows = d.stations.map((st, i) => `<div class="sched-station">
+      <div class="sched-station-top">
+        <input id="${k('st', i)}" data-draft="${k('st', i)}" data-sch="stations" data-i="${i}" data-f="topic" value="${dv(k('st', i), st.topic)}" placeholder="Station topic">
+        <span class="row-tools"><button class="x" data-act="schMove" data-list="stations" data-i="${i}" data-dir="-1" title="Move up">↑</button><button class="x" data-act="schMove" data-list="stations" data-i="${i}" data-dir="1" title="Move down">↓</button><button class="x" data-act="schDel" data-list="stations" data-i="${i}" title="Remove">×</button></span>
+      </div>
+      <textarea id="${k('sc', i)}" data-draft="${k('sc', i)}" data-sch="stations" data-i="${i}" data-f="content" data-grow rows="2" placeholder="Content & instructor notes">${dv(k('sc', i), st.content)}</textarea>
+    </div>`).join('');
+
+  // Squads: pick students from the roster into Team A / Team B.
+  const names = students().map(s => s.name);
+  const placed = new Set();
+  for (let s = 1; s <= sq.count; s++) ['A', 'B'].forEach(t => ((sq.s[s] || {})[t] || []).forEach(x => placed.add(x)));
+  const free = names.filter(x => !placed.has(x));
+  const team = (s, t) => `<div class="team"><p>Team ${t}</p>
+      ${((sq.s[s] || {})[t] || []).map(x => `<span class="name-chip">${esc(x)}<button class="x" data-act="squadDel" data-s="${s}" data-t="${t}" data-name="${esc(x)}" aria-label="Remove">×</button></span>`).join('')}
+      ${free.length ? `<select data-change="squadAdd" data-s="${s}" data-t="${t}"><option value="">+ add student</option>${free.map(x => `<option>${esc(x)}</option>`).join('')}</select>` : ''}
+    </div>`;
+
+  return `
+  ${dayStrip()}
+  <div class="sched-tools">
+    <button class="btn" data-act="printDay">Print Day ${n}</button>
+    <button class="btn" data-act="printAll">Print all 5 days</button>
+    <button class="btn" data-act="shareOpen">${token ? 'Instructor link & QR' : 'Make instructor link'}</button>
+    <button class="link" data-act="saveTemplate" title="New cohorts will start from this week's schedule">Save this week as the template</button>
+  </div>
+  <div class="sched-grid">
+    <section class="box"><div class="box-head static"><h2>Class Schedule</h2></div>
+      <div class="sched-rows">${blockRows || '<p class="empty">No times yet.</p>'}</div>
+      <button class="link add-link" data-act="schAdd" data-list="blocks">+ Add a time</button>
+    </section>
+    <section class="box"><div class="box-head static"><h2>Station Content</h2></div>
+      ${stationRows || '<p class="empty">No stations this day.</p>'}
+      <button class="link add-link" data-act="schAdd" data-list="stations">+ Add a station</button>
+      <label class="field sched-foot">Note under the stations
+        <input id="${k('sn')}" data-draft="${k('sn')}" data-sch="stationNote" value="${dv(k('sn'), d.stationNote)}" placeholder="e.g. Stations with two topics: split into 30 minute segments."></label>
+    </section>
+    <section class="box"><div class="box-head static"><h2>Instructor Notes/Reminders</h2></div>
+      <p class="muted small">One per line. Start a line with “- ” for a sub-bullet, or type *** for a divider.</p>
+      <textarea id="${k('notes')}" class="sched-notes" data-draft="${k('notes')}" data-sch="notes" data-grow rows="8">${dv(k('notes'), d.notes)}</textarea>
+    </section>
+    <section class="box"><div class="box-head static"><h2>Squads</h2>
+        <label class="squad-count">Squads <select data-change="squadCount">${[0, 2, 3, 4, 5, 6].map(c => `<option value="${c}" ${sq.count === c ? 'selected' : ''}>${c || 'none'}</option>`).join('')}</select></label></div>
+      ${sq.from && sq.from !== n ? `<p class="muted small">Same squads as Day ${sq.from}. Changing them here changes Day ${n} and the days after it.</p>` : sq.count ? '<p class="muted small">These carry forward to the following days until you change them.</p>' : ''}
+      ${sq.count ? `<div class="squads">${Array.from({ length: sq.count }, (_, i) => i + 1).map(s => `<div class="squad"><h3>Squad ${s}</h3>${team(s, 'A')}${team(s, 'B')}</div>`).join('')}</div>
+        <p class="muted small">${free.length ? free.length + ' student' + (free.length === 1 ? '' : 's') + ' not in a squad yet.' : 'Everyone is in a squad.'}</p>` : '<p class="empty">Pick how many squads to set them up.</p>'}
+    </section>
+  </div>`;
+}
+
+async function saveSquads(n, sq) {
+  await Store.set(P('schedule/' + n), { squads: { count: sq.count, s: sq.s } });
+  publishSoon();
+}
+
+/* ---------- Instructor link (read-only copy at view.html?t=...) ---------- */
+const shareUrl = token => new URL('view.html?t=' + token, location.href).href;
+let publishTimer;
+function publishSoon() { clearTimeout(publishTimer); publishTimer = setTimeout(publish, 1200); }
+async function publish() {
+  const token = S.cohortDoc && S.cohortDoc.shareToken;
+  if (!token || !S.sheet) return;
+  const days = {};
+  weekDays().forEach(d => { days[d.n] = { ...printDay(d.n), iso: d.iso || '' }; });
+  await Store.set('shared/' + token, { cohort: S.cohortKey, updated: Date.now(), days }, false);
+}
+const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, '0')).join('');
+
+let qrLoading;
+function loadQr() {
+  if (window.QRCode) return Promise.resolve();
+  return qrLoading || (qrLoading = new Promise((ok, fail) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    sc.onload = ok; sc.onerror = () => { qrLoading = null; fail(new Error('Couldn’t load the QR code maker.')); };
+    document.head.appendChild(sc);
+  }));
+}
+function drawQr(el, text, size) {
+  el.innerHTML = '';
+  new QRCode(el, { text, width: size, height: size, colorDark: '#3d322c', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+}
+
+function shareModal() {
+  const token = S.cohortDoc && S.cohortDoc.shareToken;
+  return `<div class="overlay" data-act="shareClose"><div class="modal share" data-stop>
+    <div class="modal-head"><h2>Instructor Link</h2><button class="x big" data-act="shareClose" aria-label="Close">×</button></div>
+    <div class="pad">
+      ${token ? `<div class="share-body">
+        <div id="shareQr" class="share-qr"></div>
+        <div>
+          <p>Instructors scan this (or open the link) to see the live schedule. They can view and print it, but can’t change anything. It updates a moment after you edit.</p>
+          <input class="share-url" readonly value="${esc(shareUrl(token))}" onclick="this.select()">
+          <div class="share-btns">
+            <button class="btn primary" data-act="shareCopy">Copy link</button>
+            <a class="btn" href="${esc(shareUrl(token))}" target="_blank" rel="noopener">Open it</a>
+          </div>
+          <p class="muted small">Anyone with this link can see the schedule, including squad names. The QR code is also printed on each Day page.</p>
+          <div class="share-btns">
+            <button class="link" data-act="shareNew">Make a new link (the old one stops working)</button>
+            <button class="link" data-act="shareOff">Turn the link off</button>
+          </div>
+        </div></div>`
+      : `<p>Make a private, read-only link for instructors. You’ll get a QR code to share, and it’s printed on each Day page too.</p>
+        <p class="muted small">Anyone with the link can see the schedule, including squad names. You can turn it off any time.</p>
+        <button class="btn primary" data-act="shareMake">Make the link</button>`}
+    </div>
+  </div></div>`;
+}
+
+/* ---------- Printing ---------- */
+async function printDays(list) {
+  const token = S.cohortDoc && S.cohortDoc.shareToken;
+  const root = document.getElementById('print-root');
+  root.innerHTML = list.map(n => Sched.pages(printDay(n), { qr: !!token })).join('');
+  if (token) {
+    try { await loadQr(); root.querySelectorAll('.p-qr').forEach(el => drawQr(el, shareUrl(token), 84)); }
+    catch { root.querySelectorAll('.p-qr').forEach(el => el.remove()); }
+    await new Promise(r => setTimeout(r, 150)); // let the QR images finish drawing
+  }
+  window.print();
 }
 
 /* ---------- Bag check ---------- */
@@ -668,6 +857,17 @@ function parseBag(text) {
   return out.filter(s => s.name);
 }
 
+function schChange(t) {
+  const n = S.day || 1, d = schedFor(n), f = t.dataset.sch, val = t.value;
+  const done = () => { delete S.drafts[t.dataset.draft]; };
+  if (f === 'notes' || f === 'stationNote') return saveSched(n, { [f]: val }).then(done);
+  const list = d[f].map(x => ({ ...x }));
+  const i = Number(t.dataset.i);
+  if (!list[i]) return;
+  list[i][t.dataset.f] = val;
+  return saveSched(n, { [f]: list }).then(done);
+}
+
 /* ---------- Notes (saved a moment after you stop typing) ---------- */
 const noteTimers = {};
 function saveNoteSoon(n, id) {
@@ -786,6 +986,9 @@ document.addEventListener('dblclick', async e => {
 });
 
 // The Day page boxes fill the window height on a laptop-size screen.
+// Text boxes that grow to fit what's in them.
+function grow(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
+
 function fitBoard() {
   const board = document.querySelector('.board');
   if (!board) return;
@@ -799,6 +1002,7 @@ document.addEventListener('input', e => {
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
   S.drafts[k] = t.value;
+  if (t.hasAttribute('data-grow')) grow(t);
   if (t.dataset.notes) saveNoteSoon(Number(t.dataset.notes), t.id);
 });
 
@@ -814,6 +1018,11 @@ document.addEventListener('focusout', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
+  if (t.dataset.sch) { schChange(t); return; }
+  if (t.dataset.change === 'squadCount') { act('squadCount', t); return; }
+  if (t.dataset.change === 'squadAdd') { act('squadAdd', t); return; }
+  // A priority line saves when you click or tab away, not only on Enter.
+  if (t.dataset.add === 'priority' && t.closest('.slots')) { act('addItem', t); return; }
   if (t.dataset.change === 'note') {
     await Store.set(P('students/' + t.dataset.sid), { note: t.value.trim() });
     delete S.drafts[t.dataset.draft]; render();
@@ -822,7 +1031,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen) S.bagOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
+    if (S.bagOpen) S.bagOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -979,6 +1188,72 @@ async function act(a, el = {}, e) {
         await Store.set('meta/settings', { skipStaff });
         delete S.drafts['set-skip']; toast('Saved.'); break;
       }
+      case 'schAdd': {
+        const sd = schedFor(n), list = [...sd[d.list], d.list === 'blocks' ? { time: '', activity: '' } : { topic: '', content: '' }];
+        await saveSched(n, { [d.list]: list }); break;
+      }
+      case 'schDel': {
+        const sd = schedFor(n), i = Number(d.i), item = sd[d.list][i];
+        const label = d.list === 'blocks' ? (item.activity || 'this time') : (item.topic || 'this station');
+        if (!confirm('Remove “' + label + '” from Day ' + n + '?')) return;
+        dropSchDrafts(n);
+        await saveSched(n, { [d.list]: sd[d.list].filter((_, j) => j !== i) }); break;
+      }
+      case 'schMove': {
+        const sd = schedFor(n), i = Number(d.i), j = i + Number(d.dir), list = [...sd[d.list]];
+        if (j < 0 || j >= list.length) return;
+        [list[i], list[j]] = [list[j], list[i]];
+        dropSchDrafts(n);
+        await saveSched(n, { [d.list]: list }); break;
+      }
+      case 'squadCount': {
+        const sq = squadsFor(n), count = Number(el.value), s = {};
+        for (let i = 1; i <= count; i++) s[i] = { A: [...(((sq.s || {})[i] || {}).A || [])], B: [...(((sq.s || {})[i] || {}).B || [])] };
+        for (let i = count + 1; i <= 6; i++) s[i] = { A: [], B: [] }; // saving merges, so clear removed squads on purpose
+        if (count < sq.count && !confirm('Fewer squads? Students in the removed squads go back to “not in a squad.”')) { render(); return; }
+        await saveSquads(n, { count, s }); break;
+      }
+      case 'squadAdd': {
+        if (!el.value) return;
+        const sq = squadsFor(n), s = JSON.parse(JSON.stringify(sq.s || {}));
+        s[d.s] = s[d.s] || { A: [], B: [] }; s[d.s][d.t] = [...(s[d.s][d.t] || []), el.value];
+        await saveSquads(n, { count: sq.count, s }); break;
+      }
+      case 'squadDel': {
+        const sq = squadsFor(n), s = JSON.parse(JSON.stringify(sq.s || {}));
+        s[d.s][d.t] = (s[d.s][d.t] || []).filter(x => x !== d.name);
+        await saveSquads(n, { count: sq.count, s }); break;
+      }
+      case 'saveTemplate': {
+        if (!confirm('Use this week’s schedule (times, stations and notes, not squads) as the starting point for future cohorts?')) return;
+        const tpl = {};
+        weekDays().forEach(x => { tpl[x.n] = schedFor(x.n); });
+        await Store.set('meta/settings', { scheduleTemplate: tpl });
+        toast('Saved. New cohorts will start from this schedule.'); break;
+      }
+      case 'printDay': await printDays([n]); break;
+      case 'printAll': await printDays(weekDays().map(x => x.n)); break;
+      case 'shareOpen': S.shareOpen = true; render(); setTimeout(showShareQr, 30); break;
+      case 'shareClose': S.shareOpen = false; render(); break;
+      case 'shareMake': {
+        if (!Store.configured) { toast('The instructor link works once you’re signed in for real (not in sample mode).'); return; }
+        await Store.set('cohorts/' + S.cohortKey, { shareToken: newToken() });
+        await new Promise(r => setTimeout(r, 300)); await publish(); render(); setTimeout(showShareQr, 30); break;
+      }
+      case 'shareNew': case 'shareOff': {
+        const old = S.cohortDoc && S.cohortDoc.shareToken;
+        if (!confirm(a === 'shareOff' ? 'Turn the link off? Anyone using it (or the printed QR code) won’t be able to open it.' : 'Make a new link? The old link and any printed QR codes stop working.')) return;
+        if (old) await Store.del('shared/' + old);
+        await Store.set('cohorts/' + S.cohortKey, { shareToken: a === 'shareOff' ? null : newToken() });
+        await new Promise(r => setTimeout(r, 300));
+        if (a === 'shareNew') { await publish(); setTimeout(showShareQr, 30); }
+        render(); break;
+      }
+      case 'shareCopy': {
+        const url = shareUrl(S.cohortDoc.shareToken);
+        try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Select the link and copy it.'); }
+        break;
+      }
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null });
         S.view = 'day'; pref('view', 'day');
@@ -988,6 +1263,14 @@ async function act(a, el = {}, e) {
     console.error(err);
     toast(err.message || 'Something went wrong.');
   }
+}
+
+function dropSchDrafts(n) { Object.keys(S.drafts).forEach(k => { if (k.startsWith('sch-' + n + '-')) delete S.drafts[k]; }); }
+async function showShareQr() {
+  const el = document.getElementById('shareQr');
+  const token = S.cohortDoc && S.cohortDoc.shareToken;
+  if (!el || !token) return;
+  try { await loadQr(); drawQr(el, shareUrl(token), 180); } catch (e) { el.textContent = e.message; }
 }
 
 let toastTimer;

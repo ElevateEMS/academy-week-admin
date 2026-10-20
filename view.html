@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Academy Week Schedule</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3ece6">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=10">
+</head>
+<body class="viewer">
+<!-- Read-only schedule for instructors (the QR code link). No sign-in: it can only
+     open the one shared copy whose secret code is in the link. -->
+<header class="top">
+  <div class="brand"><img src="logo.png" alt="Elevate EMS"></div>
+  <div class="page-title"><h1>Academy Week Schedule</h1><p id="updated"></p></div>
+  <nav class="icons"><button class="btn" id="printBtn" hidden>Print</button></nav>
+</header>
+<main class="wrap">
+  <div id="days"></div>
+  <div id="pages" class="viewer-pages"><p class="loading">Loading the schedule…</p></div>
+</main>
+<div id="print-root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="config.js?v=10"></script>
+<script src="schedule.js?v=10"></script>
+<script>
+(() => {
+  const token = new URLSearchParams(location.search).get('t') || '';
+  const pagesEl = document.getElementById('pages');
+  const daysEl = document.getElementById('days');
+  const stop = msg => { pagesEl.innerHTML = `<p class="loading">${msg}</p>`; };
+  if (!/^[0-9a-f]{20,}$/.test(token)) return stop('This link isn’t complete. Ask for the QR code again.');
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  let data = null, day = null;
+
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+  function show() {
+    const nums = Object.keys(data.days).map(Number).sort((a, b) => a - b);
+    if (!day) day = nums.find(n => data.days[n].iso === iso(new Date())) || nums[0];
+    document.getElementById('updated').textContent = (data.cohort ? data.cohort + ' · ' : '') + 'Updated ' + new Date(data.updated).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    daysEl.innerHTML = '<div class="daystrip">' + nums.map(n => {
+      const d = data.days[n];
+      const wk = d.iso ? new Date(d.iso + 'T12:00').toLocaleDateString('en-US', { weekday: 'short' }) : 'Day';
+      return `<button class="${n === day ? 'on' : ''}" data-n="${n}"><small>${wk}</small><b>${n}</b><small>${Sched.esc(d.date || '')}</small></button>`;
+    }).join('') + '</div>';
+    pagesEl.innerHTML = Sched.pages(data.days[day]);
+    document.getElementById('printBtn').hidden = false;
+  }
+
+  daysEl.addEventListener('click', e => {
+    const b = e.target.closest('[data-n]');
+    if (b) { day = Number(b.dataset.n); show(); }
+  });
+  document.getElementById('printBtn').addEventListener('click', () => {
+    document.getElementById('print-root').innerHTML = Sched.pages(data.days[day]);
+    window.print();
+  });
+
+  db.doc('shared/' + token).onSnapshot(snap => {
+    if (!snap.exists) return stop('This link has been turned off. Ask Bella for the new one.');
+    data = snap.data(); show();
+  }, () => stop('This link has been turned off. Ask Bella for the new one.'));
+})();
+</script>
+</body>
+</html>
