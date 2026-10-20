@@ -23,6 +23,8 @@ let unwatchGlobal = [];
 const isoOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const todayIso = () => isoOf(new Date());
 const parseIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+// "Oct 20" (for logs, where 10/20 could be misread as a count)
+const monthDay = s => s ? parseIso(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 const shortDate = s => { if (!s) return ''; const d = parseIso(s); return (d.getMonth() + 1) + '/' + d.getDate(); };
 function dayDate(n) {
   if (!S.sheet || !S.sheet.academyStart) return null;
@@ -187,8 +189,8 @@ async function rollOver() {
 
 /* ---------- Students ---------- */
 // "Not attending" (unchecked in the binder covers pop-up or a student's panel) is saved
-// as cohorts/{key}.notAttending = { sid: true }. They stay on the roster but are left
-// out of covers, squads and the counts.
+// as cohorts/{key}.notAttending = { sid: true }, or { sid: 3 } when they dropped on Day 3.
+// They stay on the roster but are left out of covers, squads and the counts.
 function students() {
   if (!S.sheet) return [];
   const notAttending = (S.cohortDoc && S.cohortDoc.notAttending) || {};
@@ -198,7 +200,7 @@ function students() {
       const sid = slug(s.name);
       const doc = S.studentsDoc[sid] || {};
       return {
-        ...s, sid, out: !!notAttending[sid],
+        ...s, sid, out: !!notAttending[sid], droppedDay: typeof notAttending[sid] === 'number' ? notAttending[sid] : null,
         skill: doc.skill || 'on', behind: doc.behind || [], note: doc.note || '',
         fixes: S.contacts.filter(c => c.sid === sid && !c.fixed).length,
         warns: S.warnings.filter(w => w.sid === sid).length,
@@ -207,6 +209,23 @@ function students() {
 }
 const studentBySid = sid => students().find(s => s.sid === sid);
 const attending = () => students().filter(s => !s.out);
+const outLabel = s => s.droppedDay ? 'Dropped · Day ' + s.droppedDay : 'Not attending';
+// Take a student out of the squads from day `from` on. Earlier days (and their printouts) keep them;
+// a day that was only carrying squads forward gets its own copy without the name.
+async function removeFromSquads(name, from) {
+  for (let d = from; d <= 5; d++) {
+    const own = S.schedule[d] && S.schedule[d].squads;
+    if (d !== from && !own) continue; // follows an earlier day, which is already fixed
+    const sq = squadsFor(d);
+    if (!sq.count) continue;
+    const s = JSON.parse(JSON.stringify(sq.s || {}));
+    let hit = false;
+    Object.values(s).forEach(team => ['A', 'B'].forEach(t => {
+      if ((team[t] || []).includes(name)) { team[t] = team[t].filter(x => x !== name); hit = true; }
+    }));
+    if (hit) await saveSquads(d, { count: sq.count, s });
+  }
+}
 
 /* ---------- Staff ---------- */
 function isSkipped(name) {
@@ -932,7 +951,7 @@ function studentsView() {
       <thead><tr><th>#</th><th>Student</th><th>Skills</th><th class="c">Patient contacts</th><th class="c">To fix</th><th class="c">Attendance</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ' <span class="tag">Not attending</span>' : ''}</td>
+        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
         <td><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
         <td class="c">${pcStepper(s)}</td>
         <td class="c">${s.fixes ? `<span class="badge warn">${s.fixes}</span>` : '<span class="muted">–</span>'}</td>
@@ -975,12 +994,13 @@ function drawer() {
   const warns = S.warnings.filter(w => w.sid === s.sid).sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created);
   const dk = k => k + '-' + s.sid;
   const note = S.drafts[dk('note')] ?? s.note;
+  const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer" data-stop>
     <div class="drawer-head"><h2>${esc(s.name)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
 
       <label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
-        ${s.out ? '<span class="muted small">(left off binder covers, squads and counts)</span>' : ''}</label>
+        ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>
 
       <section>
         <h3>Skills</h3>
@@ -997,14 +1017,15 @@ function drawer() {
         <div class="pc-big">${pcStepper(s)}<span class="muted small">in the Google Sheet (column P)</span></div>
         <div class="log-form">
           <div class="row2">
-            <label>Contact #<input id="${dk('cnum')}" data-draft="${dk('cnum')}" type="number" min="1" value="${esc(S.drafts[dk('cnum')] ?? (s.contacts + 1))}"></label>
-            <label class="grow check-inline"><input type="checkbox" class="circle" id="${dk('cadd')}" ${S.drafts[dk('cadd')] === false ? '' : 'checked'} data-act="cadd" data-sid="${s.sid}"> New simulated contact (adds 1 to their count)</label>
+            <label>Contact #<input id="${dk('cnum')}" data-draft="${dk('cnum')}" type="number" min="1" placeholder="#" value="${esc(allC ? '' : S.drafts[dk('cnum')] ?? '')}" ${allC ? 'disabled' : ''}></label>
+            <button class="chip small ${allC ? 'on' : ''}" data-act="callToggle" data-sid="${s.sid}" title="A note about all of their contacts, not one">All contacts</button>
+            <label class="grow check-inline ${allC ? 'muted' : ''}"><input type="checkbox" class="circle" id="${dk('cadd')}" ${!allC && S.drafts[dk('cadd')] !== false ? 'checked' : ''} ${allC ? 'disabled' : ''} data-act="cadd" data-sid="${s.sid}"> New simulated contact (adds 1 to their count)</label>
           </div>
           <textarea id="${dk('cfix')}" data-draft="${dk('cfix')}" rows="2" placeholder="What needs fixed? (e.g. missing vitals times, narrative too short)">${esc(S.drafts[dk('cfix')] || '')}</textarea>
           <button class="btn primary" data-act="logContact" data-sid="${s.sid}">Save contact</button>
         </div>
         <ul class="log">${contacts.map(c => `<li class="${c.fixed ? 'done' : ''}">
-          <div><b>#${esc(c.num)}</b> <span class="muted small">${shortDate(c.date)}</span>
+          <div><b>${c.num === 'all' ? 'All contacts' : '#' + esc(c.num)}</b> <span class="muted small">${monthDay(c.date)}</span>
             ${c.fix ? `<p>${esc(c.fix)}</p>` : '<p class="muted">No fixes needed.</p>'}</div>
           ${c.fix ? `<label class="fixed">${circle(c.fixed, `data-act="fixed" data-id="${c.id}"`)} Fixed</label>` : ''}
           <button class="x" data-act="delContact" data-id="${c.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">No contact notes yet.</li>'}</ul>
@@ -1021,7 +1042,7 @@ function drawer() {
           <button class="btn primary" data-act="addWarning" data-sid="${s.sid}">Add</button>
         </div>
         <ul class="log">${warns.map(w => `<li>
-          <div><span class="tag ${/warning/i.test(w.type) ? 'red' : ''}">${esc(w.type)}</span> <span class="muted small">${shortDate(w.date)}</span>
+          <div><span class="tag ${/warning/i.test(w.type) ? 'red' : ''}">${esc(w.type)}</span> <span class="muted small">${monthDay(w.date)}</span>
             ${w.note ? `<p>${esc(w.note)}</p>` : ''}</div>
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>
@@ -1407,7 +1428,13 @@ async function act(a, el = {}, e) {
       case 'binderClose': S.binderOpen = null; render(); break;
       case 'attend': {
         const s = studentBySid(d.sid);
-        await Store.set('cohorts/' + S.cohortKey, { notAttending: { [d.sid]: !s.out } }); break;
+        if (s.out) { await Store.set('cohorts/' + S.cohortKey, { notAttending: { [d.sid]: false } }); break; }
+        // During the week it's a drop on today's day; before it, they just aren't coming.
+        const today = currentWeekDay();
+        await Store.set('cohorts/' + S.cohortKey, { notAttending: { [d.sid]: today || true } });
+        await removeFromSquads(s.name, today || 1);
+        if (today) toast(`${firstName(s.name)} dropped on Day ${today}. Taken out of squads from today on.`);
+        break;
       }
       case 'binderPrint': {
         const id = S.binderOpen;
@@ -1447,13 +1474,17 @@ async function act(a, el = {}, e) {
         await Store.set(P('students/' + d.sid), { behind: next }); break;
       }
       case 'cadd': S.drafts['cadd-' + d.sid] = el.checked; break;
+      case 'callToggle': { const k = 'call-' + d.sid; S.drafts[k] = !S.drafts[k]; render(); break; }
       case 'logContact': {
         const s = studentBySid(d.sid); const k = x => x + '-' + d.sid;
-        const add = S.drafts[k('cadd')] !== false;
-        const num = String(S.drafts[k('cnum')] ?? (s.contacts + 1)).trim();
+        const all = !!S.drafts[k('call')];
+        const add = !all && S.drafts[k('cadd')] !== false;
+        const num = all ? 'all' : String(S.drafts[k('cnum')] ?? '').trim();
         const fix = (S.drafts[k('cfix')] || '').trim();
+        if (!num) { toast('Add the contact #, or pick All contacts.'); return; }
+        if (all && !fix) { toast('Write what needs fixed on all their contacts.'); return; }
         await Store.add(P('contacts'), { sid: d.sid, num, fix, fixed: false, date: todayIso(), created: Date.now() });
-        [k('cnum'), k('cfix'), k('cadd')].forEach(x => delete S.drafts[x]);
+        [k('cnum'), k('cfix'), k('cadd'), k('call')].forEach(x => delete S.drafts[x]);
         render();
         if (add) await changePc(d.sid, 1);
         toast(fix ? 'Saved. It’s on their “to fix” list.' : 'Saved.');

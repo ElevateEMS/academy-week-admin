@@ -294,6 +294,11 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .row2 label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
 .row2 label input[type=number] { width: 90px; }
 .row2 .grow { flex: 1; }
+/* The round checkbox inside the contact form (the form's text-box style was stretching it into a bar). */
+.log-form input.circle { width: 17px; height: 17px; padding: 0; border: 1.5px solid var(--taupe); border-radius: 50%; background: transparent; }
+.log-form input.circle:checked { border-color: var(--taupe-dark); }
+.row2 > .chip { align-self: end; margin-bottom: 6px; }
+.check-inline.muted { opacity: .5; }
 .check-inline { display: flex !important; align-items: center; gap: 8px; color: var(--ink) !important; padding-bottom: 8px; cursor: pointer; }
 .log { list-style: none; padding: 0; margin: 10px 0 0; }
 .log li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px dotted var(--line); }
@@ -442,7 +447,7 @@ a.btn { text-decoration: none; color: inherit; }
 .binder-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 16px; padding: 4px 0 8px; }
 .binder-list label { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dotted var(--line); cursor: pointer; }
 .binder-list label.off span { color: var(--muted); text-decoration: line-through; }
-.attend-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; cursor: pointer; padding: 4px 0 12px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
+.attend-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; cursor: pointer; padding: 16px 0; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
 .roster tr.out td { color: var(--muted); }
 .roster tr.out b { font-weight: 500; }
 
