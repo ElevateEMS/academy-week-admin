@@ -502,18 +502,19 @@ function dayView() {
   </div>`;
 }
 
+const BAG = '<svg viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="12.5" rx="2.5"/><path d="M9 7.5V6a3 3 0 0 1 6 0v1.5M4 12.5h16"/></svg>';
+const DONE_ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/></svg>';
 // The Day page strip has Prep and Finalize at either end; the Schedule page's doesn't.
 function dayStrip({ phases = true } = {}) {
   const n = phases ? curDay() : schedDay(), today = currentWeekDay();
   const days = weekDays();
-  const first = days.find(x => x.iso), last = [...days].reverse().find(x => x.iso);
-  const phase = (p, top, date) => `<button class="phase ${p === FINAL ? 'final' : ''} ${n === p ? 'on' : ''} ${phaseDay() === p ? 'today' : ''}" data-act="day" data-n="${p}">
-      <small>${top}</small><b>${dayName(p)}</b><small>${date}</small></button>`;
+  const phase = (p, top) => `<button class="phase ${p === FINAL ? 'final' : ''} ${n === p ? 'on' : ''} ${phaseDay() === p ? 'today' : ''}" data-act="day" data-n="${p}">
+      <small>${top}</small><b>${dayName(p)}</b><small class="phase-ico">${p === PREP ? BAG : DONE_ICON}</small></button>`; // small icon where the day tiles have a date
   return `<div class="daystrip">
-    ${phases ? phase(PREP, 'Before', first ? 'by ' + shortDate(first.iso) : '') : ''}
+    ${phases ? phase(PREP, 'Before') : ''}
     ${days.map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
       <small>${esc(x.label || 'Day')}</small><b>${x.n}</b><small>${x.iso ? shortDate(x.iso) : ''}</small></button>`).join('')}
-    ${phases ? phase(FINAL, 'After', last ? 'after ' + shortDate(last.iso) : '') : ''}
+    ${phases ? phase(FINAL, 'After') : ''}
   </div>`;
 }
 

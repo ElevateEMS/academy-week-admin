@@ -113,6 +113,8 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
 .daystrip button.phase:hover { background: var(--blush); }
 .daystrip button.phase.on { background: var(--blush); }
 .daystrip button.phase b { font-size: 17px; line-height: 1.82; }
+.daystrip .phase-ico { display: grid; place-items: center; height: 15px; }
+.daystrip .phase-ico svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 /* Both end tiles the same width so Day 3 stays in the middle. */
 .daystrip button.phase { width: 96px; padding-left: 4px; padding-right: 4px; }
 .pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
