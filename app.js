@@ -14,7 +14,7 @@ const S = {
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null,
-  menuOpen: false, shareOpen: false, schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -51,6 +51,8 @@ function cfg() {
   const s = S.settings || {};
   return {
     checklist: s.checklist || DEFAULTS.checklist,
+    dayNotes: s.dayNotes || {},
+    weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
     someBags: s.someBags || {},
     skipStaff: s.skipStaff || DEFAULTS.skipStaff,
@@ -84,7 +86,6 @@ function bagCarries(item, bagNo) {
   return !list || list.includes(bagNo);
 }
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
-const checklistFor = n => [...(cfg().checklist.everyDay || []), ...((cfg().checklist.days || {})[n] || [])];
 const isBagItem = text => /bag check/i.test(text);
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
@@ -92,17 +93,58 @@ const MAX_PRIORITIES = 3;
 const orderOf = t => t.order ?? t.created ?? 0;
 const itemsFor = (n, kind) => S.todos.filter(t => (t.kind || 'todo') === kind && (t.day || 1) === n).sort((a, b) => orderOf(a) - orderOf(b));
 
+// Repeat to-dos (Settings → Day Templates) are copied into a cohort as ordinary
+// to-dos the first time it's opened, so they can be checked, dragged or deleted.
+// Ids are fixed (rep-{day}-{text}) so the same one is never added twice.
+const repeatId = (n, text) => 'rep-' + n + '-' + slug(text);
+function templateFor(tpl, n) {
+  const all = [...(tpl.everyDay || []), ...((tpl.days || {})[n] || [])];
+  return all.filter((t, i) => all.findIndex(x => slug(x) === slug(t)) === i);
+}
+// Template to-dos this cohort doesn't have yet (skipping ones you deleted on purpose).
+function missingRepeats(tpl = cfg().checklist) {
+  const have = new Set(S.todos.map(t => t.id));
+  const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
+  const out = [];
+  [1, 2, 3, 4, 5].forEach(n => templateFor(tpl, n).forEach((text, i) => {
+    const id = repeatId(n, text);
+    if (!have.has(id) && !removed[id]) out.push({ id, text, n, i });
+  }));
+  return out;
+}
+function addRepeats(list) {
+  return Promise.all(list.map(({ id, text, n, i }) => {
+    const checks = (S.days[n] && S.days[n].checks) || {}; // ticked back when it was the Daily Checklist
+    return Store.set(P('todos/' + id), { text, done: !!checks[slug(text)], day: n, kind: 'todo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false);
+  }));
+}
+let seeding = false;
+async function seedRepeats() {
+  const key = S.cohortKey;
+  if (seeding || (S.cohortDoc && S.cohortDoc.repeatsAdded)) return;
+  seeding = true;
+  try {
+    if (!(await Store.claim('cohorts/' + key, 'repeatsAdded')) || key !== S.cohortKey) return; // Nick's computer got there first
+    await addRepeats(missingRepeats());
+  } catch (e) { console.warn('Repeat to-dos not added yet:', e.message); }
+  finally { seeding = false; }
+}
+
 // Unfinished to-dos from an earlier day move to today (only while the week is happening).
-let rolling = false;
+let rolling = false, rollAgain = false;
 async function rollOver() {
   const t = currentWeekDay();
-  if (!t || rolling) return;
+  if (!t) return;
+  if (rolling) { rollAgain = true; return; } // to-dos changed mid-way (e.g. repeat ones just added): check again after
   const late = S.todos.filter(x => (x.kind || 'todo') === 'todo' && !x.done && (x.day || 1) < t);
   if (!late.length) return;
   rolling = true;
   try {
     await Promise.all(late.map(x => Store.set(P('todos/' + x.id), { day: t, rolledFrom: x.rolledFrom || x.day || 1 })));
-  } finally { rolling = false; }
+  } finally {
+    rolling = false;
+    if (rollAgain) { rollAgain = false; rollOver(); }
+  }
 }
 
 /* ---------- Students ---------- */
@@ -135,7 +177,7 @@ function staffPeople() {
     return { ...p, key, lastDay: Math.max(...p.days), doc: S.staff[key] || {} };
   });
 }
-// Staff paperwork shown in the daily checklist: one "Staff roster" line and one
+// Staff paperwork shown at the end of To Do: one "Staff roster" line and one
 // "Timesheets (names)" line per day, plus "Pay ___" on each person's last day.
 // On day n it also shows anything still missing from earlier days (tagged "unfinished").
 function staffTasks(n, { carry = true } = {}) {
@@ -216,6 +258,7 @@ async function loadSheet() {
     S.sheet = data;
     if (!S.day) S.day = currentWeekDay() || Number(pref('day-' + key)) || 1;
     rollOver();
+    seedRepeats();
   } catch (e) {
     S.sheetErr = e.message;
   }
@@ -290,7 +333,8 @@ function shell() {
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
-  ${S.bagOpen ? bagModal() : ''}`;
+  ${S.bagOpen ? bagModal() : ''}
+  ${S.tplOpen ? templatesModal() : ''}`;
 }
 
 function pageTitle() {
@@ -324,14 +368,24 @@ function circle(checked, attrs, extra = '') {
   return `<input type="checkbox" class="circle" ${attrs} ${checked ? 'checked' : ''} ${extra}>`;
 }
 
-function itemList(n, kind, { compact = false } = {}) {
+function itemList(n, kind, { compact = false, more = false } = {}) {
   const items = itemsFor(n, kind);
-  const empty = kind === 'priority' ? '' : '<li class="empty">Nothing yet.</li>';
+  const empty = kind === 'priority' || more ? '' : '<li class="empty">Nothing yet.</li>';
   return `<ul class="checks drop-list ${items.length ? '' : 'is-empty'}" data-drop="items" data-day="${n}" data-kind="${kind}">
-    ${items.map(t => `<li class="${t.done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-      <label>${circle(t.done, `data-act="todo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span>${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
-      ${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
-    </li>`).join('') || empty}
+    ${items.map(t => {
+      // "Bag check" also counts as done once every bag in use is checked.
+      const bag = kind === 'todo' && isBagItem(t.text);
+      const done = t.done || (bag && bagsAllDone(t.day || 1));
+      let open = '';
+      if (bag) {
+        const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day || 1, b)).length;
+        open = `<button class="btn tiny" data-act="openBag" data-d="${t.day || 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
+      }
+      return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
+      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span>${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
+      ${open}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
+    </li>`;
+    }).join('') || empty}
   </ul>`;
 }
 
@@ -340,23 +394,11 @@ function addRow(n, kind, placeholder) {
   return `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="${kind}" data-day="${n}" placeholder="${placeholder}" value="${esc(S.drafts[k] || '')}"></div>`;
 }
 
-// The day's checklist (from Settings) plus staff paperwork, shown inside To Do.
-function dailyChecklist(n, { compact = false, carry = true } = {}) {
-  const checks = (S.days[n] && S.days[n].checks) || {};
-  const rows = checklistFor(n).map(t => {
-    const k = slug(t);
-    if (isBagItem(t)) {
-      const inUse = bagsInUse(); const ok = inUse.filter(b => bagDone(n, b)).length;
-      const on = !!(checks[k] || (inUse.length && ok === inUse.length));
-      return { on, html: `<label>${circle(on, `data-act="check" data-d="${n}" data-k="${k}"`)}<span><span class="txt">${esc(t)}</span></span></label>
-        <button class="btn tiny" data-act="openBag" data-d="${n}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>` };
-    }
-    return { on: !!checks[k], html: `<label>${circle(checks[k], `data-act="check" data-d="${n}" data-k="${k}"`)}<span><span class="txt">${esc(t)}</span></span></label>` };
-  });
-  staffTasks(n, { carry }).forEach(t => rows.push({ on: t.done, html: `<label>${circle(t.done, t.attrs)}<span><span class="txt">${t.html}</span>${t.who ? ` <span class="who">(${esc(t.who)})</span>` : ''}${t.sub ? ` <span class="sub">${t.sub}</span>` : ''}${t.late ? ` <em class="tag-soft">unfinished · Day ${t.late}</em>` : ''}</span></label>` }));
-  const done = rows.filter(r => r.on).length;
-  return `<p class="mini-head">Daily Checklist <span class="count">${done}/${rows.length}</span></p>
-    <ul class="checks">${rows.map(r => `<li class="${r.on ? 'done' : ''}">${r.html}</li>`).join('')}</ul>`;
+// The day's to-dos, then staff paperwork (from the Staffing tab) as plain lines at the end.
+function todoList(n, { compact = false, carry = true } = {}) {
+  const staff = staffTasks(n, { carry });
+  return itemList(n, 'todo', { compact, more: staff.length > 0 }) + (staff.length ? `<ul class="checks staff">${staff.map(t => `<li class="${t.done ? 'done' : ''}">
+    <label>${circle(t.done, t.attrs)}<span><span class="txt">${t.html}</span>${t.who ? ` <span class="who">(${esc(t.who)})</span>` : ''}${t.sub ? ` <span class="sub">${t.sub}</span>` : ''}${t.late ? ` <em class="tag-soft">unfinished · Day ${t.late}</em>` : ''}</span></label></li>`).join('')}</ul>` : '');
 }
 
 // "Hide checked" / "Show checked" (remembered on this computer).
@@ -365,7 +407,9 @@ const hideToggle = k => `<button class="link" data-act="hideDone" data-k="${k}">
 
 function notesArea(n, placeholder) {
   const id = 'notes-' + n;
-  const val = S.drafts[id] ?? ((S.days[n] && S.days[n].notes) || '');
+  // Until the day's notes are typed in, they start from Settings → Day Templates.
+  const saved = S.days[n] && S.days[n].notes;
+  const val = S.drafts[id] ?? (saved !== undefined ? saved : (cfg().dayNotes[n] || ''));
   return `<textarea id="${id}" class="lined" data-draft="${id}" data-notes="${n}" rows="6" placeholder="${placeholder}">${esc(val)}</textarea>`;
 }
 
@@ -413,7 +457,7 @@ function box(b, n) {
     }).join('');
     body = head('Priorities') + itemList(n, 'priority') + (slots ? `<ul class="checks slots">${slots}</ul>` : '');
   } else if (b === 'todo') {
-    body = head('To Do', hideToggle('todo')) + addRow(n, 'todo', 'Add a to-do and press Enter') + itemList(n, 'todo') + dailyChecklist(n);
+    body = head('To Do', hideToggle('todo')) + addRow(n, 'todo', '+ to do') + todoList(n);
   } else if (b === 'shopping') {
     const open = S.shopping.filter(x => !x.bought).sort((a, c) => a.created - c.created);
     const bought = S.shopping.filter(x => x.bought).sort((a, c) => c.created - a.created);
@@ -436,12 +480,13 @@ function weekView() {
   const today = currentWeekDay();
   return `
   <div class="week ${hidden('todo') ? 'hide-done' : ''}">
-    ${weekDays().map(d => `<section class="week-col ${d.n === today ? 'today' : ''}">
+    ${weekDays().map(d => `<section class="week-col ${d.n === today ? 'today' : ''}" ${cfg().weekH ? `style="height:${cfg().weekH}px"` : ''}>
       <button class="week-head" data-act="day" data-n="${d.n}" data-open="1" title="Open Day ${d.n}">
         <small>${esc(d.label)}${d.iso ? ' ' + shortDate(d.iso) : ''}</small><b>Day ${d.n}</b>${d.sub ? `<small>${esc(d.sub)}</small>` : ''}
       </button>
-      <div class="week-part"><p class="mini-head">To Do</p>${itemList(d.n, 'todo', { compact: true })}${addRow(d.n, 'todo', '+ to-do')}${dailyChecklist(d.n, { compact: true, carry: false })}</div>
+      <div class="week-part"><p class="mini-head">To Do</p>${todoList(d.n, { compact: true, carry: false })}${addRow(d.n, 'todo', '+ to do')}</div>
       <div class="week-part shaded"><p class="mini-head">Notes</p>${notesArea(d.n, 'Notes')}</div>
+      <div class="resize" data-resize="week" title="Drag to make all five days taller or shorter · double-click to reset"></div>
     </section>`).join('')}
   </div>`;
 }
@@ -815,11 +860,9 @@ function settingsView() {
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   return `<div class="settings">
     <section class="box">
-      <div class="box-head static"><h2>Daily Checklist</h2></div>
-      <p class="muted small">One item per line. Any item with “bag check” in it opens the bag pop-up.</p>
-      <label class="field">Every day<textarea id="set-every" data-draft="set-every" rows="4">${dv('set-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>
-      <div class="day-fields">${[1, 2, 3, 4, 5].map(n => `<label class="field">Day ${n} only<textarea id="set-day${n}" data-draft="set-day${n}" rows="5">${dv('set-day' + n, ((c.checklist.days || {})[n] || []).join('\n'))}</textarea></label>`).join('')}</div>
-      <button class="btn primary" data-act="saveChecklist">Save checklist</button>
+      <div class="box-head static"><h2>Day Templates</h2></div>
+      <p class="muted small">The to-dos that repeat on Day 1–5 of every cohort, and the notes each day starts with.</p>
+      <button class="btn primary" data-act="tplOpen">Edit day templates</button>
     </section>
 
     <section class="box">
@@ -845,6 +888,28 @@ function settingsView() {
       <button class="btn" data-act="resetLayout">Reset layout</button>
     </section>
   </div>`;
+}
+
+/* ---------- Day Templates pop-up ---------- */
+const TPL_KEYS = ['tpl-every', ...[1, 2, 3, 4, 5].flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
+function templatesModal() {
+  const c = cfg(), tab = S.tplTab;
+  const dv = (k, v) => esc(S.drafts[k] ?? v);
+  const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="tplTab" data-t="${t}">${label}</button>`;
+  const body = tab === 'every'
+    ? `<p class="muted small">These go on every day’s To Do. One per line. Anything with “bag check” in it opens the bag pop-up.</p>
+       <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
+    : `<label class="field">Day ${tab} to-dos <span class="small">(one per line, added after the every-day ones)</span>
+         <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>
+       <label class="field">Day ${tab} notes <span class="small">(what the Notes box starts with)</span>
+         <textarea id="tpl-notes-${tab}" data-draft="tpl-notes-${tab}" rows="8">${dv('tpl-notes-' + tab, c.dayNotes[tab] || '')}</textarea></label>`;
+  return `<div class="overlay" data-act="tplClose"><div class="modal tpl" data-stop>
+    <div class="modal-head"><h2>Day Templates</h2><button class="x big" data-act="tplClose" aria-label="Close">×</button></div>
+    <div class="bag-tabs">${tabBtn('every', 'Every day')}${[1, 2, 3, 4, 5].map(n => tabBtn(String(n), 'Day ' + n)).join('')}</div>
+    <div class="modal-body"><div class="tpl-body">${body}</div></div>
+    <div class="modal-foot"><span class="muted small">Used for every cohort. Changing a day’s notes here doesn’t touch notes you’ve already typed.</span>
+      <button class="btn primary" data-act="tplSave">Save</button></div>
+  </div></div>`;
 }
 
 const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
@@ -960,18 +1025,22 @@ document.addEventListener('pointerdown', e => {
   const handle = e.target.closest('[data-resize]');
   if (!handle) return;
   e.preventDefault();
-  const boxEl = handle.closest('.box');
+  const week = handle.dataset.resize === 'week';
+  const boxEl = handle.closest(week ? '.week-col' : '.box');
   const startY = e.clientY, startH = boxEl.offsetHeight;
   S.dragging = { type: 'resize' };
   document.body.classList.add('resizing');
-  const move = ev => { boxEl.style.flex = '0 0 auto'; boxEl.style.height = Math.max(90, startH + ev.clientY - startY) + 'px'; };
+  // On the Week page all five days stay the same height.
+  const els = week ? [...document.querySelectorAll('.week-col')] : [boxEl];
+  const move = ev => els.forEach(el => { el.style.flex = week ? '' : '0 0 auto'; el.style.height = Math.max(week ? 200 : 90, startH + ev.clientY - startY) + 'px'; });
   const up = async () => {
     document.removeEventListener('pointermove', move);
     document.removeEventListener('pointerup', up);
     document.body.classList.remove('resizing');
     S.dragging = null;
     if (boxEl.style.height && boxEl.offsetHeight !== startH) {
-      await saveLayout({ ...cfg().heights, [handle.dataset.resize]: boxEl.offsetHeight });
+      if (week) await Store.set('meta/settings', { weekH: boxEl.offsetHeight });
+      else await saveLayout({ ...cfg().heights, [handle.dataset.resize]: boxEl.offsetHeight });
     }
     render();
   };
@@ -981,6 +1050,7 @@ document.addEventListener('pointerdown', e => {
 document.addEventListener('dblclick', async e => {
   const handle = e.target.closest('[data-resize]');
   if (!handle) return;
+  if (handle.dataset.resize === 'week') { await Store.set('meta/settings', { weekH: null }); return; }
   const heights = { ...cfg().heights }; delete heights[handle.dataset.resize];
   await saveLayout(heights);
 });
@@ -1031,7 +1101,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen) S.bagOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
+    if (S.bagOpen) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1082,7 +1152,12 @@ async function act(a, el = {}, e) {
         await Store.add(P('todos'), { text, done: false, day, kind, order: Date.now(), created: Date.now() }); break;
       }
       case 'todo': { const t = S.todos.find(x => x.id === d.id); await Store.set(P('todos/' + d.id), { done: !t.done }); break; }
-      case 'delTodo': await Store.del(P('todos/' + d.id)); break;
+      case 'delTodo': {
+        const t = S.todos.find(x => x.id === d.id);
+        // A deleted repeat to-do stays gone for this cohort, even after the template is saved again.
+        if (t && t.repeat) await Store.set('cohorts/' + S.cohortKey, { removedRepeats: { [t.id]: true } });
+        await Store.del(P('todos/' + d.id)); break;
+      }
 
       case 'addShop': {
         const text = (S.drafts.shop || '').trim(); if (!text) return;
@@ -1160,14 +1235,29 @@ async function act(a, el = {}, e) {
         if (!confirm('Delete this attendance note?')) return;
         await Store.del(P('warnings/' + d.id)); break;
 
-      case 'saveChecklist': {
-        const c = cfg().checklist;
-        const everyDay = lines(S.drafts['set-every'] ?? (c.everyDay || []).join('\n'));
-        const days = {};
-        [1, 2, 3, 4, 5].forEach(x => { days[x] = lines(S.drafts['set-day' + x] ?? ((c.days || {})[x] || []).join('\n')); });
-        await Store.set('meta/settings', { checklist: { everyDay, days } });
-        ['set-every', 'set-day1', 'set-day2', 'set-day3', 'set-day4', 'set-day5'].forEach(x => delete S.drafts[x]);
-        toast('Checklist saved.'); break;
+      case 'tplOpen': S.tplOpen = true; S.tplTab = 'every'; render(); break;
+      case 'tplTab': S.tplTab = d.t; render(); break;
+      case 'tplClose':
+        if (TPL_KEYS.some(k => S.drafts[k] !== undefined) && !confirm('Close without saving your changes?')) return;
+        TPL_KEYS.forEach(k => delete S.drafts[k]);
+        S.tplOpen = false; render(); break;
+      case 'tplSave': {
+        const c = cfg();
+        const everyDay = lines(S.drafts['tpl-every'] ?? (c.checklist.everyDay || []).join('\n'));
+        const days = {}, dayNotes = {};
+        [1, 2, 3, 4, 5].forEach(x => {
+          days[x] = lines(S.drafts['tpl-todo-' + x] ?? ((c.checklist.days || {})[x] || []).join('\n'));
+          dayNotes[x] = String(S.drafts['tpl-notes-' + x] ?? (c.dayNotes[x] || '')).replace(/\s+$/, '');
+        });
+        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes });
+        TPL_KEYS.forEach(k => delete S.drafts[k]);
+        S.tplOpen = false; render();
+        // The open cohort already has its to-dos; offer to add any new ones to it.
+        const extra = S.cohortDoc && S.cohortDoc.repeatsAdded ? missingRepeats({ everyDay, days }) : [];
+        if (extra.length && confirm(`Saved. Add the ${extra.length} new to-do${extra.length === 1 ? '' : 's'} to ${S.cohortKey} too?`)) {
+          await addRepeats(extra); toast('Added to ' + S.cohortKey + '.');
+        } else toast('Day templates saved.');
+        break;
       }
       case 'saveBag': {
         if (S.drafts['set-bag'] === undefined) { toast('No changes to save.'); return; }

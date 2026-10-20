@@ -119,6 +119,7 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
   flex: 1 1 0; display: flex; flex-direction: column; position: relative; overflow: auto; }
 .box.box-priorities { flex: 0 0 auto; }
 .box > textarea.lined { flex: 1; }
+.box > .checks, .box > .add-row, .box > .box-head { flex-shrink: 0; } /* a full box scrolls instead of squashing its lists */
 .resize { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; cursor: ns-resize; }
 .resize::after { content: ''; position: absolute; left: 50%; bottom: 4px; width: 36px; margin-left: -18px; height: 3px; border-radius: 3px; background: var(--taupe); opacity: 0; transition: opacity .15s; }
 .box:hover .resize::after { opacity: .5; }
@@ -157,6 +158,12 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .checks li.moving { opacity: .45; background: var(--blush-soft); border-radius: 6px; }
 .drop-list { min-height: 26px; border-radius: 8px; transition: background .15s; }
 .box-priorities .drop-list.is-empty { min-height: 6px; }
+/* Staff paperwork lines sit right under the to-dos, looking the same. */
+.checks.staff li:last-child { border-bottom: 0; }
+.drop-list:not(.is-empty) + .checks.staff { border-top: 1px dotted var(--line); }
+.drop-list.is-empty:has(+ .checks.staff) { min-height: 8px; }
+.modal.tpl { width: min(720px, 100%); }
+.tpl-body { padding-top: 14px; }
 .drop-list.drop-here { background: rgba(255, 255, 255, .45); }
 .add-row { margin: 2px 0 6px; }
 .add-row input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 6px 2px; outline: none; }
@@ -170,15 +177,20 @@ textarea.lined { width: 100%; border: 0; resize: none; outline: none; padding: 2
 textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opacity: .8; }
 
 /* ---------- Week ---------- */
-.week { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
-.week-col { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 0 12px 12px; font-size: 14px; }
+/* All five days are as tall as the tallest one; dragging the bottom edge sets one height for all. */
+.week { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; align-items: stretch; overflow-x: auto; padding-bottom: 8px; }
+.week-col { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 0 12px 12px; font-size: 14px;
+  display: flex; flex-direction: column; position: relative; overflow: auto; }
+.week-col:hover .resize::after { opacity: .5; }
+.week-col > .week-part.shaded { flex: 1 0 auto; display: flex; flex-direction: column; border-radius: 0 0 13px 13px; margin-bottom: -12px; }
+.week-col > .week-part.shaded textarea.lined { flex: 1; }
 .week-col.today { border-color: var(--taupe); }
 .week-head { display: grid; justify-items: center; width: calc(100% + 24px); margin: 0 -12px 6px; padding: 10px 6px; background: var(--blush); border: 0; border-radius: 13px 13px 0 0; cursor: pointer; }
 .week-head:hover { background: #dcc5b8; }
 .week-head b { font-family: var(--serif); font-size: 24px; font-weight: 600; line-height: 1.1; }
 .week-head small { font-size: 11px; color: var(--taupe-dark); letter-spacing: .06em; text-transform: uppercase; }
 .week-part { border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; }
-.week-part:last-child { border-bottom: 0; }
+.week-part:last-child, .week-part.shaded { border-bottom: 0; }
 .week-part.shaded { background: var(--blush-soft); margin: 6px -12px 0; padding: 2px 12px 8px; }
 .week-part:last-child.shaded { border-radius: 0 0 13px 13px; margin-bottom: -12px; }
 .week .checks li { padding: 5px 0; }
