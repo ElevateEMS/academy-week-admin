@@ -93,7 +93,7 @@ const MAX_PRIORITIES = 3;
 const orderOf = t => t.order ?? t.created ?? 0;
 const itemsFor = (n, kind) => S.todos.filter(t => (t.kind || 'todo') === kind && (t.day || 1) === n).sort((a, b) => orderOf(a) - orderOf(b));
 
-// Repeat to-dos (Settings → Day Templates) are copied into a cohort as ordinary
+// Repeat to-dos (Setup → Day Templates) are copied into a cohort as ordinary
 // to-dos the first time it's opened, so they can be checked, dragged or deleted.
 // Ids are fixed (rep-{day}-{text}) so the same one is never added twice.
 const repeatId = (n, text) => 'rep-' + n + '-' + slug(text);
@@ -340,7 +340,7 @@ function shell() {
 function pageTitle() {
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
   if (S.view === 'students') return `<h1>Students</h1><p>${S.sheet ? students().length + ' students' : ''}</p>`;
-  if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
+  if (S.view === 'settings') return '<h1>Setup</h1><p>Shared by you and Nick</p>';
   if (S.view === 'schedule') {
     const d = weekDays().find(x => x.n === (S.day || 1)) || {};
     return `<h1>Schedule</h1><p>Day ${S.day || 1}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
@@ -356,7 +356,7 @@ function menu() {
   return `<div class="menu" data-stop>
     <label class="menu-field">Cohort<select id="cohortSel" data-change="cohort">${opts || '<option>Loading…</option>'}</select></label>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
-    <button class="menu-item" data-act="view" data-v="settings">Settings</button>
+    <button class="menu-item" data-act="view" data-v="settings">Setup</button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
   </div>`;
 }
@@ -407,7 +407,7 @@ const hideToggle = k => `<button class="link" data-act="hideDone" data-k="${k}">
 
 function notesArea(n, placeholder) {
   const id = 'notes-' + n;
-  // Until the day's notes are typed in, they start from Settings → Day Templates.
+  // Until the day's notes are typed in, they start from Setup → Day Templates.
   const saved = S.days[n] && S.days[n].notes;
   const val = S.drafts[id] ?? (saved !== undefined ? saved : (cfg().dayNotes[n] || ''));
   return `<textarea id="${id}" class="lined" data-draft="${id}" data-notes="${n}" rows="6" placeholder="${placeholder}">${esc(val)}</textarea>`;
