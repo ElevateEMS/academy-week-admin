@@ -4,7 +4,8 @@
    app.js's S, Store, esc, render, schedFor, saveSched and so on.
 
    Saved in Firebase:
-     scenarios/{driveDocId}   { title, cat, skills: { skill: count }, note, checked, removed }  (your edits)
+     scenarios/{driveDocId}   { title, cat, skills: { skill: count }, traits: { chest, breathing, alert },
+                              every: day it's in every week (0 = no), note, checked, removed }  (your edits)
      meta/settings            scenTargets, scenAddons, planSize, lastPlan { cohort, ids }
      cohorts/{key}.weekPlan   { items: [{ id, addons: [text], day }], how, updated }
      schedule stations        { topic, content, scen: [docIds] }  (scenarios added to that station)
@@ -18,6 +19,7 @@ const OB_SKILLS = () => (DEFAULTS.skills.find(g => g.group === 'OB') || { items:
 // Skills a scenario can be tagged with: not vital signs/transport (every scenario has those), not OB (rote only).
 const TAG_GROUPS = () => DEFAULTS.skills.filter(g => g.group !== 'OB')
   .map(g => ({ group: g.group, items: g.items.filter(k => !Match.isEvery(k)) })).filter(g => g.items.length);
+const TRAIT_NAME = Object.fromEntries(SCEN.TRAITS);
 const scenTargets = () => ({ ...SCEN.TARGETS, ...((S.settings && S.settings.scenTargets) || {}) });
 const scenAddons = () => (S.settings && S.settings.scenAddons) || SCEN.ADDONS;
 const planSize = () => (S.settings && S.settings.planSize) || 12;
@@ -46,6 +48,7 @@ function scenLib() {
       id, title, name: niceTitle(title), url: (lv && lv.url) || docUrl(id),
       cat: d.cat || (sd && sd.cat) || (lv && lv.cat) || 'medical',
       skills, note: d.note ?? (sd ? sd.note : ''), removed: !!d.removed,
+      traits: d.traits || (sd && sd.traits) || {}, every: d.every ?? (sd && sd.every) ?? 0,
       status: d.checked ? 'checked' : skills ? 'suggested' : 'new',
       gone: !!live && !lv, // in the library but not in the folders anymore
       fresh: !!lv && !sd && !d.skills, // a Doc added to the folders since the tagging pass
@@ -58,7 +61,9 @@ function scenLib() {
 const libById = () => Object.fromEntries(scenLib().map(s => [s.id, s]));
 const usableScen = () => scenLib().filter(s => s.skills && !s.gone);
 const addonsByText = () => Object.fromEntries(scenAddons().map(a => [a.text, a]));
-const fitsAddon = (a, cat) => !a.cat || a.cat === 'any' || a.cat === cat;
+const fitsAddon = (a, sc) => Match.fits(a, sc);
+// "Only on: Tourniquet or Chest pain"
+const needsText = a => (a.needs || []).map(n => n.startsWith('trait:') ? TRAIT_NAME[n.slice(6)] || n : n).join(' or ');
 
 // "Tourniquet, Direct Pressure ×2" in Skills Tracking order.
 function skillText(skills) {
@@ -138,17 +143,20 @@ function coverLine(miss) {
     : '<p class="cover-line ok">✓ Every summative skill is covered</p>';
 }
 async function savePlan(items, extra = {}) {
-  await Store.set('cohorts/' + S.cohortKey, { weekPlan: { items: items.map(x => ({ id: x.id, addons: x.addons || [], day: x.day || 1 })), updated: Date.now(), ...extra } });
+  await Store.set('cohorts/' + S.cohortKey, { weekPlan: { items: items.map(x => ({ id: x.id, addons: x.addons || [], day: x.day || 1, ...(x.fixed ? { fixed: true } : {}) })), updated: Date.now(), ...extra } });
 }
 async function buildPlan(how) {
   const lib = libById();
+  // Scenarios marked "in every week" go in first, on their own day.
+  const pinned = usableScen().filter(s => s.every).map(s => ({ id: s.id, day: s.every }));
   let items;
   if (how === 'nick') {
-    items = Match.suggestDays(SCEN.NICK.filter(id => lib[id]).map(id => ({ id, addons: [] })), lib);
+    const ids = [...pinned.map(p => p.id), ...SCEN.NICK.filter(id => lib[id] && !pinned.some(p => p.id === id))];
+    items = Match.suggestDays(ids.map(id => { const p = pinned.find(x => x.id === id); return { id, addons: [], ...(p ? { day: p.day, fixed: true } : {}) }; }), lib);
   } else {
     const last = S.settings && S.settings.lastPlan;
     const avoid = last && last.cohort !== S.cohortKey ? last.ids || [] : planItems().map(x => x.id);
-    items = Match.build({ lib: usableScen(), addons: scenAddons(), targets: scenTargets(), size: planSize(), avoid });
+    items = Match.build({ lib: usableScen(), addons: scenAddons(), targets: scenTargets(), size: planSize(), avoid, pinned });
     await Store.set('meta/settings', { lastPlan: { cohort: S.cohortKey, ids: items.map(x => x.id) } });
   }
   await savePlan(items, { how });
@@ -183,14 +191,14 @@ function planModal() {
     return `<li class="plan-item">
       <div class="pi-main">
         <div><a class="pi-name" href="${esc(sc.url)}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc.name)}</a>
-          ${sc.cat ? `<span class="tag ${sc.cat}">${sc.cat}</span>` : ''}${sc.gone ? ' <span class="tag red">Doc missing</span>' : ''}</div>
+          ${sc.cat ? `<span class="tag ${sc.cat}">${sc.cat}</span>` : ''}${sc.every ? ' <span class="tag ok">Every week</span>' : ''}${sc.gone ? ' <span class="tag red">Doc missing</span>' : ''}</div>
         <div class="pi-skills">${esc(skillText(sc.skills))}</div>
         ${x.addons.map((t, j) => `<div class="pi-addon">+ ${esc(t)} <button class="x" data-act="planAddonDel" data-i="${idx}" data-j="${j}" aria-label="Remove add-on">×</button></div>`).join('')}
         ${at.length ? `<div class="pi-at">✓ On ${at.map(a => 'Day ' + a.day + ' · ' + esc(a.topic || 'a station')).join(', ')}</div>` : ''}
       </div>
       <div class="pi-tools">
         <select data-change="planDay" data-i="${idx}" title="Suggested day">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${(x.day || 1) === d ? 'selected' : ''}>Day ${d}</option>`).join('')}</select>
-        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => fitsAddon(a, sc.cat) && !x.addons.includes(a.text)).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
+        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => fitsAddon(a, sc) && !x.addons.includes(a.text)).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
         <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
         <button class="x" data-act="planDel" data-i="${idx}" title="Take it out of the plan" aria-label="Remove">×</button>
       </div></li>`;
@@ -341,10 +349,11 @@ function libScenarios() {
   const shown = all.filter(s => (f === 'all' || s.cat === f || (f === 'check' && s.status !== 'checked') || (f === 'new' && s.status === 'new'))
     && (!q || s.name.toLowerCase().includes(q) || skillText(s.skills).toLowerCase().includes(q)));
   // Skills that only 0-1 scenarios have: worth writing more for (or an add-on covers them).
-  const have = {};
-  usableScen().forEach(s => Object.keys(s.skills).forEach(k => { have[k] = (have[k] || 0) + 1; }));
+  // (A skill an every-week scenario has is always covered, so it isn't a worry.)
+  const have = {}, always = {};
+  usableScen().forEach(s => Object.keys(s.skills).forEach(k => { have[k] = (have[k] || 0) + 1; if (s.every) always[k] = true; }));
   const tagged = TAG_GROUPS().flatMap(g => g.items).filter(k => (scenTargets()[k] || 0) > 0);
-  const none = tagged.filter(k => !have[k]), one = tagged.filter(k => have[k] === 1);
+  const none = tagged.filter(k => !have[k]), one = tagged.filter(k => have[k] === 1 && !always[k]);
   const chip = (k, l) => `<button class="chip small ${f === k ? 'on' : ''}" data-act="libFilter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
   const statusTag = s => s.gone ? '<span class="tag red">Doc missing</span>'
     : s.status === 'checked' ? '<span class="tag ok">✓ Checked</span>'
@@ -357,7 +366,7 @@ function libScenarios() {
       <input id="libSearchIn" class="search" data-draft="libSearch" placeholder="Find a scenario or skill" value="${esc(S.drafts.libSearch || '')}"></div>
     <ul class="lib-list">${shown.map(s => `<li class="${S.libSel === s.id ? 'open' : ''}">
       <button class="lib-row" data-act="libSel" data-id="${s.id}">
-        <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}
+        <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}${s.every ? `<span class="tag ok">Every week · Day ${s.every}</span>` : ''}${Object.keys(s.traits).filter(t => s.traits[t]).map(t => `<span class="trait">${esc(TRAIT_NAME[t])}</span>`).join('')}
         <span class="lr-skills">${s.skills ? esc(skillText(s.skills)) : '<em>no tags yet</em>'}</span></button>
       ${S.libSel === s.id ? libEditor(s) : ''}</li>`).join('') || '<li class="empty">No scenarios match.</li>'}</ul>`;
 }
@@ -369,6 +378,10 @@ function libEditor(s) {
       <a class="btn small" href="${esc(s.url)}" target="_blank" rel="noopener">Open the Doc</a></div>
     <p class="muted small">Tap the skills a student can get signed off in this scenario. Tap again for ×2, again to clear.</p>
     ${skillPicker(dr.skills, 'libSkill')}
+    <div class="skill-group"><span>Patient</span><div>${SCEN.TRAITS.map(([t, l]) => `<button class="chip small ${dr.traits[t] ? 'on' : ''}" data-act="libTrait" data-t="${t}">${l}</button>`).join('')}
+      <span class="muted small">for add-ons like “nitro on any chest pain”</span></div></div>
+    <div class="skill-group"><span>Every week</span><div><select data-change="libEvery">${[0, 1, 2, 3, 4, 5].map(d => `<option value="${d}" ${dr.every === d ? 'selected' : ''}>${d ? 'Yes, on Day ' + d : 'No'}</option>`).join('')}</select>
+      <span class="muted small">its own station every cohort, so every plan includes it</span></div></div>
     <label class="field">Note <input id="libNoteIn" data-draft="libNote" value="${esc(S.drafts.libNote ?? dr.note ?? '')}" placeholder="e.g. Needs the CPAP rewrite"></label>
     <div class="le-btns">
       <button class="btn primary small" data-act="libSave" data-id="${s.id}">Save · looks right</button>
@@ -385,11 +398,20 @@ function skillPicker(skills, act, extra = '') {
 }
 
 function libAddons() {
-  const list = S.addonDraft || (S.addonDraft = JSON.parse(JSON.stringify(scenAddons())));
+  const list = S.addonDraft || (S.addonDraft = JSON.parse(JSON.stringify(scenAddons())).map(a => ({ needs: [], ...a })));
+  const allSkills = TAG_GROUPS().flatMap(g => g.items);
+  const label = n => n.startsWith('trait:') ? TRAIT_NAME[n.slice(6)] || n : n;
   return `<ul class="addon-list">${list.map((a, i) => `<li>
       <div class="ad-top"><input data-addon="${i}" value="${esc(a.text)}" placeholder="e.g. Add an extremity GSW that needs a tourniquet">
         <div class="seg">${[['any', 'Any'], ['medical', 'Medical'], ['trauma', 'Trauma']].map(([c, l]) => `<button class="${(a.cat || 'any') === c ? 'on' : ''}" data-act="addonCat" data-i="${i}" data-c="${c}">${l}</button>`).join('')}</div>
         <button class="x" data-act="addonDel" data-i="${i}" aria-label="Delete">×</button></div>
+      <div class="ad-rule"><span class="lbl">Only on scenarios with</span>
+        ${(a.needs || []).map((n, j) => `<span class="scen-chip">${esc(label(n))}<button class="x" data-act="addonNeedDel" data-i="${i}" data-j="${j}" aria-label="Remove">×</button></span>`).join('<span class="muted small">or</span>')}
+        <select data-change="addonNeed" data-i="${i}"><option value="">${(a.needs || []).length ? '+ or…' : 'any scenario (pick to limit it)'}</option>
+          <optgroup label="Patient">${SCEN.TRAITS.map(([t, l]) => `<option value="trait:${t}">${l}</option>`).join('')}</optgroup>
+          <optgroup label="Skill">${allSkills.map(k => `<option>${esc(k)}</option>`).join('')}</optgroup></select></div>
+      <div class="ad-rule"><span class="lbl">Swap: takes away</span>
+        <select data-change="addonMinus" data-i="${i}"><option value="">nothing (adds only)</option>${allSkills.map(k => `<option ${(a.minus || {})[k] ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
       ${skillPicker(a.skills, 'addonSkill', `data-i="${i}"`)}
     </li>`).join('')}</ul>
     <button class="btn small" data-act="addonAdd">+ Add an add-on</button>`;
@@ -404,6 +426,7 @@ function libReq() {
 
 /* ---------- Clicks for all of the above (app.js's act() hands them over) ---------- */
 const cycle = n => (n >= 2 ? 0 : n + 1);
+const libDraftOf = s => ({ skills: { ...(s.skills || {}) }, cat: s.cat, note: s.note || '', traits: { ...(s.traits || {}) }, every: s.every || 0 });
 async function scenAct(a, el, e) {
   const d = el.dataset || {};
   switch (a) {
@@ -416,20 +439,24 @@ async function scenAct(a, el, e) {
     case 'libSel': {
       if (S.libSel === d.id) { S.libSel = null; render(); return true; }
       const s = libById()[d.id];
-      S.libSel = d.id; S.libDraft = { skills: { ...(s.skills || {}) }, cat: s.cat, note: s.note || '' }; delete S.drafts.libNote;
+      S.libSel = d.id; S.libDraft = libDraftOf(s); delete S.drafts.libNote;
       render(); return true;
     }
     case 'libCat': S.libDraft.cat = d.c; render(); return true;
+    case 'libTrait': { const t = S.libDraft.traits; if (t[d.t]) delete t[d.t]; else t[d.t] = true; render(); return true; }
+    case 'addonNeedDel': S.addonDraft[Number(d.i)].needs.splice(Number(d.j), 1); render(); return true;
     case 'libSkill': { const sk = S.libDraft.skills; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
     case 'libSave': {
       const s = libById()[d.id];
-      await Store.set('scenarios/' + d.id, { title: s.title, cat: S.libDraft.cat, skills: S.libDraft.skills, note: (S.drafts.libNote ?? S.libDraft.note ?? '').trim(), checked: true, saved: Date.now() }, false);
+      const dr = S.libDraft;
+      await Store.set('scenarios/' + d.id, { title: s.title, cat: dr.cat, skills: dr.skills, traits: dr.traits, every: dr.every || 0,
+        note: (S.drafts.libNote ?? dr.note ?? '').trim(), checked: true, saved: Date.now() }, false);
       delete S.drafts.libNote;
       // On to the next one that hasn't been checked, so you can go down the list.
       const list = scenLib(), i = list.findIndex(x => x.id === d.id);
       const next = list.slice(i + 1).find(x => x.status !== 'checked' && x.id !== d.id);
       S.libSel = null;
-      if (next && S.libFilter === 'check') { S.libSel = next.id; S.libDraft = { skills: { ...(next.skills || {}) }, cat: next.cat, note: next.note || '' }; }
+      if (next && S.libFilter === 'check') { S.libSel = next.id; S.libDraft = libDraftOf(next); }
       toast('Saved.'); render(); return true;
     }
     case 'libReset':
@@ -440,9 +467,9 @@ async function scenAct(a, el, e) {
     case 'addonCat': S.addonDraft[Number(d.i)].cat = d.c; render(); return true;
     case 'addonSkill': { const sk = S.addonDraft[Number(d.i)].skills; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
     case 'addonDel': S.addonDraft.splice(Number(d.i), 1); render(); return true;
-    case 'addonAdd': S.addonDraft.push({ text: '', cat: 'any', skills: {} }); render(); return true;
+    case 'addonAdd': S.addonDraft.push({ text: '', cat: 'any', skills: {}, needs: [] }); render(); return true;
     case 'addonSave': {
-      const list = (S.addonDraft || scenAddons()).map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills })).filter(x => x.text);
+      const list = (S.addonDraft || scenAddons()).map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills, needs: x.needs || [], ...(x.minus ? { minus: x.minus } : {}) })).filter(x => x.text);
       await Store.set('meta/settings', { scenAddons: list }); S.addonDraft = null; toast('Add-ons saved.'); render(); return true;
     }
     case 'reqSave': await Store.set('meta/settings', { scenTargets: S.reqDraft || scenTargets() }); S.reqDraft = null; toast('Saved.'); render(); return true;
@@ -502,6 +529,9 @@ async function scenAct(a, el, e) {
 // Dropdowns and number boxes (app.js's change listener hands these over).
 async function scenChange(t) {
   const c = t.dataset.change;
+  if (c === 'libEvery') { S.libDraft.every = Number(t.value); render(); return true; }
+  if (c === 'addonNeed') { const a = S.addonDraft[Number(t.dataset.i)]; if (t.value && !(a.needs || []).includes(t.value)) a.needs = [...(a.needs || []), t.value]; render(); return true; }
+  if (c === 'addonMinus') { const a = S.addonDraft[Number(t.dataset.i)]; if (t.value) a.minus = { [t.value]: 1 }; else delete a.minus; render(); return true; }
   if (c === 'planDay' || c === 'planAddon') {
     const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
     const it = items[Number(t.dataset.i)];
@@ -511,7 +541,8 @@ async function scenChange(t) {
   }
   if (c === 'planAdd') {
     if (!t.value) return true;
-    const lib = libById(), items = [...planItems(), { id: t.value, addons: [], day: lib[t.value].cat === 'trauma' ? 3 : 2 }];
+    const lib = libById(), sc = lib[t.value];
+    const items = [...planItems(), { id: t.value, addons: [], day: sc.every || (sc.cat === 'trauma' ? 3 : 2), ...(sc.every ? { fixed: true } : {}) }];
     await savePlan(items); return true;
   }
   if (c === 'planSize') { const v = Math.max(5, Math.min(25, Number(t.value) || 12)); await Store.set('meta/settings', { planSize: v }); return true; }

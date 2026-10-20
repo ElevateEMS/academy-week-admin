@@ -10,7 +10,8 @@
    TARGETS: summative sign-offs each student needs, from the "MINIMUM - Skill Tracking
    Rote/Summative" sheet. Editable in the app (Scenario Library → Requirements).
 
-   ADDONS: twists you can add to a scenario to cover a skill it doesn't have. Editable.
+   ADDONS: twists you can add to a scenario to cover a skill it doesn't have, some only on certain
+   scenarios (needs) and some swapping one skill for another (minus). Editable.
 
    NICK: Nick's 12 mandatory scenarios (Summer 2026), matched to the closest Doc. */
 const SCEN = (() => {
@@ -89,19 +90,44 @@ const SCEN = (() => {
     'Assisted Delivery': 0, 'Complicated Delivery': 0,
   };
 
-  // cat: which kind of scenario it fits ('any', 'medical' or 'trauma').
+  // Add-ons, from Bella's rules (Oct 20). cat: which kind of scenario ('any', 'medical', 'trauma').
+  // needs: it only goes on a scenario that has ANY of these (a skill, or 'trait:chest' / 'trait:breathing' / 'trait:alert').
+  // minus: a swap; the scenario loses this skill (jaw thrust instead of head tilt).
+  const A = (text, cat, skills, needs = [], minus = null) => ({ text, cat, skills, needs, ...(minus ? { minus } : {}) });
   const ADDONS = [
-    { text: 'Add an extremity GSW that needs a tourniquet', cat: 'trauma', skills: { 'Tourniquet': 1, 'Direct Pressure': 1 } },
-    { text: 'Add a junctional wound that needs packing', cat: 'trauma', skills: { 'Wound Packing': 1, 'Direct Pressure': 1 } },
-    { text: 'Add a mid-shaft femur fracture (traction splint)', cat: 'trauma', skills: { 'Traction Splint': 1, 'Extremity Stabilization': 1 } },
-    { text: 'Add a deformed forearm to splint', cat: 'trauma', skills: { 'Extremity Stabilization': 1, 'Extremity Splinting': 1 } },
-    { text: 'Add a significant MOI: full spinal motion restriction', cat: 'trauma', skills: { 'Manual C-Spine': 1, 'C-Collar': 1, 'Long Spine Board': 1 } },
-    { text: 'Patient stops breathing: BVM with an OPA', cat: 'any', skills: { 'Head Tilt': 1, 'OPA': 1, 'BVM': 1 } },
-    { text: 'Patient goes into arrest: CPR, AED and an i-Gel', cat: 'any', skills: { 'CPR': 1, 'Defibrillation': 1, 'SGA (iGel)': 1 } },
-    { text: 'Patient vomits: suction the airway', cat: 'any', skills: { 'Suctioning': 1 } },
-    { text: 'Patient becomes altered: check a blood glucose', cat: 'any', skills: { 'BG Monitoring': 1 } },
-    { text: 'Patient becomes hypoxic: NRB', cat: 'any', skills: { 'NRB': 1 } },
+    A('Patient is dizzy with a diabetic history: check a blood glucose', 'any', { 'BG Monitoring': 1 }),
+    A('Patient becomes hypoxic: NRB', 'any', { 'NRB': 1 }),
+    A('Patient vomits (gastric distension or gagging on an OPA): suction', 'any', { 'Suctioning': 1 }),
+    A('Add a second wound that needs packing', 'any', { 'Wound Packing': 1, 'Direct Pressure': 1 }, ['Tourniquet']),
+    A('Start with an OPA; patient gags, switch to an NPA', 'any', { 'OPA': 1, 'NPA': 1 }, ['BVM']),
+    A('Place an i-Gel', 'any', { 'SGA (iGel)': 1 }, ['BVM']),
+    A('Patient gags on the OPA: switch to an NPA', 'any', { 'NPA': 1 }, ['OPA']),
+    A('Try an OPA first; patient gags, switch to the NPA', 'any', { 'OPA': 1 }, ['NPA']),
+    A('Patient is hypoglycemic: oral glucose', 'any', { 'Oral Glucose': 1, 'BG Monitoring': 1 }, ['trait:alert']),
+    A('Patient has prescribed nitro for angina: assist with nitro', 'any', { 'Sublingual (Nitro)': 1 }, ['trait:chest']),
+    A('Patient has a prescribed inhaler: assist with it', 'any', { 'Assisted Inhaler': 1 }, ['trait:breathing']),
+    A('Breathing gets worse: CPAP', 'any', { 'CPAP': 1 }, ['trait:breathing']),
+    A('Add a mid-shaft femur fracture (traction splint)', 'trauma', { 'Traction Splint': 1, 'Extremity Stabilization': 1 }),
+    A('Add a deformed extremity to splint', 'trauma', { 'Extremity Stabilization': 1, 'Extremity Splinting': 1 }),
+    A('Add a significant MOI: full spinal motion restriction', 'trauma', { 'Manual C-Spine': 1, 'C-Collar': 1, 'Long Spine Board': 1 }),
+    A('Add an extremity bleed that needs a tourniquet', 'trauma', { 'Tourniquet': 1, 'Direct Pressure': 1 }),
+    A('Possible spinal injury: jaw thrust instead of head tilt', 'any', { 'Jaw-Thrust': 1 }, ['Head Tilt'], { 'Head Tilt': 1 }),
+    A('Head tilt instead of jaw thrust (no spinal concern)', 'any', { 'Head Tilt': 1 }, ['Jaw-Thrust'], { 'Jaw-Thrust': 1 }),
   ];
+
+  // Patient types, for add-ons like "nitro on any chest pain" (Claude's first pass; checked in the Library).
+  const TRAIT_SEED = {
+    chest: ['Medical - Angina', 'Medical - Pneumonia pediatric', 'Medical - PE unstable', 'Medical - MI unstable'],
+    breathing: ['Medical - Pediatric Measles unstable', 'Medical - Anxiety Attack', 'Medical - COPD unstable', 'Medical - Asthma unstable',
+      'Medical - Pneumonia pediatric', 'Medical - Pediatric Pertussis', 'Medical - Pediatric Croup unstable', 'Medical - Asthma',
+      'Medical - PE unstable', 'Medical - MI unstable', 'Medical - heart failure', 'Medical - Anaphylaxis unstable'],
+    alert: ['Medical - Hypoglycemia', 'Medical - Stroke Ischemic unstable', 'Medical - TIA', 'Medical - Hallucinations'],
+  };
+  SEED.forEach(x => {
+    x.traits = Object.fromEntries(Object.keys(TRAIT_SEED).filter(t => TRAIT_SEED[t].includes(x.title)).map(t => [t, true]));
+  });
+  // In every week, on that day: Nick's cardiac arrest station (its own station every cohort).
+  SEED.find(x => x.title === 'Medical - cardiac arrest unstable').every = 4;
 
   // Nick's twelve, in his order. His notes say which ones still need changes.
   const NICK = [
@@ -119,5 +145,7 @@ const SCEN = (() => {
     '1axezNWv6SYbCf1VHRPLe4kSCDLkwOit1UQz5Ne8XlTY', // 12 Sports Injury
   ];
 
-  return { SEED, TARGETS, ADDONS, NICK };
+  const TRAITS = [['chest', 'Chest pain'], ['breathing', 'Difficulty breathing'], ['alert', 'Altered but alert']];
+
+  return { SEED, TARGETS, ADDONS, NICK, TRAITS };
 })();

@@ -416,9 +416,9 @@ function shell() {
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
   ${S.binderOpen ? binderModal() : ''}
-  ${S.libOpen ? libModal() : ''}
   ${S.planOpen ? planModal() : ''}
   ${S.match ? matchModal() : ''}
+  ${S.libOpen ? libModal() : ''}
   ${S.place ? placeModal() : ''}`;
 }
 
@@ -1408,7 +1408,7 @@ document.addEventListener('focusout', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
-  if (/^plan/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
+  if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
   if (t.dataset.change === 'squadCount') { act('squadCount', t); return; }
   if (t.dataset.change === 'squadAdd') { act('squadAdd', t); return; }
