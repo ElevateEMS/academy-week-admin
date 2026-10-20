@@ -609,3 +609,5 @@ a.btn { text-decoration: none; color: inherit; }
 .extras-toggle { display: block; margin: 8px 0 4px; text-decoration: none; font-size: 14px; color: var(--taupe-dark); }
 .extras-toggle:hover { text-decoration: underline; }
 .extras { border-left: 2px solid var(--line); padding-left: 10px; margin-bottom: 6px; }
+.modal.schtpl { width: min(1180px, 100%); }
+.modal.schtpl .sched-grid { padding-bottom: 6px; }

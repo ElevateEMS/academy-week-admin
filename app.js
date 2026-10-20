@@ -15,7 +15,8 @@ const S = {
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
-  menuOpen: false, schMenu: false, datePick: null, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, schMenu: false, datePick: null, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every',
+  schTplOpen: false, schTplTab: 1, schTplDraft: null, schTplDirty: false, schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
   // Scenarios: scenDocs = your saved tags, scenLive = Docs in the Drive folders (null until listed)
   scenDocs: {}, scenDocsAt: 0, scenLive: null, scenLiveAt: 0, scenErr: null,
   libOpen: false, libTab: 'scen', libSel: null, libDraft: null, libFilter: 'all', addonDraft: null, reqDraft: null, planOpen: false, place: null, match: null,
@@ -415,6 +416,7 @@ function shell() {
   ${S.shareOpen ? shareModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
+  ${S.schTplOpen ? schTplModal() : ''}
   ${S.binderOpen ? binderModal() : ''}
   ${S.planOpen ? planModal() : ''}
   ${S.match ? matchModal() : ''}
@@ -708,7 +710,6 @@ function scheduleView() {
         <button class="menu-item" data-act="printAll">Print all 5 days</button>
         <button class="menu-item" data-act="shareOpen">${token ? 'Instructor link & QR' : 'Make instructor link'}</button>
         <button class="menu-item" data-act="libOpen">Scenario Library</button>
-        <button class="menu-item" data-act="saveTemplate">Save this week as the template <span class="muted small">New cohorts start from this schedule</span></button>
       </div>` : ''}
     </div>
   </div>
@@ -1150,6 +1151,13 @@ function settingsView() {
     </section>
 
     <section class="box">
+      <div class="box-head static"><h2>Schedule Template</h2></div>
+      <p class="muted small">The class schedule, station content and instructor notes each cohort starts with (Day 1–5). A cohort’s days you haven’t changed yet follow it too; days you’ve edited keep your changes. Scenarios added from the week plan are never saved into it.</p>
+      <div class="plan-btns"><button class="btn primary" data-act="schTplOpen">Edit schedule template</button>
+        ${S.sheet ? `<button class="btn" data-act="saveTemplate">Save ${esc(S.cohortKey)}’s week as the template</button>` : ''}</div>
+    </section>
+
+    <section class="box">
       <div class="box-head static"><h2>Scenario Library</h2></div>
       <p class="muted small">Your patient scenario Docs and the skills each one covers, the add-ons, and how many summative sign-offs each student needs. New Docs in the Medical / Trauma folders show up here on their own.</p>
       <button class="btn primary" data-act="libOpen">Open the Scenario Library</button>
@@ -1185,6 +1193,56 @@ function settingsView() {
       <button class="btn" data-act="resetLayout">Reset layout</button>
     </section>
   </div>`;
+}
+
+/* ---------- Schedule template (Setup → Schedule Template) ---------- */
+// Scenario lines added from the week plan or Find a Scenario belong to that cohort,
+// so they're left out of the template (and squads never go in it).
+function stripScenarios(day) {
+  const lib = libById();
+  return {
+    blocks: (day.blocks || []).map(b => ({ time: b.time || '', activity: b.activity || '' })),
+    stations: (day.stations || []).map(st => {
+      const names = (st.scen || []).map(id => lib[id] && lib[id].name).filter(Boolean);
+      const content = String(st.content || '').split('\n').filter(l => !names.some(nm => l.startsWith(nm + ':'))).join('\n').replace(/\s+$/, '');
+      return { topic: st.topic || '', content };
+    }),
+    stationNote: day.stationNote || '', notes: day.notes || '',
+  };
+}
+function schTplModal() {
+  const n = S.schTplTab, d = S.schTplDraft[n];
+  const id = (...p) => ['stpl', n, ...p].join('-');
+  const tools = (list, i) => `<span class="row-tools"><button class="x" data-act="stplMove" data-list="${list}" data-i="${i}" data-dir="-1" title="Move up">↑</button><button class="x" data-act="stplMove" data-list="${list}" data-i="${i}" data-dir="1" title="Move down">↓</button><button class="x" data-act="stplDel" data-list="${list}" data-i="${i}" title="Remove">×</button></span>`;
+  return `<div class="overlay" data-act="schTplClose"><div class="modal schtpl" data-stop>
+    <div class="modal-head"><h2>Schedule Template</h2><button class="x big" data-act="schTplClose" aria-label="Close">×</button></div>
+    <div class="bag-tabs">${[1, 2, 3, 4, 5].map(x => `<button class="bag-tab ${x === n ? 'on' : ''}" data-act="schTplTab" data-n="${x}">Day ${x}</button>`).join('')}</div>
+    <div class="modal-body" data-keep-scroll="schtpl"><div class="sched-grid tpl-body">
+      <div class="sched-col">
+        <section class="box"><div class="box-head static"><h2>Class Schedule</h2><button class="add-plus" data-act="stplAdd" data-list="blocks" title="Add a time" aria-label="Add a time">+</button></div>
+          <div class="sched-rows">${d.blocks.map((b, i) => `<div class="sched-row">
+            <input id="${id('bt', i)}" data-stpl="blocks" data-i="${i}" data-f="time" value="${esc(b.time)}" placeholder="Time">
+            <input id="${id('ba', i)}" data-stpl="blocks" data-i="${i}" data-f="activity" value="${esc(b.activity)}" placeholder="Activity">
+            ${tools('blocks', i)}</div>`).join('') || '<p class="empty">No times yet.</p>'}</div>
+        </section>
+        <section class="box"><div class="box-head static"><h2>Instructor Notes/Reminders</h2></div>
+          <textarea id="${id('notes')}" class="sched-notes" data-stpl="notes" data-grow rows="8">${esc(d.notes)}</textarea>
+        </section>
+      </div>
+      <div class="sched-col">
+        <section class="box"><div class="box-head static"><h2>Station Content</h2><button class="add-plus" data-act="stplAdd" data-list="stations" title="Add a station" aria-label="Add a station">+</button></div>
+          ${d.stations.map((st, i) => `<div class="sched-station">
+            <div class="sched-station-top"><input id="${id('st', i)}" data-stpl="stations" data-i="${i}" data-f="topic" value="${esc(st.topic)}" placeholder="Station topic">${tools('stations', i)}</div>
+            <textarea id="${id('sc', i)}" data-stpl="stations" data-i="${i}" data-f="content" data-grow rows="2" placeholder="Content & instructor notes">${esc(st.content)}</textarea>
+          </div>`).join('') || '<p class="empty">No stations this day.</p>'}
+          <label class="field sched-foot">Note under the stations
+            <input id="${id('sn')}" data-stpl="stationNote" value="${esc(d.stationNote)}" placeholder="e.g. Stations with two topics: split into 30 minute segments."></label>
+        </section>
+      </div>
+    </div></div>
+    <div class="modal-foot"><span class="muted small">Used for every cohort. Days a cohort has already changed keep their changes.</span>
+      <button class="btn primary" data-act="schTplSave">Save</button></div>
+  </div></div>`;
 }
 
 /* ---------- Day Templates pop-up ---------- */
@@ -1378,6 +1436,14 @@ addEventListener('resize', fitBoard);
 /* ---------- Events ---------- */
 document.addEventListener('input', e => {
   const t = e.target, k = t.dataset.draft;
+  // Schedule template pop-up: typing changes the draft until Save.
+  if (t.dataset.stpl && S.schTplDraft) {
+    const d = S.schTplDraft[S.schTplTab], f = t.dataset.stpl;
+    if (f === 'notes' || f === 'stationNote') d[f] = t.value; else d[f][Number(t.dataset.i)][t.dataset.f] = t.value;
+    S.schTplDirty = true;
+    if (t.hasAttribute('data-grow')) grow(t);
+    return;
+  }
   // Scenario Library: add-on names and requirement numbers wait for Save.
   if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
   if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
@@ -1423,7 +1489,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.datePick) S.datePick = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1705,12 +1771,39 @@ async function act(a, el = {}, e) {
         await saveSquads(n, { count: sq.count, s }); break;
       }
       case 'saveTemplate': {
-        if (!confirm('Use this week’s schedule (times, stations and notes, not squads) as the starting point for future cohorts?')) return;
+        if (!confirm(`Use ${S.cohortKey}’s schedule (times, stations and notes; not squads or scenarios) as the template for every cohort?`)) return;
         const tpl = {};
-        weekDays().forEach(x => { tpl[x.n] = schedFor(x.n); });
+        [1, 2, 3, 4, 5].forEach(x => { tpl[x] = stripScenarios(schedFor(x)); });
         await Store.set('meta/settings', { scheduleTemplate: tpl });
-        toast('Saved. New cohorts will start from this schedule.'); break;
+        toast('Saved as the schedule template.'); break;
       }
+      case 'schTplOpen':
+        S.schTplDraft = Object.fromEntries([1, 2, 3, 4, 5].map(x => [x, stripScenarios(JSON.parse(JSON.stringify(schedTemplate(x))))]));
+        S.schTplOpen = true; S.schTplTab = 1; S.schTplDirty = false; render(); break;
+      case 'schTplTab': S.schTplTab = Number(d.n); render(); break;
+      case 'schTplClose':
+        if (S.schTplDirty && !confirm('Close without saving your changes?')) return;
+        S.schTplOpen = false; S.schTplDraft = null; render(); break;
+      case 'stplAdd': {
+        const day = S.schTplDraft[S.schTplTab];
+        day[d.list].push(d.list === 'blocks' ? { time: '', activity: '' } : { topic: '', content: '' });
+        S.schTplDirty = true; render(); break;
+      }
+      case 'stplDel': {
+        const list = S.schTplDraft[S.schTplTab][d.list], i = Number(d.i), item = list[i];
+        const label = d.list === 'blocks' ? (item.activity || 'this time') : (item.topic || 'this station');
+        if (!confirm('Remove “' + label + '” from the Day ' + S.schTplTab + ' template?')) return;
+        list.splice(i, 1); S.schTplDirty = true; render(); break;
+      }
+      case 'stplMove': {
+        const list = S.schTplDraft[S.schTplTab][d.list], i = Number(d.i), j = i + Number(d.dir);
+        if (j < 0 || j >= list.length) return;
+        [list[i], list[j]] = [list[j], list[i]]; S.schTplDirty = true; render(); break;
+      }
+      case 'schTplSave':
+        await Store.set('meta/settings', { scheduleTemplate: S.schTplDraft });
+        S.schTplOpen = false; S.schTplDraft = null; S.schTplDirty = false;
+        toast('Schedule template saved.'); render(); break;
       case 'printDay': await printDays([n]); break;
       case 'printAll': await printDays(weekDays().map(x => x.n)); break;
       case 'shareOpen': S.shareOpen = true; render(); setTimeout(showShareQr, 30); break;
