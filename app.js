@@ -14,7 +14,7 @@ const S = {
   settings: null, shopping: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
-  menuOpen: false, schMenu: false, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  menuOpen: false, schMenu: false, datePick: null, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -789,6 +789,34 @@ async function printDays(list) {
   window.print();
 }
 
+/* ---------- Date picker (our own, so it matches the app instead of Chrome's) ---------- */
+// The picked date is kept in S.drafts[key] as YYYY-MM-DD (today until you pick one).
+const CAL_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M4 10.5h16"/></svg>';
+function datePicker(key) {
+  const value = S.drafts[key] || todayIso();
+  const d = parseIso(value);
+  const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+  const open = S.datePick && S.datePick.key === key;
+  let cal = '';
+  if (open) {
+    const [y, m] = S.datePick.month.split('-').map(Number);
+    const first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate();
+    const cells = Array.from({ length: first.getDay() }, () => '<span></span>');
+    for (let i = 1; i <= days; i++) {
+      const iso = isoOf(new Date(y, m - 1, i));
+      cells.push(`<button type="button" class="${iso === value ? 'on' : ''} ${iso === todayIso() ? 'today' : ''}" data-act="dpPick" data-k="${key}" data-iso="${iso}">${i}</button>`);
+    }
+    cal = `<div class="dp-pop">
+      <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
+        <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
+        <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
+      <div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>
+      <button type="button" class="link dp-today" data-act="dpPick" data-k="${key}" data-iso="${todayIso()}">Today</button>
+    </div>`;
+  }
+  return `<span class="dp"><button type="button" class="date-btn ${open ? 'on' : ''}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${label}</span></button>${cal}</span>`;
+}
+
 /* ---------- Documentation Checklist (Finalize page) ---------- */
 // Items come from Setup → Day Templates → Finalize; checks are per cohort in cohorts/{key}.docChecks.
 const DOC_SECTIONS = ['class', 'student', 'skills', 'final'];
@@ -940,7 +968,7 @@ function studentsView() {
 
   return `
   <div class="students-top">
-    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Attendance notes')}</div>
+    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Conduct notes')}</div>
     <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">
   </div>
   ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="muted small">for picking tomorrow’s scenarios</span></div>
@@ -948,15 +976,14 @@ function studentsView() {
   </section>` : ''}
   <section class="box table-box">
     <table class="roster">
-      <thead><tr><th>#</th><th>Student</th><th class="c">Skills</th><th class="c">Patient contacts</th><th class="c">To fix</th><th class="c">Attendance</th></tr></thead>
+      <thead><tr><th>#</th><th>Student</th><th class="c">Patient contacts</th><th class="c">Skills</th><th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
+        <td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
         <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
-        <td class="c">${pcStepper(s, { row: true })}</td>
-        <td class="c" data-part="fix">${s.fixes ? `<span class="badge warn">${s.fixes}</span>` : '<span class="muted">–</span>'}</td>
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
-      </tr>`).join('') || '<tr><td colspan="6" class="empty">No students match.</td></tr>'}</tbody>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty">No students match.</td></tr>'}</tbody>
     </table>
   </section>`;
 }
@@ -1006,16 +1033,6 @@ function drawer() {
       ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
         ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>`}
 
-      ${show('skills') ? `<section>
-        <h3>Skills</h3>
-        <div class="seg wide">${[['on', 'On track'], ['behind', 'Behind'], ['done', 'Done']].map(([k, l]) =>
-          `<button class="${s.skill === k ? 'on ' + k : ''}" data-act="skill" data-sid="${s.sid}" data-v="${k}">${l}</button>`).join('')}</div>
-        ${s.skill === 'behind' ? `<p class="muted small">Tap what they’re behind on:</p>
-          ${DEFAULTS.skills.map(g => `<div class="skill-group"><span>${esc(g.group)}</span><div>${g.items.map(k =>
-            `<button class="chip small ${s.behind.includes(k) ? 'on warn' : ''}" data-act="behind" data-sid="${s.sid}" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>`).join('')}` : ''}
-        <textarea id="${dk('note')}" data-draft="${dk('note')}" data-change="note" data-sid="${s.sid}" rows="2" placeholder="Skills note (optional)">${esc(note)}</textarea>
-      </section>` : ''}
-
       ${show('contacts') ? `<section>
         <h3>Patient Contacts</h3>
         <div class="pc-big">${pcStepper(s)}<span class="muted small">in the Google Sheet (column P)</span></div>
@@ -1035,11 +1052,21 @@ function drawer() {
           <button class="x" data-act="delContact" data-id="${c.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">No contact notes yet.</li>'}</ul>
       </section>` : ''}
 
+      ${show('skills') ? `<section>
+        <h3>Skills</h3>
+        <div class="seg wide">${[['on', 'On track'], ['behind', 'Behind'], ['done', 'Done']].map(([k, l]) =>
+          `<button class="${s.skill === k ? 'on ' + k : ''}" data-act="skill" data-sid="${s.sid}" data-v="${k}">${l}</button>`).join('')}</div>
+        ${s.skill === 'behind' ? `<p class="muted small">Tap what they’re behind on:</p>
+          ${DEFAULTS.skills.map(g => `<div class="skill-group"><span>${esc(g.group)}</span><div>${g.items.map(k =>
+            `<button class="chip small ${s.behind.includes(k) ? 'on warn' : ''}" data-act="behind" data-sid="${s.sid}" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>`).join('')}` : ''}
+        <textarea id="${dk('note')}" data-draft="${dk('note')}" data-change="note" data-sid="${s.sid}" rows="2" placeholder="Skills note (optional)">${esc(note)}</textarea>
+      </section>` : ''}
+
       ${show('attendance') ? `<section>
-        <h3>Attendance & Warnings</h3>
+        <h3>Conduct</h3>
         <div class="log-form">
           <div class="row2">
-            <label>Date<input id="${dk('wdate')}" data-draft="${dk('wdate')}" type="date" value="${esc(S.drafts[dk('wdate')] || todayIso())}"></label>
+            <div class="lbl">Date${datePicker(dk('wdate'))}</div>
             <label>Type<select id="${dk('wtype')}" data-draft="${dk('wtype')}">${DEFAULTS.warningTypes.map(t => `<option ${S.drafts[dk('wtype')] === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           </div>
           <textarea id="${dk('wnote')}" data-draft="${dk('wnote')}" rows="2" placeholder="What happened?">${esc(S.drafts[dk('wnote')] || '')}</textarea>
@@ -1331,7 +1358,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    if (S.datePick) S.datePick = null; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1345,6 +1372,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', e => {
   if (S.menuOpen && !e.target.closest('.menu-wrap')) { S.menuOpen = false; render(); }
   if (S.schMenu && !e.target.closest('.sched-more')) { S.schMenu = false; render(); }
+  if (S.datePick && !e.target.closest('.dp')) { S.datePick = null; render(); }
   const el = e.target.closest('[data-act]');
   if (!el) return;
   if (el.closest('.sched-more .menu')) { S.schMenu = false; render(); } // picking something closes the ⋯ menu
@@ -1484,6 +1512,16 @@ async function act(a, el = {}, e) {
         await Store.set(P('students/' + d.sid), { behind: next }); break;
       }
       case 'cadd': S.drafts['cadd-' + d.sid] = el.checked; break;
+      case 'dpOpen': {
+        const open = S.datePick && S.datePick.key === d.k;
+        S.datePick = open ? null : { key: d.k, month: (S.drafts[d.k] || todayIso()).slice(0, 7) };
+        render(); break;
+      }
+      case 'dpMonth': {
+        const [y, m] = S.datePick.month.split('-').map(Number), nd = new Date(y, m - 1 + Number(d.dir), 1);
+        S.datePick.month = isoOf(nd).slice(0, 7); render(); break;
+      }
+      case 'dpPick': S.drafts[d.k] = d.iso; S.datePick = null; render(); break;
       case 'callToggle': { const k = 'call-' + d.sid; S.drafts[k] = !S.drafts[k]; render(); break; }
       case 'logContact': {
         const s = studentBySid(d.sid); const k = x => x + '-' + d.sid;
@@ -1514,7 +1552,7 @@ async function act(a, el = {}, e) {
         render(); break;
       }
       case 'delWarning':
-        if (!confirm('Delete this attendance note?')) return;
+        if (!confirm('Delete this conduct note?')) return;
         await Store.del(P('warnings/' + d.id)); break;
 
       case 'tplOpen': S.tplOpen = true; S.tplTab = 'every'; render(); break;
