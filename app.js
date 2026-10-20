@@ -12,8 +12,8 @@ const VIEWS = ['day', 'week', 'schedule', 'students', 'settings'];
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
   settings: null, shopping: [],
-  cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [],
-  view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null,
+  cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
+  view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
   menuOpen: false, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
 };
 let unwatchCohort = [];
@@ -37,6 +37,20 @@ function weekDays() {
     return { ...d, label, iso };
   });
 }
+// Besides Day 1-5 there's Prep (before the week, day 0) and Finalize (after it, day 6).
+const PREP = 0, FINAL = 6, ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const dayName = n => n === PREP ? 'Prep' : n === FINAL ? 'Finalize' : 'Day ' + n;
+const curDay = () => S.day ?? 1;
+const schedDay = () => Math.min(5, Math.max(1, curDay())); // the Schedule page only has Day 1-5
+// Before the week → Prep; after it → Finalize; during it (or no start date) → null.
+function phaseDay() {
+  const days = weekDays().filter(d => d.iso);
+  if (!days.length) return null;
+  const t = todayIso();
+  if (t < days[0].iso) return PREP;
+  if (t > days[days.length - 1].iso) return FINAL;
+  return null;
+}
 function currentWeekDay() {
   const t = todayIso();
   const hit = weekDays().find(d => d.iso === t);
@@ -44,30 +58,38 @@ function currentWeekDay() {
 }
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
-const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes' };
-const DEFAULT_LAYOUT = [['priorities', 'shopping'], ['todo'], ['notes']];
+const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List' };
+// Prep has its own boxes and its own saved layout; every other day shares one.
+const BOARDS = {
+  day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
+  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing'], def: [['shopping', 'notes'], ['todo'], ['packing']] },
+};
+const boardOf = n => BOARDS[n === PREP ? 'prep' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
 function cfg() {
   const s = S.settings || {};
+  const board = boardOf(curDay()), saved = s[board.key];
   return {
     checklist: s.checklist || DEFAULTS.checklist,
     dayNotes: s.dayNotes || {},
+    packing: s.packingList || DEFAULTS.packingList || [],
     weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
     someBags: s.someBags || {},
     skipStaff: s.skipStaff || DEFAULTS.skipStaff,
     bagCount: DEFAULTS.bagCount,
-    layout: validLayout(s.layout) || DEFAULT_LAYOUT,
-    heights: (validLayout(s.layout) && s.layout.h) || {},
+    board,
+    layout: validLayout(saved, board) || board.def,
+    heights: (validLayout(saved, board) && saved.h) || {},
   };
 }
 // Firestore can't store nested arrays, so the layout is saved as
 // { v, c0: [...], c1: [...], c2: [...], h: { box: heightInPx } }.
-function validLayout(l) {
+function validLayout(l, board) {
   if (!l || l.v !== LAYOUT_VERSION) return null;
-  const cols = [l.c0 || [], l.c1 || [], l.c2 || []].map(c => c.filter(b => BOXES[b]));
+  const cols = [l.c0 || [], l.c1 || [], l.c2 || []].map(c => c.filter(b => board.boxes.includes(b)));
   const seen = new Set(cols.flat());
-  Object.keys(BOXES).forEach(b => { if (!seen.has(b)) cols[0].push(b); }); // a box added later still shows up
+  board.boxes.forEach(b => { if (!seen.has(b)) cols[0].push(b); }); // a box added later still shows up
   return cols;
 }
 function bagSections() {
@@ -91,14 +113,15 @@ const isBagItem = text => /bag check/i.test(text);
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
 const MAX_PRIORITIES = 3;
 const orderOf = t => t.order ?? t.created ?? 0;
-const itemsFor = (n, kind) => S.todos.filter(t => (t.kind || 'todo') === kind && (t.day || 1) === n).sort((a, b) => orderOf(a) - orderOf(b));
+const itemsFor = (n, kind) => S.todos.filter(t => (t.kind || 'todo') === kind && (t.day ?? 1) === n).sort((a, b) => orderOf(a) - orderOf(b));
 
 // Repeat to-dos (Setup → Day Templates) are copied into a cohort as ordinary
 // to-dos the first time it's opened, so they can be checked, dragged or deleted.
 // Ids are fixed (rep-{day}-{text}) so the same one is never added twice.
 const repeatId = (n, text) => 'rep-' + n + '-' + slug(text);
 function templateFor(tpl, n) {
-  const all = [...(tpl.everyDay || []), ...((tpl.days || {})[n] || [])];
+  const every = n >= 1 && n <= 5 ? (tpl.everyDay || []) : []; // "every day" means Day 1-5, not Prep/Finalize
+  const all = [...every, ...((tpl.days || {})[n] || [])];
   return all.filter((t, i) => all.findIndex(x => slug(x) === slug(t)) === i);
 }
 // Template to-dos this cohort doesn't have yet (skipping ones you deleted on purpose).
@@ -106,7 +129,7 @@ function missingRepeats(tpl = cfg().checklist) {
   const have = new Set(S.todos.map(t => t.id));
   const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
   const out = [];
-  [1, 2, 3, 4, 5].forEach(n => templateFor(tpl, n).forEach((text, i) => {
+  ALL_DAYS.forEach(n => templateFor(tpl, n).forEach((text, i) => {
     const id = repeatId(n, text);
     if (!have.has(id) && !removed[id]) out.push({ id, text, n, i });
   }));
@@ -118,14 +141,24 @@ function addRepeats(list) {
     return Store.set(P('todos/' + id), { text, done: !!checks[slug(text)], day: n, kind: 'todo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false);
   }));
 }
+// The packing list (Prep page) works the same way: copied once, ids pack-{text}.
+function missingPacking(list = cfg().packing) {
+  const have = new Set(S.packing.map(x => x.id));
+  const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
+  return list.map((text, i) => ({ id: 'pack-' + slug(text), text, i })).filter(x => !have.has(x.id) && !removed[x.id])
+    .filter((x, j, arr) => arr.findIndex(y => y.id === x.id) === j);
+}
+const addPacking = list => Promise.all(list.map(({ id, text, i }) =>
+  Store.set(P('packing/' + id), { text, packed: false, order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
 let seeding = false;
 async function seedRepeats() {
-  const key = S.cohortKey;
-  if (seeding || (S.cohortDoc && S.cohortDoc.repeatsAdded)) return;
+  const key = S.cohortKey, doc = S.cohortDoc || {}, path = 'cohorts/' + key;
+  if (seeding || (doc.repeatsAdded && doc.packingAdded)) return;
   seeding = true;
   try {
-    if (!(await Store.claim('cohorts/' + key, 'repeatsAdded')) || key !== S.cohortKey) return; // Nick's computer got there first
-    await addRepeats(missingRepeats());
+    // claim() is false when Nick's computer got there first.
+    if (!doc.repeatsAdded && await Store.claim(path, 'repeatsAdded') && key === S.cohortKey) await addRepeats(missingRepeats());
+    if (!doc.packingAdded && await Store.claim(path, 'packingAdded') && key === S.cohortKey) await addPacking(missingPacking());
   } catch (e) { console.warn('Repeat to-dos not added yet:', e.message); }
   finally { seeding = false; }
 }
@@ -136,7 +169,8 @@ async function rollOver() {
   const t = currentWeekDay();
   if (!t) return;
   if (rolling) { rollAgain = true; return; } // to-dos changed mid-way (e.g. repeat ones just added): check again after
-  const late = S.todos.filter(x => (x.kind || 'todo') === 'todo' && !x.done && (x.day || 1) < t);
+  // Prep to-dos stay on Prep.
+  const late = S.todos.filter(x => (x.kind || 'todo') === 'todo' && !x.done && (x.day ?? 1) >= 1 && (x.day ?? 1) < t);
   if (!late.length) return;
   rolling = true;
   try {
@@ -182,6 +216,7 @@ function staffPeople() {
 // On day n it also shows anything still missing from earlier days (tagged "unfinished").
 function staffTasks(n, { carry = true } = {}) {
   const out = [];
+  if (n === PREP || n === FINAL) return out;
   const people = staffPeople();
   const days = carry ? Array.from({ length: n }, (_, i) => i + 1) : [n];
   days.forEach(d => {
@@ -235,7 +270,7 @@ Store.onUser(async user => {
 async function selectCohort(key) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
-  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], schedule: {}, open: null, day: null });
+  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null });
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
   w(base, d => { S.cohortDoc = d; });
@@ -245,6 +280,7 @@ async function selectCohort(key) {
   w(base + '/days', list => { S.days = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/staff', list => { S.staff = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/todos', list => { S.todos = list; if (S.sheet) rollOver(); });
+  w(base + '/packing', list => { S.packing = list; });
   w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
   await loadSheet();
 }
@@ -256,7 +292,10 @@ async function loadSheet() {
     const data = await Sheets.loadCohort(key);
     if (key !== S.cohortKey) return;
     S.sheet = data;
-    if (!S.day) S.day = currentWeekDay() || Number(pref('day-' + key)) || 1;
+    if (S.day == null) {
+      const saved = pref('day-' + key);
+      S.day = currentWeekDay() ?? phaseDay() ?? (saved != null && !isNaN(saved) ? Number(saved) : 1);
+    }
     rollOver();
     seedRepeats();
   } catch (e) {
@@ -333,7 +372,7 @@ function shell() {
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
-  ${S.bagOpen ? bagModal() : ''}
+  ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}`;
 }
 
@@ -342,10 +381,17 @@ function pageTitle() {
   if (S.view === 'students') return `<h1>Students</h1><p>${S.sheet ? students().length + ' students' : ''}</p>`;
   if (S.view === 'settings') return '<h1>Setup</h1><p>Shared by you and Nick</p>';
   if (S.view === 'schedule') {
-    const d = weekDays().find(x => x.n === (S.day || 1)) || {};
-    return `<h1>Schedule</h1><p>Day ${S.day || 1}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
+    const d = weekDays().find(x => x.n === schedDay()) || {};
+    return `<h1>Schedule</h1><p>Day ${schedDay()}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
   }
-  const n = S.day || 1;
+  const n = curDay();
+  if (n === PREP || n === FINAL) {
+    const days = weekDays().filter(x => x.iso);
+    const long = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    const t = todayIso(), start = days.length && days[0].iso, end = days.length && days[days.length - 1].iso;
+    const when = !days.length ? '' : n === PREP ? (t < start ? ' · starts ' : ' · started ') + long(start) : (t > end ? ' · ended ' : ' · ends ') + long(end);
+    return `<h1>${dayName(n)}</h1><p>${n === PREP ? 'Before academy week' : 'After academy week'}${when}</p>`;
+  }
   const d = weekDays().find(x => x.n === n) || {};
   const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
   return `<h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>${nice ? `<p>${nice}${n === currentWeekDay() ? ' · today' : ''}</p>` : ''}`;
@@ -375,11 +421,11 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
     ${items.map(t => {
       // "Bag check" also counts as done once every bag in use is checked.
       const bag = kind === 'todo' && isBagItem(t.text);
-      const done = t.done || (bag && bagsAllDone(t.day || 1));
+      const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
       if (bag) {
-        const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day || 1, b)).length;
-        open = `<button class="btn tiny" data-act="openBag" data-d="${t.day || 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
+        const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
+        open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
       <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span>${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
@@ -416,7 +462,7 @@ function notesArea(n, placeholder) {
 /* ---------- Day page ---------- */
 function dayView() {
   if (!S.sheet) return loadingView();
-  const n = S.day || 1;
+  const n = curDay();
   const today = currentWeekDay();
   const days = weekDays();
   const list = students();
@@ -435,17 +481,24 @@ function dayView() {
   </div>`;
 }
 
-function dayStrip() {
-  const n = S.day || 1, today = currentWeekDay();
+// The Day page strip has Prep and Finalize at either end; the Schedule page's doesn't.
+function dayStrip({ phases = true } = {}) {
+  const n = phases ? curDay() : schedDay(), today = currentWeekDay();
+  const days = weekDays();
+  const first = days.find(x => x.iso), last = [...days].reverse().find(x => x.iso);
+  const phase = (p, top, date) => `<button class="phase ${n === p ? 'on' : ''} ${phaseDay() === p ? 'today' : ''}" data-act="day" data-n="${p}">
+      <small>${top}</small><b>${dayName(p)}</b><small>${date}</small></button>`;
   return `<div class="daystrip">
-    ${weekDays().map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
+    ${phases ? phase(PREP, 'Before', first ? 'by ' + shortDate(first.iso) : '') : ''}
+    ${days.map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
       <small>${esc(x.label || 'Day')}</small><b>${x.n}</b><small>${x.iso ? shortDate(x.iso) : ''}</small></button>`).join('')}
+    ${phases ? phase(FINAL, 'After', last ? 'after ' + shortDate(last.iso) : '') : ''}
   </div>`;
 }
 
 function box(b, n) {
-  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes';
-  const hideKey = b === 'shopping' ? 'shop' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
+  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing';
+  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
   let body = '';
@@ -467,7 +520,16 @@ function box(b, n) {
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span>${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes') {
-    body = head('Notes') + notesArea(n, 'Notes for today');
+    body = head('Notes') + notesArea(n, n === PREP || n === FINAL ? 'Notes' : 'Notes for today');
+  } else if (b === 'packing') {
+    // Unpacked first; packed ones drop to the bottom (or hide).
+    const byOrder = (a, c) => orderOf(a) - orderOf(c);
+    const list = [...S.packing.filter(x => !x.packed).sort(byOrder), ...S.packing.filter(x => x.packed).sort(byOrder)];
+    body = head('Packing List', list.some(x => x.packed) ? hideToggle('pack') : '')
+      + `<div class="add-row"><input id="packIn" data-draft="pack" data-add="pack" placeholder="+ add item" value="${esc(S.drafts.pack || '')}"></div>`
+      + `<ul class="checks">${list.map(x => `<li class="${x.packed ? 'done' : ''}">
+          <label>${circle(x.packed, `data-act="packed" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label>
+          <button class="x" data-act="delPack" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing on the list yet.</li>'}</ul>`;
   }
   const h = cfg().heights[b];
   return `<section class="box box-${b} ${shaded ? 'shaded' : ''} ${hideKey && hidden(hideKey) ? 'hide-done' : ''}" data-box-id="${b}" ${h ? `style="flex:0 0 auto;height:${h}px"` : ''}>
@@ -530,7 +592,7 @@ async function saveSched(n, patch) {
 
 function scheduleView() {
   if (!S.sheet) return loadingView();
-  const n = S.day || 1;
+  const n = schedDay();
   const d = schedFor(n);
   const k = (...parts) => ['sch', n, ...parts].join('-');
   const dv = (key, v) => esc(S.drafts[key] ?? v);
@@ -562,7 +624,7 @@ function scheduleView() {
     </div>`;
 
   return `
-  ${dayStrip()}
+  ${dayStrip({ phases: false })}
   <div class="sched-tools">
     <button class="btn" data-act="printDay">Print Day ${n}</button>
     <button class="btn" data-act="printAll">Print all 5 days</button>
@@ -682,7 +744,7 @@ function bagModal() {
   const all = Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
   return `<div class="overlay" data-act="closeBag"><div class="modal" data-stop>
     <div class="modal-head">
-      <h2>Bag Check · Day ${n}</h2>
+      <h2>Bag Check · ${dayName(n)}</h2>
       <button class="x big" data-act="closeBag" aria-label="Close">×</button>
     </div>
     <div class="bags-in-use"><span>Bags in use for ${esc(S.cohortKey)}:</span>
@@ -861,7 +923,7 @@ function settingsView() {
   return `<div class="settings">
     <section class="box">
       <div class="box-head static"><h2>Day Templates</h2></div>
-      <p class="muted small">The to-dos that repeat on Day 1–5 of every cohort, and the notes each day starts with.</p>
+      <p class="muted small">The to-dos that repeat for every cohort (Prep, Day 1–5, Finalize), the Prep packing list, and the notes each day starts with.</p>
       <button class="btn primary" data-act="tplOpen">Edit day templates</button>
     </section>
 
@@ -891,21 +953,23 @@ function settingsView() {
 }
 
 /* ---------- Day Templates pop-up ---------- */
-const TPL_KEYS = ['tpl-every', ...[1, 2, 3, 4, 5].flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
+const TPL_KEYS = ['tpl-every', 'tpl-pack', ...ALL_DAYS.flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
 function templatesModal() {
   const c = cfg(), tab = S.tplTab;
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="tplTab" data-t="${t}">${label}</button>`;
   const body = tab === 'every'
-    ? `<p class="muted small">These go on every day’s To Do. One per line. Anything with “bag check” in it opens the bag pop-up.</p>
+    ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line. Anything with “bag check” in it opens the bag pop-up.</p>
        <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
-    : `<label class="field">Day ${tab} to-dos <span class="small">(one per line, added after the every-day ones)</span>
+    : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' || tab === '6' ? '' : ', added after the every-day ones'})</span>
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>
-       <label class="field">Day ${tab} notes <span class="small">(what the Notes box starts with)</span>
+       ${tab === '0' ? `<label class="field">Packing list <span class="small">(one per line)</span>
+         <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>` : ''}
+       <label class="field">${dayName(Number(tab))} notes <span class="small">(what the Notes box starts with)</span>
          <textarea id="tpl-notes-${tab}" data-draft="tpl-notes-${tab}" rows="8">${dv('tpl-notes-' + tab, c.dayNotes[tab] || '')}</textarea></label>`;
   return `<div class="overlay" data-act="tplClose"><div class="modal tpl" data-stop>
     <div class="modal-head"><h2>Day Templates</h2><button class="x big" data-act="tplClose" aria-label="Close">×</button></div>
-    <div class="bag-tabs">${tabBtn('every', 'Every day')}${[1, 2, 3, 4, 5].map(n => tabBtn(String(n), 'Day ' + n)).join('')}</div>
+    <div class="bag-tabs">${tabBtn('every', 'Every day')}${ALL_DAYS.map(n => tabBtn(String(n), dayName(n))).join('')}</div>
     <div class="modal-body"><div class="tpl-body">${body}</div></div>
     <div class="modal-foot"><span class="muted small">Used for every cohort. Changing a day’s notes here doesn’t touch notes you’ve already typed.</span>
       <button class="btn primary" data-act="tplSave">Save</button></div>
@@ -923,7 +987,7 @@ function parseBag(text) {
 }
 
 function schChange(t) {
-  const n = S.day || 1, d = schedFor(n), f = t.dataset.sch, val = t.value;
+  const n = schedDay(), d = schedFor(n), f = t.dataset.sch, val = t.value;
   const done = () => { delete S.drafts[t.dataset.draft]; };
   if (f === 'notes' || f === 'stationNote') return saveSched(n, { [f]: val }).then(done);
   const list = d[f].map(x => ({ ...x }));
@@ -994,7 +1058,7 @@ document.addEventListener('dragend', async () => {
       const t = S.todos.find(x => x.id === drag.id);
       S.dragging = null;
       if (!t) return;
-      if (kind === 'priority' && (t.kind || 'todo') !== 'priority' || (kind === 'priority' && (t.day || 1) !== day)) {
+      if (kind === 'priority' && (t.kind || 'todo') !== 'priority' || (kind === 'priority' && (t.day ?? 1) !== day)) {
         if (itemsFor(day, 'priority').filter(x => x.id !== t.id).length >= MAX_PRIORITIES) { toast('Day ' + day + ' already has 3 priorities.'); return; }
       }
       const ids = [...list.querySelectorAll(':scope > [data-id]')].map(li => li.dataset.id);
@@ -1004,7 +1068,7 @@ document.addEventListener('dragend', async () => {
       const prev = i > 0 ? byId[ids[i - 1]] : null, next = byId[ids[i + 1]];
       const order = prev && next ? (orderOf(prev) + orderOf(next)) / 2 : prev ? orderOf(prev) + 1000 : next ? orderOf(next) - 1000 : Date.now();
       const upd = { day, kind, order };
-      if (day !== (t.day || 1)) upd.rolledFrom = null; // moved on purpose, so it's not "unfinished" anymore
+      if (day !== (t.day ?? 1)) upd.rolledFrom = null; // moved on purpose, so it's not "unfinished" anymore
       await Store.set(P('todos/' + t.id), upd);
     }
   } catch (err) { toast(err.message); }
@@ -1012,12 +1076,13 @@ document.addEventListener('dragend', async () => {
 });
 
 function saveLayout(heights = cfg().heights) {
+  const board = cfg().board; // Prep's layout is saved apart from the other days'
   // Every box is listed (null = no set height) because a merge-save never removes old keys.
-  const layout = { v: LAYOUT_VERSION, h: Object.fromEntries(Object.keys(BOXES).map(b => [b, heights[b] || null])) };
+  const layout = { v: LAYOUT_VERSION, h: Object.fromEntries(board.boxes.map(b => [b, heights[b] || null])) };
   document.querySelectorAll('[data-drop="boxes"]').forEach(col => {
     layout['c' + col.dataset.col] = [...col.querySelectorAll(':scope > .box')].map(b => b.dataset.boxId);
   });
-  return Store.set('meta/settings', { layout });
+  return Store.set('meta/settings', { [board.key]: layout });
 }
 
 /* ---------- Box heights (drag the bottom edge; double-click it to reset) ---------- */
@@ -1101,13 +1166,14 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.bagOpen) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
+    if (S.bagOpen !== false) S.bagOpen = false; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
   e.preventDefault();
   const t = e.target;
   if (t.dataset.add === 'shop') act('addShop');
+  else if (t.dataset.add === 'pack') act('addPack');
   else act('addItem', t);
 });
 
@@ -1123,7 +1189,7 @@ document.addEventListener('click', e => {
 
 async function act(a, el = {}, e) {
   const d = el.dataset || {};
-  const n = S.day || 1;
+  const n = schedDay(); // (only the Schedule actions below use n)
   try {
     switch (a) {
       case 'signin': await Store.signIn(); break;
@@ -1166,6 +1232,18 @@ async function act(a, el = {}, e) {
       }
       case 'bought': { const x = S.shopping.find(i => i.id === d.id); await Store.set('shopping/' + d.id, { bought: !x.bought }); break; }
       case 'delShop': await Store.del('shopping/' + d.id); break;
+
+      case 'addPack': {
+        const text = (S.drafts.pack || '').trim(); if (!text) return;
+        S.drafts.pack = ''; render();
+        await Store.add(P('packing'), { text, packed: false, order: Date.now(), created: Date.now() }); break;
+      }
+      case 'packed': { const x = S.packing.find(i => i.id === d.id); await Store.set(P('packing/' + d.id), { packed: !x.packed }); break; }
+      case 'delPack': {
+        const x = S.packing.find(i => i.id === d.id);
+        if (x && x.repeat) await Store.set('cohorts/' + S.cohortKey, { removedRepeats: { [x.id]: true } });
+        await Store.del(P('packing/' + d.id)); break;
+      }
       case 'clearBought':
         if (!confirm('Remove everything checked off as bought?')) return;
         await Promise.all(S.shopping.filter(x => x.bought).map(x => Store.del('shopping/' + x.id))); break;
@@ -1175,7 +1253,7 @@ async function act(a, el = {}, e) {
         await Store.set(P('staff/' + d.key), { name: d.name, paid: !cur }); break;
       }
 
-      case 'openBag': S.bagOpen = Number(d.d) || n; render(); break;
+      case 'openBag': S.bagOpen = d.d != null ? Number(d.d) : curDay(); render(); break;
       case 'closeBag': S.bagOpen = false; render(); break;
       case 'bagTab': S.bagTab = Number(d.b); render(); break;
       case 'toggleBagUse': {
@@ -1245,17 +1323,21 @@ async function act(a, el = {}, e) {
         const c = cfg();
         const everyDay = lines(S.drafts['tpl-every'] ?? (c.checklist.everyDay || []).join('\n'));
         const days = {}, dayNotes = {};
-        [1, 2, 3, 4, 5].forEach(x => {
+        const packingList = lines(S.drafts['tpl-pack'] ?? c.packing.join('\n'));
+        ALL_DAYS.forEach(x => {
           days[x] = lines(S.drafts['tpl-todo-' + x] ?? ((c.checklist.days || {})[x] || []).join('\n'));
           dayNotes[x] = String(S.drafts['tpl-notes-' + x] ?? (c.dayNotes[x] || '')).replace(/\s+$/, '');
         });
-        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes });
+        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList });
         TPL_KEYS.forEach(k => delete S.drafts[k]);
         S.tplOpen = false; render();
-        // The open cohort already has its to-dos; offer to add any new ones to it.
-        const extra = S.cohortDoc && S.cohortDoc.repeatsAdded ? missingRepeats({ everyDay, days }) : [];
-        if (extra.length && confirm(`Saved. Add the ${extra.length} new to-do${extra.length === 1 ? '' : 's'} to ${S.cohortKey} too?`)) {
-          await addRepeats(extra); toast('Added to ' + S.cohortKey + '.');
+        // The open cohort already has its lists; offer to add any new items to it.
+        const doc = S.cohortDoc || {};
+        const extra = doc.repeatsAdded ? missingRepeats({ everyDay, days }) : [];
+        const extraPack = doc.packingAdded ? missingPacking(packingList) : [];
+        const parts = [extra.length && `${extra.length} new to-do${extra.length === 1 ? '' : 's'}`, extraPack.length && `${extraPack.length} new packing item${extraPack.length === 1 ? '' : 's'}`].filter(Boolean);
+        if (parts.length && confirm(`Saved. Add the ${parts.join(' and ')} to ${S.cohortKey} too?`)) {
+          await addRepeats(extra); await addPacking(extraPack); toast('Added to ' + S.cohortKey + '.');
         } else toast('Day templates saved.');
         break;
       }
@@ -1345,7 +1427,7 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'resetLayout':
-        await Store.set('meta/settings', { layout: null });
+        await Store.set('meta/settings', { layout: null, prepLayout: null });
         S.view = 'day'; pref('view', 'day');
         toast('Layout reset.'); break;
     }

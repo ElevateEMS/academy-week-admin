@@ -1,14 +1,15 @@
 /* All Firebase saving lives here, so app.js only deals in plain objects.
 
    Firestore layout (shared by Bella and Nick):
-     meta/settings                     day templates (checklist = repeat to-dos, dayNotes), bag contents, which bags carry *** items, skipped staff
+     meta/settings                     day templates (checklist = repeat to-dos, dayNotes, packingList), layout + prepLayout, bag contents, which bags carry *** items, skipped staff
      shopping/{id}                     { text, bought, auto, created }  (one list, not per cohort)
-     cohorts/{key}                     { bagsInUse: [1,2,3], repeatsAdded, removedRepeats: {todoId: true} }
+     cohorts/{key}                     { bagsInUse: [1,2,3], repeatsAdded, packingAdded, removedRepeats: {id: true} }
      cohorts/{key}/students/{sid}      { skill: on|behind|done, behind: [skills], note }
      cohorts/{key}/contacts/{id}       { sid, num, fix, fixed, date, created }
      cohorts/{key}/warnings/{id}       { sid, date, type, note, created }
-     cohorts/{key}/days/{1-5}          { checks: {item: true}, bags: {bagNo: {itemId: ok|low|missing}} }
+     cohorts/{key}/days/{0-6}          { checks: {item: true}, bags: {bagNo: {itemId: ok|low|missing}} }
      cohorts/{key}/staff/{nameKey}     { name, days: {1: {roster, timesheet}}, paid }
+     cohorts/{key}/packing/{id}        { text, packed, order, created, repeat }  (Prep page; repeat ones: id pack-{text})
      cohorts/{key}/todos/{id}          { text, done, day, kind, order, created, repeat }  (repeat ones: id rep-{day}-{text})
 
    Paths are written like 'cohorts/Fall 2026/students/frazier-jason'.
