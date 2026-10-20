@@ -325,6 +325,10 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .sched-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; align-items: start; }
 .sched-col { display: grid; gap: 18px; align-content: start; }
 .sched-grid .box { overflow: visible; }
+/* The + in a box title row (adds a time / a station). */
+.add-plus { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--taupe-dark);
+  font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 2px; }
+.add-plus:hover { background: var(--blush-soft); border-color: var(--taupe); }
 .sched-rows { display: grid; gap: 2px; }
 .sched-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; }
 .sched-row input, .sched-station input, .sched-station textarea, .sched-notes, .sched-foot input {

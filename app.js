@@ -639,9 +639,8 @@ function scheduleView() {
   </div>
   <div class="sched-grid">
     <div class="sched-col">
-    <section class="box"><div class="box-head static"><h2>Class Schedule</h2></div>
+    <section class="box"><div class="box-head static"><h2>Class Schedule</h2><button class="add-plus" data-act="schAdd" data-list="blocks" title="Add a time" aria-label="Add a time">+</button></div>
       <div class="sched-rows">${blockRows || '<p class="empty">No times yet.</p>'}</div>
-      <button class="link add-link" data-act="schAdd" data-list="blocks">+ Add a time</button>
     </section>
     <section class="box"><div class="box-head static"><h2>Squads</h2>
         <label class="squad-count">Squads <select data-change="squadCount">${[0, 2, 3, 4, 5, 6].map(c => `<option value="${c}" ${sq.count === c ? 'selected' : ''}>${c || 'none'}</option>`).join('')}</select></label></div>
@@ -651,9 +650,8 @@ function scheduleView() {
     </section>
     </div>
     <div class="sched-col">
-    <section class="box"><div class="box-head static"><h2>Station Content</h2></div>
+    <section class="box"><div class="box-head static"><h2>Station Content</h2><button class="add-plus" data-act="schAdd" data-list="stations" title="Add a station" aria-label="Add a station">+</button></div>
       ${stationRows || '<p class="empty">No stations this day.</p>'}
-      <button class="link add-link" data-act="schAdd" data-list="stations">+ Add a station</button>
       <label class="field sched-foot">Note under the stations
         <input id="${k('sn')}" data-draft="${k('sn')}" data-sch="stationNote" value="${dv(k('sn'), d.stationNote)}" placeholder="e.g. Stations with two topics: split into 30 minute segments."></label>
     </section>
