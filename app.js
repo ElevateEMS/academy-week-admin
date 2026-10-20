@@ -70,7 +70,7 @@ const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping Lis
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
-  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo'], ['packing', 'scenarios']] },
+  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['notes', 'shopping'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
