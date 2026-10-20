@@ -37,7 +37,6 @@ function weekDays() {
     return { ...d, label, iso };
   });
 }
-const dayCount = () => weekDays().length || 5;
 function currentWeekDay() {
   const t = todayIso();
   const hit = weekDays().find(d => d.iso === t);
@@ -45,10 +44,9 @@ function currentWeekDay() {
 }
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
-const BOXES = {
-  priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', tomorrow: 'Tomorrow',
-};
-const DEFAULT_LAYOUT = [['priorities', 'notes'], ['todo'], ['shopping', 'tomorrow']];
+const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes' };
+const DEFAULT_LAYOUT = [['priorities', 'shopping'], ['todo'], ['notes']];
+const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
 function cfg() {
   const s = S.settings || {};
   return {
@@ -58,11 +56,13 @@ function cfg() {
     skipStaff: s.skipStaff || DEFAULTS.skipStaff,
     bagCount: DEFAULTS.bagCount,
     layout: validLayout(s.layout) || DEFAULT_LAYOUT,
+    heights: (validLayout(s.layout) && s.layout.h) || {},
   };
 }
-// Firestore can't store nested arrays, so the layout is saved as { c0: [...], c1: [...], c2: [...] }.
+// Firestore can't store nested arrays, so the layout is saved as
+// { v, c0: [...], c1: [...], c2: [...], h: { box: heightInPx } }.
 function validLayout(l) {
-  if (!l) return null;
+  if (!l || l.v !== LAYOUT_VERSION) return null;
   const cols = [l.c0 || [], l.c1 || [], l.c2 || []].map(c => c.filter(b => BOXES[b]));
   const seen = new Set(cols.flat());
   Object.keys(BOXES).forEach(b => { if (!seen.has(b)) cols[0].push(b); }); // a box added later still shows up
@@ -183,7 +183,10 @@ Store.onUser(async user => {
   try {
     S.cohorts = await Sheets.listCohorts();
   } catch (e) { S.sheetErr = e.message; render(); return; }
-  const pick = S.cohorts.find(c => c.key === S.cohortKey) || S.cohorts.find(c => /active/i.test(c.status)) || S.cohorts[0];
+  // Last one used; otherwise the active cohort that isn't the Test one.
+  const pick = S.cohorts.find(c => c.key === S.cohortKey)
+    || S.cohorts.find(c => /active/i.test(c.status) && !/^test/i.test(c.key))
+    || S.cohorts.find(c => /active/i.test(c.status)) || S.cohorts[0];
   if (pick) selectCohort(pick.key); else render();
 });
 
@@ -237,6 +240,7 @@ function render() {
       const el = document.getElementById(id);
       if (el) { el.focus(); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
     }
+    fitBoard();
   }, 0);
 }
 
@@ -267,6 +271,7 @@ function shell() {
       <img src="logo.png" alt="">
       <span><b>Academy Week Admin</b><small>${esc(S.cohortKey || '')}</small></span>
     </button>
+    <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
       ${icon('day', 'Day')}${icon('week', 'Week')}${icon('students', 'Students')}
       <div class="menu-wrap">
@@ -281,6 +286,16 @@ function shell() {
   </main>
   ${S.open ? drawer() : ''}
   ${S.bagOpen ? bagModal() : ''}`;
+}
+
+function pageTitle() {
+  if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
+  if (S.view === 'students') return `<h1>Students</h1><p>${S.sheet ? students().length + ' students' : ''}</p>`;
+  if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
+  const n = S.day || 1;
+  const d = weekDays().find(x => x.n === n) || {};
+  const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
+  return `<h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>${nice ? `<p>${nice}${n === currentWeekDay() ? ' · today' : ''}</p>` : ''}`;
 }
 
 function menu() {
@@ -351,17 +366,11 @@ function dayView() {
   const n = S.day || 1;
   const today = currentWeekDay();
   const days = weekDays();
-  const d = days.find(x => x.n === n) || {};
   const list = students();
   const behind = list.filter(s => s.skill === 'behind').length;
   const fixes = list.reduce((a, s) => a + s.fixes, 0);
-  const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
 
   return `
-  <div class="day-title">
-    <h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>
-    ${nice ? `<p>${nice}${n === today ? ' · today' : ''}</p>` : ''}
-  </div>
   <div class="daystrip">
     ${days.map(x => `<button class="${x.n === n ? 'on' : ''} ${x.n === today ? 'today' : ''}" data-act="day" data-n="${x.n}">
       <small>${esc(x.label || 'Day')}</small><b>${x.n}</b><small>${x.iso ? shortDate(x.iso) : ''}</small></button>`).join('')}
@@ -384,7 +393,11 @@ function box(b, n) {
   let body = '';
   if (b === 'priorities') {
     const count = itemsFor(n, 'priority').length;
-    body = head('Priorities') + itemList(n, 'priority') + (count < MAX_PRIORITIES ? addRow(n, 'priority', count ? 'Add another priority' : 'Today’s top 3') : '');
+    const slots = Array.from({ length: MAX_PRIORITIES - count }, (_, i) => {
+      const k = 'add-priority-' + n + '-' + i;
+      return `<li class="slot"><span class="ghost"></span><input id="${k}" data-draft="${k}" data-add="priority" data-day="${n}" value="${esc(S.drafts[k] || '')}" placeholder="${i === 0 && !count ? 'Today’s top 3' : ''}"></li>`;
+    }).join('');
+    body = head('Priorities') + itemList(n, 'priority') + (slots ? `<ul class="checks slots">${slots}</ul>` : '');
   } else if (b === 'todo') {
     body = head('To Do', hideToggle('todo')) + addRow(n, 'todo', 'Add a to-do and press Enter') + itemList(n, 'todo') + dailyChecklist(n);
   } else if (b === 'shopping') {
@@ -397,11 +410,10 @@ function box(b, n) {
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, 'Notes for today');
-  } else if (b === 'tomorrow') {
-    const last = n >= dayCount();
-    body = head(last ? 'After the Week' : 'Tomorrow') + notesArea(n + 1, last ? 'Wrap-up notes for after academy week' : `Shows up in Day ${n + 1}’s notes`);
   }
-  return `<section class="box ${shaded ? 'shaded' : ''} ${hideKey && hidden(hideKey) ? 'hide-done' : ''}" data-box-id="${b}">${body}</section>`;
+  const h = cfg().heights[b];
+  return `<section class="box box-${b} ${shaded ? 'shaded' : ''} ${hideKey && hidden(hideKey) ? 'hide-done' : ''}" data-box-id="${b}" ${h ? `style="flex:0 0 auto;height:${h}px"` : ''}>
+    ${body}<div class="resize" data-resize="${b}" title="Drag to make taller or shorter · double-click to reset"></div></section>`;
 }
 
 /* ---------- Week page ---------- */
@@ -409,13 +421,11 @@ function weekView() {
   if (!S.sheet) return loadingView();
   const today = currentWeekDay();
   return `
-  <div class="day-title"><h1>The Week</h1><p>Drag to-dos and priorities from one day to another. · ${hideToggle('todo')}</p></div>
   <div class="week ${hidden('todo') ? 'hide-done' : ''}">
     ${weekDays().map(d => `<section class="week-col ${d.n === today ? 'today' : ''}">
       <button class="week-head" data-act="day" data-n="${d.n}" data-open="1" title="Open Day ${d.n}">
         <small>${esc(d.label)}${d.iso ? ' ' + shortDate(d.iso) : ''}</small><b>Day ${d.n}</b>${d.sub ? `<small>${esc(d.sub)}</small>` : ''}
       </button>
-      <div class="week-part shaded"><p class="mini-head">Priorities</p>${itemList(d.n, 'priority', { compact: true })}${itemsFor(d.n, 'priority').length < MAX_PRIORITIES ? addRow(d.n, 'priority', '+ priority') : ''}</div>
       <div class="week-part"><p class="mini-head">To Do</p>${itemList(d.n, 'todo', { compact: true })}${addRow(d.n, 'todo', '+ to-do')}${dailyChecklist(d.n, { compact: true, carry: false })}</div>
       <div class="week-part shaded"><p class="mini-head">Notes</p>${notesArea(d.n, 'Notes')}</div>
     </section>`).join('')}
@@ -501,7 +511,6 @@ function studentsView() {
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
   return `
-  <div class="day-title"><h1>Students</h1><p>${esc(S.cohortKey)} · ${all.length} students</p></div>
   <div class="students-top">
     <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Attendance notes')}</div>
     <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">
@@ -616,7 +625,6 @@ function settingsView() {
   const all = Array.from({ length: c.bagCount }, (_, i) => i + 1);
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   return `<div class="settings">
-    <div class="day-title"><h1>Settings</h1><p>Shared by you and Nick.</p></div>
     <section class="box">
       <div class="box-head static"><h2>Daily Checklist</h2></div>
       <p class="muted small">One item per line. Any item with “bag check” in it opens the bag pop-up.</p>
@@ -713,12 +721,8 @@ document.addEventListener('dragend', async () => {
   moving.classList.remove('moving');
   try {
     if (drag.type === 'box') {
-      const layout = {};
-      document.querySelectorAll('[data-drop="boxes"]').forEach(col => {
-        layout['c' + col.dataset.col] = [...col.querySelectorAll(':scope > .box')].map(b => b.dataset.boxId);
-      });
       S.dragging = null;
-      await Store.set('meta/settings', { layout }, true);
+      await saveLayout();
     } else {
       const list = moving.parentElement;
       const day = Number(list.dataset.day), kind = list.dataset.kind;
@@ -741,6 +745,53 @@ document.addEventListener('dragend', async () => {
   } catch (err) { toast(err.message); }
   finally { S.dragging = null; render(); }
 });
+
+function saveLayout(heights = cfg().heights) {
+  // Every box is listed (null = no set height) because a merge-save never removes old keys.
+  const layout = { v: LAYOUT_VERSION, h: Object.fromEntries(Object.keys(BOXES).map(b => [b, heights[b] || null])) };
+  document.querySelectorAll('[data-drop="boxes"]').forEach(col => {
+    layout['c' + col.dataset.col] = [...col.querySelectorAll(':scope > .box')].map(b => b.dataset.boxId);
+  });
+  return Store.set('meta/settings', { layout });
+}
+
+/* ---------- Box heights (drag the bottom edge; double-click it to reset) ---------- */
+document.addEventListener('pointerdown', e => {
+  const handle = e.target.closest('[data-resize]');
+  if (!handle) return;
+  e.preventDefault();
+  const boxEl = handle.closest('.box');
+  const startY = e.clientY, startH = boxEl.offsetHeight;
+  S.dragging = { type: 'resize' };
+  document.body.classList.add('resizing');
+  const move = ev => { boxEl.style.flex = '0 0 auto'; boxEl.style.height = Math.max(90, startH + ev.clientY - startY) + 'px'; };
+  const up = async () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    document.body.classList.remove('resizing');
+    S.dragging = null;
+    if (boxEl.style.height && boxEl.offsetHeight !== startH) {
+      await saveLayout({ ...cfg().heights, [handle.dataset.resize]: boxEl.offsetHeight });
+    }
+    render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+});
+document.addEventListener('dblclick', async e => {
+  const handle = e.target.closest('[data-resize]');
+  if (!handle) return;
+  const heights = { ...cfg().heights }; delete heights[handle.dataset.resize];
+  await saveLayout(heights);
+});
+
+// The Day page boxes fill the window height on a laptop-size screen.
+function fitBoard() {
+  const board = document.querySelector('.board');
+  if (!board) return;
+  board.style.minHeight = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
+}
+addEventListener('resize', fitBoard);
 
 /* ---------- Events ---------- */
 document.addEventListener('input', e => {
@@ -815,7 +866,7 @@ async function act(a, el = {}, e) {
         await Store.set(P('days/' + day), { checks: { [d.k]: !cur } }); break;
       }
       case 'addItem': {
-        const kind = d.add, day = Number(d.day), k = 'add-' + kind + '-' + day;
+        const kind = d.add, day = Number(d.day), k = el.id || 'add-' + kind + '-' + day;
         const text = (S.drafts[k] || '').trim(); if (!text) return;
         if (kind === 'priority' && itemsFor(day, 'priority').length >= MAX_PRIORITIES) { toast('Three priorities max. Drag one to To Do to make room.'); return; }
         S.drafts[k] = ''; render();
@@ -930,6 +981,7 @@ async function act(a, el = {}, e) {
       }
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null });
+        S.view = 'day'; pref('view', 'day');
         toast('Layout reset.'); break;
     }
   } catch (err) {
