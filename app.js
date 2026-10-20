@@ -462,8 +462,15 @@ function todoList(n, { compact = false, carry = true } = {}) {
 }
 
 // "Hide checked" / "Show checked" (remembered on this computer).
-const hidden = k => pref('hide-' + k) === '1';
-const hideToggle = k => `<button class="link" data-act="hideDone" data-k="${k}">${hidden(k) ? 'Show checked' : 'Hide checked'}</button>`;
+// Each list's eye remembers its own choice on this computer; until you click it, the
+// list follows Setup → "Checked items" (shown unless you change it there).
+const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs'];
+const hidden = k => { const v = pref('hide-' + k); return v != null ? v === '1' : !!(S.settings && S.settings.hideCheckedDefault); };
+const EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
+const PRINTER = '<svg viewBox="0 0 24 24"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6.5H7z"/></svg>';
+const hideToggle = k => { const h = hidden(k), label = h ? 'Show checked' : 'Hide checked';
+  return `<button class="eye ${h ? 'off' : ''}" data-act="hideDone" data-k="${k}" title="${label}" aria-label="${label}">${h ? EYE_OFF : EYE}</button>`; };
 
 function notesArea(n, placeholder) {
   const id = 'notes-' + n;
@@ -540,7 +547,7 @@ function box(b, n) {
     const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
       <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label></li>`).join('')}</ul>`;
     body = head(`Documentation Checklist <span class="count">${done}/${all.length}</span>`,
-      (done ? hideToggle('docs') : '') + '<button class="btn tiny" data-act="printDocs">Print</button>')
+      (done ? hideToggle('docs') : '') + `<button class="eye" data-act="printDocs" title="Print the checklist" aria-label="Print the checklist">${PRINTER}</button>`)
       + `<p class="docs-sub">2 copies of each: External hard drive and Admin Google Drive<br><em>Note: physical copies received at Academy Week stay in Course Binder</em></p>
       <div class="docs-grid">
         <div><p class="mini-head">Records for the Class</p>${list('class')}</div>
@@ -1053,6 +1060,13 @@ function settingsView() {
     </section>
 
     <section class="box">
+      <div class="box-head static"><h2>Checked Items</h2></div>
+      <p class="muted small">Whether lists start out showing or hiding what’s checked off. The eye on each list still switches it.</p>
+      <div class="seg" style="align-self:flex-start">${[[false, 'Show checked'], [true, 'Hide checked']].map(([v, l]) =>
+        `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>
+    </section>
+
+    <section class="box">
       <div class="box-head static"><h2>Day Page Layout</h2></div>
       <p class="muted small">Drag any box by its title on the Day page to move it. This puts everything back where it started.</p>
       <button class="btn" data-act="resetLayout">Reset layout</button>
@@ -1331,6 +1345,9 @@ async function act(a, el = {}, e) {
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
+      case 'hideDefault': // a new default applies to every list again, so forget each eye's own choice
+        HIDE_KEYS.forEach(k => { try { localStorage.removeItem('aw-hide-' + k); } catch {} });
+        await Store.set('meta/settings', { hideCheckedDefault: d.v === '1' }); break;
 
       case 'check': {
         const day = Number(d.d);

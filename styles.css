@@ -153,7 +153,11 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .box-head { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; position: relative; cursor: grab; user-select: none; }
 .box-head h2 { text-align: center; }
 .box-head.static { cursor: default; justify-content: space-between; }
-.head-actions { position: absolute; right: 0; display: flex; gap: 10px; }
+.head-actions { position: absolute; right: 0; display: flex; gap: 10px; align-items: center; }
+/* Show/hide checked: a small, quiet eye. */
+.eye { background: none; border: 0; padding: 2px; cursor: pointer; color: var(--taupe-dark); opacity: .45; display: inline-grid; place-items: center; vertical-align: middle; }
+.eye:hover { opacity: .9; }
+.eye svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .box-head.static .head-actions { position: static; }
 .grip { position: absolute; left: -6px; width: 20px; height: 20px; color: var(--taupe); opacity: 0; transition: opacity .15s; }
 .grip svg { width: 20px; height: 20px; fill: currentColor; }
