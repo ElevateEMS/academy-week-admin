@@ -622,3 +622,9 @@ mark.hl { background: #f1dca6; color: inherit; border-radius: 3px; padding: 0 1p
 .plan-btns.one-row .btn { white-space: nowrap; }
 /* The resize bar stays on the bottom edge of a box even while its contents scroll. */
 .box > .resize { position: sticky; bottom: -16px; left: auto; right: auto; flex: 0 0 10px; margin: auto -18px -16px; z-index: 2; }
+.lib-line { display: flex; align-items: flex-start; gap: 2px; }
+.lib-line .lib-row { flex: 1; }
+.star-btn { background: none; border: 0; font-size: 18px; line-height: 1; padding: 8px 4px 0 6px; color: var(--line); cursor: pointer; }
+.star-btn:hover, .star-btn.on { color: var(--honey); }
+span.star-btn { cursor: default; }
+.star-on { color: var(--honey); }

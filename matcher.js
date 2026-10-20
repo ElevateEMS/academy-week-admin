@@ -57,7 +57,7 @@ const Match = (() => {
        3. Drop scenarios that turned out not to be needed.
        4. Fill up to `size` with other scenarios (about 2 medical for each trauma).
      `avoid` = ids used last time, so the mix changes from cohort to cohort.
-     `pinned` = [{ id, day }] scenarios that are in every week (always in, on that day). */
+     `pinned` = [{ id, day }] scenarios that are always in: on that day, or (day 0, starred) any day. */
   function build({ lib, addons, targets, size = 12, avoid = [], pinned = [], seed = Date.now(), tries = 250 }) {
     const rand = rng(seed);
     const pool = lib.filter(s => s.skills);
@@ -81,7 +81,7 @@ const Match = (() => {
       // A swap that would take away something still needed isn't worth anything.
       const addonGain = a => Object.keys(a.minus || {}).some(k => need[k] > 0) ? 0 : gainOf(a.skills) * (a.pref ? 1.4 : 1);
       const useAddon = (host, a) => { host.addons.push(a.text); take(a.skills); take(a.minus, -1); };
-      pinned.forEach(p => { if (byId[p.id] && !used.has(p.id)) { items.push({ id: p.id, addons: [], day: p.day, fixed: true }); used.add(p.id); take(byId[p.id].skills); } });
+      pinned.forEach(p => { if (byId[p.id] && !used.has(p.id)) { items.push({ id: p.id, addons: [], ...(p.day ? { day: p.day, fixed: true } : { keep: true }) }); used.add(p.id); take(byId[p.id].skills); } });
 
       // 1. Scenarios for what's still needed. Once the week is getting full, an add-on on a
       //    scenario that's already in it often beats adding another whole scenario.
@@ -140,7 +140,7 @@ const Match = (() => {
       let kept = items;
       for (const i of order) {
         const it = items[i];
-        if (it.addons.length || it.fixed || !kept.includes(it)) continue;
+        if (it.addons.length || it.fixed || it.keep || !kept.includes(it)) continue;
         const without = kept.filter(x => x !== it);
         const have = coverage(without, byId, addonsByText);
         if (Object.keys(need0).every(k => (have[k] || 0) >= need0[k])) kept = without;

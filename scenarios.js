@@ -11,9 +11,7 @@
    Rote/Summative" sheet. Editable in the app (Scenario Library → Requirements).
 
    ADDONS: twists you can add to a scenario to cover a skill it doesn't have, some only on certain
-   scenarios (needs) and some swapping one skill for another (minus). Editable.
-
-   NICK: Nick's 12 mandatory scenarios (Summer 2026), matched to the closest Doc. */
+   scenarios (needs) and some swapping one skill for another (minus). Editable. */
 const SCEN = (() => {
   const M = 'medical', T = 'trauma';
   const s = (id, title, cat, skills, note = '') => ({ id, title, cat, skills, note });
@@ -56,6 +54,8 @@ const SCEN = (() => {
     s('1t8Scl3VrI4er20BqX9RM8jmZ2MLj_7sUnqglNUxf75Y', 'Medical - heart failure', M, { 'NC': 1 }, 'Mild as written: no CPAP (Nick’s CHF rewrite would add it)'),
     s('1gu6k4uI4HtNI06mVmiswNnzZoBp4MaKzqZh_YPEVpLU', 'Medical - GI bleed unstable', M, { 'NRB': 1, 'BVM': 1, 'NPA': 1 }),
     s('1oF28_fKTsQufD2HP1MucAMWPP5swMp2x7wCyqU_74mQ', 'Medical - Anaphylaxis unstable', M, { 'NRB': 1, 'IM (Epi-Pen)': 1 }),
+    // Bella's write-up of Nick's Day 4 CPR station (Oct 20).
+    s('1zlQpviwOrMuSHPhmzIFDY-EsgGbOX1P3sgLQq2MsyD8', 'Medical - Chest Pain to CPR', M, { 'Oral (ASA)': 1, 'Sublingual (Nitro)': 1, '12 Lead ECG': 1, 'CPR': 1, 'Defibrillation': 1, 'BVM': 1, 'OPA': 1, 'Head Tilt': 1, 'SGA (iGel)': 1 }),
 
     s('1W7Zp8ZI5Ki-eIsMR0YjYfdnhzgMJ5Uu4oz_bz2c2XDc', 'Trauma - animal bite', T, { 'Direct Pressure': 1 }),
     s('1fX7xBa0RS-pG53tJyeKrZBgDSJFTOGN1AQbIerjeBaA', 'Trauma - Geriatric hip fx', T, { 'Extremity Stabilization': 1, 'Extremity Splinting': 1 }),
@@ -117,7 +117,7 @@ const SCEN = (() => {
 
   // Patient types, for add-ons like "nitro on any chest pain" (Claude's first pass; checked in the Library).
   const TRAIT_SEED = {
-    chest: ['Medical - Angina', 'Medical - Pneumonia pediatric', 'Medical - PE unstable', 'Medical - MI unstable'],
+    chest: ['Medical - Chest Pain to CPR', 'Medical - Angina', 'Medical - Pneumonia pediatric', 'Medical - PE unstable', 'Medical - MI unstable'],
     breathing: ['Medical - Pediatric Measles unstable', 'Medical - Anxiety Attack', 'Medical - COPD unstable', 'Medical - Asthma unstable',
       'Medical - Pneumonia pediatric', 'Medical - Pediatric Pertussis', 'Medical - Pediatric Croup unstable', 'Medical - Asthma',
       'Medical - PE unstable', 'Medical - MI unstable', 'Medical - heart failure', 'Medical - Anaphylaxis unstable'],
@@ -135,25 +135,9 @@ const SCEN = (() => {
   };
   SEED.forEach(x => { x.extras = EXTRA_SEED[x.title] || {}; });
   // In every week, on that day: Nick's cardiac arrest station (its own station every cohort).
-  SEED.find(x => x.title === 'Medical - cardiac arrest unstable').every = 4;
-
-  // Nick's twelve, in his order. His notes say which ones still need changes.
-  const NICK = [
-    '1x3xk-mbmC0jzkgB8BDMRc4_liqrbDuRQdwXj0iKV5lI', // 1 Pedestrian Struck (Nick wrote a new version)
-    '1vBa5IYdAlBJsc8FrKJ3lv0LxB1OyzhpedXGLp8mq64Y', // 2 Chest Pain → Cardiac Arrest (Nick wrote a new version)
-    '1pBAWkfoqI7R0j7mlGhzU4qAFnoanMbPDeKZNtyFvg3Q', // 3 Asthma / COPD
-    '1NNhb4XI2NRWJfgcRhtOnyavcyf26tZWU2F1z57TbUP4', // 4 Chest Pain / MI
-    '1dxLFxNXmtPFUUFZdsb2yRaK1c4taDT8R8NFp59d71us', // 5 Seizure w/ Fall
-    '1ASwF6YgRj2Z5xkMOFlOQbMc9c3e1N1p3jq6eNxK9unw', // 6 Hypoglycemia
-    '1u_4ARId2cuS9cz2hkmkrgyMQN85kUfb61GjJDKX8-J0', // 7 Opioid Overdose
-    '1f7OovmOBF5Yd8sL_QNhr49bwgOJfT1NCw3j6Hp8AIGo', // 8 Fall From Ladder (Nick wrote a new version)
-    '1oF28_fKTsQufD2HP1MucAMWPP5swMp2x7wCyqU_74mQ', // 9 Anaphylaxis
-    '1t8Scl3VrI4er20BqX9RM8jmZ2MLj_7sUnqglNUxf75Y', // 10 CHF (needs Nick's CPAP rewrite)
-    '1nN5bgR7OrG3RBQVB3Ugnhe47dTAkdwOqRbZhnvf-kvw', // 11 Stroke (Ischemic)
-    '1axezNWv6SYbCf1VHRPLe4kSCDLkwOit1UQz5Ne8XlTY', // 12 Sports Injury
-  ];
+  SEED.find(x => x.title === 'Medical - Chest Pain to CPR').every = 4;
 
   const TRAITS = [['chest', 'Chest pain'], ['breathing', 'Difficulty breathing'], ['alert', 'Altered but alert']];
 
-  return { SEED, TARGETS, ADDONS, NICK, TRAITS };
+  return { SEED, TARGETS, ADDONS, TRAITS };
 })();
