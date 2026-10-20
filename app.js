@@ -460,6 +460,117 @@ function menu() {
 
 const loadingView = () => `<p class="loading">${S.loading ? 'Opening the cohort sheet…' : ''}</p>`;
 
+/* ---------- Highlighting (select words in a list item → Highlight) ---------- */
+// Saved as the highlighted words themselves (item.hl = ['call Nick']), so a highlight stays put
+// even if the item's text is edited, as long as those words are still in it.
+// Where: to-dos/priorities (todo), packing (pack), shopping (shop), Documentation Checklist (doc, per cohort in docHl).
+function hlRanges(text, phrases) {
+  const out = [];
+  (phrases || []).forEach(p => {
+    if (!p) return;
+    let i = text.indexOf(p);
+    while (i >= 0 && out.some(([a, b]) => i < b && i + p.length > a && !(a === i && b === i + p.length))) i = text.indexOf(p, i + 1);
+    if (i >= 0) out.push([i, i + p.length]);
+  });
+  out.sort((x, y) => x[0] - y[0]);
+  const merged = [];
+  out.forEach(r => { const last = merged[merged.length - 1]; if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push([...r]); });
+  return merged;
+}
+function hlTxt(kind, id, text, phrases) {
+  let html = '', at = 0;
+  hlRanges(text, phrases).forEach(([a, b]) => {
+    html += esc(text.slice(at, a)) + `<mark class="hl" data-r="${a}-${b}">${esc(text.slice(a, b))}</mark>`; at = b;
+  });
+  return `<span class="txt" data-hl="${kind}:${id}">${html + esc(text.slice(at))}</span>`;
+}
+function hlItem(kind, id) {
+  if (kind === 'doc') return { text: (docItems().find(x => x.id === id) || {}).text || '', hl: (((S.cohortDoc || {}).docHl) || {})[id] || [] };
+  const list = kind === 'todo' ? S.todos : kind === 'pack' ? S.packing : S.shopping;
+  const x = list.find(i => i.id === id) || {};
+  return { text: x.text || '', hl: x.hl || [] };
+}
+function saveHl(kind, id, hl) {
+  if (kind === 'doc') return Store.set('cohorts/' + S.cohortKey, { docHl: { [id]: hl } });
+  return Store.set(kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : 'shopping/' + id, { hl });
+}
+
+let hlPop = null, hlPending = null;
+function hlShow(rect, label, pending) {
+  if (!hlPop) {
+    hlPop = document.createElement('button'); hlPop.className = 'hl-pop'; hlPop.type = 'button';
+    hlPop.addEventListener('mousedown', e => e.preventDefault()); // keep the selection while clicking it
+    hlPop.addEventListener('click', async e => {
+      e.stopPropagation();
+      const p = hlPending; hlHide(); window.getSelection().removeAllRanges();
+      try {
+        if (p.add) for (const x of p.add) { const it = hlItem(x.kind, x.id); if (!it.hl.includes(x.phrase)) await saveHl(x.kind, x.id, [...it.hl, x.phrase]); }
+        if (p.remove) {
+          const it = hlItem(p.remove.kind, p.remove.id), [a, b] = p.remove.range;
+          // Take off every saved phrase that's part of the highlight you clicked.
+          const keep = it.hl.filter(ph => !hlRanges(it.text, [ph]).some(([x, y]) => x < b && y > a));
+          await saveHl(p.remove.kind, p.remove.id, keep);
+        }
+      } catch (err) { toast(err.message); }
+    });
+    document.body.appendChild(hlPop);
+  }
+  hlPending = pending; hlPop.textContent = label;
+  hlPop.style.left = (rect.left + rect.width / 2) + 'px'; hlPop.style.top = Math.max(8, rect.top - 8) + 'px';
+  hlPop.classList.add('show');
+}
+function hlHide() { if (hlPop) hlPop.classList.remove('show'); hlPending = null; }
+
+// The selected words in each list item the selection touches.
+function hlSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return [];
+  const range = sel.getRangeAt(0);
+  const upTo = (el, node, off) => { const r = document.createRange(); r.selectNodeContents(el); r.setEnd(node, off); return r.toString().length; };
+  return [...document.querySelectorAll('.txt[data-hl]')].filter(el => range.intersectsNode(el)).map(el => {
+    const text = el.textContent;
+    let a = el.contains(range.startContainer) ? upTo(el, range.startContainer, range.startOffset) : 0;
+    let b = el.contains(range.endContainer) ? upTo(el, range.endContainer, range.endOffset) : text.length;
+    while (a < b && /\s/.test(text[a])) a++;
+    while (b > a && /\s/.test(text[b - 1])) b--;
+    const [kind, ...rest] = el.dataset.hl.split(':');
+    return { kind, id: rest.join(':'), phrase: text.slice(a, b) };
+  }).filter(x => x.phrase);
+}
+
+let hlDragOff = null, hlDown = null, hlNoClick = false;
+document.addEventListener('mousedown', e => {
+  if (hlPop && e.target === hlPop) return;
+  hlHide();
+  hlDown = { x: e.clientX, y: e.clientY }; hlNoClick = false;
+  // A to-do can be dragged to move it; on its words, a drag selects them instead.
+  const txt = e.target.closest && e.target.closest('.txt[data-hl]');
+  const li = txt && txt.closest('[draggable="true"]');
+  if (li) { li.draggable = false; hlDragOff = li; }
+}, true);
+document.addEventListener('mouseup', e => {
+  if (hlDragOff) { hlDragOff.draggable = true; hlDragOff = null; }
+  // The mouse moved while held down = selecting words, not clicking the item.
+  hlNoClick = !!hlDown && Math.hypot(e.clientX - hlDown.x, e.clientY - hlDown.y) > 3 && !!(e.target.closest && e.target.closest('.checks'));
+  hlDown = null;
+  setTimeout(() => {
+    const pieces = hlSelection();
+    if (!pieces.length) return;
+    hlShow(window.getSelection().getRangeAt(0).getBoundingClientRect(), 'Highlight', { add: pieces });
+  }, 0);
+});
+// Selecting words (or clicking a highlight) shouldn't tick the item off.
+document.addEventListener('click', e => {
+  if (hlNoClick) { hlNoClick = false; if (e.target.closest && e.target.closest('label')) { e.preventDefault(); e.stopPropagation(); return; } }
+  const mark = e.target.closest && e.target.closest('mark.hl');
+  if (mark) {
+    e.preventDefault(); e.stopPropagation();
+    const [kind, ...rest] = mark.closest('.txt').dataset.hl.split(':');
+    hlShow(mark.getBoundingClientRect(), 'Remove highlight', { remove: { kind, id: rest.join(':'), range: mark.dataset.r.split('-').map(Number) } });
+  }
+}, true);
+addEventListener('scroll', hlHide, true);
+
 /* ---------- Shared pieces ---------- */
 function circle(checked, attrs, extra = '') {
   return `<input type="checkbox" class="circle" ${attrs} ${checked ? 'checked' : ''} ${extra}>`;
@@ -480,7 +591,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span>${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
+      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
       ${open}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
     </li>`;
     }).join('') || empty}
@@ -581,14 +692,14 @@ function box(b, n) {
     body = head('Shopping List', bought.length ? hideToggle('shop') + '<button class="link" data-act="clearBought">Clear bought</button>' : '')
       + `<div class="add-row"><input id="shopIn" data-draft="shop" data-add="shop" placeholder="Add something to buy" value="${esc(S.drafts.shop || '')}"></div>`
       + `<ul class="checks">${[...open, ...bought].map(x => `<li class="${x.bought ? 'done' : ''}">
-          <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span>${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
+          <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL ? 'Notes' : 'Notes for today');
   } else if (b === 'docs') {
     const all = docItems(), done = all.filter(x => x.on).length;
     const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
-      <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label></li>`).join('')}</ul>`;
+      <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label></li>`).join('')}</ul>`;
     body = head(`Documentation Checklist <span class="count">${done}/${all.length}</span>`,
       (done ? hideToggle('docs') : '') + `<button class="eye" data-act="printDocs" title="Print the checklist" aria-label="Print the checklist">${PRINTER}</button>`)
       + `<p class="docs-sub">2 copies of each: External hard drive and Admin Google Drive<br><em>Note: physical copies received at Academy Week stay in Course Binder</em></p>
@@ -607,7 +718,7 @@ function box(b, n) {
     body = head('Packing List', list.some(x => x.packed) ? hideToggle('pack') : '')
       + `<div class="add-row"><input id="packIn" data-draft="pack" data-add="pack" placeholder="+ add item" value="${esc(S.drafts.pack || '')}"></div>`
       + `<ul class="checks">${list.map(x => `<li class="${x.packed ? 'done' : ''}">
-          <label>${circle(x.packed, `data-act="packed" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label>
+          <label>${circle(x.packed, `data-act="packed" data-id="${x.id}"`)}<span>${hlTxt('pack', x.id, x.text, x.hl)}</span></label>
           <button class="x" data-act="delPack" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing on the list yet.</li>'}</ul>`;
   }
   const h = cfg().heights[b];
@@ -880,9 +991,10 @@ function datePicker(key) {
 const DOC_SECTIONS = ['class', 'student', 'skills', 'final'];
 function docItems(sec) {
   const checks = (S.cohortDoc && S.cohortDoc.docChecks) || {};
+  const hl = (S.cohortDoc && S.cohortDoc.docHl) || {};
   return (sec ? [sec] : DOC_SECTIONS).flatMap(k => (cfg().docs[k] || []).map(text => {
     const id = k + '-' + slug(text);
-    return { id, text, on: !!checks[id] };
+    return { id, text, on: !!checks[id], hl: hl[id] };
   }));
 }
 // One page like the PDF, with whatever is already checked printed as checked.

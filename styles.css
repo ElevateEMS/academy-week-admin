@@ -611,3 +611,10 @@ a.btn { text-decoration: none; color: inherit; }
 .extras { border-left: 2px solid var(--line); padding-left: 10px; margin-bottom: 6px; }
 .modal.schtpl { width: min(1180px, 100%); }
 .modal.schtpl .sched-grid { padding-bottom: 6px; }
+/* Highlights (select words in a list item → Highlight) */
+mark.hl { background: #f1dca6; color: inherit; border-radius: 3px; padding: 0 1px; cursor: pointer; }
+.checks li.done mark.hl { background: linear-gradient(var(--taupe), var(--taupe)) 0 62% / 100% 1px no-repeat, rgba(241, 220, 166, .45); }
+.checks .txt { cursor: text; }
+.hl-pop { position: fixed; z-index: 60; transform: translate(-50%, -100%); background: var(--ink); color: #fff; border: 0; border-radius: 999px; padding: 5px 13px; font-size: 13px; box-shadow: 0 6px 18px rgba(61, 50, 44, .25); cursor: pointer; display: none; }
+.hl-pop.show { display: block; }
+.hl-pop::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: #f1dca6; margin-right: 7px; vertical-align: 0; }
