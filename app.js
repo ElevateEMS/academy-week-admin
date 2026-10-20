@@ -205,6 +205,11 @@ function students() {
         fixes: S.contacts.filter(c => c.sid === sid && !c.fixed).length,
         warns: S.warnings.filter(w => w.sid === sid).length,
       };
+    })
+    // A-Z by last name, then first, even when late enrollments were added to the bottom of the sheet.
+    .sort((a, b) => {
+      const x = coverName(a.name), y = coverName(b.name), cmp = (p, q) => p.localeCompare(q, 'en', { sensitivity: 'base' });
+      return cmp(x.last, y.last) || cmp(x.first, y.first);
     });
 }
 const studentBySid = sid => students().find(s => s.sid === sid);
