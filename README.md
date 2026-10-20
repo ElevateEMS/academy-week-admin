@@ -15,7 +15,7 @@ If `config.js` still has `APPS_SCRIPT_URL = 'PASTE'`, the app runs in **sample m
 (pretend students and staff, saved in this browser only).
 
 ## Files to upload to GitHub
-index.html, styles.css, app.js, config.js, defaults.js, store.js, sheets.js, manifest.json,
+index.html, view.html, styles.css, app.js, schedule.js, config.js, defaults.js, store.js, sheets.js, manifest.json,
 logo.png, favicon-32.png, icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png
 
 Keep the CNAME file GitHub made (it's what makes admin.elevateemsacademy.com work).
@@ -33,3 +33,11 @@ are deployed with the Firebase CLI.)
 | Cohort sheet → Staffing | the Role / Slot grid: every name that isn't OPEN or — is working that day |
 
 The app never changes anything in the sheets except column P.
+
+## Schedule + instructor link (Phase 2)
+- The Schedule page edits each day's class schedule, stations, instructor notes and squads
+  (squads carry forward to later days). New cohorts start from `DEFAULTS.schedule` in defaults.js,
+  or from "Save this week as the template".
+- Print = 2 pages per day (schedule.js draws them). The instructor link is `view.html?t=<secret>`:
+  the app copies the whole week to `shared/<secret>` a moment after each edit. firestore.rules lets
+  anyone *get* that one document (never list or write), so the link is only as private as the code in it.

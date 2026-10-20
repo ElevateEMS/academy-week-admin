@@ -12,5 +12,10 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if isStaff();
     }
+    // The instructors' read-only schedule link (view.html?t=...). Anyone with the
+    // secret code can open that one copy; nobody can list them or change them.
+    match /shared/{token} {
+      allow get: if true;
+    }
   }
 }
