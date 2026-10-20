@@ -341,7 +341,10 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .add-link { margin-top: 10px; align-self: start; }
 .sched-foot { margin: 12px 0 0; }
 .squad-count { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
-.squad-count select, .team select { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); padding: 3px 6px; }
+.squad-count select, .team select { border: 1px solid var(--line); border-radius: 8px; padding: 3px 28px 3px 8px;
+  /* Own arrow, set in from the edge like the × on a name (the browser's sits against the border). */
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237d6558' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center; }
 .squads { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin: 8px 0; }
 .squad { background: var(--blush-soft); border-radius: 12px; padding: 8px 10px 10px; }
 .squad h3 { margin: 0 0 4px; font-size: 18px; }
