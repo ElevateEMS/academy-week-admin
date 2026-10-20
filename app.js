@@ -656,7 +656,7 @@ function scheduleView() {
         <input id="${k('sn')}" data-draft="${k('sn')}" data-sch="stationNote" value="${dv(k('sn'), d.stationNote)}" placeholder="e.g. Stations with two topics: split into 30 minute segments."></label>
     </section>
     <section class="box"><div class="box-head static"><h2>Instructor Notes/Reminders</h2></div>
-      <textarea id="${k('notes')}" class="sched-notes" data-draft="${k('notes')}" data-sch="notes" data-grow rows="8">${dv(k('notes'), d.notes)}</textarea>
+      <textarea id="${k('notes')}" class="sched-notes" data-draft="${k('notes')}" data-sch="notes" data-grow rows="8">${dv(k('notes'), indentDashes(d.notes))}</textarea>
     </section>
     </div>
   </div>`;
@@ -993,8 +993,14 @@ function parseBag(text) {
   return out.filter(s => s.name);
 }
 
+// In the Instructor Notes box, "- " lines show pushed in a few spaces. The spaces are
+// only for looks: they come off again when it saves.
+const indentDashes = text => String(text || '').split('\n').map(l => l.replace(/^\s*(?=[-–•])/, '    ')).join('\n');
+const unindentDashes = text => String(text || '').split('\n').map(l => l.replace(/^\s+(?=[-–•])/, '')).join('\n');
+
 function schChange(t) {
-  const n = schedDay(), d = schedFor(n), f = t.dataset.sch, val = t.value;
+  const n = schedDay(), d = schedFor(n), f = t.dataset.sch;
+  const val = f === 'notes' ? unindentDashes(t.value) : t.value;
   const done = () => { delete S.drafts[t.dataset.draft]; };
   if (f === 'notes' || f === 'stationNote') return saveSched(n, { [f]: val }).then(done);
   const list = d[f].map(x => ({ ...x }));
@@ -1143,6 +1149,13 @@ document.addEventListener('input', e => {
   const t = e.target, k = t.dataset.draft;
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
+  if (t.dataset.sch === 'notes') { // indent a "- " line as soon as it's typed, keeping the cursor in place
+    const fixed = indentDashes(t.value);
+    if (fixed !== t.value) {
+      const pos = indentDashes(t.value.slice(0, t.selectionStart)).length;
+      t.value = fixed; t.setSelectionRange(pos, pos);
+    }
+  }
   S.drafts[k] = t.value;
   if (t.hasAttribute('data-grow')) grow(t);
   if (t.dataset.notes) saveNoteSoon(Number(t.dataset.notes), t.id);
