@@ -1,7 +1,8 @@
 /* Academy Week Admin: Bella's organizer for academy week.
    Pages: Day (planner boxes you can drag around), Week (Day 1-5 side by side; drag
    to-dos between days), Students (skills status, patient contacts + fix notes,
-   attendance/warnings), Settings. Saving: store.js. Google Sheets: sheets.js. */
+   attendance/warnings), Settings. Saving: store.js. Google Sheets: sheets.js.
+   Scenarios (library, week plan, Find a Scenario): scenario-ui.js + matcher.js. */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +16,9 @@ const S = {
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
   menuOpen: false, schMenu: false, datePick: null, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every', schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
+  // Scenarios: scenDocs = your saved tags, scenLive = Docs in the Drive folders (null until listed)
+  scenDocs: {}, scenDocsAt: 0, scenLive: null, scenLiveAt: 0, scenErr: null,
+  libOpen: false, libTab: 'scen', libSel: null, libDraft: null, libFilter: 'all', addonDraft: null, reqDraft: null, planOpen: false, place: null, match: null,
 };
 let unwatchCohort = [];
 let unwatchGlobal = [];
@@ -60,12 +64,12 @@ function currentWeekDay() {
 }
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
-const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist' };
+const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
-  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing'], def: [['shopping', 'notes'], ['todo'], ['packing']] },
+  prep: { key: 'prepLayout', boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo'], ['packing', 'scenarios']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
@@ -94,7 +98,8 @@ function validLayout(l, board) {
   if (!l || l.v !== LAYOUT_VERSION) return null;
   const cols = [l.c0 || [], l.c1 || [], l.c2 || []].slice(0, board.def.length).map(c => c.filter(b => board.boxes.includes(b)));
   const seen = new Set(cols.flat());
-  board.boxes.forEach(b => { if (!seen.has(b)) cols[0].push(b); }); // a box added later still shows up
+  // A box added later still shows up, in the column it starts in.
+  board.boxes.forEach(b => { if (!seen.has(b)) cols[Math.max(0, board.def.findIndex(c => c.includes(b)))].push(b); });
   return cols;
 }
 function bagSections() {
@@ -289,10 +294,12 @@ Store.onUser(async user => {
   if (!user) { render(); return; }
   unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
+  unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   render();
   try {
     S.cohorts = await Sheets.listCohorts();
   } catch (e) { S.sheetErr = e.message; render(); return; }
+  loadScenarios(); // which scenario Docs are in the Drive folders (no need to wait)
   // Last one used; otherwise the active cohort that isn't the Test one.
   const pick = S.cohorts.find(c => c.key === S.cohortKey)
     || S.cohorts.find(c => /active/i.test(c.status) && !/^test/i.test(c.key))
@@ -408,7 +415,11 @@ function shell() {
   ${S.shareOpen ? shareModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
-  ${S.binderOpen ? binderModal() : ''}`;
+  ${S.binderOpen ? binderModal() : ''}
+  ${S.libOpen ? libModal() : ''}
+  ${S.planOpen ? planModal() : ''}
+  ${S.match ? matchModal() : ''}
+  ${S.place ? placeModal() : ''}`;
 }
 
 function pageTitle() {
@@ -544,7 +555,7 @@ function dayStrip({ phases = true } = {}) {
 }
 
 function box(b, n) {
-  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing';
+  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios';
   const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
@@ -581,6 +592,8 @@ function box(b, n) {
           <p class="docs-skills">The following skills sheets: <span>(physical copies only)</span></p>${list('skills')}</div>
       </div>
       <p class="mini-head">Final Steps</p>${list('final')}`;
+  } else if (b === 'scenarios') {
+    body = head('Academy Week Scenarios') + scenBox();
   } else if (b === 'packing') {
     // Unpacked first; packed ones drop to the bottom (or hide).
     const byOrder = (a, c) => orderOf(a) - orderOf(c);
@@ -671,6 +684,7 @@ function scheduleView() {
         <span class="row-tools"><button class="x" data-act="schMove" data-list="stations" data-i="${i}" data-dir="-1" title="Move up">↑</button><button class="x" data-act="schMove" data-list="stations" data-i="${i}" data-dir="1" title="Move down">↓</button><button class="x" data-act="schDel" data-list="stations" data-i="${i}" title="Remove">×</button></span>
       </div>
       <textarea id="${k('sc', i)}" data-draft="${k('sc', i)}" data-sch="stations" data-i="${i}" data-f="content" data-grow rows="2" placeholder="Content & instructor notes">${dv(k('sc', i), st.content)}</textarea>
+      ${stationScen(n, i, st)}
     </div>`).join('');
 
   // Squads: pick students from the roster into Team A / Team B.
@@ -693,6 +707,7 @@ function scheduleView() {
         <button class="menu-item" data-act="printDay">Print Day ${n}</button>
         <button class="menu-item" data-act="printAll">Print all 5 days</button>
         <button class="menu-item" data-act="shareOpen">${token ? 'Instructor link & QR' : 'Make instructor link'}</button>
+        <button class="menu-item" data-act="libOpen">Scenario Library</button>
         <button class="menu-item" data-act="saveTemplate">Save this week as the template <span class="muted small">New cohorts start from this schedule</span></button>
       </div>` : ''}
     </div>
@@ -745,7 +760,14 @@ async function publish() {
   const token = S.cohortDoc && S.cohortDoc.shareToken;
   if (!token || !S.sheet) return;
   const days = {};
-  weekDays().forEach(d => { days[d.n] = { ...printDay(d.n), iso: d.iso || '' }; });
+  // Stations carry links to their scenario Docs (shown on the instructor link, not on paper).
+  const lib = libById();
+  weekDays().forEach(d => {
+    const day = printDay(d.n);
+    day.stations = day.stations.map(st => ({ topic: st.topic, content: st.content,
+      links: (st.scen || []).filter(id => lib[id]).map(id => ({ name: lib[id].name, url: lib[id].url })) }));
+    days[d.n] = { ...day, iso: d.iso || '' };
+  });
   await Store.set('shared/' + token, { cohort: S.cohortKey, updated: Date.now(), expires: shareExpires(), days }, false);
 }
 // On opening a cohort: an expired link's shared copy (with student names) is deleted;
@@ -1002,7 +1024,7 @@ function studentsView() {
     <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Conduct notes')}</div>
     <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">
   </div>
-  ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="muted small">for picking tomorrow’s scenarios</span></div>
+  ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">Find scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
   <section class="box table-box">
@@ -1125,6 +1147,12 @@ function settingsView() {
       <div class="box-head static"><h2>Day Templates</h2></div>
       <p class="muted small">The to-dos that repeat for every cohort (Prep, Day 1–5, Finalize), the Prep packing list, and the notes each day starts with.</p>
       <button class="btn primary" data-act="tplOpen">Edit day templates</button>
+    </section>
+
+    <section class="box">
+      <div class="box-head static"><h2>Scenario Library</h2></div>
+      <p class="muted small">Your patient scenario Docs and the skills each one covers, the add-ons, and how many summative sign-offs each student needs. New Docs in the Medical / Trauma folders show up here on their own.</p>
+      <button class="btn primary" data-act="libOpen">Open the Scenario Library</button>
     </section>
 
     <section class="box">
@@ -1350,8 +1378,12 @@ addEventListener('resize', fitBoard);
 /* ---------- Events ---------- */
 document.addEventListener('input', e => {
   const t = e.target, k = t.dataset.draft;
+  // Scenario Library: add-on names and requirement numbers wait for Save.
+  if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
+  if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
+  if (k === 'libSearch') { S.drafts.libSearch = t.value; render(); return; }
   if (t.dataset.sch === 'notes') { // indent a "- " line as soon as it's typed, keeping the cursor in place
     const fixed = indentDashes(t.value);
     if (fixed !== t.value) {
@@ -1376,6 +1408,7 @@ document.addEventListener('focusout', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
+  if (/^plan/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
   if (t.dataset.change === 'squadCount') { act('squadCount', t); return; }
   if (t.dataset.change === 'squadAdd') { act('squadAdd', t); return; }
@@ -1389,7 +1422,8 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.datePick) S.datePick = null; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    if (S.datePick) S.datePick = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
@@ -1700,6 +1734,9 @@ async function act(a, el = {}, e) {
         try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Select the link and copy it.'); }
         break;
       }
+      default:
+        if (!(await scenAct(a, el, e))) console.warn('Unknown action', a);
+        break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null });
         S.view = 'day'; pref('view', 'day');

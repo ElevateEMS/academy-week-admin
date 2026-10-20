@@ -15,7 +15,8 @@ service cloud.firestore {
     // The instructors' read-only schedule link (view.html?t=...). Anyone with the
     // secret code can open that one copy; nobody can list them or change them.
     match /shared/{token} {
-      allow get: if true;
+      // Works until its expiry date (7 days after Day 5), then Firebase won't open it.
+      allow get: if resource.data.get('expires', null) == null || request.time < resource.data.expires;
     }
   }
 }

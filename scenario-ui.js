@@ -1,0 +1,519 @@
+/* Phase 3: Scenario Library, Academy Week Scenarios (the week plan) and Find a Scenario.
+
+   Loaded before app.js; everything here runs only when app.js calls it, so it can use
+   app.js's S, Store, esc, render, schedFor, saveSched and so on.
+
+   Saved in Firebase:
+     scenarios/{driveDocId}   { title, cat, skills: { skill: count }, note, checked, removed }  (your edits)
+     meta/settings            scenTargets, scenAddons, planSize, lastPlan { cohort, ids }
+     cohorts/{key}.weekPlan   { items: [{ id, addons: [text], day }], how, updated }
+     schedule stations        { topic, content, scen: [docIds] }  (scenarios added to that station)
+
+   The library itself is the Docs in the Medical / Trauma folders (listed by the Apps Script);
+   scenarios.js has Claude's first tagging pass, used until you save your own. */
+
+/* ---------- The library ---------- */
+const SKILL_ORDER = () => DEFAULTS.skills.flatMap(g => g.items);
+const OB_SKILLS = () => (DEFAULTS.skills.find(g => g.group === 'OB') || { items: [] }).items;
+// Skills a scenario can be tagged with: not vital signs/transport (every scenario has those), not OB (rote only).
+const TAG_GROUPS = () => DEFAULTS.skills.filter(g => g.group !== 'OB')
+  .map(g => ({ group: g.group, items: g.items.filter(k => !Match.isEvery(k)) })).filter(g => g.items.length);
+const scenTargets = () => ({ ...SCEN.TARGETS, ...((S.settings && S.settings.scenTargets) || {}) });
+const scenAddons = () => (S.settings && S.settings.scenAddons) || SCEN.ADDONS;
+const planSize = () => (S.settings && S.settings.planSize) || 12;
+const docUrl = id => 'https://docs.google.com/document/d/' + id + '/edit';
+
+// "Medical - Asthma unstable" → "Asthma (unstable)"
+function niceTitle(t) {
+  let s = String(t || '').replace(/^\s*(medical|trauma)\s*[-–:]\s*/i, '').trim();
+  s = s.replace(/\s+unstable$/i, ' (unstable)');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+let libCache = null, libKey = '';
+function scenLib() {
+  // Rebuilt only when something it's made from changes.
+  const key = [S.scenLiveAt || 0, S.scenDocsAt || 0, planItems().map(x => x.id).join()].join('|');
+  if (libCache && key === libKey) return libCache;
+  const seed = Object.fromEntries(SCEN.SEED.map(s => [s.id, s]));
+  const live = S.scenLive ? Object.fromEntries(S.scenLive.map(s => [s.id, s])) : null;
+  const ids = new Set([...Object.keys(seed), ...(live ? Object.keys(live) : []), ...Object.keys(S.scenDocs)]);
+  const list = [...ids].map(id => {
+    const d = S.scenDocs[id] || {}, sd = seed[id], lv = live && live[id];
+    const title = (lv && lv.title) || d.title || (sd && sd.title) || 'Untitled Doc';
+    const skills = d.skills || (sd ? sd.skills : null);
+    return {
+      id, title, name: niceTitle(title), url: (lv && lv.url) || docUrl(id),
+      cat: d.cat || (sd && sd.cat) || (lv && lv.cat) || 'medical',
+      skills, note: d.note ?? (sd ? sd.note : ''), removed: !!d.removed,
+      status: d.checked ? 'checked' : skills ? 'suggested' : 'new',
+      gone: !!live && !lv, // in the library but not in the folders anymore
+      fresh: !!lv && !sd && !d.skills, // a Doc added to the folders since the tagging pass
+    };
+  }).filter(s => !s.removed && !(s.gone && !S.scenDocs[s.id] && !planItems().some(x => x.id === s.id)))
+    .sort((a, b) => a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+  libCache = list; libKey = key;
+  return list;
+}
+const libById = () => Object.fromEntries(scenLib().map(s => [s.id, s]));
+const usableScen = () => scenLib().filter(s => s.skills && !s.gone);
+const addonsByText = () => Object.fromEntries(scenAddons().map(a => [a.text, a]));
+const fitsAddon = (a, cat) => !a.cat || a.cat === 'any' || a.cat === cat;
+
+// "Tourniquet, Direct Pressure ×2" in Skills Tracking order.
+function skillText(skills) {
+  const order = SKILL_ORDER();
+  const list = Object.entries(skills || {}).filter(([, n]) => n > 0).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+  return list.length ? list.map(([k, n]) => k + (n > 1 ? ' ×' + n : '')).join(', ') : 'vital signs & transport only';
+}
+
+// Asks the Apps Script which Docs are in the folders now (new ones show up as "New").
+async function loadScenarios() {
+  try {
+    S.scenLive = await Sheets.listScenarios(); S.scenLiveAt = Date.now(); S.scenErr = null;
+  } catch (e) {
+    S.scenErr = /unknown request/i.test(e.message) ? 'The Apps Script needs the new version (see the setup steps).' : e.message;
+  }
+  render();
+}
+
+/* ---------- Where scenarios are on the schedule ---------- */
+function stationsWith(id) {
+  const out = [];
+  [1, 2, 3, 4, 5].forEach(n => schedFor(n).stations.forEach((st, i) => {
+    if ((st.scen || []).includes(id)) out.push({ day: n, i, topic: st.topic });
+  }));
+  return out;
+}
+
+// Adds a scenario's line to a station's content (and remembers it, for the Doc link).
+// i = -1 makes a new station for it.
+async function addToStation(n, i, id, addons = []) {
+  const sc = libById()[id];
+  if (!sc) return;
+  const list = schedFor(n).stations.map(x => ({ ...x }));
+  if (i < 0) { list.push({ topic: (sc.cat === 'trauma' ? 'Trauma' : 'Medical') + ' Scenarios', content: '' }); i = list.length - 1; }
+  const st = list[i];
+  if ((st.scen || []).includes(id)) { toast('It’s already at that station.'); return false; }
+  const line = sc.name + ': ' + skillText(sc.skills) + addons.map(t => ' + ' + t).join('');
+  st.content = (st.content || '').replace(/\s+$/, '');
+  st.content = (st.content ? st.content + '\n' : '') + line;
+  st.scen = [...(st.scen || []), id];
+  dropSchDrafts(n);
+  await saveSched(n, { stations: list });
+  toast(`Added to Day ${n} · ${st.topic || 'station'}.`);
+  return true;
+}
+async function removeFromStation(n, i, id) {
+  const sc = libById()[id];
+  const list = schedFor(n).stations.map(x => ({ ...x }));
+  const st = list[i];
+  if (!st) return;
+  st.scen = (st.scen || []).filter(x => x !== id);
+  if (sc) st.content = (st.content || '').split('\n').filter(l => !l.startsWith(sc.name + ':')).join('\n');
+  dropSchDrafts(n);
+  await saveSched(n, { stations: list });
+}
+
+// The chips under a station on the Schedule page.
+function stationScen(n, i, st) {
+  const lib = libById();
+  const chips = (st.scen || []).map(id => {
+    const sc = lib[id];
+    return `<span class="scen-chip"><a href="${esc(sc ? sc.url : docUrl(id))}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc ? sc.name : 'Scenario')}</a><button class="x" data-act="stScenDel" data-i="${i}" data-id="${id}" title="Take it off this station" aria-label="Remove">×</button></span>`;
+  }).join('');
+  return `<div class="st-scen">${chips}<button class="link" data-act="matchOpen" data-i="${i}">Find a scenario</button></div>`;
+}
+
+/* ---------- The week plan (Prep page) ---------- */
+const planItems = () => (S.cohortDoc && S.cohortDoc.weekPlan && S.cohortDoc.weekPlan.items) || [];
+function planStatus(items = planItems()) {
+  const have = Match.coverage(items, libById(), addonsByText());
+  return { have, miss: Match.missing(have, scenTargets(), SKILL_ORDER()) };
+}
+const missText = miss => miss.map(m => m.short + ' ' + m.skill).join(', ');
+function coverLine(miss) {
+  return miss.length
+    ? `<p class="cover-line short"><b>Missing:</b> ${esc(missText(miss))}</p>`
+    : '<p class="cover-line ok">✓ Every summative skill is covered</p>';
+}
+async function savePlan(items, extra = {}) {
+  await Store.set('cohorts/' + S.cohortKey, { weekPlan: { items: items.map(x => ({ id: x.id, addons: x.addons || [], day: x.day || 1 })), updated: Date.now(), ...extra } });
+}
+async function buildPlan(how) {
+  const lib = libById();
+  let items;
+  if (how === 'nick') {
+    items = Match.suggestDays(SCEN.NICK.filter(id => lib[id]).map(id => ({ id, addons: [] })), lib);
+  } else {
+    const last = S.settings && S.settings.lastPlan;
+    const avoid = last && last.cohort !== S.cohortKey ? last.ids || [] : planItems().map(x => x.id);
+    items = Match.build({ lib: usableScen(), addons: scenAddons(), targets: scenTargets(), size: planSize(), avoid });
+    await Store.set('meta/settings', { lastPlan: { cohort: S.cohortKey, ids: items.map(x => x.id) } });
+  }
+  await savePlan(items, { how });
+  const { miss } = planStatus(items);
+  toast(`${items.length} scenarios. ` + (miss.length ? 'Still missing: ' + missText(miss) : 'Every skill is covered.'));
+}
+
+function scenBox() {
+  const items = planItems();
+  if (!items.length) return `<p class="muted small">Let the app pick about ${planSize()} scenarios from your library that cover every summative skill on the Skills Tracking sheet. Each build is a different mix.</p>
+    <div class="plan-btns"><button class="btn primary small" data-act="planBuild">Build a new mix</button><button class="btn small" data-act="planNick">Use Nick’s set</button></div>
+    <p class="plan-foot"><button class="link" data-act="libOpen">Scenario Library</button></p>`;
+  const lib = libById(), { miss } = planStatus(items);
+  const byDay = [1, 2, 3, 4, 5].map(d => [d, items.filter(x => (x.day || 1) === d)]).filter(([, l]) => l.length);
+  return `${coverLine(miss)}
+    <ul class="plan-mini">${byDay.map(([d, l]) => `<li><span class="d">Day ${d}</span><span>${l.map(x => {
+      const sc = lib[x.id];
+      return `<span class="${sc && sc.cat === 'trauma' ? 'tr' : ''}">${esc(sc ? sc.name : 'Missing Doc')}${x.addons.length ? ' +' : ''}</span>`;
+    }).join(' · ')}</span></li>`).join('')}</ul>
+    <div class="plan-btns"><button class="btn primary small" data-act="planOpen">Open the plan</button><button class="link" data-act="libOpen">Scenario Library</button></div>`;
+}
+
+function planModal() {
+  const items = planItems(), lib = libById(), addons = scenAddons(), targets = scenTargets();
+  const { have, miss } = planStatus(items);
+  const med = items.filter(x => (lib[x.id] || {}).cat !== 'trauma').length;
+  const missSet = Object.fromEntries(miss.map(m => [m.skill, m.short]));
+
+  const row = (x, idx) => {
+    const sc = lib[x.id] || { name: 'A Doc that’s gone from the folders', cat: '', skills: {}, url: docUrl(x.id), gone: true };
+    const at = stationsWith(x.id);
+    return `<li class="plan-item">
+      <div class="pi-main">
+        <div><a class="pi-name" href="${esc(sc.url)}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc.name)}</a>
+          ${sc.cat ? `<span class="tag ${sc.cat}">${sc.cat}</span>` : ''}${sc.gone ? ' <span class="tag red">Doc missing</span>' : ''}</div>
+        <div class="pi-skills">${esc(skillText(sc.skills))}</div>
+        ${x.addons.map((t, j) => `<div class="pi-addon">+ ${esc(t)} <button class="x" data-act="planAddonDel" data-i="${idx}" data-j="${j}" aria-label="Remove add-on">×</button></div>`).join('')}
+        ${at.length ? `<div class="pi-at">✓ On ${at.map(a => 'Day ' + a.day + ' · ' + esc(a.topic || 'a station')).join(', ')}</div>` : ''}
+      </div>
+      <div class="pi-tools">
+        <select data-change="planDay" data-i="${idx}" title="Suggested day">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${(x.day || 1) === d ? 'selected' : ''}>Day ${d}</option>`).join('')}</select>
+        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => fitsAddon(a, sc.cat) && !x.addons.includes(a.text)).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
+        <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
+        <button class="x" data-act="planDel" data-i="${idx}" title="Take it out of the plan" aria-label="Remove">×</button>
+      </div></li>`;
+  };
+
+  // "+ Add a scenario": the ones that fill the most of what's missing first.
+  const inPlan = new Set(items.map(x => x.id));
+  const gain = s => Object.entries(s.skills).reduce((g, [k, n]) => g + Math.min(n, missSet[k] || 0), 0);
+  const choices = usableScen().filter(s => !inPlan.has(s.id)).map(s => ({ s, g: gain(s) }))
+    .sort((a, b) => b.g - a.g || a.s.cat.localeCompare(b.s.cat) || a.s.name.localeCompare(b.s.name));
+  const option = ({ s, g }) => `<option value="${s.id}">${esc(s.name)}${g ? ' (fills ' + Object.keys(s.skills).filter(k => missSet[k]).join(', ') + ')' : ''}</option>`;
+
+  const days = [1, 2, 3, 4, 5].map(d => [d, items.map((x, i) => [x, i]).filter(([x]) => (x.day || 1) === d)]).filter(([, l]) => l.length);
+  const cell = k => { const h = have[k] || 0, t = targets[k] || 0; return `<span class="cov ${h < t ? 'short' : ''}">${esc(k)} <b>${h}/${t}</b></span>`; };
+
+  return `<div class="overlay" data-act="planClose"><div class="modal plan" data-stop>
+    <div class="modal-head"><h2>Academy Week Scenarios</h2><button class="x big" data-act="planClose" aria-label="Close">×</button></div>
+    <div class="modal-body" data-keep-scroll="plan">
+      <div class="plan-top">
+        ${items.length ? coverLine(miss) : '<p class="muted">No scenarios picked yet.</p>'}
+        <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma${(S.cohortDoc.weekPlan || {}).how === 'nick' ? ' · started from Nick’s set' : ''}</p>
+        <div class="plan-btns">
+          <button class="btn small" data-act="planBuild">Build a new mix</button>
+          <button class="btn small" data-act="planNick">Use Nick’s set</button>
+          <label class="plan-size">About <input type="number" min="5" max="25" id="planSizeIn" data-change="planSize" value="${planSize()}"> scenarios</label>
+        </div>
+      </div>
+      <div class="plan-grid">
+        <div>
+          ${days.map(([d, l]) => `<p class="mini-head">Day ${d}</p><ul class="plan-list">${l.map(([x, i]) => row(x, i)).join('')}</ul>`).join('')}
+          <div class="plan-add"><select data-change="planAdd"><option value="">+ Add a scenario${miss.length ? ' (best fits for what’s missing first)' : ''}</option>${choices.map(option).join('')}</select></div>
+        </div>
+        <aside class="plan-cov">
+          <p class="mini-head">Sign-offs this plan gives each student</p>
+          <p class="muted small">Have / need, from the MINIMUM Skill Tracking sheet. Vital signs and transport count once per scenario.</p>
+          ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="cov-list">${g.items.map(cell).join('')}</div>`).join('')}
+        </aside>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="link" data-act="libOpen">Scenario Library</button><span class="muted small">Days are only suggestions: change them, then add each one to a station.</span><button class="btn primary" data-act="planClose">Done</button></div>
+  </div></div>`;
+}
+
+// Picking the station for a scenario from the plan (or from Find a Scenario without a station).
+function placeModal() {
+  const p = S.place, lib = libById();
+  const n = p.day, stations = schedFor(n).stations;
+  const names = p.ids.map(id => (lib[id] || {}).name || 'Scenario').join(' + ');
+  return `<div class="overlay" data-act="placeClose"><div class="modal place" data-stop>
+    <div class="modal-head"><h2>Add to a Station</h2><button class="x big" data-act="placeClose" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <p><b>${esc(names)}</b>${p.addons.length ? `<br><span class="muted small">+ ${esc(p.addons.join(' + '))}</span>` : ''}</p>
+      <div class="place-days">${[1, 2, 3, 4, 5].map(d => `<button class="chip small ${d === n ? 'on' : ''}" data-act="placeDay" data-n="${d}">Day ${d}</button>`).join('')}</div>
+      <div class="place-list">
+        ${stations.map((st, i) => `<button class="place-st" data-act="placeTo" data-i="${i}"><b>${esc(st.topic || 'Station ' + (i + 1))}</b><span>${esc((st.content || '').split('\n')[0] || '')}</span></button>`).join('')}
+        <button class="place-st new" data-act="placeTo" data-i="-1"><b>+ New station</b><span>“${(lib[p.ids[0]] || {}).cat === 'trauma' ? 'Trauma' : 'Medical'} Scenarios” on Day ${n}</span></button>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+/* ---------- Find a Scenario ---------- */
+// Who's behind on what (attending students; one squad if picked): { skill: how many students }.
+function behindCounts(m) {
+  const sq = squadsFor(m.n);
+  const inSquad = m.squad ? new Set([...((sq.s[m.squad] || {}).A || []), ...((sq.s[m.squad] || {}).B || [])]) : null;
+  const out = {};
+  attending().filter(s => s.skill === 'behind' && (!inSquad || inSquad.has(s.name)))
+    .forEach(s => s.behind.forEach(k => { out[k] = (out[k] || 0) + 1; }));
+  return out;
+}
+function matchWant(m) {
+  const counts = behindCounts(m);
+  const tagged = new Set(TAG_GROUPS().flatMap(g => g.items));
+  if (m.picked) return Object.fromEntries(Object.keys(m.picked).filter(k => tagged.has(k)).map(k => [k, counts[k] || 1]));
+  return Object.fromEntries(Object.entries(counts).filter(([k]) => tagged.has(k)));
+}
+
+function matchModal() {
+  const m = S.match, lib = libById(), counts = behindCounts(m), want = matchWant(m);
+  const st = m.i != null ? schedFor(m.n).stations[m.i] : null;
+  const sq = squadsFor(m.n);
+  const everyBehind = Object.keys(counts).filter(k => Match.isEvery(k));
+  const obBehind = Object.keys(counts).filter(k => OB_SKILLS().includes(k));
+  const r = Object.keys(want).length ? Match.find({ lib: usableScen(), addons: scenAddons(), want, cat: m.cat }) : null;
+  const planned = Object.fromEntries(planItems().map(x => [x.id, x.day || 1]));
+
+  const card = res => {
+    const where = res.ids.flatMap(id => stationsWith(id).map(a => `${(lib[id] || {}).name}: on Day ${a.day}`));
+    const plan = res.ids.filter(id => planned[id] && !stationsWith(id).length).map(id => `${(lib[id] || {}).name}: in the week plan for Day ${planned[id]}`);
+    return `<div class="match-card">
+      <div class="mc-names">${res.ids.map(id => { const sc = lib[id] || {}; return `<a href="${esc(sc.url)}" target="_blank" rel="noopener">${esc(sc.name)}</a> <span class="tag ${sc.cat}">${sc.cat}</span>`; }).join('<span class="plus">+</span>')}</div>
+      ${res.addons.length ? `<div class="pi-addon">+ ${esc(res.addons.join(' + '))}</div>` : ''}
+      <div class="mc-cover">Covers ${res.covers.map(esc).join(', ') || 'none of them'}${res.misses.length ? ` · <span class="short">not ${res.misses.map(esc).join(', ')}</span>` : ''}</div>
+      ${[...where, ...plan].map(t => `<div class="pi-at">${esc(t)}</div>`).join('')}
+      <button class="btn tiny" data-act="matchAdd" data-ids="${res.ids.join(',')}" data-addons="${esc(JSON.stringify(res.addons))}">${st ? 'Add to this station' : 'Add to a station'}</button>
+    </div>`;
+  };
+  const section = (title, list) => list.length ? `<p class="mini-head">${title}</p><div class="match-cards">${list.map(card).join('')}</div>` : '';
+
+  return `<div class="overlay" data-act="matchClose"><div class="modal match" data-stop>
+    <div class="modal-head"><h2>Find a Scenario</h2><button class="x big" data-act="matchClose" aria-label="Close">×</button></div>
+    <div class="modal-body" data-keep-scroll="match">
+      <p class="muted small">${st ? `Day ${m.n} · <b>${esc(st.topic || 'Station')}</b>` : 'Pick skills, then add the scenario to a station.'}</p>
+      ${st && (st.scen || []).length ? `<div class="st-scen at">At this station: ${(st.scen || []).map(id => `<span class="scen-chip">${esc((lib[id] || {}).name || 'Scenario')}<button class="x" data-act="stScenDel" data-i="${m.i}" data-id="${id}" data-n="${m.n}" title="Take it off (to swap it for another)" aria-label="Remove">×</button></span>`).join('')}</div>` : ''}
+      ${sq.count ? `<div class="match-row"><span class="lbl">Behind in</span>${[0, ...Array.from({ length: sq.count }, (_, i) => i + 1)].map(s => `<button class="chip small ${(m.squad || 0) === s ? 'on' : ''}" data-act="matchSquad" data-s="${s}">${s ? 'Squad ' + s : 'All squads'}</button>`).join('')}</div>` : ''}
+      <div class="match-row"><span class="lbl">Kind</span><div class="seg">${[['medical', 'Medical'], ['trauma', 'Trauma'], ['both', 'Both']].map(([k, l]) => `<button class="${m.cat === k ? 'on' : ''}" data-act="matchCat" data-c="${k}">${l}</button>`).join('')}</div></div>
+      <p class="mini-head">Skills to cover <span class="count">${Object.keys(counts).length ? 'numbers = students behind on it' : 'nobody is marked behind, so pick any'}</span></p>
+      ${TAG_GROUPS().map(g => `<div class="skill-group"><span>${esc(g.group)}</span><div>${g.items.map(k =>
+        `<button class="chip small ${want[k] ? 'on' : ''} ${counts[k] ? 'warn' : ''}" data-act="matchSkill" data-k="${esc(k)}">${esc(k)}${counts[k] ? ` <b>${counts[k]}</b>` : ''}</button>`).join('')}</div></div>`).join('')}
+      ${everyBehind.length ? `<p class="muted small">${esc(everyBehind.join(', '))}: every scenario has these, so any one works.</p>` : ''}
+      ${obBehind.length ? `<p class="muted small">${esc(obBehind.join(', '))}: rote only, so that’s a skill station, not a scenario.</p>` : ''}
+      ${m.picked ? '<button class="link" data-act="matchReset">Back to who’s behind</button>' : ''}
+      <div class="match-results">
+        ${!r ? '<p class="empty">Pick the skills to cover.</p>'
+          : section('One scenario covers them all', r.singles) + section('Best pair (the two scenarios a team runs)', r.pairs)
+            + section(r.singles.length || r.pairs.length ? 'Or the closest one + an add-on' : 'Closest + an add-on', r.addon)
+            + section('Closest (no add-on fills the rest)', r.close)
+            + (!r.singles.length && !r.pairs.length && !r.addon.length && !r.close.length ? `<p class="empty">Nothing in the ${m.cat === 'both' ? '' : m.cat + ' '}library has these.${m.cat !== 'both' ? ' Try Both.' : ''}</p>` : '')}
+      </div>
+    </div>
+  </div></div>`;
+}
+
+/* ---------- Scenario Library pop-up ---------- */
+function libModal() {
+  const tab = S.libTab;
+  const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="libTab" data-t="${t}">${label}</button>`;
+  const body = tab === 'addons' ? libAddons() : tab === 'req' ? libReq() : libScenarios();
+  const foot = tab === 'addons' ? '<span class="muted small">Add-ons are twists you add to a scenario for a skill it doesn’t have. The builder and Find a Scenario use them.</span><button class="btn primary" data-act="addonSave">Save add-ons</button>'
+    : tab === 'req' ? '<span class="muted small">Summative sign-offs each student needs.</span><button class="btn primary" data-act="reqSave">Save</button>'
+    : '<span class="muted small">Shared by you and Nick. Tags are what each scenario lets a student get signed off.</span>';
+  return `<div class="overlay" data-act="libClose"><div class="modal lib" data-stop>
+    <div class="modal-head"><h2>Scenario Library</h2><button class="x big" data-act="libClose" aria-label="Close">×</button></div>
+    <div class="bag-tabs">${tabBtn('scen', 'Scenarios')}${tabBtn('addons', 'Add-ons')}${tabBtn('req', 'Requirements')}</div>
+    <div class="modal-body" data-keep-scroll="lib">${body}</div>
+    <div class="modal-foot">${foot}</div>
+  </div></div>`;
+}
+
+function libScenarios() {
+  const all = scenLib();
+  const f = S.libFilter, q = (S.drafts.libSearch || '').trim().toLowerCase();
+  const counts = {
+    all: all.length, medical: all.filter(s => s.cat === 'medical').length, trauma: all.filter(s => s.cat === 'trauma').length,
+    check: all.filter(s => s.status !== 'checked').length, new: all.filter(s => s.status === 'new').length,
+  };
+  const shown = all.filter(s => (f === 'all' || s.cat === f || (f === 'check' && s.status !== 'checked') || (f === 'new' && s.status === 'new'))
+    && (!q || s.name.toLowerCase().includes(q) || skillText(s.skills).toLowerCase().includes(q)));
+  // Skills that only 0-1 scenarios have: worth writing more for (or an add-on covers them).
+  const have = {};
+  usableScen().forEach(s => Object.keys(s.skills).forEach(k => { have[k] = (have[k] || 0) + 1; }));
+  const tagged = TAG_GROUPS().flatMap(g => g.items).filter(k => (scenTargets()[k] || 0) > 0);
+  const none = tagged.filter(k => !have[k]), one = tagged.filter(k => have[k] === 1);
+  const chip = (k, l) => `<button class="chip small ${f === k ? 'on' : ''}" data-act="libFilter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
+  const statusTag = s => s.gone ? '<span class="tag red">Doc missing</span>'
+    : s.status === 'checked' ? '<span class="tag ok">✓ Checked</span>'
+    : s.status === 'suggested' ? '<span class="tag">Suggested</span>' : '<span class="tag warn">New: needs tags</span>';
+
+  return `
+    ${S.scenErr ? `<div class="alert small">Couldn’t list the scenario folders: ${esc(S.scenErr)} Showing the scenarios known on Oct 20 instead.</div>` : !S.scenLive ? '<p class="muted small">Checking the Drive folders for new Docs…</p>' : ''}
+    ${none.length || one.length ? `<div class="thin">${none.length ? `<p><b>In no scenario yet:</b> ${esc(none.join(', '))} <span class="muted">(add-ons cover these)</span></p>` : ''}${one.length ? `<p><b>Only in one scenario:</b> ${esc(one.join(', '))}</p>` : ''}</div>` : ''}
+    <div class="lib-top"><div class="chips">${chip('all', 'All')}${chip('medical', 'Medical')}${chip('trauma', 'Trauma')}${chip('check', 'Not checked yet')}${counts.new ? chip('new', 'New') : ''}</div>
+      <input id="libSearchIn" class="search" data-draft="libSearch" placeholder="Find a scenario or skill" value="${esc(S.drafts.libSearch || '')}"></div>
+    <ul class="lib-list">${shown.map(s => `<li class="${S.libSel === s.id ? 'open' : ''}">
+      <button class="lib-row" data-act="libSel" data-id="${s.id}">
+        <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}
+        <span class="lr-skills">${s.skills ? esc(skillText(s.skills)) : '<em>no tags yet</em>'}</span></button>
+      ${S.libSel === s.id ? libEditor(s) : ''}</li>`).join('') || '<li class="empty">No scenarios match.</li>'}</ul>`;
+}
+
+function libEditor(s) {
+  const dr = S.libDraft;
+  return `<div class="lib-edit">
+    <div class="le-top"><div class="seg">${['medical', 'trauma'].map(c => `<button class="${dr.cat === c ? 'on' : ''}" data-act="libCat" data-c="${c}">${c === 'medical' ? 'Medical' : 'Trauma'}</button>`).join('')}</div>
+      <a class="btn small" href="${esc(s.url)}" target="_blank" rel="noopener">Open the Doc</a></div>
+    <p class="muted small">Tap the skills a student can get signed off in this scenario. Tap again for ×2, again to clear.</p>
+    ${skillPicker(dr.skills, 'libSkill')}
+    <label class="field">Note <input id="libNoteIn" data-draft="libNote" value="${esc(S.drafts.libNote ?? dr.note ?? '')}" placeholder="e.g. Needs the CPAP rewrite"></label>
+    <div class="le-btns">
+      <button class="btn primary small" data-act="libSave" data-id="${s.id}">Save · looks right</button>
+      ${S.scenDocs[s.id] && SCEN.SEED.some(x => x.id === s.id) ? `<button class="link" data-act="libReset" data-id="${s.id}">Go back to the suggested tags</button>` : ''}
+      ${s.gone ? `<button class="link" data-act="libRemove" data-id="${s.id}">Remove from the library</button>` : ''}
+    </div>
+  </div>`;
+}
+function skillPicker(skills, act, extra = '') {
+  return TAG_GROUPS().map(g => `<div class="skill-group"><span>${esc(g.group)}</span><div>${g.items.map(k => {
+    const n = (skills || {})[k] || 0;
+    return `<button class="chip small ${n ? 'on' : ''}" data-act="${act}" data-k="${esc(k)}" ${extra}>${esc(k)}${n > 1 ? ' ×' + n : ''}</button>`;
+  }).join('')}</div></div>`).join('');
+}
+
+function libAddons() {
+  const list = S.addonDraft || (S.addonDraft = JSON.parse(JSON.stringify(scenAddons())));
+  return `<ul class="addon-list">${list.map((a, i) => `<li>
+      <div class="ad-top"><input data-addon="${i}" value="${esc(a.text)}" placeholder="e.g. Add an extremity GSW that needs a tourniquet">
+        <div class="seg">${[['any', 'Any'], ['medical', 'Medical'], ['trauma', 'Trauma']].map(([c, l]) => `<button class="${(a.cat || 'any') === c ? 'on' : ''}" data-act="addonCat" data-i="${i}" data-c="${c}">${l}</button>`).join('')}</div>
+        <button class="x" data-act="addonDel" data-i="${i}" aria-label="Delete">×</button></div>
+      ${skillPicker(a.skills, 'addonSkill', `data-i="${i}"`)}
+    </li>`).join('')}</ul>
+    <button class="btn small" data-act="addonAdd">+ Add an add-on</button>`;
+}
+
+function libReq() {
+  const t = S.reqDraft || (S.reqDraft = { ...scenTargets() });
+  return `<p class="muted small">From the “MINIMUM - Skill Tracking Rote/Summative” sheet. The week builder plans for these.</p>
+    ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="req-grid">${g.items.map(k =>
+      `<label>${esc(k)}<input type="number" min="0" max="20" data-req="${esc(k)}" value="${t[k] ?? 0}"></label>`).join('')}</div>`).join('')}`;
+}
+
+/* ---------- Clicks for all of the above (app.js's act() hands them over) ---------- */
+const cycle = n => (n >= 2 ? 0 : n + 1);
+async function scenAct(a, el, e) {
+  const d = el.dataset || {};
+  switch (a) {
+    case 'libOpen': S.libOpen = true; S.libTab = 'scen'; S.menuOpen = false; S.schMenu = false; if (!S.scenLive) loadScenarios(); render(); return true;
+    case 'libClose':
+      if ((S.addonDraft || S.reqDraft) && !confirm('Close without saving your changes?')) return true;
+      S.libOpen = false; S.libSel = null; S.addonDraft = null; S.reqDraft = null; render(); return true;
+    case 'libTab': S.libTab = d.t; render(); return true;
+    case 'libFilter': S.libFilter = d.f; render(); return true;
+    case 'libSel': {
+      if (S.libSel === d.id) { S.libSel = null; render(); return true; }
+      const s = libById()[d.id];
+      S.libSel = d.id; S.libDraft = { skills: { ...(s.skills || {}) }, cat: s.cat, note: s.note || '' }; delete S.drafts.libNote;
+      render(); return true;
+    }
+    case 'libCat': S.libDraft.cat = d.c; render(); return true;
+    case 'libSkill': { const sk = S.libDraft.skills; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
+    case 'libSave': {
+      const s = libById()[d.id];
+      await Store.set('scenarios/' + d.id, { title: s.title, cat: S.libDraft.cat, skills: S.libDraft.skills, note: (S.drafts.libNote ?? S.libDraft.note ?? '').trim(), checked: true, saved: Date.now() }, false);
+      delete S.drafts.libNote;
+      // On to the next one that hasn't been checked, so you can go down the list.
+      const list = scenLib(), i = list.findIndex(x => x.id === d.id);
+      const next = list.slice(i + 1).find(x => x.status !== 'checked' && x.id !== d.id);
+      S.libSel = null;
+      if (next && S.libFilter === 'check') { S.libSel = next.id; S.libDraft = { skills: { ...(next.skills || {}) }, cat: next.cat, note: next.note || '' }; }
+      toast('Saved.'); render(); return true;
+    }
+    case 'libReset':
+      if (!confirm('Go back to the suggested tags for this scenario?')) return true;
+      await Store.del('scenarios/' + d.id); S.libSel = null; render(); return true;
+    case 'libRemove': await Store.set('scenarios/' + d.id, { removed: true }); S.libSel = null; render(); return true;
+
+    case 'addonCat': S.addonDraft[Number(d.i)].cat = d.c; render(); return true;
+    case 'addonSkill': { const sk = S.addonDraft[Number(d.i)].skills; const n = cycle(sk[d.k] || 0); if (n) sk[d.k] = n; else delete sk[d.k]; render(); return true; }
+    case 'addonDel': S.addonDraft.splice(Number(d.i), 1); render(); return true;
+    case 'addonAdd': S.addonDraft.push({ text: '', cat: 'any', skills: {} }); render(); return true;
+    case 'addonSave': {
+      const list = (S.addonDraft || scenAddons()).map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills })).filter(x => x.text);
+      await Store.set('meta/settings', { scenAddons: list }); S.addonDraft = null; toast('Add-ons saved.'); render(); return true;
+    }
+    case 'reqSave': await Store.set('meta/settings', { scenTargets: S.reqDraft || scenTargets() }); S.reqDraft = null; toast('Saved.'); render(); return true;
+
+    case 'planBuild': case 'planNick':
+      if (planItems().length && !confirm(a === 'planNick' ? 'Replace this plan with Nick’s set?' : 'Replace this plan with a new mix?')) return true;
+      await buildPlan(a === 'planNick' ? 'nick' : 'mix'); return true;
+    case 'planOpen': S.planOpen = true; render(); return true;
+    case 'planClose': S.planOpen = false; render(); return true;
+    case 'planDel': { const items = planItems().filter((_, i) => i !== Number(d.i)); await savePlan(items); return true; }
+    case 'planAddonDel': {
+      const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
+      items[Number(d.i)].addons.splice(Number(d.j), 1); await savePlan(items); return true;
+    }
+    case 'placeOpen': { const x = planItems()[Number(d.i)]; S.place = { ids: [x.id], addons: x.addons || [], day: x.day || 1 }; render(); return true; }
+    case 'placeClose': S.place = null; render(); return true;
+    case 'placeDay': S.place.day = Number(d.n); render(); return true;
+    case 'placeTo': {
+      const p = S.place; S.place = null;
+      let i = Number(d.i);
+      for (const [j, id] of p.ids.entries()) {
+        const before = schedFor(p.day).stations.length;
+        await addToStation(p.day, i, id, j === 0 ? p.addons : []);
+        if (i < 0) i = before; // the second scenario of a pair goes on the station just made
+      }
+      if (S.match) S.match = null;
+      render(); return true;
+    }
+
+    case 'matchOpen': {
+      const today = currentWeekDay();
+      const n = d.i != null ? schedDay() : Math.min(5, today ? today + 1 : schedDay());
+      S.match = { n, i: d.i != null ? Number(d.i) : null, picked: null, cat: 'both', squad: 0 };
+      render(); return true;
+    }
+    case 'matchClose': S.match = null; render(); return true;
+    case 'matchSquad': S.match.squad = Number(d.s); S.match.picked = null; render(); return true;
+    case 'matchCat': S.match.cat = d.c; render(); return true;
+    case 'matchSkill': {
+      const cur = matchWant(S.match);
+      const picked = Object.fromEntries(Object.keys(cur).map(k => [k, true]));
+      if (picked[d.k]) delete picked[d.k]; else picked[d.k] = true;
+      S.match.picked = picked; render(); return true;
+    }
+    case 'matchReset': S.match.picked = null; render(); return true;
+    case 'matchAdd': {
+      const ids = d.ids.split(','), addons = JSON.parse(d.addons || '[]'), m = S.match;
+      if (m.i == null) { S.place = { ids, addons, day: m.n }; render(); return true; }
+      for (const [j, id] of ids.entries()) await addToStation(m.n, m.i, id, j === 0 ? addons : []);
+      S.match = null; render(); return true;
+    }
+    case 'stScenDel': await removeFromStation(d.n ? Number(d.n) : schedDay(), Number(d.i), d.id); return true;
+  }
+  return false;
+}
+
+// Dropdowns and number boxes (app.js's change listener hands these over).
+async function scenChange(t) {
+  const c = t.dataset.change;
+  if (c === 'planDay' || c === 'planAddon') {
+    const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
+    const it = items[Number(t.dataset.i)];
+    if (c === 'planDay') it.day = Number(t.value);
+    else if (t.value) it.addons.push(t.value);
+    await savePlan(items); return true;
+  }
+  if (c === 'planAdd') {
+    if (!t.value) return true;
+    const lib = libById(), items = [...planItems(), { id: t.value, addons: [], day: lib[t.value].cat === 'trauma' ? 3 : 2 }];
+    await savePlan(items); return true;
+  }
+  if (c === 'planSize') { const v = Math.max(5, Math.min(25, Number(t.value) || 12)); await Store.set('meta/settings', { planSize: v }); return true; }
+  return false;
+}

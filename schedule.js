@@ -1,5 +1,5 @@
 /* Draws one day of the schedule as two pages, the same way the old Google Doc looked:
-     page 1: Class Schedule + Station Content
+     page 1: Class Schedule + Station Content (+ links to scenario Docs on screen only)
      page 2: Instructor Notes/Reminders + Squad Assignments + Notes for tomorrow
    Used by the app's Print button and by view.html (the instructors' QR link).
 
@@ -12,6 +12,10 @@ const Sched = (() => {
   // Station content: one paragraph per line; lines starting with "Note:" in italics.
   const contentHtml = text => String(text || '').split('\n').filter(l => l.trim())
     .map(l => /^note:/i.test(l.trim()) ? `<p class="p-note">${esc(l.trim())}</p>` : `<p>${esc(l.trim())}</p>`).join('');
+
+  // Links to the scenario Docs at a station (instructor link only; they don't print).
+  const linksHtml = links => links && links.length
+    ? `<p class="p-links">${links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join('')}</p>` : '';
 
   // Instructor notes: plain lines are headings/sentences (no bullet), "- " lines are
   // bullets under them, "***" is a divider.
@@ -56,7 +60,7 @@ const Sched = (() => {
         <tbody>${blocks.map(b => `<tr class="${/lunch/i.test(b.activity) ? 'p-lunch' : ''}"><td>${esc(b.time)}</td><td>${esc(b.activity)}</td></tr>`).join('')}</tbody></table>
       ${stations.length ? `<h2>Station Content</h2>
       <table class="p-table p-stations"><thead><tr><th>Topic</th><th>Content &amp; Instructor Notes</th></tr></thead>
-        <tbody>${stations.map(s => `<tr><td>${esc(s.topic)}</td><td>${contentHtml(s.content)}</td></tr>`).join('')}</tbody></table>` : ''}
+        <tbody>${stations.map(s => `<tr><td>${esc(s.topic)}</td><td>${contentHtml(s.content)}${linksHtml(s.links)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${d.stationNote ? `<p class="p-note">${esc(d.stationNote)}</p>` : ''}
     </section>
     <section class="p-page">

@@ -3,6 +3,7 @@
      loadCohort(key)             -> that cohort's Student Roster tab (names, column P, Academy Week Start)
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
+     listScenarios               -> the scenario Docs in the Medical and Trauma folders (names, links)
 
    In sample mode it answers with pretend data instead. */
 const Sheets = (() => {
@@ -23,6 +24,7 @@ const Sheets = (() => {
     loadCohort: key => call('loadCohort', { cohort: key }),
     changeContacts: (key, student, by) =>
       call('changeContacts', { cohort: key, row: student.row, name: student.name, by }).then(o => o.count),
+    listScenarios: () => call('listScenarios').then(o => o.scenarios),
   };
 })();
 
@@ -61,6 +63,7 @@ function sampleSheets() {
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
     }),
+    listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);
       counts[student.name] = now;
