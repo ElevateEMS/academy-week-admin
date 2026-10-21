@@ -265,20 +265,21 @@ function planModal() {
   const row = (x, idx) => {
     const sc = lib[x.id] || { name: 'A Doc that’s gone from the folders', cat: '', skills: {}, url: docUrl(x.id), gone: true };
     const at = stationsWith(x.id);
+    const more = addons.filter(a => Match.canAdd(a, sc, x.addons, addonsByText()));
     return `<li class="plan-item">
-      <div class="pi-main">
+      <div class="pi-top">
         <div><a class="pi-name" href="${esc(sc.url)}" target="_blank" rel="noopener" title="Open the Doc">${esc(sc.name)}</a>
           ${sc.cat ? `<span class="tag ${sc.cat}">${sc.cat}</span>` : ''}${sc.every ? ' <span class="tag ok">Every week</span>' : sc.star ? ' <span class="star-on" title="Always included">★</span>' : ''}${sc.gone ? ' <span class="tag red">Doc missing</span>' : ''}</div>
-        <div class="pi-skills">${esc(skillText(sc.skills))}</div>
-        ${x.addons.map((t, j) => `<div class="pi-addon">+ ${esc(t)} <button class="x" data-act="planAddonDel" data-i="${idx}" data-j="${j}" aria-label="Remove add-on">×</button></div>`).join('')}
-        ${at.length ? `<div class="pi-at">✓ On ${at.map(a => `<span class="pi-st">Day ${a.day} · ${esc(a.topic || 'a station')}<button class="x" data-act="stScenDel" data-n="${a.day}" data-i="${a.i}" data-id="${x.id}" title="Take it off this station (it stays in the plan)" aria-label="Take off station">×</button></span>`).join(', ')}</div>` : ''}
+        <div class="pi-tools">
+          <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
+          <button class="trash-btn" data-act="planDelAsk" data-i="${idx}" title="Remove from plan" aria-label="Remove from plan">${ICONS.trash}</button>
+        </div>
       </div>
-      <div class="pi-tools">
-        <select data-change="planDay" data-i="${idx}" title="Suggested day">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${(x.day || 1) === d ? 'selected' : ''}>Day ${d}</option>`).join('')}</select>
-        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => Match.canAdd(a, sc, x.addons, addonsByText())).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
-        <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
-        <button class="trash-btn" data-act="planDelAsk" data-i="${idx}" title="Remove from plan" aria-label="Remove from plan">${ICONS.trash}</button>
-      </div></li>`;
+      <div class="pi-skills">${esc(skillText(sc.skills))}</div>
+      ${x.addons.map((t, j) => `<div class="pi-addon">+ ${esc(t)} <button class="x" data-act="planAddonDel" data-i="${idx}" data-j="${j}" aria-label="Remove add-on">×</button></div>`).join('')}
+      ${more.length ? `<select class="pi-add" data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${more.map(a => `<option>${esc(a.text)}</option>`).join('')}</select>` : ''}
+      ${at.length ? `<div class="pi-at">✓ On ${at.map(a => `<span class="pi-st">Day ${a.day} · ${esc(a.topic || 'a station')}<button class="x" data-act="stScenDel" data-n="${a.day}" data-i="${a.i}" data-id="${x.id}" title="Take it off this station (it stays in the plan)" aria-label="Take off station">×</button></span>`).join(', ')}</div>` : ''}
+    </li>`;
   };
 
   // "+ Add a scenario": the ones that fill the most of what's missing first.
@@ -315,7 +316,7 @@ function planModal() {
         </aside>
       </div>
     </div>
-    <div class="modal-foot"><button class="link" data-act="libOpen">Scenario Library</button><span class="muted small">Days start from your schedule (up to 3 per Medical / Trauma Scenarios station). Change any day, then “Put the plan on the schedule”.</span><button class="btn primary" data-act="planClose">Done</button></div>
+    <div class="modal-foot"><button class="link" data-act="libOpen">Scenario Library</button><span class="muted small">Days start from your schedule (up to 3 per Medical / Trauma Scenarios station). Adding a scenario to a station on another day moves it to that day.</span><button class="btn primary" data-act="planClose">Done</button></div>
   </div></div>`;
 }
 
@@ -598,7 +599,7 @@ async function scenAct(a, el, e) {
       const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
       items[Number(d.i)].addons.splice(Number(d.j), 1); await savePlan(items); return true;
     }
-    case 'placeOpen': { const x = planItems()[Number(d.i)]; S.place = { ids: [x.id], addons: x.addons || [], day: x.day || 1 }; render(); return true; }
+    case 'placeOpen': { const x = planItems()[Number(d.i)]; S.place = { ids: [x.id], addons: x.addons || [], day: x.day || 1, planId: x.id }; render(); return true; }
     case 'placeClose': S.place = null; render(); return true;
     case 'placeDay': S.place.day = Number(d.n); render(); return true;
     case 'placeTo': {
@@ -610,6 +611,12 @@ async function scenAct(a, el, e) {
         if (i < 0) i = before; // the second scenario of a pair goes on the station just made
       }
       if (S.match) S.match = null;
+      // Placed from the plan: it now belongs under that day in the plan too.
+      if (p.planId) {
+        const items = planItems().map(x => ({ ...x }));
+        const it = items.find(x => x.id === p.planId);
+        if (it && (it.day || 1) !== p.day && !it.fixed) { it.day = p.day; await savePlan(items); }
+      }
       render(); return true;
     }
 
@@ -646,11 +653,10 @@ async function scenChange(t) {
   if (c === 'libEvery') { S.libDraft.every = Number(t.value); render(); return true; }
   if (c === 'addonNeed') { const a = S.addonDraft[Number(t.dataset.i)]; if (t.value && !(a.needs || []).includes(t.value)) a.needs = [...(a.needs || []), t.value]; render(); return true; }
   if (c === 'addonMinus') { const a = S.addonDraft[Number(t.dataset.i)]; if (t.value) a.minus = { [t.value]: 1 }; else delete a.minus; render(); return true; }
-  if (c === 'planDay' || c === 'planAddon') {
+  if (c === 'planAddon') {
     const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
     const it = items[Number(t.dataset.i)];
-    if (c === 'planDay') it.day = Number(t.value);
-    else if (t.value) it.addons.push(t.value);
+    if (t.value) it.addons.push(t.value);
     await savePlan(items); return true;
   }
   if (c === 'planAdd') {
