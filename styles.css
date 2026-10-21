@@ -301,8 +301,10 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .check-inline.muted { opacity: .5; }
 /* "To fix: 1" right after a student's contact count (only when something needs fixing).
    Equal side slots keep every − n + centered under the header. */
-.pc-cell { display: inline-grid; grid-template-columns: 5.5em auto 5.5em; align-items: center; gap: 10px; }
-.to-fix { justify-self: start; white-space: nowrap; font-style: italic; font-size: 13px; color: #8a6a35; cursor: pointer; }
+.pc-cell { display: inline-grid; grid-template-columns: minmax(0, 5.5em) auto minmax(0, 5.5em); align-items: center; gap: 10px; }
+/* Patient contacts, Skills and Conduct: same width, so they're evenly spaced (the To fix note uses the room beside the stepper) */
+.roster th.c { width: 19%; }
+.to-fix { justify-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-style: italic; font-size: 13px; color: #8a6a35; cursor: pointer; }
 .to-fix:hover { text-decoration: underline; text-underline-offset: 2px; }
 .pc-num { cursor: pointer; border-radius: 6px; padding: 0 4px; }
 .pc-num:hover { background: var(--blush-soft); }
@@ -708,3 +710,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 /* Library opened from the plan: Add / In plan at the right end of each row */
 .lib-line .lib-add { flex: none; align-self: center; margin-left: 8px; white-space: nowrap; }
 .lib-line .lib-add.in { font-size: 12.5px; color: #4f6a4b; background: var(--sage-soft); border-radius: 999px; padding: 3px 10px; }
+
+/* Prep scenarios box: plan status after the cover line; Open the plan on the right */
+.cover-state { opacity: .75; }
+.plan-btns.right { justify-content: flex-end; }

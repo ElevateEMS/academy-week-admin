@@ -222,10 +222,16 @@ function planStatus(items = planItems()) {
   return { have, miss: Match.missing(have, scenTargets(), SKILL_ORDER()) };
 }
 const missText = miss => miss.map(m => m.short + ' ' + m.skill).join(', ');
-function coverLine(miss) {
+// "Suggested layout" until scenarios are put on stations, then "N of M on the schedule", then "On the schedule".
+function planState(items = planItems()) {
+  const placed = items.filter(x => stationsWith(x.id).length).length;
+  return !placed ? 'Suggested layout' : placed < items.length ? `${placed} of ${items.length} on the schedule` : 'On the schedule';
+}
+function coverLine(miss, state = '') {
+  const note = state ? ` <span class="cover-state">· ${esc(state)}</span>` : '';
   return miss.length
-    ? `<p class="cover-line short"><b>Missing:</b> ${esc(missText(miss))}</p>`
-    : '<p class="cover-line ok">✓ Every summative skill is covered</p>';
+    ? `<p class="cover-line short"><b>Missing:</b> ${esc(missText(miss))}${note}</p>`
+    : `<p class="cover-line ok">✓ Every summative skill is covered${note}</p>`;
 }
 async function savePlan(items, extra = {}) {
   await Store.set('cohorts/' + S.cohortKey, { weekPlan: { items: items.map(x => ({ id: x.id, addons: x.addons || [], day: x.day || 1, ...(x.fixed ? { fixed: true } : {}) })), updated: Date.now(), ...extra } });
@@ -245,15 +251,15 @@ async function buildPlan(how) {
 function scenBox() {
   const items = planItems();
   if (!items.length) return `<p class="muted small">Let the app pick about ${planSize()} scenarios from your library that cover every summative skill on the Skills Tracking sheet. Each build is a different mix, always with your ★ scenarios.</p>
-    <div class="plan-btns one-row"><button class="btn primary small" data-act="planBuild">Build a new mix</button><button class="btn small" data-act="libOpen">Scenario Library</button></div>`;
+    <div class="plan-btns one-row right"><button class="btn primary small" data-act="planBuild">Build a new mix</button></div>`;
   const lib = libById(), { miss } = planStatus(items);
   const byDay = [1, 2, 3, 4, 5].map(d => [d, items.filter(x => (x.day || 1) === d)]).filter(([, l]) => l.length);
-  return `${coverLine(miss)}
+  return `${coverLine(miss, planState(items))}
     <ul class="plan-mini">${byDay.map(([d, l]) => `<li><span class="d">Day ${d}</span><span>${l.map(x => {
       const sc = lib[x.id];
       return `<span class="${sc && sc.cat === 'trauma' ? 'tr' : ''}">${esc(sc ? sc.name : 'Missing Doc')}${x.addons.length ? ' +' : ''}</span>`;
     }).join(' · ')}</span></li>`).join('')}</ul>
-    <div class="plan-btns one-row"><button class="btn primary small" data-act="planOpen">Open the plan</button><button class="btn small" data-act="libOpen">Scenario Library</button></div>`;
+    <div class="plan-btns one-row right"><button class="btn primary small" data-act="planOpen">Open the plan</button></div>`;
 }
 
 function planModal() {
@@ -288,7 +294,7 @@ function planModal() {
     <div class="modal-head"><h2>Academy Week Scenarios</h2><button class="x big" data-act="planClose" aria-label="Close">×</button></div>
     <div class="modal-body" data-keep-scroll="plan">
       <div class="plan-top">
-        ${items.length ? coverLine(miss) : '<p class="muted">No scenarios picked yet.</p>'}
+        ${items.length ? coverLine(miss, planState(items)) : '<p class="muted">No scenarios picked yet.</p>'}
         <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
         <div class="plan-btns">
           <button class="btn small" data-act="planBuild">Build a new mix</button>
