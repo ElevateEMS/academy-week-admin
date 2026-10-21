@@ -683,3 +683,20 @@ body select:not([multiple]) { -webkit-appearance: none; appearance: none; cursor
 .place-st .ps-top em { flex: none; font-style: normal; font-size: 12.5px; color: var(--taupe-dark); }
 .place-st .ps-top em.here { color: #4f6a4b; }
 .place-st span.ps-on { color: var(--ink); opacity: .75; font-style: italic; white-space: normal; }
+
+/* Plan: × after each station a scenario is on */
+.pi-st { white-space: nowrap; }
+.pi-at .x { opacity: .5; font-size: 15px; padding: 0 4px; }
+.pi-at .x:hover { opacity: 1; }
+
+/* Plan: trash = remove from plan (always asks first) */
+.trash-btn { flex: none; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 4px; margin-left: 8px; border-radius: 6px; opacity: .6; display: grid; place-items: center; }
+.trash-btn svg { width: 17px; height: 17px; }
+.trash-btn:hover { opacity: 1; color: var(--rose); background: var(--blush-soft); }
+.modal.confirm { width: min(600px, 100%); }
+.modal.confirm .modal-foot .btn { white-space: nowrap; }
+.modal.confirm .modal-body { padding-top: 14px; }
+.modal.confirm .modal-foot .btn:first-child { margin-right: auto; }
+.modal.confirm .modal-foot .btn.primary { margin-left: 0; }
+.btn.primary.danger { background: #a3625a; border-color: #a3625a; }
+.btn.primary.danger:hover { background: #874c45; }

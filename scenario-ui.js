@@ -188,13 +188,16 @@ async function addToStation(n, i, id, addons = []) {
   toast(`Added to Day ${n} · ${st.topic || 'station'}.`);
   return true;
 }
+// i = one station, or null = every station that day it's on.
 async function removeFromStation(n, i, id) {
   const sc = libById()[id];
   const list = schedFor(n).stations.map(x => ({ ...x }));
-  const st = list[i];
-  if (!st) return;
-  st.scen = (st.scen || []).filter(x => x !== id);
-  if (sc) st.content = (st.content || '').split('\n').filter(l => !l.startsWith(sc.name + ':')).join('\n');
+  const hits = i == null ? list.filter(st => (st.scen || []).includes(id)) : [list[i]].filter(Boolean);
+  if (!hits.length) return;
+  hits.forEach(st => {
+    st.scen = (st.scen || []).filter(x => x !== id);
+    if (sc) st.content = (st.content || '').split('\n').filter(l => !l.startsWith(sc.name + ':')).join('\n');
+  });
   dropSchDrafts(n);
   await saveSched(n, { stations: list });
 }
@@ -268,13 +271,13 @@ function planModal() {
           ${sc.cat ? `<span class="tag ${sc.cat}">${sc.cat}</span>` : ''}${sc.every ? ' <span class="tag ok">Every week</span>' : sc.star ? ' <span class="star-on" title="Always included">★</span>' : ''}${sc.gone ? ' <span class="tag red">Doc missing</span>' : ''}</div>
         <div class="pi-skills">${esc(skillText(sc.skills))}</div>
         ${x.addons.map((t, j) => `<div class="pi-addon">+ ${esc(t)} <button class="x" data-act="planAddonDel" data-i="${idx}" data-j="${j}" aria-label="Remove add-on">×</button></div>`).join('')}
-        ${at.length ? `<div class="pi-at">✓ On ${at.map(a => 'Day ' + a.day + ' · ' + esc(a.topic || 'a station')).join(', ')}</div>` : ''}
+        ${at.length ? `<div class="pi-at">✓ On ${at.map(a => `<span class="pi-st">Day ${a.day} · ${esc(a.topic || 'a station')}<button class="x" data-act="stScenDel" data-n="${a.day}" data-i="${a.i}" data-id="${x.id}" title="Take it off this station (it stays in the plan)" aria-label="Take off station">×</button></span>`).join(', ')}</div>` : ''}
       </div>
       <div class="pi-tools">
         <select data-change="planDay" data-i="${idx}" title="Suggested day">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${(x.day || 1) === d ? 'selected' : ''}>Day ${d}</option>`).join('')}</select>
         <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => Match.canAdd(a, sc, x.addons, addonsByText())).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
         <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
-        <button class="x" data-act="planDel" data-i="${idx}" title="Take it out of the plan" aria-label="Remove">×</button>
+        <button class="trash-btn" data-act="planDelAsk" data-i="${idx}" title="Remove from plan" aria-label="Remove from plan">${ICONS.trash}</button>
       </div></li>`;
   };
 
@@ -317,6 +320,21 @@ function planModal() {
 }
 
 // Picking the station for a scenario from the plan (or from Additional Scenarios without a station).
+// "Remove from plan?" (and, if it's placed, from the schedule too).
+function planDelModal() {
+  const x = planItems()[S.planDelAsk];
+  if (!x) return '';
+  const name = (libById()[x.id] || {}).name || 'this scenario', at = stationsWith(x.id);
+  return `<div class="overlay" data-act="planDelClose"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Remove Scenario</h2><button class="x big" data-act="planDelClose" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>Remove <b>${esc(name)}</b> from the plan?</p>
+      ${at.length ? `<p class="muted small">It’s on ${at.map(a => 'Day ' + a.day + ' · ' + esc(a.topic || 'a station')).join(', ')}.</p>` : ''}</div>
+    <div class="modal-foot"><button class="btn" data-act="planDelClose">Cancel</button>
+      ${at.length ? `<button class="btn" data-act="planDel">Plan only</button><button class="btn primary danger" data-act="planDel" data-sched="1">Remove from plan and schedule</button>`
+        : '<button class="btn primary danger" data-act="planDel">Remove</button>'}</div>
+  </div></div>`;
+}
+
 function placeModal() {
   const p = S.place, lib = libById();
   const n = p.day, stations = schedFor(n).stations;
@@ -564,7 +582,18 @@ async function scenAct(a, el, e) {
       if (!confirm('Put each scenario on its day’s Medical / Trauma Scenarios station (up to 3 each)? Ones already on the schedule are left where they are.')) return true;
       await placePlan(); return true;
     case 'planClose': S.planOpen = false; render(); return true;
-    case 'planDel': { const items = planItems().filter((_, i) => i !== Number(d.i)); await savePlan(items); return true; }
+    case 'planDelAsk': S.planDelAsk = Number(d.i); render(); return true;
+    case 'planDelClose': S.planDelAsk = null; render(); return true;
+    case 'planDel': { // from the confirm pop-up; data-sched = also take it off the schedule
+      const idx = S.planDelAsk; S.planDelAsk = null;
+      const x = planItems()[idx];
+      if (!x) { render(); return true; }
+      const at = stationsWith(x.id);
+      await savePlan(planItems().filter((_, i) => i !== idx));
+      if (d.sched) for (const n of new Set(at.map(a => a.day))) await removeFromStation(n, null, x.id);
+      toast('Removed ' + ((libById()[x.id] || {}).name || 'it') + (d.sched ? ' from the plan and schedule.' : ' from the plan.'));
+      render(); return true;
+    }
     case 'planAddonDel': {
       const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
       items[Number(d.i)].addons.splice(Number(d.j), 1); await savePlan(items); return true;
