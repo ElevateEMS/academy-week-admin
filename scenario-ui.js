@@ -111,6 +111,20 @@ const stationKind = topic => /\bcpr\b/i.test(topic || '') ? 'cpr'
 const PER_STATION = 3; // no more than 3 scenarios expected per rotation
 const PRACTICE = 'Practice / makeups (dealer’s choice)';
 const scenLine = (sc, addons = []) => sc.name + ': ' + skillText(sc.skills) + addons.map(t => ' + ' + t).join('');
+// A placed scenario's add-ons changed: rewrite its line on every station it's on.
+async function refreshScenLines(id, addons) {
+  const sc = libById()[id];
+  if (!sc) return;
+  for (const n of new Set(stationsWith(id).map(a => a.day))) {
+    const list = schedFor(n).stations.map(x => ({ ...x }));
+    list.forEach(st => {
+      if (!(st.scen || []).includes(id)) return;
+      st.content = String(st.content || '').split('\n').map(l => l.startsWith(sc.name + ':') ? scenLine(sc, addons) : l).join('\n');
+    });
+    dropSchDrafts(n);
+    await saveSched(n, { stations: list });
+  }
+}
 
 /* Days for a plan from the schedule itself: day by day, each Medical / Trauma Scenarios
    station takes up to 3 of that kind (front-loaded, so the last day is free for makeups),
@@ -187,6 +201,17 @@ async function addToStation(n, i, id, addons = []) {
   await saveSched(n, { stations: list });
   toast(`Added to Day ${n} · ${st.topic || 'station'}.`);
   return true;
+}
+// Take several scenarios off every station on one day (one save).
+async function removeManyFromStations(n, ids) {
+  const lib = libById(), list = schedFor(n).stations.map(x => ({ ...x }));
+  list.forEach(st => ids.forEach(id => {
+    if (!(st.scen || []).includes(id)) return;
+    st.scen = st.scen.filter(x => x !== id);
+    const sc = lib[id]; if (sc) st.content = String(st.content || '').split('\n').filter(l => !l.startsWith(sc.name + ':')).join('\n');
+  }));
+  dropSchDrafts(n);
+  await saveSched(n, { stations: list });
 }
 // i = one station, or null = every station that day it's on.
 async function removeFromStation(n, i, id) {
@@ -590,6 +615,14 @@ async function scenAct(a, el, e) {
 
     case 'planBuild':
       if (planItems().length && !confirm('Replace this plan with a new mix?')) return true;
+      { // The old plan's scenarios that are on the schedule: offer to take them off too.
+        const placed = planItems().filter(x => stationsWith(x.id).length);
+        if (placed.length && confirm(`${placed.length} scenario${placed.length === 1 ? ' from this plan is' : 's from this plan are'} on the schedule. Take ${placed.length === 1 ? 'it' : 'them'} off the schedule too?`)) {
+          const byDay = {};
+          placed.forEach(x => stationsWith(x.id).forEach(a => { (byDay[a.day] = byDay[a.day] || new Set()).add(x.id); }));
+          for (const [n, ids] of Object.entries(byDay)) await removeManyFromStations(Number(n), [...ids]);
+        }
+      }
       await buildPlan('mix'); return true;
     case 'libStar': { const s = libById()[d.id]; await Store.set('scenarios/' + d.id, { star: !s.star }); return true; }
     case 'planOpen': S.planOpen = true; render(); return true;
@@ -617,7 +650,8 @@ async function scenAct(a, el, e) {
     }
     case 'planAddonDel': {
       const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
-      items[Number(d.i)].addons.splice(Number(d.j), 1); await savePlan(items); return true;
+      const it = items[Number(d.i)];
+      it.addons.splice(Number(d.j), 1); await savePlan(items); await refreshScenLines(it.id, it.addons); return true;
     }
     case 'placeOpen': { const x = planItems()[Number(d.i)]; S.place = { ids: [x.id], addons: x.addons || [], day: x.day || 1, planId: x.id }; render(); return true; }
     case 'placeClose': S.place = null; render(); return true;
@@ -676,8 +710,9 @@ async function scenChange(t) {
   if (c === 'planAddon') {
     const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
     const it = items[Number(t.dataset.i)];
-    if (t.value) it.addons.push(t.value);
-    await savePlan(items); return true;
+    if (!t.value) return true;
+    it.addons.push(t.value);
+    await savePlan(items); await refreshScenLines(it.id, it.addons); return true;
   }
   if (c === 'planSize') { const v = Math.max(5, Math.min(25, Number(t.value) || 12)); await Store.set('meta/settings', { planSize: v }); return true; }
   return false;
