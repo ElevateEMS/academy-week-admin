@@ -716,3 +716,6 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 /* Prep scenarios box: plan status after the cover line; Open the plan on the right */
 .cover-state { opacity: .75; }
 .plan-btns.right { justify-content: flex-end; }
+
+/* Prep: the scenarios box fits the plan (no inner scroll) unless you drag it */
+.box.box-scenarios { flex: 0 0 auto; }

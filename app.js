@@ -70,12 +70,12 @@ const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping Lis
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
-  prep: { key: 'prepLayout', v: 3, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['notes', 'shopping'], ['todo', 'scenarios'], ['packing']] },
+  prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
-const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v3 = 50/50 heights)
+const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v4 = scenarios fit + notes match)
 function cfg() {
   const s = S.settings || {};
   const board = boardOf(curDay()), saved = s[board.key];
@@ -1664,6 +1664,11 @@ function fitBoard() {
   const board = document.querySelector('.board');
   if (!board) return;
   board.style.minHeight = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
+  // Prep: the scenarios box is only as tall as the plan, and Notes matches it (unless either was drag-sized).
+  const scen = board.querySelector('.box-scenarios'), notes = board.querySelector('.box-notes'), h = cfg().heights;
+  if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
+    notes.style.flex = '0 0 auto'; notes.style.height = scen.offsetHeight + 'px';
+  }
 }
 addEventListener('resize', fitBoard);
 
