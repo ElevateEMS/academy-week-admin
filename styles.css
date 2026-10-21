@@ -672,3 +672,14 @@ span.star-btn { cursor: default; }
 .add-pocket input { width: 100%; border: 0; background: transparent; outline: none; font-family: var(--serif); font-size: 16px; padding: 4px; }
 .add-pocket input::placeholder { color: var(--muted); font-style: italic; }
 .pocket:hover .pocket-head .x { opacity: .6; }
+
+/* Every dropdown: our own arrow, set in from the edge (the browser's sits against the border). */
+body select:not([multiple]) { -webkit-appearance: none; appearance: none; cursor: pointer; padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237d6558' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; }
+
+/* Add to a Station: how many scenarios each station has */
+.place-st .ps-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.place-st .ps-top em { flex: none; font-style: normal; font-size: 12.5px; color: var(--taupe-dark); }
+.place-st .ps-top em.here { color: #4f6a4b; }
+.place-st span.ps-on { color: var(--ink); opacity: .75; font-style: italic; white-space: normal; }

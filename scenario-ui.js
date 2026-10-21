@@ -327,7 +327,14 @@ function placeModal() {
       <p><b>${esc(names)}</b>${p.addons.length ? `<br><span class="muted small">+ ${esc(p.addons.join(' + '))}</span>` : ''}</p>
       <div class="place-days">${[1, 2, 3, 4, 5].map(d => `<button class="chip small ${d === n ? 'on' : ''}" data-act="placeDay" data-n="${d}">Day ${d}</button>`).join('')}</div>
       <div class="place-list">
-        ${stations.map((st, i) => `<button class="place-st" data-act="placeTo" data-i="${i}"><b>${esc(st.topic || 'Station ' + (i + 1))}</b><span>${esc((st.content || '').split('\n')[0] || '')}</span></button>`).join('')}
+        ${stations.map((st, i) => {
+          // How many scenarios are on it already (no limit), and which ones.
+          const on = st.scen || [], here = p.ids.some(id => on.includes(id));
+          const count = here ? 'Already here' : on.length ? on.length + (on.length === 1 ? ' scenario' : ' scenarios') : '';
+          return `<button class="place-st" data-act="placeTo" data-i="${i}"><div class="ps-top"><b>${esc(st.topic || 'Station ' + (i + 1))}</b>${count ? `<em class="${here ? 'here' : ''}">${count}</em>` : ''}</div>
+            <span>${esc((st.content || '').split('\n')[0] || '')}</span>
+            ${on.length ? `<span class="ps-on">${esc(on.map(id => (lib[id] || {}).name || 'Scenario').join(' · '))}</span>` : ''}</button>`;
+        }).join('')}
         <button class="place-st new" data-act="placeTo" data-i="-1"><b>+ New station</b><span>“${(lib[p.ids[0]] || {}).cat === 'trauma' ? 'Trauma' : 'Medical'} Scenarios” on Day ${n}</span></button>
       </div>
     </div>
