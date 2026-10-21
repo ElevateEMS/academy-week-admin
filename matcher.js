@@ -18,13 +18,32 @@ const Match = (() => {
     for (const [k, n] of Object.entries(skills || {})) have[k] = (have[k] || 0) + n * times;
   };
 
+  // Skills that can't both happen in one scenario (it's one or the other).
+  const EITHER_OR = [['Head Tilt', 'Jaw-Thrust']];
+  const clashes = skills => EITHER_OR.some(pair => pair.every(k => (skills[k] || 0) > 0));
+  // A scenario's skills with its add-ons on. An add-on that would make it clash is left off.
+  function withAddons(sc, texts, addonsByText) {
+    const skills = { ...((sc && sc.skills) || {}) };
+    (texts || []).forEach(t => {
+      const a = addonsByText[t]; if (!a) return;
+      const next = { ...skills }; addSkills(next, a.skills); addSkills(next, a.minus, -1);
+      if (!clashes(next)) Object.assign(skills, next);
+    });
+    return skills;
+  }
+  // Can this add-on go on this scenario, given the add-ons it already has?
+  function canAdd(addon, sc, texts, addonsByText) {
+    if (!fits(addon, sc) || (texts || []).includes(addon.text)) return false;
+    const next = withAddons(sc, texts, addonsByText);
+    addSkills(next, addon.skills); addSkills(next, addon.minus, -1);
+    return !clashes(next);
+  }
+
   // What a plan delivers: { skill: count }.
   function coverage(items, byId, addonsByText) {
     const have = {};
     items.forEach(it => {
-      const sc = byId[it.id];
-      if (sc) addSkills(have, sc.skills);
-      (it.addons || []).forEach(t => { const a = addonsByText[t]; if (a) { addSkills(have, a.skills); addSkills(have, a.minus, -1); } });
+      addSkills(have, withAddons(byId[it.id], it.addons, addonsByText));
       EVERY.forEach(k => { have[k] = (have[k] || 0) + 1; });
     });
     return have;
@@ -86,7 +105,7 @@ const Match = (() => {
       // 1. Scenarios for what's still needed. Once the week is getting full, an add-on on a
       //    scenario that's already in it often beats adding another whole scenario.
       const addonLean = 0.3 + rand() * 0.9; // some tries lean on add-ons more than others
-      const hostFor = a => items.filter(it => fits(a, byId[it.id]) && !it.addons.includes(a.text) && it.addons.length < 2)
+      const hostFor = a => items.filter(it => canAdd(a, byId[it.id], it.addons, addonsByText) && it.addons.length < 2)
         .sort((x, y) => x.addons.length - y.addons.length || rand() - 0.5)[0];
       for (;;) {
         let pick = null, pickScore = 0;
@@ -117,9 +136,9 @@ const Match = (() => {
         const left = Object.keys(need).filter(k => need[k] > 0);
         if (!left.length) break;
         // Only add-ons that have somewhere to go: a scenario in the week, or one that could be added.
-        const hostIn = a => items.filter(it => fits(a, byId[it.id]) && !it.addons.includes(a.text))
+        const hostIn = a => items.filter(it => canAdd(a, byId[it.id], it.addons, addonsByText))
           .sort((x, y) => x.addons.length - y.addons.length || rand() - 0.5)[0];
-        const hostOut = a => pool.filter(s => !used.has(s.id) && fits(a, s)).sort(() => rand() - 0.5)[0];
+        const hostOut = a => pool.filter(s => !used.has(s.id) && canAdd(a, s, [], addonsByText)).sort(() => rand() - 0.5)[0];
         let pick = null, pickG = 0;
         for (const a of addons) {
           const g = addonGain(a) * (0.8 + rand() * 0.4);
@@ -204,6 +223,7 @@ const Match = (() => {
        addon:   the closest scenarios, with add-ons for what they're missing */
   function find({ lib, addons, want, cat = 'both', limit = 4 }) {
     const keys = Object.keys(want);
+    const addonsByText = Object.fromEntries(addons.map(a => [a.text, a]));
     const pool = lib.filter(s => s.skills && (cat === 'both' || s.cat === cat));
     const total = keys.reduce((a, k) => a + want[k], 0);
     const result = (ids, extraSkills = {}, addonList = []) => {
@@ -235,7 +255,7 @@ const Match = (() => {
       const sc = pool.find(s => s.id === r.ids[0]);
       let left = r.misses.slice(); const picked = [], extra = {};
       while (left.length && picked.length < 2) {
-        const a = addons.filter(x => fits(x, sc) && !picked.includes(x.text) && !Object.keys(x.minus || {}).some(k => want[k]))
+        const a = addons.filter(x => canAdd(x, sc, picked, addonsByText) && !Object.keys(x.minus || {}).some(k => want[k]))
           .map(x => ({ x, g: left.filter(k => x.skills[k]).reduce((s, k) => s + want[k], 0) }))
           .filter(o => o.g > 0).sort((p, q) => q.g - p.g || !!q.x.pref - !!p.x.pref)[0];
         if (!a) break;
@@ -250,7 +270,7 @@ const Match = (() => {
     return { singles, pairs, addon, close };
   }
 
-  return { EVERY, isEvery, coverage, missing, build, suggestDays, find, fits };
+  return { EVERY, isEvery, coverage, missing, build, suggestDays, find, fits, canAdd, clashes };
 })();
 
 if (typeof module !== 'undefined') module.exports = Match;

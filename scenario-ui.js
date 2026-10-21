@@ -75,7 +75,6 @@ function extraAddons() {
 }
 const allAddons = () => [...extraAddons(), ...scenAddons()];
 const addonsByText = () => Object.fromEntries(allAddons().map(a => [a.text, a]));
-const fitsAddon = (a, sc) => Match.fits(a, sc);
 // "Only on: Tourniquet or Chest pain"
 const needsText = a => (a.needs || []).map(n => n.startsWith('trait:') ? TRAIT_NAME[n.slice(6)] || n : n).join(' or ');
 
@@ -273,7 +272,7 @@ function planModal() {
       </div>
       <div class="pi-tools">
         <select data-change="planDay" data-i="${idx}" title="Suggested day">${[1, 2, 3, 4, 5].map(d => `<option value="${d}" ${(x.day || 1) === d ? 'selected' : ''}>Day ${d}</option>`).join('')}</select>
-        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => fitsAddon(a, sc) && !x.addons.includes(a.text)).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
+        <select data-change="planAddon" data-i="${idx}"><option value="">+ add-on</option>${addons.filter(a => Match.canAdd(a, sc, x.addons, addonsByText())).map(a => `<option>${esc(a.text)}</option>`).join('')}</select>
         <button class="btn tiny" data-act="placeOpen" data-i="${idx}">Add to a station</button>
         <button class="x" data-act="planDel" data-i="${idx}" title="Take it out of the plan" aria-label="Remove">×</button>
       </div></li>`;
