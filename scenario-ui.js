@@ -463,7 +463,7 @@ function libEditor(s) {
       <span class="muted small">its own station every cohort, so every plan includes it</span></div></div>
     <label class="field">Note <input id="libNoteIn" data-draft="libNote" value="${esc(S.drafts.libNote ?? dr.note ?? '')}" placeholder="Optional: Note"></label>
     <div class="le-btns">
-      <button class="btn primary small" data-act="libSave" data-id="${s.id}">Save · looks right</button>
+      <button class="btn primary small" data-act="libSave" data-id="${s.id}">Save</button>
       ${S.scenDocs[s.id] && SCEN.SEED.some(x => x.id === s.id) ? `<button class="link" data-act="libReset" data-id="${s.id}">Go back to the suggested tags</button>` : ''}
       ${s.gone ? `<button class="link" data-act="libRemove" data-id="${s.id}">Remove from the library</button>` : ''}
     </div>
