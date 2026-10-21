@@ -539,10 +539,11 @@ a.btn { text-decoration: none; color: inherit; }
 .plan-item .x { opacity: .5; }
 .plan-add { margin: 14px 0 6px; }
 .plan-add select { max-width: 100%; width: 100%; padding: 7px 10px; }
-.plan-cov { position: sticky; top: 130px; background: var(--bg); border-radius: 14px; padding: 4px 14px 12px; margin-top: 12px; }
-.cov-group { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 10px 0 4px; }
-.cov-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.cov { font-size: 12.5px; background: var(--paper); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.plan-cov { position: sticky; top: 14px; background: var(--bg); border-radius: 14px; padding: 2px 14px 10px; margin-top: 14px; } /* starts at the top and stays put while the list scrolls */
+.plan-cov .mini-head { margin: 8px 0 2px; }
+.cov-group { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 7px 0 3px; }
+.cov-list { display: flex; flex-wrap: wrap; gap: 3px 4px; }
+.cov { font-size: 12px; background: var(--paper); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .cov b { font-weight: 600; color: var(--taupe-dark); }
 .cov.short { background: var(--honey-soft); color: #6e5326; }
 .cov.short b { color: #6e5326; }

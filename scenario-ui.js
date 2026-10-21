@@ -318,16 +318,16 @@ function planModal() {
   return `<div class="overlay" data-act="planClose"><div class="modal plan" data-stop>
     <div class="modal-head"><h2>Academy Week Scenarios</h2><button class="x big" data-act="planClose" aria-label="Close">×</button></div>
     <div class="modal-body" data-keep-scroll="plan">
-      <div class="plan-top">
-        ${items.length ? coverLine(miss, planState(items)) : '<p class="muted">No scenarios picked yet.</p>'}
-        <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
-        <div class="plan-btns">
-          <button class="btn small" data-act="planBuild">Build a new mix</button>
-          ${items.length ? '<button class="btn primary small push-right" data-act="planPlace">Put the plan on the schedule</button>' : ''}
-        </div>
-      </div>
       <div class="plan-grid">
         <div>
+          <div class="plan-top">
+            ${items.length ? coverLine(miss, planState(items)) : '<p class="muted">No scenarios picked yet.</p>'}
+            <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
+            <div class="plan-btns">
+              <button class="btn small" data-act="planBuild">Build a new mix</button>
+              ${items.length ? '<button class="btn primary small push-right" data-act="planPlace">Put the plan on the schedule</button>' : ''}
+            </div>
+          </div>
           ${days.map(([d, l]) => `<p class="mini-head">Day ${d}</p><ul class="plan-list">${l.map(([x, i]) => row(x, i)).join('')}</ul>`).join('')}
           <div class="plan-add"><button class="btn small" data-act="libAddOpen">+ Add a scenario</button></div>
         </div>
