@@ -1418,7 +1418,7 @@ function bagEdModal() {
       <ul class="pocket-items" data-drop="bagitems">${sec.items.map((raw, j) => {
         const it = bagRaw(raw), id = bagId(sec.name, raw);
         return `<li data-bi="${p}-${j}" draggable="true"><div class="bi-row"><span class="bgrip">${ICONS.grip}</span>
-          <input class="bi-name" id="bagI-${p}-${j}" data-draft="bagI-${p}-${j}" data-bagitem="${p}-${j}" value="${esc(S.drafts['bagI-' + p + '-' + j] ?? it.name)}" aria-label="Item">
+          <textarea class="bi-name" id="bagI-${p}-${j}" data-draft="bagI-${p}-${j}" data-bagitem="${p}-${j}" data-grow rows="1" aria-label="Item">${esc(S.drafts['bagI-' + p + '-' + j] ?? it.name)}</textarea>
           <button class="some-tog ${it.some ? 'on' : ''}" data-act="bagSome" data-bi="${p}-${j}" title="Only some bags carry this">${it.some ? 'Some bags' : 'All bags'}</button>
           <button class="x" data-act="bagItemDel" data-bi="${p}-${j}" title="Remove" aria-label="Remove">×</button></div>
           ${it.some ? `<div class="bi-bags">${all.map(b => `<label>${circle(bagCarries({ id, some: true }, b), `data-act="someBag" data-id="${id}" data-b="${b}"`)}<span>${b}</span></label>`).join('')}</div>` : ''}</li>`;

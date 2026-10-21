@@ -651,9 +651,14 @@ span.star-btn { cursor: default; }
 .pocket-items { list-style: none; margin: 0; padding: 2px 0; min-height: 26px; border-radius: 8px; }
 .pocket-items.drop-here { background: rgba(230, 211, 200, .35); }
 .pocket-items li { padding: 1px 0; cursor: grab; }
-.bi-row { display: flex; align-items: center; gap: 4px; }
-.bi-row .some-tog { margin-left: auto; }
-.bi-name { flex: 0 1 auto; field-sizing: content; min-width: 3ch; max-width: 100%; cursor: text; border: 0; background: transparent; font-size: 14px; color: var(--ink); padding: 3px 4px; border-radius: 6px; outline: none; }
+.bi-row { display: flex; align-items: flex-start; gap: 4px; position: relative; }
+.bi-row .bgrip { margin-top: 4px; }
+.bi-row .x { margin-top: 1px; }
+.bi-row .some-tog { margin-left: auto; margin-top: 2px; }
+/* "All bags" only shows on hover and takes no room, so long names can use the whole row */
+.bi-row .some-tog:not(.on) { position: absolute; right: 26px; top: 0; margin: 0; background: var(--paper); }
+.bi-row .bi-name + .some-tog:not(.on) ~ .x { margin-left: auto; }
+.bi-name { flex: 0 1 auto; field-sizing: content; min-width: 3ch; max-width: 100%; cursor: text; resize: none; overflow: hidden; line-height: 1.35; display: block; font-family: inherit; border: 0; background: transparent; font-size: 14px; color: var(--ink); padding: 3px 4px; border-radius: 6px; outline: none; }
 .some-tog { flex: none; border: 1px solid transparent; background: none; color: var(--muted); font-size: 11px; padding: 1px 7px; border-radius: 999px; cursor: pointer; opacity: 0; }
 .pocket-items li:hover .some-tog, .some-tog:focus { opacity: .8; border-color: var(--line); }
 .some-tog.on { opacity: 1; color: #6e5326; background: var(--honey-soft); border-color: transparent; }
