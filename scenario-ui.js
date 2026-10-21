@@ -333,7 +333,6 @@ function planModal() {
         </div>
         <aside class="plan-cov">
           <p class="mini-head">Sign-offs this plan gives each student</p>
-          <p class="muted small">Have / need, from the MINIMUM Skill Tracking sheet. Vital signs and transport count once per scenario.</p>
           ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="cov-list">${g.items.map(cell).join('')}</div>`).join('')}
         </aside>
       </div>
