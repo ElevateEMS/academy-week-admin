@@ -635,3 +635,34 @@ span.star-btn { cursor: default; }
 .box-scenarios .plan-mini li { padding: 3px 0; line-height: 1.35; }
 .box-scenarios .plan-btns { margin-top: 4px; gap: 8px; }
 .box-scenarios .btn.small { padding: 3px 10px; font-size: 12.5px; }
+
+/* Setup → Bag Contents pop-up: one mini box per pocket */
+.modal.bag-ed { width: min(1060px, 100%); }
+.pocket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; align-items: start; margin-top: 10px; }
+.pocket { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 8px; box-shadow: var(--shadow); }
+.pocket.moving, .pocket-items li.moving { opacity: .4; }
+.pocket-head { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--line-soft); padding-bottom: 6px; }
+.pocket-name { flex: 1; min-width: 0; resize: none; overflow: hidden; line-height: 1.25; display: block; border: 0; background: transparent; font-family: var(--serif); font-size: 17px; font-weight: 600; color: var(--ink); padding: 3px 4px; border-radius: 6px; outline: none; }
+.pocket-name:focus, .bi-name:focus { background: var(--line-soft); }
+.pgrip { margin-top: 5px; }
+.pgrip, .bgrip { flex: none; width: 16px; height: 16px; color: var(--taupe); opacity: .35; cursor: grab; }
+.pgrip svg, .bgrip svg { width: 16px; height: 16px; fill: currentColor; }
+.pocket:hover .pgrip, .pocket-items li:hover .bgrip { opacity: .8; }
+.pocket-items { list-style: none; margin: 0; padding: 2px 0; min-height: 26px; border-radius: 8px; }
+.pocket-items.drop-here { background: rgba(230, 211, 200, .35); }
+.pocket-items li { padding: 1px 0; cursor: grab; }
+.bi-row { display: flex; align-items: center; gap: 4px; }
+.bi-row .some-tog { margin-left: auto; }
+.bi-name { flex: 0 1 auto; field-sizing: content; min-width: 3ch; max-width: 100%; cursor: text; border: 0; background: transparent; font-size: 14px; color: var(--ink); padding: 3px 4px; border-radius: 6px; outline: none; }
+.some-tog { flex: none; border: 1px solid transparent; background: none; color: var(--muted); font-size: 11px; padding: 1px 7px; border-radius: 999px; cursor: pointer; opacity: 0; }
+.pocket-items li:hover .some-tog, .some-tog:focus { opacity: .8; border-color: var(--line); }
+.some-tog.on { opacity: 1; color: #6e5326; background: var(--honey-soft); border-color: transparent; }
+.pocket-items .x { opacity: 0; } .pocket-items li:hover .x { opacity: .6; }
+.bi-bags { display: flex; gap: 10px; padding: 2px 0 5px 24px; }
+.bi-bags label { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.bi-bags .circle { width: 15px; height: 15px; }
+.pocket .add-row { margin: 2px 0 0; } .pocket .add-row input { font-size: 13.5px; padding: 4px 2px; }
+.add-pocket { border-style: dashed; background: transparent; box-shadow: none; display: flex; align-items: center; min-height: 54px; }
+.add-pocket input { width: 100%; border: 0; background: transparent; outline: none; font-family: var(--serif); font-size: 16px; padding: 4px; }
+.add-pocket input::placeholder { color: var(--muted); font-style: italic; }
+.pocket:hover .pocket-head .x { opacity: .6; }

@@ -417,6 +417,7 @@ function shell() {
   ${S.shareOpen ? shareModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
+  ${S.bagEd ? bagEdModal() : ''}
   ${S.schTplOpen ? schTplModal() : ''}
   ${S.binderOpen ? binderModal() : ''}
   ${S.planOpen ? planModal() : ''}
@@ -539,7 +540,7 @@ function hlSelection() {
   }).filter(x => x.phrase);
 }
 
-let hlDragOff = null, hlDown = null, hlNoClick = false;
+let bagDragOff = null, hlDragOff = null, hlDown = null, hlNoClick = false;
 document.addEventListener('mousedown', e => {
   if (hlPop && e.target === hlPop) return;
   hlHide();
@@ -548,9 +549,19 @@ document.addEventListener('mousedown', e => {
   const txt = e.target.closest && e.target.closest('.txt[data-hl]');
   const li = txt && txt.closest('[draggable="true"]');
   if (li) { li.draggable = false; hlDragOff = li; }
+  // Bag editor: typing in a name box shouldn't start a drag.
+  // Bag editor: in a name box, a drag selects text; on an item row, it moves the item, not its pocket.
+  const inBag = e.target.closest && e.target.closest('.bag-ed .pocket');
+  if (inBag) {
+    const field = e.target.closest('input, textarea'), li = e.target.closest('li[data-bi]');
+    const off = [field || li ? inBag : null, field && li].filter(Boolean);
+    off.forEach(x => { x.draggable = false; });
+    if (off.length) bagDragOff = off;
+  }
 }, true);
 document.addEventListener('mouseup', e => {
   if (hlDragOff) { hlDragOff.draggable = true; hlDragOff = null; }
+  if (bagDragOff) { bagDragOff.forEach(x => { x.draggable = true; }); bagDragOff = null; }
   // The mouse moved while held down = selecting words, not clicking the item.
   hlNoClick = !!hlDown && Math.hypot(e.clientX - hlDown.x, e.clientY - hlDown.y) > 3 && !!(e.target.closest && e.target.closest('.checks'));
   hlDown = null;
@@ -1256,9 +1267,6 @@ function drawer() {
 /* ---------- Settings ---------- */
 function settingsView() {
   const c = cfg();
-  const bagText = c.bag.map(sec => '# ' + sec.name + '\n' + sec.items.join('\n')).join('\n\n');
-  const someItems = bagSections().flatMap(sec => sec.items.filter(it => it.some));
-  const all = Array.from({ length: c.bagCount }, (_, i) => i + 1);
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   return `<div class="settings">
     <section class="box">
@@ -1282,12 +1290,8 @@ function settingsView() {
 
     <section class="box">
       <div class="box-head static"><h2>Bag Contents</h2></div>
-      <p class="muted small">Lines starting with # are pockets/pouches. Put *** after anything only some bags carry.</p>
-      <textarea id="set-bag" class="mono" data-draft="set-bag" rows="22">${dv('set-bag', bagText)}</textarea>
-      <button class="btn primary" data-act="saveBag">Save bag contents</button>
-      ${someItems.length ? `<h3>Which bags carry the *** items</h3>
-      <table class="grid-table"><thead><tr><th></th>${all.map(b => `<th>Bag ${b}</th>`).join('')}</tr></thead>
-        <tbody>${someItems.map(it => `<tr><td>${esc(it.name)}</td>${all.map(b => `<td>${circle(bagCarries(it, b), `data-act="someBag" data-id="${it.id}" data-b="${b}"`)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+      <p class="muted small">The pockets and pouches in the jump bags, what goes in each, and which bags carry the items only some bags have. The daily bag check uses this list.</p>
+      <button class="btn primary" data-act="bagEdOpen">Edit bag contents</button>
     </section>
 
     <section class="box">
@@ -1389,15 +1393,93 @@ function templatesModal() {
   </div></div>`;
 }
 
-const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
-function parseBag(text) {
-  const out = [];
-  lines(text).forEach(l => {
-    if (l.startsWith('#')) out.push({ name: l.replace(/^#+\s*/, ''), items: [] });
-    else { if (!out.length) out.push({ name: 'Bag', items: [] }); out[out.length - 1].items.push(l); }
-  });
-  return out.filter(s => s.name);
+/* ---------- Bag Contents editor (Setup) ----------
+   Still saved as settings.bag = [{ name, items: ['BP cuff', 'i-Gel ***'] }] so the
+   bag check works as before. Item ids come from pocket + name, so when one is
+   renamed or moved its "which bags" choice is copied to the new id. */
+const bagAll = () => Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
+const bagRaw = raw => ({ name: raw.replace(/\s*\*\*\*\s*$/, '').trim(), some: /\*\*\*\s*$/.test(raw) });
+const bagId = (pocket, raw) => slug(pocket + ' ' + bagRaw(raw).name);
+const bagCopy = () => cfg().bag.map(sec => ({ name: sec.name, items: [...sec.items] }));
+async function saveBagList(bag) {
+  // Old id -> new id by position isn't possible after a move, so match by "pocket|raw" pairs passed in.
+  const some = cfg().someBags, moved = {};
+  (bag.__from || []).forEach(([oldId, newId]) => { if (oldId !== newId && some[oldId]) moved[newId] = some[oldId]; });
+  Object.keys(S.drafts).forEach(k => { if (/^bag[NI]-/.test(k)) delete S.drafts[k]; });
+  const clean = bag.map(sec => ({ name: sec.name, items: sec.items.filter(Boolean) }));
+  await Store.set('meta/settings', { bag: clean, ...(Object.keys(moved).length ? { someBags: moved } : {}) });
 }
+function bagEdModal() {
+  const bag = cfg().bag, all = bagAll();
+  const card = (sec, p) => `<section class="pocket" data-p="${p}" draggable="true">
+      <div class="pocket-head"><span class="pgrip" title="Drag to move this pocket">${ICONS.grip}</span>
+        <textarea class="pocket-name" id="bagN-${p}" data-draft="bagN-${p}" data-bagname="${p}" data-grow rows="1" aria-label="Pocket name">${esc(S.drafts['bagN-' + p] ?? sec.name)}</textarea>
+        <button class="x" data-act="bagPocketDel" data-p="${p}" title="Delete this pocket" aria-label="Delete pocket">×</button></div>
+      <ul class="pocket-items" data-drop="bagitems">${sec.items.map((raw, j) => {
+        const it = bagRaw(raw), id = bagId(sec.name, raw);
+        return `<li data-bi="${p}-${j}" draggable="true"><div class="bi-row"><span class="bgrip">${ICONS.grip}</span>
+          <input class="bi-name" id="bagI-${p}-${j}" data-draft="bagI-${p}-${j}" data-bagitem="${p}-${j}" value="${esc(S.drafts['bagI-' + p + '-' + j] ?? it.name)}" aria-label="Item">
+          <button class="some-tog ${it.some ? 'on' : ''}" data-act="bagSome" data-bi="${p}-${j}" title="Only some bags carry this">${it.some ? 'Some bags' : 'All bags'}</button>
+          <button class="x" data-act="bagItemDel" data-bi="${p}-${j}" title="Remove" aria-label="Remove">×</button></div>
+          ${it.some ? `<div class="bi-bags">${all.map(b => `<label>${circle(bagCarries({ id, some: true }, b), `data-act="someBag" data-id="${id}" data-b="${b}"`)}<span>${b}</span></label>`).join('')}</div>` : ''}</li>`;
+      }).join('')}</ul>
+      <div class="add-row"><input id="bagAdd-${p}" data-draft="bagAdd-${p}" data-add="bagitem" data-p="${p}" placeholder="+ add item" value="${esc(S.drafts['bagAdd-' + p] || '')}"></div>
+    </section>`;
+  return `<div class="overlay" data-act="bagEdClose"><div class="modal bag-ed" data-stop>
+    <div class="modal-head"><h2>Bag Contents</h2><button class="x big" data-act="bagEdClose" aria-label="Close">×</button></div>
+    <div class="modal-body" data-keep-scroll="bagEd"><p class="muted small">Changes save as you go. Drag items between pockets, or drag a pocket by its dots. “Some bags” lets you tap which of bags 1–${all.length} carry it.</p>
+      <div class="pocket-grid" data-drop="pockets">${bag.map(card).join('')}
+        <section class="pocket add-pocket"><input id="bagPocketIn" data-draft="bagPocketIn" data-add="bagpocket" placeholder="+ Add a pocket" value="${esc(S.drafts.bagPocketIn || '')}"></section></div></div>
+  </div></div>`;
+}
+async function bagAddItem(p) {
+  const k = 'bagAdd-' + p, text = String(S.drafts[k] || '').trim();
+  if (!text) return;
+  delete S.drafts[k];
+  const bag = bagCopy(); bag[p].items.push(text.replace(/\s*\*\*\*\s*$/, ''));
+  await saveBagList(bag);
+  setTimeout(() => { const el = document.getElementById(k); if (el) el.focus(); }, 0);
+}
+async function bagAddPocket() {
+  const name = String(S.drafts.bagPocketIn || '').trim();
+  if (!name) return;
+  delete S.drafts.bagPocketIn;
+  await saveBagList([...bagCopy(), { name, items: [] }]);
+}
+async function bagRename(t) {
+  delete S.drafts[t.id];
+  const bag = bagCopy(), from = [];
+  if (t.dataset.bagname != null) {
+    const p = Number(t.dataset.bagname), name = t.value.trim(), old = bag[p].name;
+    if (!name) { t.value = old; return; }
+    if (name === old) return;
+    bag[p].items.forEach(raw => from.push([bagId(old, raw), bagId(name, raw)]));
+    bag[p].name = name;
+  } else {
+    const [p, j] = t.dataset.bagitem.split('-').map(Number), raw = bag[p].items[j], it = bagRaw(raw), name = t.value.trim();
+    if (name === it.name) return;
+    if (!name) bag[p].items.splice(j, 1);
+    else { bag[p].items[j] = name + (it.some ? ' ***' : ''); from.push([bagId(bag[p].name, raw), bagId(bag[p].name, name)]); }
+  }
+  bag.__from = from;
+  await saveBagList(bag);
+}
+// Drag-and-drop finished: read the new order off the page.
+async function bagDragDone() {
+  const old = cfg().bag, from = [];
+  const bag = [...document.querySelectorAll('.pocket-grid > .pocket[data-p]')].map(card => {
+    const sec = old[Number(card.dataset.p)];
+    return { name: sec.name, items: [...card.querySelectorAll('li[data-bi]')].map(li => {
+      const [p, j] = li.dataset.bi.split('-').map(Number), raw = old[p].items[j];
+      from.push([bagId(old[p].name, raw), bagId(sec.name, raw)]);
+      return raw;
+    }) };
+  });
+  bag.__from = from;
+  await saveBagList(bag);
+}
+
+const lines = s => String(s || '').split('\n').map(x => x.trim()).filter(Boolean);
 
 // In the Instructor Notes box, "- " lines show pushed in a few spaces. The spaces are
 // only for looks: they come off again when it saves.
@@ -1431,6 +1513,14 @@ function saveNoteSoon(n, id) {
 
 /* ---------- Drag and drop ---------- */
 document.addEventListener('dragstart', e => {
+  const bagEl = e.target.closest && e.target.closest('.bag-ed li[data-bi], .bag-ed .pocket[data-p]');
+  if (bagEl) {
+    S.dragging = { type: bagEl.matches('li') ? 'bagitem' : 'pocket' };
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', 'bag'); } catch {}
+    setTimeout(() => bagEl.classList.add('moving'), 0);
+    return;
+  }
   const el = e.target.closest && e.target.closest('[data-drag]');
   if (!el) return;
   S.dragging = el.dataset.drag === 'box' ? { type: 'box', id: el.dataset.box } : { type: 'item', id: el.dataset.id };
@@ -1442,6 +1532,25 @@ document.addEventListener('dragstart', e => {
 
 document.addEventListener('dragover', e => {
   if (!S.dragging) return;
+  if (S.dragging.type === 'pocket') {
+    const grid = e.target.closest('.pocket-grid'); if (!grid) return;
+    e.preventDefault();
+    const moving = grid.querySelector('.moving'), over = e.target.closest('.pocket[data-p]');
+    if (!moving || !over || over === moving) return;
+    const r = over.getBoundingClientRect();
+    grid.insertBefore(moving, e.clientX < r.left + r.width / 2 ? over : over.nextSibling);
+    return;
+  }
+  if (S.dragging.type === 'bagitem') {
+    const zone = e.target.closest('[data-drop="bagitems"]');
+    document.querySelectorAll('.drop-here').forEach(x => x !== zone && x.classList.remove('drop-here'));
+    if (!zone) return;
+    e.preventDefault(); zone.classList.add('drop-here');
+    const moving = document.querySelector('.bag-ed .moving'); if (!moving) return;
+    const after = [...zone.children].find(c => e.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
+    if (after) { if (after !== moving) zone.insertBefore(moving, after); } else if (zone.lastElementChild !== moving) zone.appendChild(moving);
+    return;
+  }
   const zone = e.target.closest(S.dragging.type === 'box' ? '[data-drop="boxes"]' : '[data-drop="items"]');
   document.querySelectorAll('.drop-here').forEach(x => x !== zone && x.classList.remove('drop-here'));
   if (!zone) return;
@@ -1467,6 +1576,11 @@ document.addEventListener('dragend', async () => {
   document.querySelectorAll('.drop-here').forEach(x => x.classList.remove('drop-here'));
   if (!drag || !moving) { S.dragging = null; render(); return; }
   moving.classList.remove('moving');
+  if (drag.type === 'bagitem' || drag.type === 'pocket') {
+    S.dragging = null;
+    try { await bagDragDone(); } catch (err) { toast(err.message); } finally { render(); }
+    return;
+  }
   try {
     if (drag.type === 'box') {
       S.dragging = null;
@@ -1593,6 +1707,9 @@ document.addEventListener('change', async e => {
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
+  if (t.dataset.bagname != null || t.dataset.bagitem != null) { try { await bagRename(t); } catch (err) { toast(err.message); } return; }
+  if (t.dataset.add === 'bagitem') { bagAddItem(Number(t.dataset.p)).catch(err => toast(err.message)); return; }
+  if (t.dataset.add === 'bagpocket') { bagAddPocket().catch(err => toast(err.message)); return; }
   if (t.dataset.change === 'squadCount') { act('squadCount', t); return; }
   if (t.dataset.change === 'squadAdd') { act('squadAdd', t); return; }
   // A priority line saves when you click or tab away, not only on Enter.
@@ -1606,12 +1723,15 @@ document.addEventListener('change', async e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.datePick) S.datePick = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('.bag-ed input:not([data-add]), .bag-ed textarea')) { e.preventDefault(); e.target.blur(); return; } // renaming a pocket/item
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || !e.target.dataset.add) return;
   e.preventDefault();
   const t = e.target;
+  if (t.dataset.add === 'bagitem') { bagAddItem(Number(t.dataset.p)).catch(err => toast(err.message)); return; }
+  if (t.dataset.add === 'bagpocket') { bagAddPocket().catch(err => toast(err.message)); return; }
   if (t.dataset.add === 'shop') act('addShop');
   else if (t.dataset.add === 'pack') act('addPack');
   else act('addItem', t);
@@ -1832,12 +1952,22 @@ async function act(a, el = {}, e) {
         } else toast('Day templates saved.');
         break;
       }
-      case 'saveBag': {
-        if (S.drafts['set-bag'] === undefined) { toast('No changes to save.'); return; }
-        const bag = parseBag(S.drafts['set-bag']);
-        if (!bag.length) { toast('The bag list is empty.'); return; }
-        await Store.set('meta/settings', { bag });
-        delete S.drafts['set-bag']; toast('Bag contents saved.'); break;
+      case 'bagEdOpen': S.bagEd = true; render(); break;
+      case 'bagEdClose': S.bagEd = false; render(); break;
+      case 'bagSome': {
+        const bag = bagCopy(), [p, j] = d.bi.split('-').map(Number), it = bagRaw(bag[p].items[j]);
+        bag[p].items[j] = it.name + (it.some ? '' : ' ***');
+        await saveBagList(bag); break;
+      }
+      case 'bagItemDel': {
+        const bag = bagCopy(), [p, j] = d.bi.split('-').map(Number);
+        bag[p].items.splice(j, 1); await saveBagList(bag); break;
+      }
+      case 'bagPocketDel': {
+        const bag = bagCopy(), p = Number(d.p);
+        if (bag[p].items.length && !confirm(`Delete “${bag[p].name}” and its ${bag[p].items.length} item${bag[p].items.length === 1 ? '' : 's'}?`)) return;
+        if (bag.length === 1) { toast('The bag needs at least one pocket.'); return; }
+        bag.splice(p, 1); await saveBagList(bag); break;
       }
       case 'someBag': {
         const all = Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
