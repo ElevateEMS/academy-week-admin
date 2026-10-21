@@ -423,12 +423,6 @@ function libScenarios() {
   };
   const shown = all.filter(s => (f === 'all' || s.cat === f || (f === 'check' && s.status !== 'checked') || (f === 'new' && s.status === 'new') || (f === 'star' && (s.star || s.every)))
     && (!q || s.name.toLowerCase().includes(q) || skillText(s.skills).toLowerCase().includes(q)));
-  // Skills that only 0-1 scenarios have: worth writing more for (or an add-on covers them).
-  // (A skill an every-week scenario has is always covered, so it isn't a worry.)
-  const have = {}, always = {};
-  usableScen().forEach(s => Object.keys(s.skills).forEach(k => { have[k] = (have[k] || 0) + 1; if (s.every || s.star) always[k] = true; }));
-  const tagged = TAG_GROUPS().flatMap(g => g.items).filter(k => (scenTargets()[k] || 0) > 0);
-  const none = tagged.filter(k => !have[k]), one = tagged.filter(k => have[k] === 1 && !always[k]);
   const chip = (k, l) => `<button class="chip small ${f === k ? 'on' : ''}" data-act="libFilter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
   const statusTag = s => s.gone ? '<span class="tag red">Doc missing</span>'
     : s.status === 'checked' ? '' // once you've saved it, the "Suggested" tag just goes away
@@ -436,7 +430,6 @@ function libScenarios() {
 
   return `
     ${S.scenErr ? `<div class="alert small">Couldn’t list the scenario folders: ${esc(S.scenErr)} Showing the scenarios known on Oct 20 instead.</div>` : !S.scenLive ? '<p class="muted small">Checking the Drive folders for new Docs…</p>' : ''}
-    ${none.length || one.length ? `<div class="thin">${none.length ? `<p><b>In no scenario yet:</b> ${esc(none.join(', '))} <span class="muted">(add-ons cover these)</span></p>` : ''}${one.length ? `<p><b>Only in one scenario:</b> ${esc(one.join(', '))}</p>` : ''}</div>` : ''}
     <div class="lib-top"><div class="chips">${chip('all', 'All')}${chip('medical', 'Medical')}${chip('trauma', 'Trauma')}${chip('star', '★ Always')}${chip('check', 'Not checked yet')}${counts.new ? chip('new', 'New') : ''}</div>
       <input id="libSearchIn" class="search" data-draft="libSearch" placeholder="Find a scenario or skill" value="${esc(S.drafts.libSearch || '')}"></div>
     <ul class="lib-list">${shown.map(s => `<li class="${S.libSel === s.id ? 'open' : ''}">
