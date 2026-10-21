@@ -421,18 +421,27 @@ function addCell(s) {
   if (!s.skills || s.gone) return '';
   return `<button class="btn tiny lib-add" data-act="planAddId" data-id="${s.id}">+ Add to plan</button>`;
 }
+// Opening the Add-ons / Requirements tab makes a working copy; only warn on close
+// if it's actually different from what's saved.
+function libUnsaved() {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const addonsNow = list => list.map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills, needs: x.needs || [], ...(x.minus ? { minus: x.minus } : {}) })).filter(x => x.text);
+  if (S.addonDraft && !same(addonsNow(S.addonDraft), addonsNow(JSON.parse(JSON.stringify(scenAddons()))))) return true;
+  if (S.reqDraft) { const t = scenTargets(); if (Object.keys({ ...t, ...S.reqDraft }).some(k => (S.reqDraft[k] || 0) !== (t[k] || 0))) return true; }
+  return false;
+}
 function libModal() {
   const tab = S.libTab;
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="libTab" data-t="${t}">${label}</button>`;
   const body = tab === 'addons' ? libAddons() : tab === 'req' ? libReq() : libScenarios();
   const foot = tab === 'addons' ? '<span class="muted small">Add-ons are twists you add to a scenario for a skill it doesn’t have. The builder and Additional Scenarios use them.</span><button class="btn primary" data-act="addonSave">Save add-ons</button>'
-    : tab === 'req' ? '<span class="muted small">Summative sign-offs each student needs.</span><button class="btn primary" data-act="reqSave">Save</button>'
-    : '<span class="muted small">Shared by you and Nick. Tags are what each scenario lets a student get signed off.</span>';
+    : tab === 'req' ? '<button class="btn primary" data-act="reqSave">Save</button>'
+    : '';
   return `<div class="overlay" data-act="libClose"><div class="modal lib" data-stop>
     <div class="modal-head"><h2>Scenario Library</h2><button class="x big" data-act="libClose" aria-label="Close">×</button></div>
     <div class="bag-tabs">${tabBtn('scen', 'Scenarios')}${tabBtn('addons', 'Add-ons')}${tabBtn('req', 'Requirements')}</div>
     <div class="modal-body" data-keep-scroll="lib">${body}</div>
-    <div class="modal-foot">${foot}</div>
+    ${foot ? `<div class="modal-foot">${foot}</div>` : ''}
   </div></div>`;
 }
 
@@ -514,7 +523,7 @@ function libAddons() {
 
 function libReq() {
   const t = S.reqDraft || (S.reqDraft = { ...scenTargets() });
-  return `<p class="muted small">From the “MINIMUM - Skill Tracking Rote/Summative” sheet. The week builder plans for these.</p>
+  return `<p class="muted small">MINIMUM - SUMMATIVE skills. The week builder plans for these.</p>
     ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="req-grid">${g.items.map(k =>
       `<label>${esc(k)}<input type="number" min="0" max="20" data-req="${esc(k)}" value="${t[k] ?? 0}"></label>`).join('')}</div>`).join('')}`;
 }
@@ -529,7 +538,7 @@ async function scenAct(a, el, e) {
     // falls through
     case 'libOpen': S.libOpen = true; S.libTab = 'scen'; S.menuOpen = false; S.schMenu = false; if (!S.scenLive) loadScenarios(); render(); return true;
     case 'libClose':
-      if ((S.addonDraft || S.reqDraft) && !confirm('Close without saving your changes?')) return true;
+      if (libUnsaved() && !confirm('Close without saving your changes?')) return true;
       S.libOpen = false; S.libAdd = false; S.libSel = null; S.addonDraft = null; S.reqDraft = null; render(); return true;
     case 'libTab': S.libTab = d.t; render(); return true;
     case 'libFilter': S.libFilter = d.f; render(); return true;
