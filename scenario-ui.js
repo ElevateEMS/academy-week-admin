@@ -260,7 +260,6 @@ function planModal() {
   const items = planItems(), lib = libById(), addons = allAddons(), targets = scenTargets();
   const { have, miss } = planStatus(items);
   const med = items.filter(x => (lib[x.id] || {}).cat !== 'trauma').length;
-  const missSet = Object.fromEntries(miss.map(m => [m.skill, m.short]));
 
   const row = (x, idx) => {
     const sc = lib[x.id] || { name: 'A Doc that’s gone from the folders', cat: '', skills: {}, url: docUrl(x.id), gone: true };
@@ -282,13 +281,6 @@ function planModal() {
     </li>`;
   };
 
-  // "+ Add a scenario": the ones that fill the most of what's missing first.
-  const inPlan = new Set(items.map(x => x.id));
-  const gain = s => Object.entries(s.skills).reduce((g, [k, n]) => g + Math.min(n, missSet[k] || 0), 0);
-  const choices = usableScen().filter(s => !inPlan.has(s.id)).map(s => ({ s, g: gain(s) }))
-    .sort((a, b) => b.g - a.g || a.s.cat.localeCompare(b.s.cat) || a.s.name.localeCompare(b.s.name));
-  const option = ({ s, g }) => `<option value="${s.id}">${esc(s.name)}${g ? ' (fills ' + Object.keys(s.skills).filter(k => missSet[k]).join(', ') + ')' : ''}</option>`;
-
   const days = [1, 2, 3, 4, 5].map(d => [d, items.map((x, i) => [x, i]).filter(([x]) => (x.day || 1) === d)]).filter(([, l]) => l.length);
   const cell = k => { const h = have[k] || 0, t = targets[k] || 0; return `<span class="cov ${h < t ? 'short' : ''}">${esc(k)} <b>${h}/${t}</b></span>`; };
 
@@ -299,7 +291,6 @@ function planModal() {
         ${items.length ? coverLine(miss) : '<p class="muted">No scenarios picked yet.</p>'}
         <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
         <div class="plan-btns">
-          ${items.length ? '<button class="btn primary small" data-act="planPlace">Put the plan on the schedule</button>' : ''}
           <button class="btn small" data-act="planBuild">Build a new mix</button>
           <label class="plan-size">About <input type="number" min="5" max="25" id="planSizeIn" data-change="planSize" value="${planSize()}"> scenarios</label>
         </div>
@@ -307,7 +298,7 @@ function planModal() {
       <div class="plan-grid">
         <div>
           ${days.map(([d, l]) => `<p class="mini-head">Day ${d}</p><ul class="plan-list">${l.map(([x, i]) => row(x, i)).join('')}</ul>`).join('')}
-          <div class="plan-add"><select data-change="planAdd"><option value="">+ Add a scenario${miss.length ? ' (best fits for what’s missing first)' : ''}</option>${choices.map(option).join('')}</select></div>
+          <div class="plan-add"><button class="btn small" data-act="libAddOpen">+ Add a scenario</button></div>
         </div>
         <aside class="plan-cov">
           <p class="mini-head">Sign-offs this plan gives each student</p>
@@ -316,7 +307,7 @@ function planModal() {
         </aside>
       </div>
     </div>
-    <div class="modal-foot"><button class="link" data-act="libOpen">Scenario Library</button><span class="muted small">Days start from your schedule (up to 3 per Medical / Trauma Scenarios station). Adding a scenario to a station on another day moves it to that day.</span><button class="btn primary" data-act="planClose">Done</button></div>
+    ${items.length ? '<div class="modal-foot"><button class="btn primary" data-act="planPlace">Put the plan on the schedule</button></div>' : ''}
   </div></div>`;
 }
 
@@ -424,6 +415,12 @@ function matchModal() {
 }
 
 /* ---------- Scenario Library pop-up ---------- */
+// Library opened from the plan's "+ Add a scenario": a right-aligned Add / In plan on each row.
+function addCell(s) {
+  if (planItems().some(x => x.id === s.id)) return '<span class="lib-add in">In plan</span>';
+  if (!s.skills || s.gone) return '';
+  return `<button class="btn tiny lib-add" data-act="planAddId" data-id="${s.id}">+ Add to plan</button>`;
+}
 function libModal() {
   const tab = S.libTab;
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="libTab" data-t="${t}">${label}</button>`;
@@ -463,7 +460,7 @@ function libScenarios() {
         : `<button class="star-btn ${s.star ? 'on' : ''}" data-act="libStar" data-id="${s.id}" title="${s.star ? 'Always included: click to undo' : 'Always include this in every plan'}">${s.star ? '★' : '☆'}</button>`}
       <button class="lib-row" data-act="libSel" data-id="${s.id}">
         <span class="lr-name">${esc(s.name)}</span><span class="tag ${s.cat}">${s.cat}</span>${statusTag(s)}${s.every ? `<span class="tag ok">Every week · Day ${s.every}</span>` : ''}${Object.keys(s.extras).length ? `<span class="trait">+${Object.keys(s.extras).length} optional</span>` : ''}${Object.keys(s.traits).filter(t => s.traits[t]).map(t => `<span class="trait">${esc(TRAIT_NAME[t])}</span>`).join('')}
-        <span class="lr-skills">${s.skills ? esc(skillText(s.skills)) : '<em>no tags yet</em>'}</span></button></div>
+        <span class="lr-skills">${s.skills ? esc(skillText(s.skills)) : '<em>no tags yet</em>'}</span></button>${S.libAdd ? addCell(s) : ''}</div>
       ${S.libSel === s.id ? libEditor(s) : ''}</li>`).join('') || '<li class="empty">No scenarios match.</li>'}</ul>`;
 }
 
@@ -528,10 +525,12 @@ const libDraftOf = s => ({ skills: { ...(s.skills || {}) }, extras: { ...(s.extr
 async function scenAct(a, el, e) {
   const d = el.dataset || {};
   switch (a) {
+    case 'libAddOpen': S.libAdd = true; S.libSel = null; S.libFilter = 'all'; // then the same as libOpen
+    // falls through
     case 'libOpen': S.libOpen = true; S.libTab = 'scen'; S.menuOpen = false; S.schMenu = false; if (!S.scenLive) loadScenarios(); render(); return true;
     case 'libClose':
       if ((S.addonDraft || S.reqDraft) && !confirm('Close without saving your changes?')) return true;
-      S.libOpen = false; S.libSel = null; S.addonDraft = null; S.reqDraft = null; render(); return true;
+      S.libOpen = false; S.libAdd = false; S.libSel = null; S.addonDraft = null; S.reqDraft = null; render(); return true;
     case 'libTab': S.libTab = d.t; render(); return true;
     case 'libFilter': S.libFilter = d.f; render(); return true;
     case 'libSel': {
@@ -583,6 +582,12 @@ async function scenAct(a, el, e) {
       if (!confirm('Put each scenario on its day’s Medical / Trauma Scenarios station (up to 3 each)? Ones already on the schedule are left where they are.')) return true;
       await placePlan(); return true;
     case 'planClose': S.planOpen = false; render(); return true;
+    case 'planAddId': {
+      const sc = libById()[d.id];
+      if (!sc || planItems().some(x => x.id === d.id)) return true;
+      await savePlan([...planItems(), { id: d.id, addons: [], day: sc.every || (sc.cat === 'trauma' ? 3 : 2), ...(sc.every ? { fixed: true } : {}) }]);
+      toast('Added ' + sc.name + ' to the plan.'); return true;
+    }
     case 'planDelAsk': S.planDelAsk = Number(d.i); render(); return true;
     case 'planDelClose': S.planDelAsk = null; render(); return true;
     case 'planDel': { // from the confirm pop-up; data-sched = also take it off the schedule
@@ -657,12 +662,6 @@ async function scenChange(t) {
     const items = planItems().map(x => ({ ...x, addons: [...(x.addons || [])] }));
     const it = items[Number(t.dataset.i)];
     if (t.value) it.addons.push(t.value);
-    await savePlan(items); return true;
-  }
-  if (c === 'planAdd') {
-    if (!t.value) return true;
-    const lib = libById(), sc = lib[t.value];
-    const items = [...planItems(), { id: t.value, addons: [], day: sc.every || (sc.cat === 'trauma' ? 3 : 2), ...(sc.every ? { fixed: true } : {}) }];
     await savePlan(items); return true;
   }
   if (c === 'planSize') { const v = Math.max(5, Math.min(25, Number(t.value) || 12)); await Store.set('meta/settings', { planSize: v }); return true; }
