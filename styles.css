@@ -348,6 +348,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 
 @media (max-width: 1100px) {
   .board, .board.wide { grid-template-columns: 1fr 1fr; }
+  .board .box { flex: 0 0 auto; min-height: 180px; } /* the board isn't stretched to the window here, so each box fits what's in it */
   .top { grid-template-columns: auto 1fr auto; }
 }
 @media (max-width: 720px) {
