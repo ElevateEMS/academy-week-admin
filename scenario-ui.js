@@ -323,7 +323,7 @@ function planModal() {
         <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
         <div class="plan-btns">
           <button class="btn small" data-act="planBuild">Build a new mix</button>
-          <label class="plan-size">About <input type="number" min="5" max="25" id="planSizeIn" data-change="planSize" value="${planSize()}"> scenarios</label>
+          ${items.length ? '<button class="btn primary small push-right" data-act="planPlace">Put the plan on the schedule</button>' : ''}
         </div>
       </div>
       <div class="plan-grid">
@@ -337,7 +337,6 @@ function planModal() {
         </aside>
       </div>
     </div>
-    ${items.length ? '<div class="modal-foot"><button class="btn primary" data-act="planPlace">Put the plan on the schedule</button></div>' : ''}
   </div></div>`;
 }
 
@@ -457,7 +456,7 @@ function libUnsaved() {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const addonsNow = list => list.map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills, needs: x.needs || [], ...(x.minus ? { minus: x.minus } : {}) })).filter(x => x.text);
   if (S.addonDraft && !same(addonsNow(S.addonDraft), addonsNow(JSON.parse(JSON.stringify(scenAddons()))))) return true;
-  if (S.reqDraft) { const t = scenTargets(); if (Object.keys({ ...t, ...S.reqDraft }).some(k => (S.reqDraft[k] || 0) !== (t[k] || 0))) return true; }
+  if (S.reqDraft) { const t = { ...scenTargets(), _size: planSize() }; if (Object.keys({ ...t, ...S.reqDraft }).some(k => (S.reqDraft[k] || 0) !== (t[k] || 0))) return true; }
   return false;
 }
 function libModal() {
@@ -552,8 +551,9 @@ function libAddons() {
 }
 
 function libReq() {
-  const t = S.reqDraft || (S.reqDraft = { ...scenTargets() });
-  return `<p class="muted small">MINIMUM - SUMMATIVE skills. The week builder plans for these.</p>
+  const t = S.reqDraft || (S.reqDraft = { ...scenTargets(), _size: planSize() });
+  return `<label class="req-size"><b>Scenarios per week:</b> about <input type="number" min="5" max="25" data-req="_size" value="${t._size}"></label>
+    <p class="muted small">MINIMUM - SUMMATIVE skills. The week builder plans for these.</p>
     ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="req-grid">${g.items.map(k =>
       `<label>${esc(k)}<input type="number" min="0" max="20" data-req="${esc(k)}" value="${t[k] ?? 0}"></label>`).join('')}</div>`).join('')}`;
 }
@@ -610,7 +610,11 @@ async function scenAct(a, el, e) {
       const list = (S.addonDraft || scenAddons()).map(x => ({ text: x.text.trim(), cat: x.cat || 'any', skills: x.skills, needs: x.needs || [], ...(x.minus ? { minus: x.minus } : {}) })).filter(x => x.text);
       await Store.set('meta/settings', { scenAddons: list }); S.addonDraft = null; toast('Add-ons saved.'); render(); return true;
     }
-    case 'reqSave': await Store.set('meta/settings', { scenTargets: S.reqDraft || scenTargets() }); S.reqDraft = null; toast('Saved.'); render(); return true;
+    case 'reqSave': {
+      const { _size, ...targets } = S.reqDraft || { ...scenTargets(), _size: planSize() };
+      await Store.set('meta/settings', { scenTargets: targets, planSize: Math.max(5, Math.min(25, Number(_size) || 12)) });
+      S.reqDraft = null; toast('Saved.'); render(); return true;
+    }
 
     case 'planBuild':
       if (planItems().length && !confirm('Replace this plan with a new mix?')) return true;
@@ -713,6 +717,5 @@ async function scenChange(t) {
     it.addons.push(t.value);
     await savePlan(items); await refreshScenLines(it.id, it.addons); return true;
   }
-  if (c === 'planSize') { const v = Math.max(5, Math.min(25, Number(t.value) || 12)); await Store.set('meta/settings', { planSize: v }); return true; }
   return false;
 }
