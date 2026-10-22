@@ -1,6 +1,6 @@
 {
-  "name": "Academy Week Admin",
-  "short_name": "AW Admin",
+  "name": "Elevate EMS Admin",
+  "short_name": "EMS Admin",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

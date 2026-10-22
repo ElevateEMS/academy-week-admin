@@ -4,6 +4,11 @@
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
      listScenarios               -> the scenario Docs in the Medical and Trauma folders (names, links)
+     createCohort(key)           -> adds a cohort to the config sheet; the Student Hub script makes its folder + sheets
+     setStatus(key, status)      -> Upcoming / Active / Former in the config sheet (column F)
+
+   loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
+   review dates) as `info`, plus its status and links to its sheet and folder.
 
    In sample mode it answers with pretend data instead. */
 const Sheets = (() => {
@@ -25,6 +30,8 @@ const Sheets = (() => {
     changeContacts: (key, student, by) =>
       call('changeContacts', { cohort: key, row: student.row, name: student.name, by }).then(o => o.count),
     listScenarios: () => call('listScenarios').then(o => o.scenarios),
+    createCohort: key => call('createCohort', { cohort: key }),
+    setStatus: (key, status) => call('setStatus', { cohort: key, status }),
   };
 })();
 
@@ -50,19 +57,37 @@ function sampleSheets() {
   const subs = ['Skills', 'Scenarios', 'Review', 'Final Review', 'Psychomotor'];
   const labels = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
 
+  const cohorts = [
+    { key: 'Spring 2026', status: 'Former' },
+    { key: 'Fall 2026', status: 'Active' },
+    { key: 'Test 2026', status: 'Active' },
+  ];
+  const orient = new Date(start); orient.setDate(orient.getDate() - 119);
+  const reviews = [7, 14, 28, 42].map(n => { const d = new Date(orient); d.setDate(d.getDate() + n); return iso(d); });
+
   return {
-    listCohorts: () => wait([
-      { key: 'Fall 2026', status: 'Active' },
-      { key: 'Test 2026', status: 'Active' },
-      { key: 'Spring 2026', status: 'Former' },
-    ]),
-    loadCohort: key => wait({
+    listCohorts: () => wait(cohorts.map(c => ({ ...c }))),
+    async createCohort(key) {
+      if (cohorts.some(c => c.key === key)) throw new Error(key + ' is already in the config sheet.');
+      cohorts.push({ key, status: 'Upcoming' });
+      return wait({ cohort: key });
+    },
+    async setStatus(key, status) {
+      const c = cohorts.find(x => x.key === key); if (c) c.status = status;
+      return wait({ cohort: key, status });
+    },
+    loadCohort: key => { const fresh = (cohorts.find(c => c.key === key) || {}).status === 'Upcoming'; return wait({
       cohort: key,
-      academyStart: iso(start),
+      status: (cohorts.find(c => c.key === key) || {}).status || '',
+      sheetUrl: 'https://docs.google.com/spreadsheets/', folderUrl: 'https://drive.google.com/drive/',
+      info: fresh
+        ? { jbl: '', firstDay: '', cpr: '', academyStart: '', meet: '', reviews: [] }
+        : { jbl: '6B37F3', firstDay: iso(orient), cpr: '', academyStart: iso(start), meet: 'meet.google.com/abc-defg-hij', reviews },
+      academyStart: fresh ? '' : iso(start),
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5) })),
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
-    }),
+    }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);

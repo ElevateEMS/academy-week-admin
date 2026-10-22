@@ -1,4 +1,4 @@
-/* Starting lists. Everything here can be changed in the app's Settings page;
+/* Starting lists. Everything here can be changed in the app's Setup page;
    these are only used until something is saved there. */
 const DEFAULTS = {
   // Same skills, same order as the paper Skills Tracking sheet.
@@ -41,6 +41,24 @@ const DEFAULTS = {
     { name: 'Additional Equipment', items: ['Pressure dressing (if not in orange)', 'SAM splint', 'OB kit ***'] },
   ],
   bagCount: 5,
+
+  // Course page → Setup Checklist, copied into each new cohort (from "KEY - Update with each
+  // cohort checklist.pdf", page 1). A line starting with # is a heading.
+  setupList: [
+    '# Documents', 'Syllabus', 'Suggested schedule', 'Google Meet link/calendar & add to google sheet',
+    '# JB Learning', 'Copy course', 'Upload schedule', 'Input course code into email draft', 'Quiz/Exam dates',
+    '# Prep Student Portal - Google Drive', 'Add cohort to config sheet',
+    'Add the following to the cohort sheet: dates, google meet link, JBL course code',
+    'Upload syllabus and schedule to cohort folder', 'Add student information to cohort sheet as they enroll (verify emails)',
+    '# ODEMSA', 'Verify dates availability with ODEMSA (including CPR class day)',
+    '# Once previous cohort is over & this one is about to start',
+    'Flip previous cohort to “former” in config sheet', 'Flip upcoming cohort to “active” in config sheet',
+    'Create gmail group for emails for students', 'Orientation morning: send Student Portal link and JBL access code to students',
+  ],
+
+  // What goes in each binder (the list icon on a "Prepare binders" to-do).
+  binderList: ['Student cover page', 'Student Skills Tracker', 'Vital Sign practice assignment', '1 Scenario Eval',
+    '10 Medical/Trauma Assessments', '3 Airway', '3 Bleeding', '3 Backboarding', '8 Splinting'],
 
   // Staffing names that never get paperwork/pay reminders (the two of you).
   skipStaff: ['Bella', 'Nick'],

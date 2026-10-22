@@ -1,7 +1,11 @@
-/* Academy Week Admin: Bella's organizer for academy week.
-   Pages: Day (planner boxes you can drag around), Week (Day 1-5 side by side; drag
-   to-dos between days), Students (skills status, patient contacts + fix notes,
-   attendance/warnings), Settings. Saving: store.js. Google Sheets: sheets.js.
+/* Elevate EMS Admin (was Academy Week Admin): Bella's organizer for each cohort.
+   Two sides, switched in the header:
+   - Course: the whole cohort from setup on (cohort info from the sheet, Setup Checklist,
+     Changes for future classes, Notes).
+   - Academy Week: Day (planner boxes you can drag around), Week (Day 1-5 side by side; drag
+     to-dos between days), Schedule, Students (skills status, patient contacts + fix notes,
+     attendance/warnings).
+   Plus Setup (templates and settings). Saving: store.js. Google Sheets: sheets.js.
    Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js. */
 
 const $ = s => document.querySelector(s);
@@ -9,10 +13,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
-const VIEWS = ['day', 'week', 'schedule', 'students', 'settings'];
+const VIEWS = ['course', 'day', 'week', 'schedule', 'students', 'settings'];
+const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
-  settings: null, shopping: [],
+  settings: null, shopping: [], updates: [], prevTodos: [],
   cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [],
   view: VIEWS.includes(pref('view')) ? pref('view') : 'day', day: null, open: null, bagOpen: false, bagTab: null, // bagOpen = day number while the bag pop-up is open (Prep is 0, so compare with false)
   menuOpen: false, schMenu: false, datePick: null, binderOpen: null, shareOpen: false, tplOpen: false, tplTab: 'every',
@@ -28,6 +33,10 @@ let unwatchGlobal = [];
 const isoOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const todayIso = () => isoOf(new Date());
 const parseIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const isIsoDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+// The cohort sheet's settings box (JBL code, dates, Meet link, review dates). Blank = not set yet.
+const cohortInfo = () => (S.sheet && S.sheet.info) || {};
+const longDate = s => parseIso(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 // "Oct 20" (for logs, where 10/20 could be misread as a count)
 const monthDay = s => s ? parseIso(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 const shortDate = s => { if (!s) return ''; const d = parseIso(s); return (d.getMonth() + 1) + '/' + d.getDate(); };
@@ -65,24 +74,28 @@ function currentWeekDay() {
 }
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
-const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios' };
+const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios',
+  info: 'Cohort Info', setup: 'Setup Checklist', changes: 'Changes for Future Classes' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
+  course: { key: 'courseLayout', boxes: ['info', 'setup', 'changes', 'notes'], def: [['info', 'notes'], ['setup'], ['changes']] },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
 const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v4 = scenarios fit + notes match)
 function cfg() {
   const s = S.settings || {};
-  const board = boardOf(curDay()), saved = s[board.key];
+  const board = S.view === 'course' ? BOARDS.course : boardOf(curDay()), saved = s[board.key];
   return {
     checklist: s.checklist || DEFAULTS.checklist,
     dayNotes: s.dayNotes || {},
     packing: s.packingList || DEFAULTS.packingList || [],
+    setup: s.setupList || DEFAULTS.setupList,
+    binder: s.binderList || DEFAULTS.binderList,
     docs: { ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) },
     weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
@@ -122,6 +135,7 @@ function bagCarries(item, bagNo) {
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
 const isBagItem = text => /bag check/i.test(text);
 const isBinderItem = text => /binder cover/i.test(text);
+const isBinderList = text => /prepare binders/i.test(text); // gets the list icon: what goes in each binder
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
 const MAX_PRIORITIES = 3;
@@ -163,17 +177,61 @@ function missingPacking(list = cfg().packing) {
 }
 const addPacking = list => Promise.all(list.map(({ id, text, i }) =>
   Store.set(P('packing/' + id), { text, packed: false, order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
+
+// The Course page's Setup Checklist (Setup → Templates → Course Setup) is copied the same way.
+// It's kept with the to-dos as kind 'setup' on day SETUP, so checking, dragging, editing and
+// highlighting all work as on the Day page. A "# " line is a heading. "Do before next cohort"
+// changes are kind 'next' on the same day.
+const SETUP = -1;
+const setupLine = raw => { const heading = /^#/.test(raw); const text = raw.replace(/^#+\s*/, '').trim(); return { heading, text, id: (heading ? 'setuph-' : 'setup-') + slug(text) }; };
+function missingSetup(list = cfg().setup) {
+  const have = new Set(S.todos.map(x => x.id));
+  const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
+  return list.map((raw, i) => ({ ...setupLine(raw), i })).filter(x => x.text && !have.has(x.id) && !removed[x.id])
+    .filter((x, j, arr) => arr.findIndex(y => y.id === x.id) === j);
+}
+// A cohort that has already had orientation gets the list already checked off.
+function addSetup(list, { done = false } = {}) {
+  return Promise.all(list.map(({ id, text, heading, i }) =>
+    Store.set(P('todos/' + id), { text, heading, done: !heading && done, day: SETUP, kind: 'setup', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
+}
+const pastOrientation = () => { const f = cohortInfo().firstDay; return isIsoDate(f) && f < todayIso(); };
+
 let seeding = false;
 async function seedRepeats() {
   const key = S.cohortKey, doc = S.cohortDoc || {}, path = 'cohorts/' + key;
-  if (seeding || (doc.repeatsAdded && doc.packingAdded)) return;
+  if (seeding || (doc.repeatsAdded && doc.packingAdded && doc.setupAdded)) return;
   seeding = true;
   try {
     // claim() is false when Nick's computer got there first.
     if (!doc.repeatsAdded && await Store.claim(path, 'repeatsAdded') && key === S.cohortKey) await addRepeats(missingRepeats());
     if (!doc.packingAdded && await Store.claim(path, 'packingAdded') && key === S.cohortKey) await addPacking(missingPacking());
+    if (!doc.setupAdded && await Store.claim(path, 'setupAdded') && key === S.cohortKey) await addSetup(missingSetup(), { done: pastOrientation() });
   } catch (e) { console.warn('Repeat to-dos not added yet:', e.message); }
   finally { seeding = false; }
+}
+
+/* ---------- Cohorts in order (for "the previous cohort") ---------- */
+// "Spring 2027" → 2027.0, "Summer 2027" → 2027.33, "Fall 2027" → 2027.67. Test/QA/Custom ones aren't real classes.
+const SEASONS = { winter: 0, spring: 0.1, summer: 0.4, fall: 0.7, autumn: 0.7 };
+function cohortRank(key) {
+  const m = String(key).match(/^(winter|spring|summer|fall|autumn)\s+(\d{4})$/i);
+  return m ? Number(m[2]) + SEASONS[m[1].toLowerCase()] : null;
+}
+function prevCohort(key = S.cohortKey) {
+  const me = cohortRank(key);
+  if (me == null) return null;
+  return S.cohorts.map(c => ({ ...c, r: cohortRank(c.key) })).filter(c => c.r != null && c.r < me).sort((a, b) => b.r - a.r)[0] || null;
+}
+// The previous cohort's "Do before next cohort" list shows on this cohort's Setup Checklist.
+let unwatchPrev = null, prevFor = null;
+function watchPrev() {
+  const prev = prevCohort();
+  const key = prev ? prev.key : null;
+  if (key === prevFor) return;
+  if (unwatchPrev) unwatchPrev();
+  unwatchPrev = null; prevFor = key; S.prevTodos = [];
+  if (key) unwatchPrev = Store.watch('cohorts/' + key + '/todos', list => { S.prevTodos = list.filter(x => x.kind === 'next'); render(); });
 }
 
 // Unfinished to-dos from an earlier day move to today (only while the week is happening).
@@ -294,9 +352,11 @@ Store.onUser(async user => {
   S.user = user;
   unwatchGlobal.forEach(u => u()); unwatchGlobal = [];
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
+  if (unwatchPrev) { unwatchPrev(); unwatchPrev = null; prevFor = null; }
   if (!user) { clearSheetCopies(); render(); return; }
   unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
+  unwatchGlobal.push(Store.watch('updates', list => { S.updates = list; render(); }));
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   render();
   // The last cohort used opens straight away (while the cohort list loads alongside it).
@@ -305,6 +365,7 @@ Store.onUser(async user => {
   try {
     S.cohorts = await Sheets.listCohorts();
   } catch (e) { S.sheetErr = e.message; render(); return; }
+  watchPrev();
   loadScenarios(); // which scenario Docs are in the Drive folders (no need to wait)
   // Last one used; otherwise the active cohort that isn't the Test one.
   const pick = S.cohorts.find(c => c.key === S.cohortKey)
@@ -330,11 +391,31 @@ function pickDay(key) {
   const saved = pref('day-' + key);
   S.day = currentWeekDay() ?? phaseDay() ?? (saved != null && !isNaN(saved) ? Number(saved) : 1);
 }
+// Opening a cohort: the Course side until 6 weeks before academy week (or while its start
+// date isn't in the sheet yet), then the Academy Week side. Students and Setup stay put.
+const AW_LEAD_DAYS = 42;
+function sideByDate() {
+  const start = S.sheet && S.sheet.academyStart;
+  if (!isIsoDate(start)) return 'course';
+  const from = parseIso(start); from.setDate(from.getDate() - AW_LEAD_DAYS);
+  return todayIso() >= isoOf(from) ? 'aw' : 'course';
+}
+let sidePickedFor = null;
+function pickSide(key) {
+  if (sidePickedFor === key) return;
+  sidePickedFor = key;
+  if (!['course', 'day', 'week', 'schedule'].includes(S.view)) return;
+  const side = sideByDate();
+  if (side === 'course') S.view = 'course';
+  else if (S.view === 'course') S.view = 'day';
+}
 
 async function selectCohort(key) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null });
+  sidePickedFor = null;
+  watchPrev();
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
   w(base, d => { S.cohortDoc = d; if (S.sheet) shareHousekeeping(); });
@@ -353,7 +434,7 @@ async function loadSheet() {
   S.loading = true; S.sheetErr = null;
   const key = S.cohortKey;
   const copy = !S.sheet && sheetCopy(key);
-  if (copy) { S.sheet = copy; pickDay(key); }
+  if (copy) { S.sheet = copy; pickDay(key); pickSide(key); }
   render();
   try {
     const data = await Sheets.loadCohort(key);
@@ -361,6 +442,7 @@ async function loadSheet() {
     S.sheet = data;
     sheetCopy(key, data);
     pickDay(key);
+    pickSide(key);
     rollOver();
     seedRepeats();
     shareHousekeeping();
@@ -408,6 +490,8 @@ const ICONS = {
   students: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.8 14.2c2.2.2 4 1.7 4.6 4.8"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   schedule: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 9h6M9 13h6M9 17h4"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="1.1"/><circle cx="4.8" cy="12" r="1.1"/><circle cx="4.8" cy="17.5" r="1.1"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24"><path d="M9 17.5h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2v1.5h5V16c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8c0-.4.4-.8.8-.8h4.4c.4 0 .8.4.8.8V7M6.5 7l.9 12.2c.1.9.8 1.8 1.8 1.8h5.6c1 0 1.7-.9 1.8-1.8L17.5 7M10 11v6M14 11v6"/></svg>',
   grip: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
 };
@@ -415,8 +499,8 @@ const ICONS = {
 function signInView() {
   return `<div class="signin"><div class="signin-card">
     <img class="signin-logo" src="logo.png" alt="Elevate EMS">
-    <h1>Academy Week Admin</h1>
-    <p>Paperwork, students, shopping and equipment, all in one calm place.</p>
+    <h1>Elevate EMS Admin</h1>
+    <p>Cohort setup, academy week, students and paperwork, all in one calm place.</p>
     <button class="btn primary wide" data-act="signin">Sign in with Google</button>
     <p class="muted small">Use your elevateemsacademy.com account.</p>
   </div></div>`;
@@ -428,25 +512,35 @@ function bootShell() {
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
-    <span class="brand"><img src="logo.png" alt=""><span><b>Academy Week Admin</b><small>${esc(S.cohortKey || '')}</small></span></span>
+    <span class="brand"><img src="logo.png" alt=""><span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span></span>
     <div class="page-title"></div>
-    <nav class="icons">${icon('day')}${icon('schedule')}${icon('students')}<div class="menu-wrap">${icon('settings')}</div></nav>
+    <nav class="icons">${icon('students')}<div class="menu-wrap">${icon('settings')}</div></nav>
   </header>
   <main class="wrap"></main>`;
 }
 
+// Course / Academy Week switch. Students and Setup belong to neither, so nothing is lit there.
+function sideSwitch() {
+  const side = S.view === 'course' ? 'course' : ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : null;
+  return `<div class="side-switch" role="group" aria-label="Course or Academy Week">
+    <button class="${side === 'course' ? 'on' : ''}" data-act="side" data-s="course">Course</button>
+    <button class="${side === 'aw' ? 'on' : ''}" data-act="side" data-s="aw">Academy Week</button></div>`;
+}
+
 function shell() {
   const icon = (v, label) => `<button class="icon-btn ${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}" title="${label}" aria-label="${label}">${ICONS[v]}</button>`;
+  const aw = ['day', 'week', 'schedule'].includes(S.view);
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
-    <button class="brand" data-act="view" data-v="day" title="Day">
+    <button class="brand" data-act="side" data-s="${sideByDate()}" title="Today’s side">
       <img src="logo.png" alt="">
-      <span><b>Academy Week Admin</b><small>${esc(S.cohortKey || '')}</small></span>
+      <span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span>
     </button>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${icon('day', 'Day')}${icon('schedule', 'Schedule')}${icon('students', 'Students')}
+      ${sideSwitch()}
+      ${aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''}${icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -455,7 +549,7 @@ function shell() {
   </header>
   <main class="wrap">
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${{ course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -470,10 +564,18 @@ function shell() {
   ${S.planClearAsk ? planClearModal() : ''}
   ${S.match ? matchModal() : ''}
   ${S.libOpen ? libModal() : ''}
-  ${S.place ? placeModal() : ''}`;
+  ${S.place ? placeModal() : ''}
+  ${S.binderList ? binderListModal() : ''}
+  ${S.updOpen ? updatesModal() : ''}
+  ${S.newCohort ? newCohortModal() : ''}`;
 }
 
 function pageTitle() {
+  if (S.view === 'course') {
+    const f = cohortInfo().firstDay, n = S.sheet ? students().length : 0;
+    const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
+    return `<h1>Course</h1><p>${S.sheet ? when + ' · ' + n + ' student' + (n === 1 ? '' : 's') + ' enrolled' : ''}</p>`;
+  }
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
   if (S.view === 'students') {
     const out = students().filter(s => s.out).length;
@@ -501,6 +603,7 @@ function menu() {
   const opts = S.cohorts.map(c => `<option value="${esc(c.key)}" ${c.key === S.cohortKey ? 'selected' : ''}>${esc(c.key)}${c.status && !/active/i.test(c.status) ? ' (' + esc(c.status) + ')' : ''}</option>`).join('');
   return `<div class="menu" data-stop>
     <label class="menu-field">Cohort<select id="cohortSel" data-change="cohort">${opts || '<option>Loading…</option>'}</select></label>
+    <button class="menu-item" data-act="newCohortOpen">+ New cohort</button>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
     <button class="menu-item" data-act="view" data-v="settings">Setup</button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
@@ -527,7 +630,8 @@ function hlRanges(text, phrases) {
   return merged;
 }
 // Clicking an item's words edits them (To Do / priorities, Packing, Shopping); the circle checks it off.
-const EDITABLE = ['todo', 'pack', 'shop'];
+const EDITABLE = ['todo', 'pack', 'shop', 'upd'];
+const itemPath = (kind, id) => kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : kind === 'upd' ? 'updates/' + id : 'shopping/' + id;
 function hlTxt(kind, id, text, phrases) {
   if (S.editItem === kind + ':' + id) {
     const k = 'edit-' + kind + '-' + id;
@@ -541,13 +645,13 @@ function hlTxt(kind, id, text, phrases) {
 }
 function hlItem(kind, id) {
   if (kind === 'doc') return { text: (docItems().find(x => x.id === id) || {}).text || '', hl: (((S.cohortDoc || {}).docHl) || {})[id] || [] };
-  const list = kind === 'todo' ? S.todos : kind === 'pack' ? S.packing : S.shopping;
+  const list = kind === 'todo' ? S.todos : kind === 'pack' ? S.packing : kind === 'upd' ? S.updates : S.shopping;
   const x = list.find(i => i.id === id) || {};
   return { text: x.text || '', hl: x.hl || [] };
 }
 function saveHl(kind, id, hl) {
   if (kind === 'doc') return Store.set('cohorts/' + S.cohortKey, { docHl: { [id]: hl } });
-  return Store.set(kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : 'shopping/' + id, { hl });
+  return Store.set(itemPath(kind, id), { hl });
 }
 
 let hlPop = null, hlPending = null;
@@ -649,7 +753,7 @@ async function saveEdit(el) {
   const text = el.value.trim(), old = hlItem(kind, id).text;
   delete S.drafts[el.id]; S.editItem = null;
   if (text && text !== old) {
-    await Store.set(kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : 'shopping/' + id, { text });
+    await Store.set(itemPath(kind, id), { text });
   }
   render();
 }
@@ -670,6 +774,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
+      if (kind === 'todo' && isBinderList(t.text)) open = `<button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -697,7 +802,7 @@ function todoList(n, { compact = false, carry = true } = {}) {
 // "Hide checked" / "Show checked" (remembered on this computer).
 // Each list's eye remembers its own choice on this computer; until you click it, the
 // list follows Setup → "Checked items" (shown unless you change it there).
-const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs'];
+const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs', 'setup', 'next', 'upd'];
 const hidden = k => { const v = pref('hide-' + k); return v != null ? v === '1' : !!(S.settings && S.settings.hideCheckedDefault); };
 const BOOK = '<svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5c-.8 0-1.5.7-1.5 1.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/><path d="M4 20.5V5.5M20 20.5V5.5"/></svg>';
 const RESET = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.8h3.8"/></svg>';
@@ -714,6 +819,95 @@ function notesArea(n, placeholder) {
   const saved = S.days[n] && S.days[n].notes;
   const val = S.drafts[id] ?? (saved !== undefined ? saved : (cfg().dayNotes[n] || ''));
   return `<textarea id="${id}" class="lined" data-draft="${id}" data-notes="${n}" rows="6" placeholder="${placeholder}">${esc(val)}</textarea>`;
+}
+
+/* ---------- Course page ---------- */
+function courseView() {
+  if (!S.sheet) return loadingView();
+  return `<div class="board course-board">
+    ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, 'course')).join('')}</div>`).join('')}
+  </div>`;
+}
+const nextCohort = (key = S.cohortKey) => {
+  const me = cohortRank(key);
+  if (me == null) return null;
+  return S.cohorts.map(c => ({ ...c, r: cohortRank(c.key) })).filter(c => c.r != null && c.r > me).sort((a, b) => a.r - b.r)[0] || null;
+};
+const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}">Make ${key === S.cohortKey ? '' : esc(key) + ' '}${status}</button>`;
+
+// Cohort Info: what's in the sheet's settings box, TBD where it's blank.
+function infoBox() {
+  const i = cohortInfo(), st = S.sheet.status || '';
+  const tbd = '<span class="tbd">TBD</span>';
+  const date = v => isIsoDate(v) ? esc(longDate(v)) : v ? esc(v) : tbd;
+  const days = weekDays().filter(d => d.iso);
+  const aw = days.length ? esc(longDate(days[0].iso)) + ' – ' + esc(parseIso(days[days.length - 1].iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })) : date(i.academyStart);
+  const meet = i.meet ? `<a href="${esc(/^https?:/i.test(i.meet) ? i.meet : 'https://' + i.meet)}" target="_blank" rel="noopener">${esc(i.meet.replace(/^https?:\/\//i, ''))}</a>` : tbd;
+  const rev = (i.reviews || []).map(v => isIsoDate(v) ? shortDate(v) : v);
+  const upcoming = (i.reviews || []).filter(v => isIsoDate(v) && v >= todayIso());
+  const list = students(), paused = list.filter(x => /paused/i.test(x.status)).length;
+  const next = st === 'Upcoming' ? statusBtn(S.cohortKey, 'Active') : st === 'Active' ? statusBtn(S.cohortKey, 'Former') : st === 'Former' ? statusBtn(S.cohortKey, 'Active') : '';
+  const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
+  return `<div class="info-rows">
+    ${row('Status', `<span class="status-pill ${slug(st)}">${esc(st || 'Unknown')}</span> ${next}`)}
+    ${row('Orientation', date(i.firstDay))}
+    ${row('Full CPR course', date(i.cpr))}
+    ${row('Academy Week', aw)}
+    ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
+    ${row('Google Meet', meet)}
+    ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
+    ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
+  </div>
+  <div class="info-links">
+    ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
+    ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener">Cohort folder ↗</a>` : ''}
+  </div>`;
+}
+
+// Setup items the app can check from the sheets: in the config sheet, settings box filled in,
+// the previous cohort flipped to Former, this one flipped to Active, how many have enrolled.
+function setupAuto(text) {
+  const out = { done: null, note: '', btn: '' };
+  const i = cohortInfo(), st = S.sheet.status || '';
+  if (/config sheet/i.test(text) && /^\s*add\b/i.test(text) && !/student/i.test(text)) out.done = true;
+  else if (/cohort sheet/i.test(text) && /(meet|jbl|dates)/i.test(text)) {
+    const missing = [!isIsoDate(i.firstDay) && 'first day', !isIsoDate(i.academyStart) && 'Academy Week start', !i.meet && 'Meet link', !i.jbl && 'JBL code'].filter(Boolean);
+    out.done = !missing.length;
+    if (missing.length) out.note = ` <em class="tag-soft">missing: ${missing.join(', ')}</em>`;
+  } else if (/former/i.test(text)) {
+    const prev = prevCohort();
+    if (prev) {
+      out.done = /former/i.test(prev.status);
+      if (!out.done) out.btn = statusBtn(prev.key, 'Former');
+    }
+  } else if (/active/i.test(text) && /(upcoming|flip|this)/i.test(text)) {
+    out.done = /active/i.test(st);
+    if (!out.done && st) out.btn = statusBtn(S.cohortKey, 'Active');
+  } else if (/as they enroll|student information/i.test(text)) {
+    const n = students().length;
+    out.note = ` <em class="tag-soft">${n} enrolled</em>`;
+  }
+  return out;
+}
+function setupList() {
+  const items = itemsFor(SETUP, 'setup');
+  return `<ul class="checks drop-list setup-list ${items.length ? '' : 'is-empty'}" data-drop="items" data-day="${SETUP}" data-kind="setup">
+    ${items.map(t => {
+      if (t.heading) return `<li class="sec-head" draggable="true" data-drag="item" data-id="${t.id}">${hlTxt('todo', t.id, t.text, t.hl)}<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
+      const auto = setupAuto(t.text), done = auto.done === true || t.done;
+      const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
+      return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}
+        <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
+    }).join('') || '<li class="empty">Nothing yet.</li>'}
+  </ul>`;
+}
+// The previous cohort's "Do before next cohort" list (checking one off here checks it off there too).
+function prevChanges() {
+  if (!prevFor || !S.prevTodos.length) return '';
+  const list = [...S.prevTodos].sort((a, b) => orderOf(a) - orderOf(b));
+  return `<p class="mini-head">From ${esc(prevFor)}’s changes</p>
+    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label></li>`).join('')}</ul>`;
 }
 
 /* ---------- Day page ---------- */
@@ -759,8 +953,9 @@ function dayStrip({ phases = true } = {}) {
 }
 
 function box(b, n) {
-  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios';
-  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo' : null;
+  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info';
+  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
+    : b === 'setup' ? 'setup' : b === 'changes' ? 'next' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
   let body = '';
@@ -782,7 +977,22 @@ function box(b, n) {
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes') {
-    body = head('Notes') + notesArea(n, n === PREP || n === FINAL ? 'Notes' : 'Notes for today');
+    body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
+  } else if (b === 'info') {
+    body = head('Cohort Info') + infoBox();
+  } else if (b === 'setup') {
+    const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
+    const done = all.filter(t => t.done || setupAuto(t.text).done === true).length;
+    body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, all.some(t => t.done) || done ? hideToggle('setup') : '')
+      + setupList() + addRow(SETUP, 'setup', '+ add item') + prevChanges();
+  } else if (b === 'changes') {
+    const nxt = nextCohort(), open = S.updates.filter(x => !x.done).length;
+    body = head('Changes for Future Classes', (itemsFor(SETUP, 'next').some(t => t.done) ? hideToggle('next') : '')
+        + `<button class="eye" data-act="updOpen" title="Future updates" aria-label="Future updates">${ICONS.bulb}</button>`)
+      + `<p class="mini-head">Do before next cohort</p>`
+      + addRow(SETUP, 'next', '+ add a change') + itemList(SETUP, 'next')
+      + `<p class="muted small changes-foot">These show up on ${nxt ? esc(nxt.key) + '’s' : 'the next cohort’s'} Setup Checklist.</p>
+        <button class="link changes-upd" data-act="updOpen">Future updates${open ? ' · ' + open + ' open' : ''}</button>`;
   } else if (b === 'docs') {
     const all = docItems(), done = all.filter(x => x.on).length;
     const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
@@ -1136,6 +1346,47 @@ function binderModal() {
       <button class="btn primary" data-act="binderPrint" ${count ? '' : 'disabled'}>Print ${count} cover${count === 1 ? '' : 's'}</button></div>
   </div></div>`;
 }
+// What goes in each binder: a plain list, opened from the icon on a "Prepare binders" to-do.
+function binderListModal() {
+  return `<div class="overlay" data-act="binderListClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Binder Paperwork</h2><button class="x big" data-act="binderListClose" aria-label="Close">×</button></div>
+    <div class="modal-body"><ul class="plain-list">${cfg().binder.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <div class="modal-foot"><span class="muted small">Change this list in Setup → Templates → Prep.</span></div>
+  </div></div>`;
+}
+
+// Future updates: one list for every cohort, kept until each one is checked off.
+function updatesModal() {
+  const byNew = (a, b) => (a.created || 0) - (b.created || 0);
+  const list = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
+  return `<div class="overlay" data-act="updClose"><div class="modal small-modal ${hidden('upd') ? 'hide-done' : ''}" data-stop>
+    <div class="modal-head"><h2>Future Updates</h2><span class="head-tools">${S.updates.some(x => x.done) ? hideToggle('upd') : ''}<button class="x big" data-act="updClose" aria-label="Close">×</button></span></div>
+    <div class="modal-body">
+      <p class="muted small">Ideas and possible changes for some day. This list carries on from cohort to cohort until you check things off.</p>
+      <div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" placeholder="+ add an update" value="${esc(S.drafts.upd || '')}"></div>
+      <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}">
+        <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
+        <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+    </div>
+  </div></div>`;
+}
+
+// + New cohort (cohort menu): added to the config sheet, and the Student Hub makes its folder and sheets.
+function newCohortModal() {
+  const nc = S.newCohort;
+  return `<div class="overlay" data-act="newCohortClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>New Cohort</h2>${nc.busy ? '' : '<button class="x big" data-act="newCohortClose" aria-label="Close">×</button>'}</div>
+    <div class="pad">
+      <label class="field">Type it the way you would in the config sheet
+        <input id="newCohortIn" data-draft="newCohort" data-add="newcohort" placeholder="e.g. Summer 2027" value="${esc(S.drafts.newCohort || '')}" ${nc.busy ? 'disabled' : ''} autocomplete="off"></label>
+      <p class="muted small">This adds it to the config sheet, and the Student Hub makes its folder, Ride Along Agreements, Clinical Tracking and Student Roster sheets, the same as typing it into the sheet yourself (which still works too). It starts as <b>Upcoming</b>, so students can’t log in until you make it Active.</p>
+      ${nc.err ? `<div class="alert">${esc(nc.err)}</div>` : ''}
+    </div>
+    <div class="modal-foot">${nc.busy ? '<span class="muted small">Making the folder and sheets… this can take up to a minute.</span>' : ''}
+      <button class="btn primary" data-act="newCohortCreate" ${nc.busy ? 'disabled' : ''}>${nc.busy ? 'Creating…' : 'Create cohort'}</button></div>
+  </div></div>`;
+}
+
 async function printBinders() {
   const root = document.getElementById('print-root');
   root.innerHTML = attending().map(coverHtml).join('');
@@ -1345,9 +1596,9 @@ function settingsView() {
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   return `<div class="settings">
     <section class="box">
-      <div class="box-head static"><h2>Day Templates</h2></div>
-      <p class="muted small">The to-dos that repeat for every cohort (Prep, Day 1–5, Finalize), the Prep packing list, and the notes each day starts with.</p>
-      <button class="btn primary" data-act="tplOpen">Edit day templates</button>
+      <div class="box-head static"><h2>Templates</h2></div>
+      <p class="muted small">The Course page’s Setup Checklist, the to-dos that repeat for every cohort (Prep, Day 1–5, Finalize), the Prep packing list and binder paperwork, and the notes each day starts with.</p>
+      <button class="btn primary" data-act="tplOpen">Edit templates</button>
     </section>
 
     <section class="box">
@@ -1384,8 +1635,8 @@ function settingsView() {
     </section>
 
     <section class="box">
-      <div class="box-head static"><h2>Day Page Layout</h2></div>
-      <p class="muted small">Drag any box by its title on the Day page to move it. This puts everything back where it started.</p>
+      <div class="box-head static"><h2>Page Layout</h2></div>
+      <p class="muted small">Drag any box by its title on the Course or Day pages to move it. This puts everything back where it started.</p>
       <button class="btn" data-act="resetLayout">Reset layout</button>
     </section>
   </div>`;
@@ -1442,28 +1693,33 @@ function schTplModal() {
 }
 
 /* ---------- Day Templates pop-up ---------- */
-const TPL_KEYS = ['tpl-every', 'tpl-pack', 'tpl-doc-class', 'tpl-doc-student', 'tpl-doc-skills', 'tpl-doc-final', ...ALL_DAYS.flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
+const TPL_KEYS = ['tpl-setup', 'tpl-binder', 'tpl-every', 'tpl-pack', 'tpl-doc-class', 'tpl-doc-student', 'tpl-doc-skills', 'tpl-doc-final', ...ALL_DAYS.flatMap(n => ['tpl-todo-' + n, 'tpl-notes-' + n])];
 function templatesModal() {
   const c = cfg(), tab = S.tplTab;
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="tplTab" data-t="${t}">${label}</button>`;
-  const body = tab === 'every'
+  const body = tab === 'setup'
+    ? `<p class="muted small">The Setup Checklist on each new cohort’s Course page. One per line; start a line with <b>#</b> to make it a heading. A few items check themselves off from the Google Sheet (in the config sheet, dates/Meet link/JBL code filled in, Former/Active).</p>
+       <label class="field">Course setup<textarea id="tpl-setup" data-draft="tpl-setup" rows="16">${dv('tpl-setup', c.setup.join('\n'))}</textarea></label>`
+    : tab === 'every'
     ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line. Anything with “bag check” in it opens the bag pop-up.</p>
        <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
     : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' || tab === '6' ? '' : ', added after the every-day ones'})</span>
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>
        ${tab === '0' ? `<label class="field">Packing list <span class="small">(one per line)</span>
-         <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>` : ''}
+         <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>
+       <label class="field">Binder paperwork <span class="small">(one per line; the list icon on a “Prepare binders” to-do shows it)</span>
+         <textarea id="tpl-binder" data-draft="tpl-binder" rows="8">${dv('tpl-binder', c.binder.join('\n'))}</textarea></label>` : ''}
        ${tab === '6' ? `<p class="tpl-group">Documentation Checklist <span class="muted small">(one per line)</span></p>
          <div class="day-fields">${[['class', 'Records for the Class'], ['student', 'Records for each Student'], ['skills', 'Skills sheets (physical copies only)'], ['final', 'Final Steps']].map(([k2, label]) =>
            `<label class="field">${label}<textarea id="tpl-doc-${k2}" data-draft="tpl-doc-${k2}" rows="7">${dv('tpl-doc-' + k2, (c.docs[k2] || []).join('\n'))}</textarea></label>`).join('')}</div>` : ''}
        <label class="field">${dayName(Number(tab))} notes <span class="small">(what the Notes box starts with)</span>
          <textarea id="tpl-notes-${tab}" data-draft="tpl-notes-${tab}" rows="8">${dv('tpl-notes-' + tab, c.dayNotes[tab] || '')}</textarea></label>`;
   return `<div class="overlay" data-act="tplClose"><div class="modal tpl" data-stop>
-    <div class="modal-head"><h2>Day Templates</h2><button class="x big" data-act="tplClose" aria-label="Close">×</button></div>
-    <div class="bag-tabs">${tabBtn('every', 'Every day')}${ALL_DAYS.map(n => tabBtn(String(n), dayName(n))).join('')}</div>
+    <div class="modal-head"><h2>Templates</h2><button class="x big" data-act="tplClose" aria-label="Close">×</button></div>
+    <div class="bag-tabs">${tabBtn('setup', 'Course Setup')}${tabBtn('every', 'Every day')}${ALL_DAYS.map(n => tabBtn(String(n), dayName(n))).join('')}</div>
     <div class="modal-body"><div class="tpl-body">${body}</div></div>
-    <div class="modal-foot"><span class="muted small">Used for every cohort. Changing a day’s notes here doesn’t touch notes you’ve already typed.</span>
+    <div class="modal-foot"><span class="muted small">Used for every new cohort. Changing a day’s notes here doesn’t touch notes you’ve already typed.</span>
       <button class="btn primary" data-act="tplSave">Save</button></div>
   </div></div>`;
 }
@@ -1581,6 +1837,8 @@ function schChange(t) {
 }
 
 /* ---------- Notes (saved a moment after you stop typing) ---------- */
+// Day pages' notes are days/0-6; the Course page's are days/course.
+const noteDay = v => isNaN(v) ? v : Number(v);
 const noteTimers = {};
 function saveNoteSoon(n, id) {
   clearTimeout(noteTimers[id]);
@@ -1777,14 +2035,14 @@ document.addEventListener('input', e => {
   }
   S.drafts[k] = t.value;
   if (t.hasAttribute('data-grow')) grow(t);
-  if (t.dataset.notes) saveNoteSoon(Number(t.dataset.notes), t.id);
+  if (t.dataset.notes) saveNoteSoon(noteDay(t.dataset.notes), t.id);
 });
 
 document.addEventListener('focusout', e => {
   const t = e.target;
   if (t.dataset && t.dataset.edit && !S.rendering && S.editItem === t.dataset.edit) { saveEdit(t).catch(err => toast(err.message)); return; }
   if (t.dataset && t.dataset.notes && S.drafts[t.id] !== undefined) {
-    const id = t.id, n = Number(t.dataset.notes), text = S.drafts[id];
+    const id = t.id, n = noteDay(t.dataset.notes), text = S.drafts[id];
     clearTimeout(noteTimers[id]);
     Store.set(P('days/' + n), { notes: text }).then(() => { if (S.drafts[id] === text) delete S.drafts[id]; });
   }
@@ -1814,7 +2072,8 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { delete S.drafts[e.target.id]; S.editItem = null; render(); return; }
   }
   if (e.key === 'Escape') {
-    if (S.datePick) S.datePick = null; else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
+    if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.binderList) S.binderList = false; else if (S.updOpen && !S.editItem) S.updOpen = false;
+    else if (S.datePick) S.datePick = null; else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
@@ -1826,6 +2085,8 @@ document.addEventListener('keydown', e => {
   if (t.dataset.add === 'bagpocket') { bagAddPocket().catch(err => toast(err.message)); return; }
   if (t.dataset.add === 'shop') act('addShop');
   else if (t.dataset.add === 'pack') act('addPack');
+  else if (t.dataset.add === 'upd') act('addUpd');
+  else if (t.dataset.add === 'newcohort') act('newCohortCreate');
   else act('addItem', t);
 });
 
@@ -1852,11 +2113,62 @@ async function act(a, el = {}, e) {
       case 'menu': S.menuOpen = !S.menuOpen; render(); break;
       case 'schMenu': S.schMenu = !S.schMenu; render(); break;
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
-      case 'view': S.view = d.v; pref('view', d.v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
+      case 'view':
+        S.view = d.v; pref('view', d.v); S.open = null; S.menuOpen = false;
+        if (['day', 'week', 'schedule'].includes(d.v)) pref('awView', d.v);
+        render(); window.scrollTo(0, 0); break;
+      case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
+        const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
+      }
       case 'day':
         S.day = Number(d.n); pref('day-' + S.cohortKey, d.n);
-        if (d.open) { S.view = 'day'; pref('view', 'day'); window.scrollTo(0, 0); }
+        if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
         render(); break;
+      case 'setStatus': {
+        const key = d.k, status = d.s;
+        const why = status === 'Active' ? 'Students on its roster will be able to log in to the Student Hub.'
+          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub.' : '';
+        if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
+        await Sheets.setStatus(key, status);
+        S.cohorts = S.cohorts.map(c => c.key === key ? { ...c, status } : c);
+        if (key === S.cohortKey && S.sheet) { S.sheet = { ...S.sheet, status }; sheetCopy(key, S.sheet); }
+        toast(`${key} is now ${status}.`); render(); break;
+      }
+      case 'prevTodo': {
+        const x = S.prevTodos.find(i => i.id === d.id);
+        if (x && prevFor) await Store.set('cohorts/' + prevFor + '/todos/' + d.id, { done: !x.done });
+        break;
+      }
+      case 'updOpen': S.updOpen = true; render(); setTimeout(() => { const el = document.getElementById('updIn'); if (el) el.focus(); }, 0); break;
+      case 'updClose': S.updOpen = false; render(); break;
+      case 'addUpd': {
+        const text = (S.drafts.upd || '').trim(); if (!text) return;
+        S.drafts.upd = ''; render();
+        await Store.add('updates', { text, done: false, created: Date.now(), from: S.cohortKey || '' }); break;
+      }
+      case 'updDone': { const x = S.updates.find(i => i.id === d.id); await Store.set('updates/' + d.id, { done: !x.done }); break; }
+      case 'delUpd': await Store.del('updates/' + d.id); break;
+      case 'binderList': S.binderList = true; render(); break;
+      case 'binderListClose': S.binderList = false; render(); break;
+      case 'newCohortOpen':
+        S.menuOpen = false; S.newCohort = { busy: false, err: '' }; render();
+        setTimeout(() => { const el = document.getElementById('newCohortIn'); if (el) el.focus(); }, 0); break;
+      case 'newCohortClose': if (S.newCohort && S.newCohort.busy) return; S.newCohort = null; render(); break;
+      case 'newCohortCreate': {
+        const key = String(S.drafts.newCohort || '').replace(/\s+/g, ' ').trim();
+        if (!key || !S.newCohort || S.newCohort.busy) { if (!key) toast('Type the cohort’s name first.'); return; }
+        if (S.cohorts.some(c => c.key.toLowerCase() === key.toLowerCase())) { S.newCohort.err = key + ' is already in the config sheet.'; render(); return; }
+        S.newCohort = { busy: true, err: '' }; render();
+        try {
+          await Sheets.createCohort(key);
+        } catch (err) { S.newCohort = { busy: false, err: err.message }; render(); return; }
+        delete S.drafts.newCohort; S.newCohort = null;
+        try { S.cohorts = await Sheets.listCohorts(); } catch {}
+        S.view = 'course'; pref('view', 'course');
+        toast(`${key} is set up. Its folder and sheets are in your Drive.`);
+        await selectCohort(key); break;
+      }
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
@@ -2015,7 +2327,7 @@ async function act(a, el = {}, e) {
         if (!confirm('Delete this conduct note?')) return;
         await Store.del(P('warnings/' + d.id)); break;
 
-      case 'tplOpen': S.tplOpen = true; S.tplTab = 'every'; render(); break;
+      case 'tplOpen': S.tplOpen = true; S.tplTab = d.t || 'setup'; render(); break;
       case 'tplTab': S.tplTab = d.t; render(); break;
       case 'tplClose':
         if (TPL_KEYS.some(k => S.drafts[k] !== undefined) && !confirm('Close without saving your changes?')) return;
@@ -2026,22 +2338,27 @@ async function act(a, el = {}, e) {
         const everyDay = lines(S.drafts['tpl-every'] ?? (c.checklist.everyDay || []).join('\n'));
         const days = {}, dayNotes = {};
         const packingList = lines(S.drafts['tpl-pack'] ?? c.packing.join('\n'));
+        const setupList = lines(S.drafts['tpl-setup'] ?? c.setup.join('\n'));
+        const binderList = lines(S.drafts['tpl-binder'] ?? c.binder.join('\n'));
         const docChecklist = Object.fromEntries(DOC_SECTIONS.map(k2 => [k2, lines(S.drafts['tpl-doc-' + k2] ?? (c.docs[k2] || []).join('\n'))]));
         ALL_DAYS.forEach(x => {
           days[x] = lines(S.drafts['tpl-todo-' + x] ?? ((c.checklist.days || {})[x] || []).join('\n'));
           dayNotes[x] = String(S.drafts['tpl-notes-' + x] ?? (c.dayNotes[x] || '')).replace(/\s+$/, '');
         });
-        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList, docChecklist });
+        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList, docChecklist, setupList, binderList });
         TPL_KEYS.forEach(k => delete S.drafts[k]);
         S.tplOpen = false; render();
         // The open cohort already has its lists; offer to add any new items to it.
         const doc = S.cohortDoc || {};
         const extra = doc.repeatsAdded ? missingRepeats({ everyDay, days }) : [];
         const extraPack = doc.packingAdded ? missingPacking(packingList) : [];
-        const parts = [extra.length && `${extra.length} new to-do${extra.length === 1 ? '' : 's'}`, extraPack.length && `${extraPack.length} new packing item${extraPack.length === 1 ? '' : 's'}`].filter(Boolean);
+        const extraSetup = doc.setupAdded ? missingSetup(setupList).filter(x => !x.heading) : [];
+        const parts = [extra.length && `${extra.length} new to-do${extra.length === 1 ? '' : 's'}`, extraPack.length && `${extraPack.length} new packing item${extraPack.length === 1 ? '' : 's'}`,
+          extraSetup.length && `${extraSetup.length} new setup item${extraSetup.length === 1 ? '' : 's'}`].filter(Boolean);
         if (parts.length && confirm(`Saved. Add the ${parts.join(' and ')} to ${S.cohortKey} too?`)) {
-          await addRepeats(extra); await addPacking(extraPack); toast('Added to ' + S.cohortKey + '.');
-        } else toast('Day templates saved.');
+          await addRepeats(extra); await addPacking(extraPack); await addSetup(extraSetup.map(x => ({ ...x, i: x.i + 1000 })));
+          toast('Added to ' + S.cohortKey + '.');
+        } else toast('Templates saved.');
         break;
       }
       case 'skillsSheet': S.skillsSheet = true; render(); break;
@@ -2172,8 +2489,8 @@ async function act(a, el = {}, e) {
         if (!(await scenAct(a, el, e))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
-        await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null });
-        S.view = 'day'; pref('view', 'day');
+        await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null });
+        S.view = sideByDate() === 'course' ? 'course' : 'day'; pref('view', S.view);
         toast('Layout reset.'); break;
     }
   } catch (err) {

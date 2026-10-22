@@ -740,3 +740,51 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 
 /* Editing an item's words in place */
 .txt-edit { font: inherit; color: var(--ink); border: 0; border-bottom: 1px solid var(--taupe); background: transparent; outline: none; padding: 0 0 1px; width: 100%; min-width: 120px; }
+
+/* ---------- Course / Academy Week switch (header) ---------- */
+.side-switch { display: inline-flex; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin-right: 6px; box-shadow: var(--shadow); }
+.side-switch button { border: 0; background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; letter-spacing: .03em; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.side-switch button:hover { color: var(--ink); }
+.side-switch button.on { background: var(--taupe-dark); color: #fff; }
+@media (max-width: 720px) { .side-switch button { padding: 5px 10px; font-size: 12px; } .icons { flex-wrap: wrap; justify-content: flex-end; } }
+
+/* ---------- Course page ---------- */
+.info-rows { display: grid; gap: 0; }
+.info-row { display: grid; grid-template-columns: 128px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
+.info-row:last-child { border-bottom: 0; }
+.info-row > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); }
+.info-row > b { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.info-row a { color: var(--ink); text-underline-offset: 2px; }
+.info-row details summary { cursor: pointer; }
+.info-row details .small { display: block; font-weight: 400; margin-top: 2px; }
+.info-row .btn.tiny { margin-left: 6px; vertical-align: 1px; }
+.tbd { font-style: italic; font-weight: 400; color: var(--taupe-dark); opacity: .8; letter-spacing: .04em; }
+.status-pill { display: inline-block; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; padding: 1px 10px; border-radius: 999px; background: var(--paper); color: var(--taupe-dark); }
+.status-pill.active { background: var(--sage-soft); color: #56704f; }
+.status-pill.upcoming { background: var(--honey-soft); color: #7a5d30; }
+.info-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; flex-shrink: 0; }
+.info-links .btn { text-decoration: none; color: var(--ink); }
+.box-info > .info-rows { flex-shrink: 0; }
+.box.box-info { flex: 0 0 auto; }
+/* Setup Checklist headings (a "# " line in the template) */
+.setup-list li.sec-head { font-family: var(--serif); font-size: 17px; font-weight: 600; padding: 12px 0 3px; border-bottom: 1px solid var(--line); }
+.setup-list li.sec-head:first-child { padding-top: 2px; }
+.setup-list li.sec-head .txt { cursor: text; }
+.setup-list li .btn.tiny { margin-left: 27px; }
+.setup-list input.circle:disabled { cursor: default; opacity: .75; }
+.box-setup .mini-head, .box-changes .mini-head { flex-shrink: 0; }
+.changes-foot { margin: 8px 0 2px; flex-shrink: 0; }
+.changes-upd { align-self: flex-start; flex-shrink: 0; }
+.box > .changes-foot, .box > .changes-upd { flex-shrink: 0; }
+
+/* Small pop-ups: binder paperwork, future updates, new cohort */
+.modal.small-modal { width: min(520px, 100%); }
+.modal-head .head-tools { display: flex; align-items: center; gap: 8px; }
+.plain-list { margin: 14px 0 4px; padding-left: 20px; line-height: 1.9; }
+.small-modal .modal-body > .muted { margin: 12px 0 4px; }
+.small-modal .field { margin-bottom: 8px; }
+.small-modal .alert { margin: 10px 0 0; }
+/* Templates pop-up: room for the Course Setup tab on one line */
+.modal.tpl { width: min(880px, 100%); }
+.modal.tpl .bag-tabs { overflow-x: auto; }
+.modal.tpl .bag-tab { white-space: nowrap; padding: 8px 12px; }
