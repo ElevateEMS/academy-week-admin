@@ -479,6 +479,7 @@ function render() {
       if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
     fitBoard();
+    document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
   }, 0);
@@ -665,6 +666,14 @@ function hlShow(rect, label, pending) {
       e.stopPropagation();
       const p = hlPending; hlHide(); window.getSelection().removeAllRanges();
       try {
+        if (p.addNote) {
+          const hl = notesHl(p.addNote.n);
+          if (!hl.includes(p.addNote.phrase)) await Store.set(P('days/' + p.addNote.n), { hl: [...hl, p.addNote.phrase] });
+        }
+        if (p.removeNote) {
+          const [a, b] = p.removeNote.range;
+          await Store.set(P('days/' + p.removeNote.n), { hl: notesHl(p.removeNote.n).filter(ph => !hlRanges(p.removeNote.text, [ph]).some(([x, y]) => x < b && y > a)) });
+        }
         if (p.add) for (const x of p.add) { const it = hlItem(x.kind, x.id); if (!it.hl.includes(x.phrase)) await saveHl(x.kind, x.id, [...it.hl, x.phrase]); }
         if (p.remove) {
           const it = hlItem(p.remove.kind, p.remove.id), [a, b] = p.remove.range;
@@ -723,12 +732,28 @@ document.addEventListener('mouseup', e => {
   // The mouse moved while held down = selecting words, not clicking the item.
   hlNoClick = !!hlDown && Math.hypot(e.clientX - hlDown.x, e.clientY - hlDown.y) > 3 && !!(e.target.closest && e.target.closest('.checks'));
   hlDown = null;
+  const notes = e.target.closest && e.target.closest('textarea[data-notes]');
   setTimeout(() => {
+    if (notes) return notesPop(notes, e);
     const pieces = hlSelection();
     if (!pieces.length) return;
     hlShow(window.getSelection().getRangeAt(0).getBoundingClientRect(), 'Highlight', { add: pieces });
   }, 0);
 });
+// In Notes: words selected → Highlight; a click inside a highlight → Remove highlight.
+function notesPop(t, e) {
+  const n = noteDay(t.dataset.notes), a = t.selectionStart, b = t.selectionEnd, text = t.value;
+  const at = { left: e.clientX, top: e.clientY - 6, width: 0 };
+  if (b > a) {
+    let x = a, y = b;
+    while (x < y && /\s/.test(text[x])) x++;
+    while (y > x && /\s/.test(text[y - 1])) y--;
+    if (y > x) hlShow(at, 'Highlight', { addNote: { n, phrase: text.slice(x, y) } });
+    return;
+  }
+  const hit = hlRanges(text, notesHl(n)).find(([x, y]) => a > x && a < y);
+  if (hit) hlShow(at, 'Remove highlight', { removeNote: { n, range: hit, text } });
+}
 // Selecting words (or clicking a highlight) shouldn't tick the item off.
 document.addEventListener('click', e => {
   if (hlNoClick) { hlNoClick = false; if (e.target.closest && e.target.closest('label')) { e.preventDefault(); e.stopPropagation(); return; } }
@@ -760,6 +785,7 @@ async function saveEdit(el) {
   render();
 }
 addEventListener('scroll', hlHide, true);
+addEventListener('scroll', e => { const t = e.target; if (t && t.dataset && t.dataset.notes) { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; } }, true);
 
 /* ---------- Shared pieces ---------- */
 function circle(checked, attrs, extra = '') {
@@ -820,7 +846,22 @@ function notesArea(n, placeholder) {
   // Until the day's notes are typed in, they start from Setup → Day Templates.
   const saved = S.days[n] && S.days[n].notes;
   const val = S.drafts[id] ?? (saved !== undefined ? saved : (cfg().dayNotes[n] || ''));
-  return `<textarea id="${id}" class="lined" data-draft="${id}" data-notes="${n}" rows="6" placeholder="${placeholder}">${esc(val)}</textarea>`;
+  // Highlights: a layer behind the (see-through) typing box draws them under the words.
+  return `<div class="notes-wrap"><div class="notes-back" aria-hidden="true" data-back="${id}">${notesBack(val, notesHl(n))}</div>
+    <textarea id="${id}" class="lined" data-draft="${id}" data-notes="${n}" rows="6" placeholder="${placeholder}">${esc(val)}</textarea></div>`;
+}
+// Notes highlights are saved like list items' (the highlighted words), on days/{n}.hl.
+const notesHl = n => (S.days[n] && S.days[n].hl) || [];
+function notesBack(text, phrases) {
+  let html = '', at = 0;
+  hlRanges(text, phrases).forEach(([a, b]) => { html += esc(text.slice(at, a)) + `<mark class="nhl">${esc(text.slice(a, b))}</mark>`; at = b; });
+  return html + esc(text.slice(at)) + '\n '; // the extra line keeps it as tall as the typing box
+}
+function syncBack(t) {
+  const back = document.querySelector(`[data-back="${t.id}"]`);
+  if (!back) return;
+  back.innerHTML = notesBack(t.value, notesHl(noteDay(t.dataset.notes)));
+  back.scrollTop = t.scrollTop;
 }
 
 /* ---------- Course page ---------- */
@@ -2099,7 +2140,7 @@ document.addEventListener('input', e => {
   }
   S.drafts[k] = t.value;
   if (t.hasAttribute('data-grow')) grow(t);
-  if (t.dataset.notes) saveNoteSoon(noteDay(t.dataset.notes), t.id);
+  if (t.dataset.notes) { syncBack(t); hlHide(); saveNoteSoon(noteDay(t.dataset.notes), t.id); }
 });
 
 document.addEventListener('focusout', e => {

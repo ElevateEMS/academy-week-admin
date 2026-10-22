@@ -844,3 +844,15 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 @media (max-width: 720px) {
   .course-board .box-info, .course-board .box-setup, .course-board .box-notes, .course-board .box-changes { grid-column: auto; grid-row: auto; }
 }
+/* Notes highlights: the typing box is see-through and a layer behind it draws the lines and
+   the highlight color, letter for letter under the same words. */
+.notes-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 140px; }
+.box > .notes-wrap { flex: 1; }
+.week-col > .week-part.shaded > .notes-wrap { flex: 1; }
+.week .notes-wrap { min-height: 84px; }
+.notes-wrap > textarea.lined { flex: 1; position: relative; z-index: 1; background: transparent; }
+.notes-back { position: absolute; inset: 0; overflow: hidden; pointer-events: none; padding: 2px; color: transparent;
+  white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; line-height: 28px; font: inherit; line-height: 28px;
+  background: repeating-linear-gradient(transparent, transparent 27px, rgba(125, 101, 88, .22) 27px, rgba(125, 101, 88, .22) 28px);
+  background-attachment: local; }
+.notes-back mark.nhl { background: #f1dca6; color: transparent; border-radius: 3px; }
