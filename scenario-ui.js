@@ -275,7 +275,7 @@ async function buildPlan(how) {
 
 function scenBox() {
   const items = planItems();
-  if (!items.length) return `<p class="muted small">Let the app pick about ${planSize()} scenarios from your library that cover every summative skill on the Skills Tracking sheet. Each build is a different mix, always with your ★ scenarios.</p>
+  if (!items.length) return `<p class="muted small">Build a new mix of scenarios covering every summative skill, always with your ★ ones.</p>
     <div class="plan-btns one-row right"><button class="btn primary small" data-act="planBuild">Build a new mix</button></div>`;
   const lib = libById(), { miss } = planStatus(items);
   const byDay = [1, 2, 3, 4, 5].map(d => [d, items.filter(x => (x.day || 1) === d)]).filter(([, l]) => l.length);
