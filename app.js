@@ -1322,7 +1322,9 @@ const CAL_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height
 // Review session dates (key ending in rev-new) use a bigger calendar in the middle of the
 // screen where you tap as many days as you like, then Done.
 const multiForm = key => { const m = key.match(/^(ie-|nc-)rev-new$/); return m ? courseForm(m[1]) : null; };
-function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
+// title: the calendar opens in the middle of the screen with that heading (used in pop-ups,
+// where a calendar under the field would be cut off at the bottom).
+function datePicker(key, { optional = false, empty = 'Not set', title = '' } = {}) {
   const multi = multiForm(key);
   const value = S.drafts[key] || (optional ? '' : todayIso());
   const d = value ? parseIso(value) : null;
@@ -1350,7 +1352,7 @@ function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
       </div>`;
       return `<span class="dp"><button type="button" class="date-btn empty ${open ? 'on' : ''}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${n ? 'Add or remove dates' : empty}</span></button>${cal}</span>`;
     }
-    cal = `<div class="dp-pop">
+    cal = `<div class="dp-pop ${title ? 'dp-center' : ''}">${title ? `<p class="dp-title">${esc(title)}</p>` : ''}
       <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
         <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
         <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
@@ -1464,7 +1466,7 @@ function courseFields(prefix, form) {
   const dis = form.busy ? 'disabled' : '';
   return `<div class="course-fields">
     ${COURSE_FIELDS.map(([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
-      ? datePicker(prefix + k, { optional: true })
+      ? datePicker(prefix + k, { optional: true, title: label })
       : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : ''}" autocomplete="off" ${dis}>`}</div>`).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
       ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
