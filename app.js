@@ -293,11 +293,14 @@ Store.onUser(async user => {
   S.user = user;
   unwatchGlobal.forEach(u => u()); unwatchGlobal = [];
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
-  if (!user) { render(); return; }
+  if (!user) { clearSheetCopies(); render(); return; }
   unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   render();
+  // The last cohort used opens straight away (while the cohort list loads alongside it).
+  const last = S.cohortKey;
+  if (last) selectCohort(last);
   try {
     S.cohorts = await Sheets.listCohorts();
   } catch (e) { S.sheetErr = e.message; render(); return; }
@@ -306,8 +309,26 @@ Store.onUser(async user => {
   const pick = S.cohorts.find(c => c.key === S.cohortKey)
     || S.cohorts.find(c => /active/i.test(c.status) && !/^test/i.test(c.key))
     || S.cohorts.find(c => /active/i.test(c.status)) || S.cohorts[0];
-  if (pick) selectCohort(pick.key); else render();
+  if (pick && pick.key !== last) selectCohort(pick.key); else render();
 });
+
+// The last sheet data for each cohort is kept in this browser, so a refresh can show the
+// page at once; the fresh copy from the Google Sheet replaces it a moment later.
+function sheetCopyKey(key) { return 'aw-sheet-' + key; }
+function sheetCopy(key, data) {
+  try {
+    if (data === undefined) { const t = localStorage.getItem(sheetCopyKey(key)); return t ? JSON.parse(t) : null; }
+    localStorage.setItem(sheetCopyKey(key), JSON.stringify(data));
+  } catch { return null; }
+}
+function clearSheetCopies() {
+  try { Object.keys(localStorage).filter(k => k.startsWith('aw-sheet-')).forEach(k => localStorage.removeItem(k)); } catch {}
+}
+function pickDay(key) {
+  if (S.day != null) return;
+  const saved = pref('day-' + key);
+  S.day = currentWeekDay() ?? phaseDay() ?? (saved != null && !isNaN(saved) ? Number(saved) : 1);
+}
 
 async function selectCohort(key) {
   S.cohortKey = key; pref('cohort', key);
@@ -328,16 +349,17 @@ async function selectCohort(key) {
 }
 
 async function loadSheet() {
-  S.loading = true; S.sheetErr = null; render();
+  S.loading = true; S.sheetErr = null;
   const key = S.cohortKey;
+  const copy = !S.sheet && sheetCopy(key);
+  if (copy) { S.sheet = copy; pickDay(key); }
+  render();
   try {
     const data = await Sheets.loadCohort(key);
     if (key !== S.cohortKey) return;
     S.sheet = data;
-    if (S.day == null) {
-      const saved = pref('day-' + key);
-      S.day = currentWeekDay() ?? phaseDay() ?? (saved != null && !isNaN(saved) ? Number(saved) : 1);
-    }
+    sheetCopy(key, data);
+    pickDay(key);
     rollOver();
     seedRepeats();
     shareHousekeeping();
