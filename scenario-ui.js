@@ -284,7 +284,7 @@ function scenBox() {
       const sc = lib[x.id];
       return `<span class="${sc && sc.cat === 'trauma' ? 'tr' : ''}">${esc(sc ? sc.name : 'Missing Doc')}${x.addons.length ? ' +' : ''}</span>`;
     }).join(' · ')}</span></li>`).join('')}</ul>
-    <div class="plan-btns one-row right"><button class="btn primary small" data-act="planOpen">Open the plan</button></div>`;
+    <div class="plan-btns one-row right"><button class="eye" data-act="planClearAsk" title="Clear plan" aria-label="Clear plan">${RESET}</button><button class="btn primary small" data-act="planOpen">Open the plan</button></div>`;
 }
 
 function planModal() {
@@ -325,7 +325,7 @@ function planModal() {
             <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
             <div class="plan-btns">
               <button class="btn small" data-act="planBuild">Build a new mix</button>
-              ${items.length ? '<button class="link quiet" data-act="planClearAsk">Clear plan</button>' : ''}
+              ${items.length ? `<button class="eye" data-act="planClearAsk" title="Clear plan" aria-label="Clear plan">${RESET}</button>` : ''}
               ${items.length ? '<button class="btn primary small push-right" data-act="planPlace">Put the plan on the schedule</button>' : ''}
             </div>
           </div>
