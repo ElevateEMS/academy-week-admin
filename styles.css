@@ -828,3 +828,5 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .dp-multi .dp-title span { display: block; font-family: Jost, sans-serif; font-size: 12px; font-weight: 400; color: var(--muted); }
 .dp-multi .dp-grid button { width: 36px; height: 36px; font-size: 14px; }
 .dp-multi-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+/* Editing an item: the edit line spans the whole row, not just the old text's width */
+.checks label > span:has(> .txt-edit) { flex: 1; min-width: 0; display: block; }
