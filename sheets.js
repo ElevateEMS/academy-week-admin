@@ -4,8 +4,10 @@
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
      listScenarios               -> the scenario Docs in the Medical and Trauma folders (names, links)
-     createCohort(key)           -> adds a cohort to the config sheet; the Student Hub script makes its folder + sheets
+     createCohort(key, info)     -> adds a cohort to the config sheet; the Student Hub script makes its folder + sheets,
+                                    then any course details typed in go into its settings box
      setStatus(key, status)      -> Upcoming / Active / Former in the config sheet (column F)
+     saveSettings(key, info)     -> writes course details (only the fields sent) into the settings box
 
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
    review dates) as `info`, plus its status and links to its sheet and folder.
@@ -30,8 +32,9 @@ const Sheets = (() => {
     changeContacts: (key, student, by) =>
       call('changeContacts', { cohort: key, row: student.row, name: student.name, by }).then(o => o.count),
     listScenarios: () => call('listScenarios').then(o => o.scenarios),
-    createCohort: key => call('createCohort', { cohort: key }),
+    createCohort: (key, info) => call('createCohort', { cohort: key, info }),
     setStatus: (key, status) => call('setStatus', { cohort: key, status }),
+    saveSettings: (key, info) => call('saveSettings', { cohort: key, info }).then(o => o.info),
   };
 })();
 
@@ -65,25 +68,34 @@ function sampleSheets() {
   const orient = new Date(start); orient.setDate(orient.getDate() - 119);
   const reviews = [7, 14, 28, 42].map(n => { const d = new Date(orient); d.setDate(d.getDate() + n); return iso(d); });
 
+  const blank = { jbl: '', firstDay: '', cpr: '', academyStart: '', meet: '', reviews: [] };
+  const saved = {}; // course details "written to the sheet" in sample mode
+  const fresh = key => (cohorts.find(c => c.key === key) || {}).status === 'Upcoming' && !saved[key];
+  const infoFor = key => saved[key] || (fresh(key) ? { ...blank }
+    : { jbl: '6B37F3', firstDay: iso(orient), cpr: '', academyStart: iso(start), meet: 'meet.google.com/abc-defg-hij', reviews });
+
   return {
     listCohorts: () => wait(cohorts.map(c => ({ ...c }))),
-    async createCohort(key) {
+    async createCohort(key, info) {
       if (cohorts.some(c => c.key === key)) throw new Error(key + ' is already in the config sheet.');
       cohorts.push({ key, status: 'Upcoming' });
-      return wait({ cohort: key });
+      if (info && Object.keys(info).length) saved[key] = { ...blank, ...info };
+      return wait({ cohort: key, info: saved[key] || null });
+    },
+    async saveSettings(key, info) {
+      saved[key] = { ...infoFor(key), ...info };
+      return wait(saved[key]);
     },
     async setStatus(key, status) {
       const c = cohorts.find(x => x.key === key); if (c) c.status = status;
       return wait({ cohort: key, status });
     },
-    loadCohort: key => { const fresh = (cohorts.find(c => c.key === key) || {}).status === 'Upcoming'; return wait({
+    loadCohort: key => { const info = infoFor(key); return wait({
       cohort: key,
       status: (cohorts.find(c => c.key === key) || {}).status || '',
       sheetUrl: 'https://docs.google.com/spreadsheets/', folderUrl: 'https://drive.google.com/drive/',
-      info: fresh
-        ? { jbl: '', firstDay: '', cpr: '', academyStart: '', meet: '', reviews: [] }
-        : { jbl: '6B37F3', firstDay: iso(orient), cpr: '', academyStart: iso(start), meet: 'meet.google.com/abc-defg-hij', reviews },
-      academyStart: fresh ? '' : iso(start),
+      info,
+      academyStart: info.academyStart,
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5) })),
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,

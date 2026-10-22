@@ -75,14 +75,14 @@ function currentWeekDay() {
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
 const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios',
-  info: 'Cohort Info', setup: 'Setup Checklist', changes: 'Changes for Future Classes' };
+  info: 'Course Details', setup: 'Setup Checklist', changes: 'Changes for Future Classes' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
-  course: { key: 'courseLayout', boxes: ['info', 'setup', 'changes', 'notes'], def: [['info', 'notes'], ['setup'], ['changes']] },
+  course: { key: 'courseLayout', v: 3, boxes: ['info', 'setup', 'changes', 'notes'], def: [['info', 'changes'], ['setup'], ['notes']] },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
@@ -491,7 +491,7 @@ const ICONS = {
   settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   schedule: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 9h6M9 13h6M9 17h4"/></svg>',
   list: '<svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="1.1"/><circle cx="4.8" cy="12" r="1.1"/><circle cx="4.8" cy="17.5" r="1.1"/></svg>',
-  bulb: '<svg viewBox="0 0 24 24"><path d="M9 17.5h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2v1.5h5V16c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14.5 7.5l3 3"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8c0-.4.4-.8.8-.8h4.4c.4 0 .8.4.8.8V7M6.5 7l.9 12.2c.1.9.8 1.8 1.8 1.8h5.6c1 0 1.7-.9 1.8-1.8L17.5 7M10 11v6M14 11v6"/></svg>',
   grip: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
 };
@@ -566,7 +566,7 @@ function shell() {
   ${S.libOpen ? libModal() : ''}
   ${S.place ? placeModal() : ''}
   ${S.binderList ? binderListModal() : ''}
-  ${S.updOpen ? updatesModal() : ''}
+  ${S.infoEdit ? infoEditModal() : ''}
   ${S.newCohort ? newCohortModal() : ''}`;
 }
 
@@ -835,7 +835,7 @@ const nextCohort = (key = S.cohortKey) => {
 };
 const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}">Make ${key === S.cohortKey ? '' : esc(key) + ' '}${status}</button>`;
 
-// Cohort Info: what's in the sheet's settings box, TBD where it's blank.
+// Course Details box: what's in the sheet's settings box, TBD where it's blank.
 function infoBox() {
   const i = cohortInfo(), st = S.sheet.status || '';
   const tbd = '<span class="tbd">TBD</span>';
@@ -859,8 +859,8 @@ function infoBox() {
     ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
   </div>
   <div class="info-links">
-    ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
     ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener">Cohort folder ↗</a>` : ''}
+    ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
   </div>`;
 }
 
@@ -953,7 +953,7 @@ function dayStrip({ phases = true } = {}) {
 }
 
 function box(b, n) {
-  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info';
+  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info' || b === 'changes';
   const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
     : b === 'setup' ? 'setup' : b === 'changes' ? 'next' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
@@ -979,20 +979,28 @@ function box(b, n) {
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
   } else if (b === 'info') {
-    body = head('Cohort Info') + infoBox();
+    body = head('Course Details', `<button class="eye" data-act="infoEditOpen" title="Edit course details" aria-label="Edit course details">${ICONS.pencil}</button>`) + infoBox();
   } else if (b === 'setup') {
     const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
     const done = all.filter(t => t.done || setupAuto(t.text).done === true).length;
     body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, all.some(t => t.done) || done ? hideToggle('setup') : '')
       + setupList() + addRow(SETUP, 'setup', '+ add item') + prevChanges();
   } else if (b === 'changes') {
-    const nxt = nextCohort(), open = S.updates.filter(x => !x.done).length;
-    body = head('Changes for Future Classes', (itemsFor(SETUP, 'next').some(t => t.done) ? hideToggle('next') : '')
-        + `<button class="eye" data-act="updOpen" title="Future updates" aria-label="Future updates">${ICONS.bulb}</button>`)
-      + `<p class="mini-head">Do before next cohort</p>`
-      + addRow(SETUP, 'next', '+ add a change') + itemList(SETUP, 'next')
-      + `<p class="muted small changes-foot">These show up on ${nxt ? esc(nxt.key) + '’s' : 'the next cohort’s'} Setup Checklist.</p>
-        <button class="link changes-upd" data-act="updOpen">Future updates${open ? ' · ' + open + ' open' : ''}</button>`;
+    const nxt = nextCohort();
+    // A + by each heading opens its add line (it closes again when left empty).
+    const plus = (k, label) => `<button class="add-plus small-plus" data-act="chAdd" data-k="${k}" title="${label}" aria-label="${label}">+</button>`;
+    const byNew = (a, c) => (a.created || 0) - (c.created || 0);
+    const upd = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
+    body = head('Changes for Future Classes', itemsFor(SETUP, 'next').some(t => t.done) || S.updates.some(x => x.done) ? hideToggle('next') : '')
+      + `<p class="mini-head with-plus">Do before next cohort ${plus('next', 'Add a change')}</p>
+        <p class="muted small changes-foot">Shows up on ${nxt ? esc(nxt.key) + '’s' : 'the next cohort’s'} Setup Checklist.</p>`
+      + (S.changesAdd === 'next' ? `<div class="add-row"><input id="add-next-${SETUP}" data-draft="add-next-${SETUP}" data-add="next" data-day="${SETUP}" data-chadd="next" placeholder="Type a change, then Enter" value="${esc(S.drafts['add-next-' + SETUP] || '')}"></div>` : '')
+      + itemList(SETUP, 'next')
+      + `<hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
+        ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
+        <ul class="checks">${upd.map(x => `<li class="${x.done ? 'done' : ''}">
+          <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
+          <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
   } else if (b === 'docs') {
     const all = docItems(), done = all.filter(x => x.on).length;
     const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
@@ -1258,10 +1266,11 @@ async function printDays(list) {
 /* ---------- Date picker (our own, so it matches the app instead of Chrome's) ---------- */
 // The picked date is kept in S.drafts[key] as YYYY-MM-DD (today until you pick one).
 const CAL_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M4 10.5h16"/></svg>';
-function datePicker(key) {
-  const value = S.drafts[key] || todayIso();
-  const d = parseIso(value);
-  const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+// optional: starts empty (shows `empty`, or "Not set") and gets a Clear link, for dates that may not be known yet.
+function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
+  const value = S.drafts[key] || (optional ? '' : todayIso());
+  const d = value ? parseIso(value) : null;
+  const label = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }) : empty;
   const open = S.datePick && S.datePick.key === key;
   let cal = '';
   if (open) {
@@ -1277,10 +1286,11 @@ function datePicker(key) {
         <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
         <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
       <div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>
-      <button type="button" class="link dp-today" data-act="dpPick" data-k="${key}" data-iso="${todayIso()}">Today</button>
+      <div class="dp-foot"><button type="button" class="link" data-act="dpPick" data-k="${key}" data-iso="${todayIso()}">Today</button>
+        ${optional && value ? `<button type="button" class="link" data-act="dpClear" data-k="${key}">Clear</button>` : ''}</div>
     </div>`;
   }
-  return `<span class="dp"><button type="button" class="date-btn ${open ? 'on' : ''}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${label}</span></button>${cal}</span>`;
+  return `<span class="dp"><button type="button" class="date-btn ${open ? 'on' : ''} ${value ? '' : 'empty'}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${label}</span></button>${cal}</span>`;
 }
 
 /* ---------- Documentation Checklist (Finalize page) ---------- */
@@ -1355,36 +1365,67 @@ function binderListModal() {
   </div></div>`;
 }
 
-// Future updates: one list for every cohort, kept until each one is checked off.
-function updatesModal() {
-  const byNew = (a, b) => (a.created || 0) - (b.created || 0);
-  const list = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
-  return `<div class="overlay" data-act="updClose"><div class="modal small-modal ${hidden('upd') ? 'hide-done' : ''}" data-stop>
-    <div class="modal-head"><h2>Future Updates</h2><span class="head-tools">${S.updates.some(x => x.done) ? hideToggle('upd') : ''}<button class="x big" data-act="updClose" aria-label="Close">×</button></span></div>
-    <div class="modal-body">
-      <p class="muted small">Ideas and possible changes for some day. This list carries on from cohort to cohort until you check things off.</p>
-      <div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" placeholder="+ add an update" value="${esc(S.drafts.upd || '')}"></div>
-      <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}">
-        <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
-        <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
-    </div>
-  </div></div>`;
-}
-
 // + New cohort (cohort menu): added to the config sheet, and the Student Hub makes its folder and sheets.
 function newCohortModal() {
   const nc = S.newCohort;
   return `<div class="overlay" data-act="newCohortClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>New Cohort</h2>${nc.busy ? '' : '<button class="x big" data-act="newCohortClose" aria-label="Close">×</button>'}</div>
-    <div class="pad">
+    <div class="modal-body pad-top" data-keep-scroll="newCohort">
       <label class="field">Type it the way you would in the config sheet
         <input id="newCohortIn" data-draft="newCohort" data-add="newcohort" placeholder="e.g. Summer 2027" value="${esc(S.drafts.newCohort || '')}" ${nc.busy ? 'disabled' : ''} autocomplete="off"></label>
       <p class="muted small">This adds it to the config sheet, and the Student Hub makes its folder, Ride Along Agreements, Clinical Tracking and Student Roster sheets, the same as typing it into the sheet yourself (which still works too). It starts as <b>Upcoming</b>, so students can’t log in until you make it Active.</p>
+      <p class="mini-head">Course details <span class="count">optional · go into its sheet</span></p>
+      ${courseFields('nc-', nc)}
       ${nc.err ? `<div class="alert">${esc(nc.err)}</div>` : ''}
     </div>
     <div class="modal-foot">${nc.busy ? '<span class="muted small">Making the folder and sheets… this can take up to a minute.</span>' : ''}
       <button class="btn primary" data-act="newCohortCreate" ${nc.busy ? 'disabled' : ''}>${nc.busy ? 'Creating…' : 'Create cohort'}</button></div>
   </div></div>`;
+}
+
+// Course details: the cohort sheet's settings box (AG5:AG34), typed here instead of in the sheet.
+// prefix = 'ie-' (Course Details pencil) or 'nc-' (New Cohort); form.reviews = review dates (yyyy-MM-dd).
+const COURSE_FIELDS = [['firstDay', 'Orientation', 'date'], ['cpr', 'Full CPR course', 'date'], ['academyStart', 'Academy Week start', 'date'],
+  ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text']];
+function courseFields(prefix, form) {
+  const dis = form.busy ? 'disabled' : '';
+  return `<div class="course-fields">
+    ${COURSE_FIELDS.map(([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
+      ? datePicker(prefix + k, { optional: true })
+      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : ''}" autocomplete="off" ${dis}>`}</div>`).join('')}
+    <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
+      ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
+      ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
+  </div>`;
+}
+const courseForm = prefix => prefix === 'ie-' ? S.infoEdit : S.newCohort;
+// What's been typed, as the sheet wants it (blank = clear / TBD).
+function courseValues(prefix) {
+  const out = {};
+  COURSE_FIELDS.forEach(([k]) => { out[k] = String(S.drafts[prefix + k] || '').trim(); });
+  out.reviews = [...courseForm(prefix).reviews];
+  return out;
+}
+const clearCourseDrafts = prefix => COURSE_FIELDS.forEach(([k]) => delete S.drafts[prefix + k]);
+
+function infoEditModal() {
+  const f = S.infoEdit;
+  return `<div class="overlay" data-act="infoEditClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Edit Course Details</h2>${f.busy ? '' : '<button class="x big" data-act="infoEditClose" aria-label="Close">×</button>'}</div>
+    <div class="modal-body pad-top" data-keep-scroll="infoEdit">
+      <p class="muted small">Saving writes these into ${esc(S.cohortKey)}’s cohort sheet (the settings box on the Student Roster tab), the same as typing them there. Students see the new dates in the Student Hub right away. Leave one blank to show TBD.</p>
+      ${courseFields('ie-', f)}
+      ${f.err ? `<div class="alert">${esc(f.err)}</div>` : ''}
+    </div>
+    <div class="modal-foot">${f.busy ? '<span class="muted small">Saving to the sheet…</span>' : ''}
+      <button class="btn primary" data-act="infoEditSave" ${f.busy ? 'disabled' : ''}>${f.busy ? 'Saving…' : 'Save to the sheet'}</button></div>
+  </div></div>`;
+}
+// The sheet answered with its settings box: show it here and keep the Day pages' dates in step.
+function applyInfo(info) {
+  if (!info || !S.sheet) return;
+  S.sheet = { ...S.sheet, info, academyStart: isIsoDate(info.academyStart) ? info.academyStart : '' };
+  sheetCopy(S.cohortKey, S.sheet);
 }
 
 async function printBinders() {
@@ -2040,6 +2081,11 @@ document.addEventListener('input', e => {
 
 document.addEventListener('focusout', e => {
   const t = e.target;
+  // Changes box: an add line you leave empty closes again.
+  if (t.dataset && t.dataset.chadd && !S.rendering && !t.value.trim()) {
+    setTimeout(() => { if (S.changesAdd === t.dataset.chadd && !String(S.drafts[t.dataset.draft] || '').trim()) { S.changesAdd = null; render(); } }, 150);
+    return;
+  }
   if (t.dataset && t.dataset.edit && !S.rendering && S.editItem === t.dataset.edit) { saveEdit(t).catch(err => toast(err.message)); return; }
   if (t.dataset && t.dataset.notes && S.drafts[t.id] !== undefined) {
     const id = t.id, n = noteDay(t.dataset.notes), text = S.drafts[id];
@@ -2071,9 +2117,11 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
     if (e.key === 'Escape') { delete S.drafts[e.target.id]; S.editItem = null; render(); return; }
   }
+  if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
-    if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.binderList) S.binderList = false; else if (S.updOpen && !S.editItem) S.updOpen = false;
-    else if (S.datePick) S.datePick = null; else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
+    if (S.datePick) S.datePick = null;
+    else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
+    else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
@@ -2140,8 +2188,6 @@ async function act(a, el = {}, e) {
         if (x && prevFor) await Store.set('cohorts/' + prevFor + '/todos/' + d.id, { done: !x.done });
         break;
       }
-      case 'updOpen': S.updOpen = true; render(); setTimeout(() => { const el = document.getElementById('updIn'); if (el) el.focus(); }, 0); break;
-      case 'updClose': S.updOpen = false; render(); break;
       case 'addUpd': {
         const text = (S.drafts.upd || '').trim(); if (!text) return;
         S.drafts.upd = ''; render();
@@ -2149,24 +2195,36 @@ async function act(a, el = {}, e) {
       }
       case 'updDone': { const x = S.updates.find(i => i.id === d.id); await Store.set('updates/' + d.id, { done: !x.done }); break; }
       case 'delUpd': await Store.del('updates/' + d.id); break;
+      case 'chAdd': {
+        S.changesAdd = S.changesAdd === d.k ? null : d.k; render();
+        const id = d.k === 'upd' ? 'updIn' : 'add-next-' + SETUP;
+        if (S.changesAdd) setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
+        break;
+      }
       case 'binderList': S.binderList = true; render(); break;
       case 'binderListClose': S.binderList = false; render(); break;
       case 'newCohortOpen':
-        S.menuOpen = false; S.newCohort = { busy: false, err: '' }; render();
+        S.menuOpen = false; S.newCohort = { busy: false, err: '', reviews: [] }; clearCourseDrafts('nc-'); render();
         setTimeout(() => { const el = document.getElementById('newCohortIn'); if (el) el.focus(); }, 0); break;
       case 'newCohortClose': if (S.newCohort && S.newCohort.busy) return; S.newCohort = null; render(); break;
       case 'newCohortCreate': {
         const key = String(S.drafts.newCohort || '').replace(/\s+/g, ' ').trim();
         if (!key || !S.newCohort || S.newCohort.busy) { if (!key) toast('Type the cohort’s name first.'); return; }
         if (S.cohorts.some(c => c.key.toLowerCase() === key.toLowerCase())) { S.newCohort.err = key + ' is already in the config sheet.'; render(); return; }
-        S.newCohort = { busy: true, err: '' }; render();
+        // Only the course details you filled in are sent (the rest stay blank = TBD).
+        const vals = courseValues('nc-'), info = {};
+        COURSE_FIELDS.forEach(([k]) => { if (vals[k]) info[k] = vals[k]; });
+        if (vals.reviews.length) info.reviews = vals.reviews;
+        S.newCohort.busy = true; S.newCohort.err = ''; render();
+        let res;
         try {
-          await Sheets.createCohort(key);
-        } catch (err) { S.newCohort = { busy: false, err: err.message }; render(); return; }
-        delete S.drafts.newCohort; S.newCohort = null;
+          res = await Sheets.createCohort(key, info);
+        } catch (err) { S.newCohort.busy = false; S.newCohort.err = err.message; render(); return; }
+        delete S.drafts.newCohort; clearCourseDrafts('nc-'); S.newCohort = null;
         try { S.cohorts = await Sheets.listCohorts(); } catch {}
         S.view = 'course'; pref('view', 'course');
-        toast(`${key} is set up. Its folder and sheets are in your Drive.`);
+        toast(res && res.settingsError ? `${key} is set up, but the course details didn’t save: ${res.settingsError} Add them with the pencil on Course Details.`
+          : `${key} is set up. Its folder and sheets are in your Drive.`);
         await selectCohort(key); break;
       }
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
@@ -2293,7 +2351,36 @@ async function act(a, el = {}, e) {
         const [y, m] = S.datePick.month.split('-').map(Number), nd = new Date(y, m - 1 + Number(d.dir), 1);
         S.datePick.month = isoOf(nd).slice(0, 7); render(); break;
       }
-      case 'dpPick': S.drafts[d.k] = d.iso; S.datePick = null; render(); break;
+      case 'dpPick': {
+        S.datePick = null;
+        const m = d.k.match(/^(ie-|nc-)rev-new$/); // a review session date: added to the list
+        if (m) { const f = courseForm(m[1]); if (f && !f.reviews.includes(d.iso)) f.reviews = [...f.reviews, d.iso].sort(); }
+        else S.drafts[d.k] = d.iso;
+        render(); break;
+      }
+      case 'dpClear': delete S.drafts[d.k]; S.datePick = null; render(); break;
+      case 'revDel': { const f = courseForm(d.f); if (f) f.reviews = f.reviews.filter(x => x !== d.iso); render(); break; }
+      case 'infoEditOpen': {
+        const i = cohortInfo(), orig = {};
+        COURSE_FIELDS.forEach(([k, , type]) => { const v = String(i[k] || ''); orig[k] = type === 'date' ? (isIsoDate(v) ? v : '') : v; S.drafts['ie-' + k] = orig[k]; });
+        orig.reviews = (i.reviews || []).filter(isIsoDate);
+        S.infoEdit = { busy: false, err: '', reviews: [...orig.reviews], orig };
+        render(); break;
+      }
+      case 'infoEditClose': if (S.infoEdit && S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); render(); break;
+      case 'infoEditSave': {
+        const f = S.infoEdit; if (!f || f.busy) return;
+        const now = courseValues('ie-'), changed = {};
+        COURSE_FIELDS.forEach(([k]) => { if (now[k] !== f.orig[k]) changed[k] = now[k]; });
+        if (JSON.stringify(now.reviews) !== JSON.stringify(f.orig.reviews)) changed.reviews = now.reviews;
+        if (!Object.keys(changed).length) { S.infoEdit = null; clearCourseDrafts('ie-'); render(); return; }
+        f.busy = true; f.err = ''; render();
+        try {
+          applyInfo(await Sheets.saveSettings(S.cohortKey, changed));
+        } catch (err) { f.busy = false; f.err = err.message; render(); return; }
+        S.infoEdit = null; clearCourseDrafts('ie-');
+        toast('Saved to ' + S.cohortKey + '’s sheet.'); render(); break;
+      }
       case 'callToggle': { const k = 'call-' + d.sid; S.drafts[k] = !S.drafts[k]; render(); break; }
       case 'logContact': {
         const s = studentBySid(d.sid); const k = x => x + '-' + d.sid;
