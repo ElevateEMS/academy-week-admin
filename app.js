@@ -383,11 +383,18 @@ function render() {
     const id = a && a.id;
     const sel = id && typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null;
     const scrolls = [...document.querySelectorAll('[data-keep-scroll]')].map(el => [el.dataset.keepScroll, el.scrollTop]);
+    S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? shell() : S.authKnown ? signInView() : bootShell();
+    S.rendering = false;
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
     if (id) {
       const el = document.getElementById(id);
       if (el) { el.focus(); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
+    }
+    if (S.editFocus) { // just clicked an item's words: cursor at the end
+      S.editFocus = false;
+      const el = document.querySelector('[data-edit]');
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
     fitBoard();
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
@@ -519,7 +526,13 @@ function hlRanges(text, phrases) {
   out.forEach(r => { const last = merged[merged.length - 1]; if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push([...r]); });
   return merged;
 }
+// Clicking an item's words edits them (To Do / priorities, Packing, Shopping); the circle checks it off.
+const EDITABLE = ['todo', 'pack', 'shop'];
 function hlTxt(kind, id, text, phrases) {
+  if (S.editItem === kind + ':' + id) {
+    const k = 'edit-' + kind + '-' + id;
+    return `<input class="txt-edit" id="${k}" data-draft="${k}" data-edit="${kind}:${id}" value="${esc(S.drafts[k] ?? text)}" aria-label="Edit item">`;
+  }
   let html = '', at = 0;
   hlRanges(text, phrases).forEach(([a, b]) => {
     html += esc(text.slice(at, a)) + `<mark class="hl" data-r="${a}-${b}">${esc(text.slice(a, b))}</mark>`; at = b;
@@ -586,10 +599,9 @@ document.addEventListener('mousedown', e => {
   hlHide();
   hlDown = { x: e.clientX, y: e.clientY }; hlNoClick = false;
   // A to-do can be dragged to move it; on its words, a drag selects them instead.
-  const txt = e.target.closest && e.target.closest('.txt[data-hl]');
+  const txt = e.target.closest && e.target.closest('.txt[data-hl], .txt-edit');
   const li = txt && txt.closest('[draggable="true"]');
   if (li) { li.draggable = false; hlDragOff = li; }
-  // Bag editor: typing in a name box shouldn't start a drag.
   // Bag editor: in a name box, a drag selects text; on an item row, it moves the item, not its pocket.
   const inBag = e.target.closest && e.target.closest('.bag-ed .pocket');
   if (inBag) {
@@ -619,8 +631,28 @@ document.addEventListener('click', e => {
     e.preventDefault(); e.stopPropagation();
     const [kind, ...rest] = mark.closest('.txt').dataset.hl.split(':');
     hlShow(mark.getBoundingClientRect(), 'Remove highlight', { remove: { kind, id: rest.join(':'), range: mark.dataset.r.split('-').map(Number) } });
+    return;
   }
+  const txt = e.target.closest && e.target.closest('.txt[data-hl]');
+  if (txt && EDITABLE.includes(txt.dataset.hl.split(':')[0])) {
+    e.preventDefault(); e.stopPropagation();
+    S.editItem = txt.dataset.hl; S.editFocus = true; render();
+    return;
+  }
+  // On those items only the circle checks it off (not the rest of the row).
+  const lab = e.target.closest && e.target.closest('label');
+  const own = lab && lab.querySelector('.txt[data-hl], .txt-edit');
+  if (own && !e.target.matches('input') && EDITABLE.includes((own.dataset.hl || own.dataset.edit).split(':')[0])) { e.preventDefault(); e.stopPropagation(); }
 }, true);
+async function saveEdit(el) {
+  const [kind, ...rest] = el.dataset.edit.split(':'), id = rest.join(':');
+  const text = el.value.trim(), old = hlItem(kind, id).text;
+  delete S.drafts[el.id]; S.editItem = null;
+  if (text && text !== old) {
+    await Store.set(kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : 'shopping/' + id, { text });
+  }
+  render();
+}
 addEventListener('scroll', hlHide, true);
 
 /* ---------- Shared pieces ---------- */
@@ -1750,6 +1782,7 @@ document.addEventListener('input', e => {
 
 document.addEventListener('focusout', e => {
   const t = e.target;
+  if (t.dataset && t.dataset.edit && !S.rendering && S.editItem === t.dataset.edit) { saveEdit(t).catch(err => toast(err.message)); return; }
   if (t.dataset && t.dataset.notes && S.drafts[t.id] !== undefined) {
     const id = t.id, n = Number(t.dataset.notes), text = S.drafts[id];
     clearTimeout(noteTimers[id]);
@@ -1776,6 +1809,10 @@ document.addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.target.dataset && e.target.dataset.edit) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
+    if (e.key === 'Escape') { delete S.drafts[e.target.id]; S.editItem = null; render(); return; }
+  }
   if (e.key === 'Escape') {
     if (S.datePick) S.datePick = null; else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;

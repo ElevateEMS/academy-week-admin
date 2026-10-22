@@ -737,3 +737,6 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .students-tools { display: flex; align-items: center; gap: 10px; }
 .modal.pdf { width: min(1000px, 100%); height: calc(100vh - 40px); }
 .modal.pdf iframe { flex: 1; width: 100%; border: 0; border-radius: 0 0 18px 18px; background: #fff; }
+
+/* Editing an item's words in place */
+.txt-edit { font: inherit; color: var(--ink); border: 0; border-bottom: 1px solid var(--taupe); background: transparent; outline: none; padding: 0 0 1px; width: 100%; min-width: 120px; }
