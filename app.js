@@ -533,13 +533,15 @@ function shell() {
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
-    <button class="brand" data-act="side" data-s="${sideByDate()}" title="Today’s side">
-      <img src="logo.png" alt="">
-      <span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span>
-    </button>
+    <div class="head-left">
+      <button class="brand" data-act="side" data-s="${sideByDate()}" title="Today’s side">
+        <img src="logo.png" alt="">
+        <span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span>
+      </button>
+      ${sideSwitch()}
+    </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${sideSwitch()}
       ${aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''}${icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
@@ -1267,7 +1269,11 @@ async function printDays(list) {
 // The picked date is kept in S.drafts[key] as YYYY-MM-DD (today until you pick one).
 const CAL_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M4 10.5h16"/></svg>';
 // optional: starts empty (shows `empty`, or "Not set") and gets a Clear link, for dates that may not be known yet.
+// Review session dates (key ending in rev-new) use a bigger calendar in the middle of the
+// screen where you tap as many days as you like, then Done.
+const multiForm = key => { const m = key.match(/^(ie-|nc-)rev-new$/); return m ? courseForm(m[1]) : null; };
 function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
+  const multi = multiForm(key);
   const value = S.drafts[key] || (optional ? '' : todayIso());
   const d = value ? parseIso(value) : null;
   const label = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }) : empty;
@@ -1279,7 +1285,20 @@ function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
     const cells = Array.from({ length: first.getDay() }, () => '<span></span>');
     for (let i = 1; i <= days; i++) {
       const iso = isoOf(new Date(y, m - 1, i));
-      cells.push(`<button type="button" class="${iso === value ? 'on' : ''} ${iso === todayIso() ? 'today' : ''}" data-act="dpPick" data-k="${key}" data-iso="${iso}">${i}</button>`);
+      const on = multi ? multi.reviews.includes(iso) : iso === value;
+      cells.push(`<button type="button" class="${on ? 'on' : ''} ${iso === todayIso() ? 'today' : ''}" data-act="${multi ? 'dpToggle' : 'dpPick'}" data-k="${key}" data-iso="${iso}">${i}</button>`);
+    }
+    if (multi) {
+      const n = multi.reviews.length;
+      cal = `<div class="dp-pop dp-multi">
+        <p class="dp-title">Review sessions <span>tap every date, then Done</span></p>
+        <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
+          <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
+          <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
+        <div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>
+        <div class="dp-multi-foot"><span class="muted small">${n} date${n === 1 ? '' : 's'} picked</span><button type="button" class="btn primary small" data-act="dpDone">Done</button></div>
+      </div>`;
+      return `<span class="dp"><button type="button" class="date-btn empty ${open ? 'on' : ''}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${n ? 'Add or remove dates' : empty}</span></button>${cal}</span>`;
     }
     cal = `<div class="dp-pop">
       <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
@@ -1289,6 +1308,10 @@ function datePicker(key, { optional = false, empty = 'Not set' } = {}) {
       <div class="dp-foot"><button type="button" class="link" data-act="dpPick" data-k="${key}" data-iso="${todayIso()}">Today</button>
         ${optional && value ? `<button type="button" class="link" data-act="dpClear" data-k="${key}">Clear</button>` : ''}</div>
     </div>`;
+  }
+  if (multi) {
+    const n = multi.reviews.length;
+    return `<span class="dp"><button type="button" class="date-btn empty" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${n ? 'Add or remove dates' : empty}</span></button></span>`;
   }
   return `<span class="dp"><button type="button" class="date-btn ${open ? 'on' : ''} ${value ? '' : 'empty'}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${label}</span></button>${cal}</span>`;
 }
@@ -1372,7 +1395,7 @@ function newCohortModal() {
     <div class="modal-head"><h2>New Cohort</h2>${nc.busy ? '' : '<button class="x big" data-act="newCohortClose" aria-label="Close">×</button>'}</div>
     <div class="modal-body pad-top" data-keep-scroll="newCohort">
       <label class="field">Type it the way you would in the config sheet
-        <input id="newCohortIn" data-draft="newCohort" data-add="newcohort" placeholder="e.g. Summer 2027" value="${esc(S.drafts.newCohort || '')}" ${nc.busy ? 'disabled' : ''} autocomplete="off"></label>
+        <input id="newCohortIn" data-draft="newCohort" data-add="newcohort" placeholder="e.g. Spring 2026" value="${esc(S.drafts.newCohort || '')}" ${nc.busy ? 'disabled' : ''} autocomplete="off"></label>
       <p class="muted small">This adds it to the config sheet, and the Student Hub makes its folder, Ride Along Agreements, Clinical Tracking and Student Roster sheets, the same as typing it into the sheet yourself (which still works too). It starts as <b>Upcoming</b>, so students can’t log in until you make it Active.</p>
       <p class="mini-head">Course details <span class="count">optional · go into its sheet</span></p>
       ${courseFields('nc-', nc)}
@@ -2344,9 +2367,18 @@ async function act(a, el = {}, e) {
       case 'cadd': S.drafts['cadd-' + d.sid] = el.checked; break;
       case 'dpOpen': {
         const open = S.datePick && S.datePick.key === d.k;
-        S.datePick = open ? null : { key: d.k, month: (S.drafts[d.k] || todayIso()).slice(0, 7) };
+        // Review dates open on the month after the last one picked, else the orientation month.
+        const multi = multiForm(d.k), prefix = d.k.slice(0, 3);
+        const start = multi ? (multi.reviews[multi.reviews.length - 1] || S.drafts[prefix + 'firstDay'] || todayIso()) : (S.drafts[d.k] || todayIso());
+        S.datePick = open ? null : { key: d.k, month: start.slice(0, 7) };
         render(); break;
       }
+      case 'dpToggle': {
+        const f = multiForm(d.k); if (!f) return;
+        f.reviews = f.reviews.includes(d.iso) ? f.reviews.filter(x => x !== d.iso) : [...f.reviews, d.iso].sort();
+        render(); break;
+      }
+      case 'dpDone': S.datePick = null; render(); break;
       case 'dpMonth': {
         const [y, m] = S.datePick.month.split('-').map(Number), nd = new Date(y, m - 1 + Number(d.dir), 1);
         S.datePick.month = isoOf(nd).slice(0, 7); render(); break;

@@ -818,3 +818,13 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .box-changes .mini-head:not(:first-of-type) { margin-top: 10px; }
 /* Course Details: the one reference box on the Course page, set apart with a thin taupe edge */
 .box.box-info.shaded { border-color: var(--taupe); }
+/* Header: the Course / Academy Week switch sits right after the logo and name */
+.head-left { display: flex; align-items: center; gap: 10px 22px; flex-wrap: wrap; min-width: 0; }
+.head-left .side-switch { margin-right: 0; }
+/* Review sessions: a bigger calendar in the middle of the screen, pick as many days as you like */
+.dp-pop.dp-multi { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 330px; z-index: 60; padding: 16px 18px 14px;
+  box-shadow: 0 20px 60px rgba(61, 50, 44, .3); }
+.dp-multi .dp-title { margin: 0 0 8px; font-family: var(--serif); font-size: 20px; font-weight: 600; text-align: center; }
+.dp-multi .dp-title span { display: block; font-family: Jost, sans-serif; font-size: 12px; font-weight: 400; color: var(--muted); }
+.dp-multi .dp-grid button { width: 36px; height: 36px; font-size: 14px; }
+.dp-multi-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
