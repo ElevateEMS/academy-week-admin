@@ -602,10 +602,19 @@ function pageTitle() {
   return `<h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>${nice ? `<p>${nice}${n === currentWeekDay() ? ' · today' : ''}</p>` : ''}`;
 }
 
+// The cohort menu lists Active and Upcoming cohorts; Former and Test/QA ones only after
+// "Show former & test cohorts" (they're hidden, not removed: the app still uses them).
+const isTestCohort = key => /^(test|qa)\b/i.test(key);
+const isOldCohort = c => /former/i.test(c.status || '') || isTestCohort(c.key);
 function menu() {
-  const opts = S.cohorts.map(c => `<option value="${esc(c.key)}" ${c.key === S.cohortKey ? 'selected' : ''}>${esc(c.key)}${c.status && !/active/i.test(c.status) ? ' (' + esc(c.status) + ')' : ''}</option>`).join('');
+  const opt = c => `<option value="${esc(c.key)}" ${c.key === S.cohortKey ? 'selected' : ''}>${esc(c.key)}${c.status && !/active/i.test(c.status) ? ' (' + esc(c.status) + ')' : ''}</option>`;
+  const main = S.cohorts.filter(c => !isOldCohort(c));
+  const old = S.cohorts.filter(isOldCohort);
+  const shownOld = S.showOld ? old : old.filter(c => c.key === S.cohortKey); // the one you're on always shows
+  const opts = main.map(opt).join('') + (shownOld.length ? `<optgroup label="Former & test">${shownOld.map(opt).join('')}</optgroup>` : '');
   return `<div class="menu" data-stop>
-    <label class="menu-field">Cohort<select id="cohortSel" data-change="cohort">${opts || '<option>Loading…</option>'}</select></label>
+    <label class="menu-field">Cohort<select id="cohortSel" data-change="cohort">${opts || '<option>Loading…</option>'}</select>
+      ${old.length ? `<button class="link menu-old" data-act="toggleOld">${S.showOld ? 'Hide' : 'Show'} former & test cohorts</button>` : ''}</label>
     <button class="menu-item" data-act="newCohortOpen">+ New cohort</button>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
     <button class="menu-item" data-act="view" data-v="settings">Setup</button>
@@ -2222,7 +2231,8 @@ async function act(a, el = {}, e) {
     switch (a) {
       case 'signin': await Store.signIn(); break;
       case 'signout': S.menuOpen = false; await Store.signOut(); break;
-      case 'menu': S.menuOpen = !S.menuOpen; render(); break;
+      case 'menu': S.menuOpen = !S.menuOpen; S.showOld = false; render(); break;
+      case 'toggleOld': S.showOld = !S.showOld; render(); break;
       case 'schMenu': S.schMenu = !S.schMenu; render(); break;
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
       case 'view':

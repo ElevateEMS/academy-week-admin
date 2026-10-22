@@ -856,3 +856,4 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
   background: repeating-linear-gradient(transparent, transparent 27px, rgba(125, 101, 88, .22) 27px, rgba(125, 101, 88, .22) 28px);
   background-attachment: local; }
 .notes-back mark.nhl { background: #f1dca6; color: transparent; border-radius: 3px; }
+.menu-field .menu-old { justify-self: start; text-transform: none; letter-spacing: 0; font-size: 12px; margin-top: 2px; }
