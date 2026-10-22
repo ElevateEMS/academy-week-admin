@@ -334,7 +334,7 @@ function planModal() {
         </div>
         <aside class="plan-cov">
           <p class="mini-head">Sign-offs this plan gives each student</p>
-          ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<p class="cov-group">${esc(g.group)}</p><div class="cov-list">${g.items.map(cell).join('')}</div>`).join('')}
+          ${DEFAULTS.skills.filter(g => g.group !== 'OB').map(g => `<div class="cov-sec"><p class="cov-group">${esc(g.group)}</p><div class="cov-list">${g.items.map(cell).join('')}</div></div>`).join('')}
         </aside>
       </div>
     </div>

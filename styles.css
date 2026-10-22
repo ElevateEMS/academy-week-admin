@@ -723,3 +723,11 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 /* Plan: quiet "Clear plan" link next to Build a new mix */
 .link.quiet { font-size: 13px; color: var(--muted); }
 .link.quiet:hover { color: var(--rose); }
+
+/* Plan sign-offs panel: fills the pop-up's height (locked in place), groups spread out,
+   sizes scale with the window so it never needs scrolling */
+.plan-cov { display: flex; flex-direction: column; justify-content: space-between; min-height: calc(100vh - 150px); padding: 6px 16px 14px; }
+.plan-cov .mini-head { margin: 8px 0 0; }
+.plan-cov .cov-group { font-size: clamp(10.5px, 1.4vh, 12px); margin: 0 0 clamp(3px, .7vh, 7px); }
+.plan-cov .cov-list { gap: clamp(3px, .6vh, 7px) clamp(4px, .5vh, 6px); }
+.plan-cov .cov { font-size: clamp(12px, 1.65vh, 14px); padding: clamp(1px, .35vh, 4px) clamp(8px, 1vh, 11px); }
