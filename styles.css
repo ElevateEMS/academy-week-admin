@@ -728,6 +728,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
    sizes scale with the window so it never needs scrolling */
 .plan-cov { display: flex; flex-direction: column; justify-content: space-between; min-height: calc(100vh - 150px); padding: 6px 16px 14px; }
 .plan-cov .mini-head { margin: 8px 0 0; }
-.plan-cov .cov-group { font-size: clamp(10.5px, 1.4vh, 12px); margin: 0 0 clamp(3px, .7vh, 7px); }
-.plan-cov .cov-list { gap: clamp(3px, .6vh, 7px) clamp(4px, .5vh, 6px); }
-.plan-cov .cov { font-size: clamp(12px, 1.65vh, 14px); padding: clamp(1px, .35vh, 4px) clamp(8px, 1vh, 11px); }
+.plan-cov .cov-group { font-size: clamp(10.5px, 1.4vh, 12px); margin: clamp(5px, .95vh, 9px) 0; line-height: 1; } /* same space above and below, so it sits centered in the gap */
+.plan-cov .cov-sec:first-of-type .cov-group { margin-top: clamp(4px, .7vh, 8px); }
+.plan-cov .cov-list { gap: clamp(3px, .5vh, 5px) clamp(4px, .5vh, 6px); }
+.plan-cov .cov { font-size: clamp(12px, 1.65vh, 14px); padding: clamp(1px, .3vh, 3px) clamp(8px, 1vh, 11px); }
