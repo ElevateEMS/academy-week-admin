@@ -830,3 +830,17 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .dp-multi-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 /* Editing an item: the edit line spans the whole row, not just the old text's width */
 .checks label > span:has(> .txt-edit) { flex: 1; min-width: 0; display: block; }
+/* Course page on a smaller window: Course Details, Setup Checklist, Notes, then Changes last.
+   Two columns: Course Details / Notes / Changes down the left, the checklist down the right.
+   One column (phone): straight down in that order. */
+@media (max-width: 1100px) {
+  .course-board { align-items: start; grid-auto-rows: auto; }
+  .course-board > .board-col { display: contents; }
+  .course-board .box-info { order: 1; grid-column: 1; grid-row: 1; }
+  .course-board .box-setup { order: 2; grid-column: 2; grid-row: 1 / span 3; }
+  .course-board .box-notes { order: 3; grid-column: 1; grid-row: 2; }
+  .course-board .box-changes { order: 4; grid-column: 1; grid-row: 3; }
+}
+@media (max-width: 720px) {
+  .course-board .box-info, .course-board .box-setup, .course-board .box-notes, .course-board .box-changes { grid-column: auto; grid-row: auto; }
+}

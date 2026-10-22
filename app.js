@@ -576,7 +576,7 @@ function pageTitle() {
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? students().length : 0;
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
-    return `<h1>Course</h1><p>${S.sheet ? when + ' · ' + n + ' student' + (n === 1 ? '' : 's') + ' enrolled' : ''}</p>`;
+    return `<h1>${esc(S.cohortKey || 'Course')}</h1><p>${S.sheet ? when + ' · ' + n + ' student' + (n === 1 ? '' : 's') + ' enrolled' : ''}</p>`;
   }
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
   if (S.view === 'students') {
