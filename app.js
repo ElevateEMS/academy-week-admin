@@ -410,11 +410,11 @@ function pickSide(key) {
   else if (S.view === 'course') S.view = 'day';
 }
 
-async function selectCohort(key) {
+async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null });
-  sidePickedFor = null;
+  sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
@@ -2296,12 +2296,18 @@ async function act(a, el = {}, e) {
         try {
           res = await Sheets.createCohort(key, info);
         } catch (err) { S.newCohort.busy = false; S.newCohort.err = err.message; render(); return; }
+        // The details didn't come back saved with the new cohort: try once more on their own.
+        let infoErr = '';
+        if (Object.keys(info).length && !(res && res.info)) {
+          try { await Sheets.saveSettings(key, info); } catch (err) { infoErr = (res && res.settingsError) || err.message; }
+        }
         delete S.drafts.newCohort; clearCourseDrafts('nc-'); S.newCohort = null;
         try { S.cohorts = await Sheets.listCohorts(); } catch {}
         S.view = 'course'; pref('view', 'course');
-        toast(res && res.settingsError ? `${key} is set up, but the course details didn’t save: ${res.settingsError} Add them with the pencil on Course Details.`
-          : `${key} is set up. Its folder and sheets are in your Drive.`);
-        await selectCohort(key); break;
+        if (!infoErr) toast(`${key} is set up. Its folder and sheets are in your Drive.`);
+        await selectCohort(key, { keepView: true });
+        if (infoErr) alert(`${key} is set up, but its course details didn’t save to the sheet:\n\n${infoErr}\n\nAdd them with the pencil on Course Details.`);
+        break;
       }
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
