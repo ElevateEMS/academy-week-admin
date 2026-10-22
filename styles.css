@@ -732,3 +732,8 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .plan-cov .cov-sec:first-of-type .cov-group { margin-top: clamp(4px, .7vh, 8px); }
 .plan-cov .cov-list { gap: clamp(3px, .5vh, 5px) clamp(4px, .5vh, 6px); }
 .plan-cov .cov { font-size: clamp(12px, 1.65vh, 14px); padding: clamp(1px, .3vh, 3px) clamp(8px, 1vh, 11px); }
+
+/* Students: Skills Tracking sheet icon + PDF pop-up */
+.students-tools { display: flex; align-items: center; gap: 10px; }
+.modal.pdf { width: min(1000px, 100%); height: calc(100vh - 40px); }
+.modal.pdf iframe { flex: 1; width: 100%; border: 0; border-radius: 0 0 18px 18px; background: #fff; }

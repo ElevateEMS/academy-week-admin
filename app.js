@@ -455,6 +455,7 @@ function shell() {
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
   ${S.bagEd ? bagEdModal() : ''}
+  ${S.skillsSheet ? skillsSheetModal() : ''}
   ${S.schTplOpen ? schTplModal() : ''}
   ${S.binderOpen ? binderModal() : ''}
   ${S.planOpen ? planModal() : ''}
@@ -668,6 +669,7 @@ const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs'];
 const hidden = k => { const v = pref('hide-' + k); return v != null ? v === '1' : !!(S.settings && S.settings.hideCheckedDefault); };
 const BOOK = '<svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5c-.8 0-1.5.7-1.5 1.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/><path d="M4 20.5V5.5M20 20.5V5.5"/></svg>';
 const RESET = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.8h3.8"/></svg>';
+const SHEET = '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 12.5l2 2 4-4.5"/></svg>';
 const EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
 const PRINTER = '<svg viewBox="0 0 24 24"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6.5H7z"/></svg>';
@@ -1192,7 +1194,8 @@ function studentsView() {
   return `
   <div class="students-top">
     <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Conduct notes')}</div>
-    <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">
+    <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button>
+      <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}"></div>
   </div>
   ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
@@ -1449,6 +1452,13 @@ async function saveBagList(bag) {
   Object.keys(S.drafts).forEach(k => { if (/^bag[NI]-/.test(k)) delete S.drafts[k]; });
   const clean = bag.map(sec => ({ name: sec.name, items: sec.items.filter(Boolean) }));
   await Store.set('meta/settings', { bag: clean, ...(Object.keys(moved).length ? { someBags: moved } : {}) });
+}
+// The printed Skills Tracking sheet students carry (skills-tracking.pdf), for reference.
+function skillsSheetModal() {
+  return `<div class="overlay" data-act="skillsSheetClose"><div class="modal pdf" data-stop>
+    <div class="modal-head"><h2>Skills Tracking</h2><button class="x big" data-act="skillsSheetClose" aria-label="Close">×</button></div>
+    <iframe src="skills-tracking.pdf#view=FitH&navpanes=0" title="Skills Tracking sheet"></iframe>
+  </div></div>`;
 }
 function bagEdModal() {
   const bag = cfg().bag, all = bagAll();
@@ -1768,7 +1778,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.datePick) S.datePick = null; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
+    if (S.datePick) S.datePick = null; else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
@@ -1998,6 +2008,8 @@ async function act(a, el = {}, e) {
         } else toast('Day templates saved.');
         break;
       }
+      case 'skillsSheet': S.skillsSheet = true; render(); break;
+      case 'skillsSheetClose': S.skillsSheet = false; render(); break;
       case 'bagEdOpen': S.bagEd = true; render(); break;
       case 'bagEdClose': S.bagEd = false; render(); break;
       case 'bagSome': {
