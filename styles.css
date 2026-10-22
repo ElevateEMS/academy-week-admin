@@ -719,3 +719,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 
 /* Prep: the scenarios box fits the plan (no inner scroll) unless you drag it */
 .box.box-scenarios { flex: 0 0 auto; }
+
+/* Plan: quiet "Clear plan" link next to Build a new mix */
+.link.quiet { font-size: 13px; color: var(--muted); }
+.link.quiet:hover { color: var(--rose); }

@@ -423,6 +423,7 @@ function shell() {
   ${S.binderOpen ? binderModal() : ''}
   ${S.planOpen ? planModal() : ''}
   ${S.planDelAsk != null ? planDelModal() : ''}
+  ${S.planClearAsk ? planClearModal() : ''}
   ${S.match ? matchModal() : ''}
   ${S.libOpen ? libModal() : ''}
   ${S.place ? placeModal() : ''}`;
@@ -1730,7 +1731,7 @@ document.addEventListener('change', async e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (S.datePick) S.datePick = null; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
+    if (S.datePick) S.datePick = null; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }

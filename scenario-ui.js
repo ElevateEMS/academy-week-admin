@@ -325,6 +325,7 @@ function planModal() {
             <p class="muted small">${items.length} scenarios · ${med} medical · ${items.length - med} trauma</p>
             <div class="plan-btns">
               <button class="btn small" data-act="planBuild">Build a new mix</button>
+              ${items.length ? '<button class="link quiet" data-act="planClearAsk">Clear plan</button>' : ''}
               ${items.length ? '<button class="btn primary small push-right" data-act="planPlace">Put the plan on the schedule</button>' : ''}
             </div>
           </div>
@@ -341,6 +342,18 @@ function planModal() {
 }
 
 // Picking the station for a scenario from the plan (or from Additional Scenarios without a station).
+// "Clear the whole plan?" (and, if any are placed, take them off the schedule too).
+function planClearModal() {
+  const placed = planItems().filter(x => stationsWith(x.id).length).length;
+  return `<div class="overlay" data-act="planClearClose"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Clear Plan</h2><button class="x big" data-act="planClearClose" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>Clear all ${planItems().length} scenarios from ${esc(S.cohortKey)}’s plan?</p>
+      ${placed ? `<p class="muted small">${placed} of them ${placed === 1 ? 'is' : 'are'} on the schedule. Anything you typed on a station yourself stays.</p>` : ''}</div>
+    <div class="modal-foot"><button class="btn" data-act="planClearClose">Cancel</button>
+      ${placed ? `<button class="btn" data-act="planClear">Clear plan only</button><button class="btn primary danger" data-act="planClear" data-sched="1">Clear plan and schedule</button>`
+        : '<button class="btn primary danger" data-act="planClear">Clear plan</button>'}</div>
+  </div></div>`;
+}
 // "Remove from plan?" (and, if it's placed, from the schedule too).
 function planDelModal() {
   const x = planItems()[S.planDelAsk];
@@ -638,6 +651,19 @@ async function scenAct(a, el, e) {
       if (!sc || planItems().some(x => x.id === d.id)) return true;
       await savePlan([...planItems(), { id: d.id, addons: [], day: sc.every || (sc.cat === 'trauma' ? 3 : 2), ...(sc.every ? { fixed: true } : {}) }]);
       toast('Added ' + sc.name + ' to the plan.'); return true;
+    }
+    case 'planClearAsk': S.planClearAsk = true; render(); return true;
+    case 'planClearClose': S.planClearAsk = false; render(); return true;
+    case 'planClear': {
+      S.planClearAsk = false;
+      if (d.sched) {
+        const byDay = {};
+        planItems().forEach(x => stationsWith(x.id).forEach(a => { (byDay[a.day] = byDay[a.day] || new Set()).add(x.id); }));
+        for (const [n, ids] of Object.entries(byDay)) await removeManyFromStations(Number(n), [...ids]);
+      }
+      await savePlan([]);
+      toast(d.sched ? 'Plan cleared, and taken off the schedule.' : 'Plan cleared.');
+      render(); return true;
     }
     case 'planDelAsk': S.planDelAsk = Number(d.i); render(); return true;
     case 'planDelClose': S.planDelAsk = null; render(); return true;
