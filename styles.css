@@ -816,3 +816,5 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .add-plus.small-plus:hover, .box.shaded .add-plus.small-plus:hover { background: none; opacity: 1; }
 .box-sep { border: 0; border-top: 1px solid rgba(125, 101, 88, .3); margin: 16px 0 4px; flex-shrink: 0; width: 100%; }
 .box-changes .mini-head:not(:first-of-type) { margin-top: 10px; }
+/* Course Details: the one reference box on the Course page, set apart with a thin taupe edge */
+.box.box-info.shaded { border-color: var(--taupe); }
