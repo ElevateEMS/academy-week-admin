@@ -285,6 +285,7 @@ function staffTasks(n, { carry = true } = {}) {
 
 /* ---------- Boot ---------- */
 Store.onUser(async user => {
+  S.authKnown = true; // until now, sign-in was still being checked (bootShell)
   if (user && !user.sample && !STAFF_EMAILS.includes(String(user.email).toLowerCase())) {
     toast('That Google account doesn’t have access. Use your Elevate EMS account.');
     await Store.signOut();
@@ -382,7 +383,7 @@ function render() {
     const id = a && a.id;
     const sel = id && typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null;
     const scrolls = [...document.querySelectorAll('[data-keep-scroll]')].map(el => [el.dataset.keepScroll, el.scrollTop]);
-    $('#app').innerHTML = S.user ? shell() : signInView();
+    $('#app').innerHTML = S.user ? shell() : S.authKnown ? signInView() : bootShell();
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
     if (id) {
       const el = document.getElementById(id);
@@ -412,6 +413,19 @@ function signInView() {
     <button class="btn primary wide" data-act="signin">Sign in with Google</button>
     <p class="muted small">Use your elevateemsacademy.com account.</p>
   </div></div>`;
+}
+
+// While sign-in is being checked on a refresh: just the header, so the page fills in under it.
+function bootShell() {
+  const icon = v => `<span class="icon-btn">${ICONS[v]}</span>`;
+  return `
+  ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
+  <header class="top">
+    <span class="brand"><img src="logo.png" alt=""><span><b>Academy Week Admin</b><small>${esc(S.cohortKey || '')}</small></span></span>
+    <div class="page-title"></div>
+    <nav class="icons">${icon('day')}${icon('schedule')}${icon('students')}<div class="menu-wrap">${icon('settings')}</div></nav>
+  </header>
+  <main class="wrap"></main>`;
 }
 
 function shell() {
