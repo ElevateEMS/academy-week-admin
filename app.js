@@ -1175,11 +1175,10 @@ function studentsView() {
     all: all.length,
     behind: all.filter(s => s.skill === 'behind').length,
     fixes: all.filter(s => s.fixes).length,
-    warnings: all.filter(s => s.warns).length,
   };
   const q = S.search.trim().toLowerCase();
   const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
-    (S.filter === 'all' || (S.filter === 'behind' && s.skill === 'behind') || (S.filter === 'fixes' && s.fixes) || (S.filter === 'warnings' && s.warns))
+    (S.filter === 'all' || (S.filter === 'behind' && s.skill === 'behind') || (S.filter === 'fixes' && s.fixes))
     && (!q || s.name.toLowerCase().includes(q)));
 
   // Who's behind on what, grouped by skill (for planning the next day).
@@ -1193,7 +1192,7 @@ function studentsView() {
 
   return `
   <div class="students-top">
-    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}${chip('warnings', 'Conduct notes')}</div>
+    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}</div>
     <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button>
       <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}"></div>
   </div>
