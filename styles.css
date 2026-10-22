@@ -811,7 +811,8 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .setup-list li.sec-head > .txt, .setup-list li.sec-head > .txt-edit { flex: 1; min-width: 0; }
 /* Changes box: a small + beside each heading, and a line between the two lists */
 .mini-head.with-plus { justify-content: flex-start; align-items: center; gap: 8px; }
-.add-plus.small-plus { width: 22px; height: 22px; font-size: 15px; line-height: 1; padding: 0; display: inline-grid; place-items: center; font-family: Jost, sans-serif; }
-.box.shaded .add-plus.small-plus { background: rgba(255, 255, 255, .45); border-color: rgba(125, 101, 88, .35); }
+.add-plus.small-plus { width: 22px; height: 22px; font-size: 20px; line-height: 1; padding: 0 0 2px; display: inline-grid; place-items: center; font-family: Jost, sans-serif;
+  border: 0; background: none; color: var(--taupe-dark); opacity: .7; }
+.add-plus.small-plus:hover, .box.shaded .add-plus.small-plus:hover { background: none; opacity: 1; }
 .box-sep { border: 0; border-top: 1px solid rgba(125, 101, 88, .3); margin: 16px 0 4px; flex-shrink: 0; width: 100%; }
 .box-changes .mini-head:not(:first-of-type) { margin-top: 10px; }
