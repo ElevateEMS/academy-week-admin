@@ -872,7 +872,6 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .em-row.overdue .em-sub { color: var(--rose); }
 .em-list.later .em-name { font-weight: 400; color: var(--taupe-dark); }
 .em-list.later .btn.tiny { opacity: .7; }
-.em-more { align-self: flex-start; margin: 4px 0 2px; flex-shrink: 0; }
 .em-note { background: var(--honey-soft); color: #7a5d30; border-radius: 10px; padding: 7px 11px; font-size: 13px; margin: 0 0 8px; flex-shrink: 0; }
 .em-done { margin-top: 10px; flex-shrink: 0; }
 .em-done summary { cursor: pointer; font-family: var(--serif); font-size: 17px; font-weight: 600; }

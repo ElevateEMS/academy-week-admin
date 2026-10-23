@@ -128,7 +128,9 @@ function emailRows() {
       (rows[key] = rows[key] || { key, tpl: t, date, custom, sids: [] }).sids.push(p.sid);
     });
   });
-  const list = Object.values(rows).sort((a, b) => (a.date || '0').localeCompare(b.date || '0') || a.tpl.name.localeCompare(b.tpl.name));
+  // Same day: in the order of the template list (on track before behind, etc.).
+  const order = Object.fromEntries(emailTemplates({ all: true }).map((t, i) => [t.id, i]));
+  const list = Object.values(rows).sort((a, b) => (a.date || '0').localeCompare(b.date || '0') || order[a.tpl.id] - order[b.tpl.id]);
   list.undated = undated;
   return list;
 }
@@ -151,7 +153,6 @@ function emailsBox() {
       <span class="em-main"><span class="em-name">${esc(r.tpl.name)}</span><span class="em-sub">${emSoon(r.date)} · ${rowWho(r)}</span></span>
       ${r.pick ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed this time" aria-label="Not needed this time">×</button>` : ''}
       <button class="btn tiny" data-act="emDraft" data-row="${esc(r.key)}">Draft</button></li>`;
-  const shown = S.emailAll ? later : later.slice(0, 4);
   const notes = [];
   if (rows.undated.has('orientation') || rows.undated.has('next') || rows.undated.has('final')) notes.push('Add the orientation date in Course Details to schedule the orientation and payment emails.');
   if (rows.undated.has('academy')) notes.push('Add the Academy Week start date in Course Details to schedule the Academy Week emails.');
@@ -163,8 +164,7 @@ function emailsBox() {
     <p class="mini-head">Due now <span class="count">${due.length || ''}</span></p>
     <ul class="em-list">${due.map(row).join('') || '<li class="empty">Nothing due today.</li>'}</ul>
     ${later.length ? `<p class="mini-head">Coming up</p>
-      <ul class="em-list later">${shown.map(row).join('')}</ul>
-      ${later.length > 4 ? `<button class="link em-more" data-act="emailAll">${S.emailAll ? 'Show fewer' : 'Show all ' + later.length}</button>` : ''}` : ''}
+      <ul class="em-list later">${later.map(row).join('')}</ul>` : ''}
     ${log.length ? `<details class="em-done" ${S.emailDoneOpen ? 'open' : ''}><summary data-act="emailDoneToggle">Drafted <span class="count">${log.length}</span></summary>
       <ul class="em-list done">${log.slice(0, 20).map(x => `<li class="em-row"><span class="em-main"><span class="em-name">✓ ${esc(x.name)}</span>
         <span class="em-sub">${monthDay(isoOf(new Date(x.at)))} · ${x.count === 1 ? esc((x.names || [])[0] || '1 student') : x.count + ' students'}</span></span></li>`).join('')}</ul></details>` : ''}`;
@@ -517,7 +517,6 @@ async function emCreate() {
 async function emailAct(a, el, e) {
   const d = el.dataset || {};
   switch (a) {
-    case 'emailAll': S.emailAll = !S.emailAll; render(); return true;
     case 'emSkip': await Store.set('cohorts/' + S.cohortKey, { emailSkip: { [d.row]: true } }); return true;
     case 'emailDoneToggle': e && e.preventDefault(); S.emailDoneOpen = !S.emailDoneOpen; render(); return true;
     case 'emDraft': {
