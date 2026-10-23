@@ -900,7 +900,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-late-row p { margin: 0 0 6px; }
 .em-late-fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .em-late-fields input { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--paper); outline: none; width: 170px; }
-.em-late-fields input.need { border-color: var(--honey); background: #fff8ea; box-shadow: 0 0 0 3px rgba(193, 154, 98, .18); }
+.em-late-fields input.need:placeholder-shown { border-color: var(--honey); background: #fff8ea; box-shadow: 0 0 0 3px rgba(193, 154, 98, .18); }
 .em-late .muted.small { margin: 8px 0 0; }
 
 .em-pick-list { display: grid; gap: 6px; margin: 4px 0 6px; }
@@ -916,13 +916,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 
 .modal.em-stu { width: min(1100px, 100%); }
 .em-table td, .em-table th { font-size: 13.5px; vertical-align: top; }
-.em-table tr[data-act] { cursor: pointer; }
-.em-table tr.on td { background: var(--blush-soft); }
 .em-yes { color: var(--sage); font-weight: 600; }
-.em-stu-edit td { background: var(--blush-soft); cursor: default; }
-.em-stu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; padding: 2px 4px 6px; }
-.em-stu-grid .mini-head { margin-top: 2px; }
-.em-stu-foot { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .tag-soft.warn { background: var(--honey-soft); color: #7a5d30; }
 
 .em-count { font-size: 15px; margin: 0 0 10px; }
@@ -952,7 +946,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-help summary { cursor: pointer; color: var(--taupe-dark); }
 .em-help p { margin: 6px 0; line-height: 1.55; }
 @media (max-width: 900px) {
-  .em-panes, .em-stu-grid { grid-template-columns: 1fr; }
+  .em-panes { grid-template-columns: 1fr; }
   .em-tpl-grid { grid-template-columns: 1fr; }
   .em-tpl-list { border-right: 0; }
   /* The list and the editor take turns: pick a template, "‹ All templates" goes back. */
@@ -979,3 +973,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-back { display: none; }
 .em-sig { margin: 4px 0 0; padding-top: 8px; border-top: 1px dashed #ddd; color: #999; font-size: 12px; font-style: italic; font-family: Jost, sans-serif; }
 .em-table th.c, .em-table td.c { text-align: center; }
+.cell-link { border: 0; background: none; padding: 2px 4px; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
+.cell-link:hover { text-decoration: underline; text-underline-offset: 3px; background: var(--blush-soft); }
+.em-due-note { margin: 12px 0 2px; font-size: 14px; }
+.em-ext-fields { display: grid; grid-template-columns: auto auto 1fr; gap: 10px 12px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
+.small-modal .modal-foot .link { margin-right: auto; }

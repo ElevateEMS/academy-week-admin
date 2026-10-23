@@ -365,33 +365,23 @@ function emailPickModal() {
   </div></div>`;
 }
 
-/* ---------- Late enrollees + extensions (people icon on the Emails box) ---------- */
+/* ---------- Student Emails (people icon on the Emails box) ---------- */
+// Click a student's Orientation date: late enrollee (their own orientation; payments follow it).
+// Click their due dates: an extension (only for alternative deadlines).
 function emailStudentsModal() {
-  const people = emPeople(), sel = S.emailStu;
+  const people = emPeople();
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
   const rows = people.map(p => {
-    const open = sel === p.sid;
     const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before'), sentN = drafted.length;
     const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');
-    return `<tr class="${open ? 'on' : ''}" data-act="emStuSel" data-sid="${p.sid}">
+    return `<tr>
       <td><b>${esc(p.name)}</b>${p.late ? ' <em class="tag-soft">late enrollee</em>' : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.needsLate ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
         <div class="muted small">${validEmail(p.email) ? esc(p.email) : '<span class="tbd">no email in the sheet</span>'}</div></td>
       <td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
-      <td class="c">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : '<span class="tbd">TBD</span>'}</td>
-      <td class="c">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</td>
+      <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
+      <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>
       <td class="c">${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</td>
-      <td class="c" title="${esc(sentTip)}">${sentN || '<span class="muted">–</span>'}</td></tr>
-      ${open ? `<tr class="em-stu-edit" data-stop><td colspan="8"><div class="em-stu-grid">
-        <div><p class="mini-head">Late enrollee</p>
-          <div class="em-late-fields">${datePicker('ems-date-' + p.sid, { optional: true, empty: 'Their orientation', title: 'Their orientation' })}
-            <input id="ems-time-${p.sid}" data-draft="ems-time-${p.sid}" placeholder="Time, e.g. 6:30 PM" value="${esc(S.drafts['ems-time-' + p.sid] || '')}" autocomplete="off"></div>
-          <p class="muted small">Their emails use this date; payments are due 2 and 4 weeks after it. Clear the date to put them back on the cohort’s dates.</p></div>
-        <div><p class="mini-head">Payment dates (extension)</p>
-          <div class="em-late-fields"><span class="muted small">Next</span>${datePicker('ems-next-' + p.sid, { optional: true, empty: 'Usual date', title: 'Next installment due' })}
-            <span class="muted small">Final</span>${datePicker('ems-final-' + p.sid, { optional: true, empty: 'Usual date', title: 'Final installment due' })}</div>
-          <p class="muted small">Leave on “Usual date” unless you gave them an extension. Their reminders move to the new date.</p></div>
-        <div class="em-stu-foot"><button class="btn small" data-act="emStuSel" data-sid="${p.sid}">Cancel</button><button class="btn small primary" data-act="emStuSave" data-sid="${p.sid}">Save</button></div>
-      </div></td></tr>` : ''}`;
+      <td class="c" title="${esc(sentTip)}">${sentN || '<span class="muted">–</span>'}</td></tr>`;
   }).join('');
   return `<div class="overlay" data-act="emStuClose"><div class="modal em-stu" data-stop>
     <div class="modal-head"><h2>Student Emails</h2><button class="x big" data-act="emStuClose" aria-label="Close">×</button></div>
@@ -401,6 +391,56 @@ function emailStudentsModal() {
     </div>
   </div></div>`;
 }
+// Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,
+// otherwise the day before and 29 days after the cohort's.
+function usualDue(lateDate) {
+  const f = cohortInfo().firstDay, orient = isIsoDate(lateDate) ? lateDate : isIsoDate(f) ? f : '';
+  if (!orient) return { next: '', final: '' };
+  return isIsoDate(lateDate) ? { next: addDays(orient, 14), final: addDays(orient, 28) } : { next: addDays(orient, -1), final: addDays(orient, 29) };
+}
+function emStuEditModal() {
+  const ed = S.emailStu, p = emPersonBySid(ed.sid);
+  if (!p) return '';
+  const k = x => 'ems-' + x + '-' + p.sid;
+  let title, body, undo = '';
+  if (ed.kind === 'late') {
+    const date = S.drafts[k('date')], due = usualDue(date), pd = (S.studentsDoc[p.sid] || {}).payDates || {};
+    title = 'Late Enrollee';
+    body = `<p class="muted small">${esc(p.name)}’s own orientation. Their emails use it.</p>
+      <div class="em-late-fields">${datePicker(k('date'), { optional: true, empty: 'Pick a date', title: 'Their orientation' })}
+        <input id="${k('time')}" data-draft="${k('time')}" class="${S.drafts[k('time')] ? '' : 'need'}" placeholder="Time, e.g. 6:30 PM" value="${esc(S.drafts[k('time')] || '')}" autocomplete="off"></div>
+      ${isIsoDate(date) ? `<p class="em-due-note">Next due <b>${monthDay(due.next)}</b> · Final due <b>${monthDay(due.final)}</b>, set automatically.${isIsoDate(pd.next) || isIsoDate(pd.final) ? ' (Their extension dates still apply.)' : ''}</p>` : ''}`;
+    if (p.late) undo = `<button class="link" data-act="emLateClear" data-sid="${p.sid}">Back to the cohort’s orientation</button>`;
+  } else {
+    const late = (S.studentsDoc[p.sid] || {}).late || {}, due = usualDue(late.date);
+    title = 'Extension';
+    body = `<p class="muted small">${esc(p.name)}’s payment deadlines. Change only the one you’re extending; their reminders move to the new date.</p>
+      <div class="em-ext-fields"><span>Next installment</span>${datePicker(k('next'), { optional: true, empty: 'TBD', title: 'Next installment due' })}
+        <span class="muted small">usually ${due.next ? monthDay(due.next) : 'TBD'}</span>
+        <span>Final installment</span>${datePicker(k('final'), { optional: true, empty: 'TBD', title: 'Final installment due' })}
+        <span class="muted small">usually ${due.final ? monthDay(due.final) : 'TBD'}</span></div>`;
+    if (p.ext.next || p.ext.final) undo = `<button class="link" data-act="emExtClear" data-sid="${p.sid}">Back to the usual dates</button>`;
+  }
+  return `<div class="overlay" data-act="emStuEditClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>${title}</h2><button class="x big" data-act="emStuEditClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">${body}</div>
+    <div class="modal-foot">${undo}<button class="btn primary" data-act="${ed.kind === 'late' ? 'emLateSave2' : 'emExtSave'}" data-sid="${p.sid}">Save</button></div>
+  </div></div>`;
+}
+// Saves a student's late/extension change; a payment reminder already drafted for a date that
+// just moved comes back for the new date.
+async function emSaveStudent(sid, upd) {
+  const before = emPersonBySid(sid);
+  await Store.set(P('students/' + sid), upd);
+  const doc = S.studentsDoc[sid] || {};
+  S.studentsDoc[sid] = { ...doc, ...upd, late: 'late' in upd ? upd.late : doc.late, payDates: { ...(doc.payDates || {}), ...(upd.payDates || {}) } };
+  const after = emPersonBySid(sid), resend = {};
+  if (before && after) emailTemplates({ all: true }).forEach(t => {
+    if ((t.when.from === 'next' && before.next !== after.next) || (t.when.from === 'final' && before.final !== after.final)) resend[t.id] = null;
+  });
+  if (Object.keys(resend).length) await Store.set(P('students/' + sid), { sent: resend });
+}
+const emStuDone = sid => { ['date', 'time', 'next', 'final'].forEach(x => delete S.drafts['ems-' + x + '-' + sid]); S.emailStu = null; };
 
 /* ---------- Setup → Book Codes ---------- */
 function bookCodesModal() {
@@ -576,31 +616,33 @@ async function emailAct(a, el, e) {
 
     case 'emStuOpen': S.emailStuOpen = true; S.emailStu = null; render(); return true;
     case 'emStuClose': S.emailStuOpen = false; S.emailStu = null; render(); return true;
-    case 'emStuSel': {
-      if (S.emailStu === d.sid) { S.emailStu = null; render(); return true; }
-      const doc = S.studentsDoc[d.sid] || {}, late = doc.late || {}, pd = doc.payDates || {};
+    case 'emLateOpen': case 'emExtOpen': {
+      const p = emPersonBySid(d.sid), late = (S.studentsDoc[d.sid] || {}).late || {};
       S.drafts['ems-date-' + d.sid] = isIsoDate(late.date) ? late.date : '';
       S.drafts['ems-time-' + d.sid] = late.time || '';
-      S.drafts['ems-next-' + d.sid] = isIsoDate(pd.next) ? pd.next : '';
-      S.drafts['ems-final-' + d.sid] = isIsoDate(pd.final) ? pd.final : '';
-      S.emailStu = d.sid; render(); return true;
+      S.drafts['ems-next-' + d.sid] = p.next || '';
+      S.drafts['ems-final-' + d.sid] = p.final || '';
+      S.emailStu = { sid: d.sid, kind: a === 'emLateOpen' ? 'late' : 'ext' }; render(); return true;
     }
-    case 'emStuSave': {
-      const sid = d.sid, k = x => S.drafts['ems-' + x + '-' + sid];
-      const date = k('date'), time = String(k('time') || '').trim(), next = k('next'), fin = k('final');
-      if (isIsoDate(date) && !time) { toast('Type their orientation time too.'); return true; }
-      const doc = S.studentsDoc[sid] || {}, pd = doc.payDates || {};
-      const upd = { late: isIsoDate(date) ? { date, time } : null, payDates: { next: isIsoDate(next) ? next : null, final: isIsoDate(fin) ? fin : null } };
-      // A new due date gets its own reminders again.
-      const resend = {};
-      emailTemplates({ all: true }).forEach(t => {
-        if ((t.when.from === 'next' && (pd.next || null) !== upd.payDates.next) || (t.when.from === 'final' && (pd.final || null) !== upd.payDates.final)) resend[t.id] = null;
-      });
-      if (Object.keys(resend).length) upd.sent = resend;
-      await Store.set(P('students/' + sid), upd);
-      ['date', 'time', 'next', 'final'].forEach(x => delete S.drafts['ems-' + x + '-' + sid]);
-      S.emailStu = null; toast('Saved.'); render(); return true;
+    case 'emStuEditClose': emStuDone(S.emailStu.sid); render(); return true;
+    case 'emLateSave2': {
+      const date = S.drafts['ems-date-' + d.sid], time = String(S.drafts['ems-time-' + d.sid] || '').trim();
+      if (!isIsoDate(date) || !time) { toast('Pick their orientation date and type the time.'); return true; }
+      await emSaveStudent(d.sid, { late: { date, time } });
+      emStuDone(d.sid); toast('Saved. Their emails and payment dates follow ' + monthDay(date) + '.'); render(); return true;
     }
+    case 'emLateClear':
+      if (!confirm('Put them back on the cohort’s orientation and payment dates?')) return true;
+      await emSaveStudent(d.sid, { late: null }); emStuDone(d.sid); toast('Back on the cohort’s dates.'); render(); return true;
+    case 'emExtSave': {
+      const late = (S.studentsDoc[d.sid] || {}).late || {}, due = usualDue(late.date);
+      const next = S.drafts['ems-next-' + d.sid], fin = S.drafts['ems-final-' + d.sid];
+      // The usual date isn't an extension, so it isn't saved as one.
+      await emSaveStudent(d.sid, { payDates: { next: isIsoDate(next) && next !== due.next ? next : null, final: isIsoDate(fin) && fin !== due.final ? fin : null } });
+      emStuDone(d.sid); toast('Saved.'); render(); return true;
+    }
+    case 'emExtClear':
+      await emSaveStudent(d.sid, { payDates: { next: null, final: null } }); emStuDone(d.sid); toast('Back on the usual dates.'); render(); return true;
 
     case 'bookCodesOpen': S.bookCodesOpen = true; S.menuOpen = false; render(); return true;
     case 'bookCodesClose': S.bookCodesOpen = false; render(); return true;
@@ -728,10 +770,11 @@ function emailEscape() {
   if (S.emailPick) { S.emailPick = null; return true; }
   if (S.emailTplEd) { if (!S.emailTplEd.dirty || confirm('Close without saving your changes?')) S.emailTplEd = null; return true; }
   if (S.bookCodesOpen) { S.bookCodesOpen = false; return true; }
-  if (S.emailStuOpen) { if (S.emailStu) S.emailStu = null; else S.emailStuOpen = false; return true; }
+  if (S.emailStu) { emStuDone(S.emailStu.sid); return true; }
+  if (S.emailStuOpen) { S.emailStuOpen = false; return true; }
   return false;
 }
 function emailModals() {
-  return (S.emailStuOpen ? emailStudentsModal() : '') + (S.emailPick ? emailPickModal() : '') + (S.emailDraft ? emailDraftModal() : '')
+  return (S.emailStuOpen ? emailStudentsModal() : '') + (S.emailStu ? emStuEditModal() : '') + (S.emailPick ? emailPickModal() : '') + (S.emailDraft ? emailDraftModal() : '')
     + (S.emailTplEd ? emailTplModal() : '') + (S.bookCodesOpen ? bookCodesModal() : '');
 }
