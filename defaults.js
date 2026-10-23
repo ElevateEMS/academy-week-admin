@@ -151,7 +151,7 @@ DEFAULTS.schedule = {
 /* ---------- Emails (Course page → Emails box; Setup → Email Templates) ----------
    The app only makes Gmail drafts in gbrown@'s Drafts; nothing is sent by the app.
    Written the way they're typed in the template editor:
-     {first name} etc.        filled in from the cohort sheet (blank ones say TBD)
+     {first name} etc.        filled in from the cohort sheet (blank course details say TBD)
      {if late}…{else}…{end}   only for some students (see the help in the template editor)
      **bold**  *italic*  [words](link)  "- " at the start of a line = a bullet
      [[like this]]            something you type in before the draft can be made

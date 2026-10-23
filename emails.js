@@ -222,6 +222,7 @@ function emValues(p) {
   [1, 2, 3, 4, 5].forEach(n => { const d = days.find(x => x.n === n); v['day ' + n] = d ? emDate(d.iso, { short: true }) : ''; });
   return v;
 }
+const EM_PERSONAL = ['first name', 'full name', 'referral code', 'book code'];
 // → { subject, body, missing: [fill-ins that came out TBD] }
 const OLD_SIGNOFF = /\n*Best regards,\s*\n\s*\n?\s*Gabriella Brown\s*\n\s*Elevate EMS, LLC\s*$/;
 function emFill(t, p, group) {
@@ -231,6 +232,8 @@ function emFill(t, p, group) {
       const key = k.trim().toLowerCase();
       if (!(key in vals)) return m;
       if (vals[key]) return vals[key];
+      // A student's own detail with no student (the group email, or no code yet): highlighted, not TBD.
+      if (EM_PERSONAL.includes(key)) return '[[' + k.trim() + ']]';
       missing.add(k.trim()); return 'TBD';
     })
     .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -418,7 +421,7 @@ function bookCodesModal() {
 
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Fill-ins, “only for some students” and formatting</summary>
-  <p><b>Fill-ins</b> (blank ones say TBD): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code}</p>
+  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code}</p>
   <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension. Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 function emailTplModal() {
@@ -621,7 +624,7 @@ async function emailAct(a, el, e) {
 
     case 'emtOpen': {
       const first = emailTemplates({ all: true })[0];
-      S.emailTplEd = { sel: first.id, draft: emtCopy(first), dirty: false, as: 'group', view: 'list' };
+      S.emailTplEd = { sel: first.id, draft: emtCopy(first), dirty: false, as: first.send === 'bcc' ? 'group' : (emPeople()[0] || {}).sid || 'group', view: 'list' };
       S.menuOpen = false; render(); return true;
     }
     case 'emtClose':
