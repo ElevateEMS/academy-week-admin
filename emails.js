@@ -25,7 +25,8 @@ function emailTemplates({ all = false } = {}) {
 }
 const tplById = id => emailTemplates({ all: true }).find(t => t.id === id);
 
-const WHO = { all: 'Whole cohort', check: 'Whole cohort (you uncheck anyone first)', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final', pick: 'Students you pick' };
+// check (Cohort Graduates): everyone attending Academy Week, all checked; you uncheck anyone when you draft it.
+const WHO = { all: 'Whole cohort', check: 'Cohort Graduates', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final', pick: 'Students you pick' };
 const FROM = { enroll: 'As each student enrolls', orientation: 'Orientation', next: 'Next installment due', final: 'Final installment due', academy: 'Academy Week start', manual: 'Only when you pick it' };
 function whenText(w) {
   if (w.from === 'enroll' || w.from === 'manual') return FROM[w.from];
@@ -420,7 +421,7 @@ function bookCodesModal() {
 }
 
 /* ---------- Setup → Email Templates ---------- */
-const EM_HELP = `<details class="em-help"><summary>Fill-ins, “only for some students” and formatting</summary>
+const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
   <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code}</p>
   <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension. Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
