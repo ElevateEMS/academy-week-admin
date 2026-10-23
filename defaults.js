@@ -318,32 +318,6 @@ Keep up the great work you guys, you're almost there!
 
 ${SIGN}` },
 
-  { id: 'coursework-ontrack', name: 'Coursework reminders (on track)', subject: 'EMT Coursework Reminders',
-    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
-
-As we approach Academy Week in just 1 week, I wanted to send out a to-do list for you to make sure nothing gets missed. You've been keeping a steady pace on your coursework and are doing a great job so far, so this is just a quick reminder of what's still outstanding on your end:
-- [[item]]
-
-As a reminder, all coursework is due **{coursework deadline}**, and you need to finish the course with an 80% average as well as score 80% or higher on the final exam, which we'll take in person during Academy Week. This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
-
-We look forward to seeing you at Academy Week, keep up the good work!
-
-${SIGN}` },
-
-  { id: 'coursework-behind', name: 'Coursework reminders (behind)', subject: 'EMT Course Deadline Notice',
-    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
-
-This is a reminder notice that you have 1 week left to complete all of your coursework before the **{coursework deadline}** deadline, and right now you still have the following outstanding:
-- [[item]]
-
-You also need to finish the course with an 80% average and score 80% or higher on the final exam (which we'll take in person during Academy Week) in order to be successful in the course and be eligible to sit for the NREMT exam. If you don't think you'll be able to get everything done in time and with the minimum grade requirements, please reach out to staff to discuss your options.
-
-This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
-
-We hope to see you at Academy Week, and wish you luck with the coursework!
-
-${SIGN}` },
-
   { id: 'aw-instructions', name: 'Academy Week instructions', subject: 'IMPORTANT: Academy Week Instructions & Reminders',
     when: { from: 'academy', days: -14 }, who: 'all', send: 'bcc', body: `Hello to all of our {cohort} EMT students,
 
@@ -375,6 +349,32 @@ Don't hesitate to reach out if you have any questions or need anything as we app
 
 ${SIGN}` },
 
+  { id: 'coursework-ontrack', name: 'Coursework reminders (on track)', subject: 'EMT Coursework Reminders',
+    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
+
+As we approach Academy Week in just 1 week, I wanted to send out a to-do list for you to make sure nothing gets missed. You've been keeping a steady pace on your coursework and are doing a great job so far, so this is just a quick reminder of what's still outstanding on your end:
+- [[item]]
+
+As a reminder, all coursework is due **{coursework deadline}**, and you need to finish the course with an 80% average as well as score 80% or higher on the final exam, which we'll take in person during Academy Week. This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
+
+We look forward to seeing you at Academy Week, keep up the good work!
+
+${SIGN}` },
+
+  { id: 'coursework-behind', name: 'Coursework reminders (behind)', subject: 'EMT Course Deadline Notice',
+    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
+
+This is a reminder notice that you have 1 week left to complete all of your coursework before the **{coursework deadline}** deadline, and right now you still have the following outstanding:
+- [[item]]
+
+You also need to finish the course with an 80% average and score 80% or higher on the final exam (which we'll take in person during Academy Week) in order to be successful in the course and be eligible to sit for the NREMT exam. If you don't think you'll be able to get everything done in time and with the minimum grade requirements, please reach out to staff to discuss your options.
+
+This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
+
+We hope to see you at Academy Week, and wish you luck with the coursework!
+
+${SIGN}` },
+
   { id: 'congrats', name: 'Congratulations (cleared for Academy Week)', subject: 'Congratulations, You\'re Cleared for Academy Week!',
     when: { from: 'academy', days: -1 }, who: 'pick', send: 'each', body: `Hi {first name},
 
@@ -395,7 +395,7 @@ Unfortunately, due to your failure to abide by the deadlines and expectations se
 ${SIGN}` },
 
   { id: 'cohort-congrats', name: 'Congratulations to the cohort', subject: 'Congratulations to the {cohort} Cohort',
-    when: { from: 'manual', days: 0 }, who: 'all', send: 'bcc', body: `Students,
+    when: { from: 'academy', days: 5 }, who: 'check', send: 'bcc', body: `Students,
 
 I know it was a long week (and long course) but I just wanted to say one more time that I'm proud of all of you and all the work you put in to be here. You all did an amazing job at Academy Week with your skills and patient assessments, and we can tell that you came prepared with the knowledge to be successful and the mindset to learn and improve. You are all going to pass your NREMT exam and become wonderful EMTs, I am confident of this! (Please please please utilize Test Prep...) And be confident in yourselves, while also giving yourselves grace as you enter the world of medicine. Remember to always keep learning, allow yourself to make mistakes and learn from them, and push yourselves to be the providers I know you can be. Go forth and do great things!
 

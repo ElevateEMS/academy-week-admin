@@ -25,7 +25,7 @@ function emailTemplates({ all = false } = {}) {
 }
 const tplById = id => emailTemplates({ all: true }).find(t => t.id === id);
 
-const WHO = { all: 'Whole cohort', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final', pick: 'Students you pick' };
+const WHO = { all: 'Whole cohort', check: 'Whole cohort (you uncheck anyone first)', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final', pick: 'Students you pick' };
 const FROM = { enroll: 'As each student enrolls', orientation: 'Orientation', next: 'Next installment due', final: 'Final installment due', academy: 'Academy Week start', manual: 'Only when you pick it' };
 function whenText(w) {
   if (w.from === 'enroll' || w.from === 'manual') return FROM[w.from];
@@ -106,11 +106,11 @@ function emailRows() {
   emailTemplates().forEach(t => {
     const from = t.when.from;
     if (from === 'manual') return;
-    if (t.who === 'pick') { // "students you pick" on a date: a reminder row; you choose who when you draft it
+    if (t.who === 'pick' || t.who === 'check') { // a reminder row; you choose who when you draft it (check = everyone starts checked)
       const a = emAnchor(from, emCohortPerson()), date = a.date ? addDays(a.date, Number(t.when.days) || 0) : '';
       if (from !== 'enroll' && !date) { undated.add(from); return; }
       const key = t.id + '|pick|' + date;
-      if (skipped[key] || (date && date < start) || people.some(p => p.sent[t.id])) return;
+      if ((date && date < start) || people.some(p => p.sent[t.id])) return;
       rows[key] = { key, tpl: t, date, custom: false, pick: true, sids: people.map(p => p.sid) };
       return;
     }
@@ -130,19 +130,22 @@ function emailRows() {
   });
   // Same day: in the order of the template list (on track before behind, etc.).
   const order = Object.fromEntries(emailTemplates({ all: true }).map((t, i) => [t.id, i]));
+  Object.keys(rows).forEach(k => { if (skipped[k]) delete rows[k]; }); // × "not needed for this cohort"
   const list = Object.values(rows).sort((a, b) => (a.date || '0').localeCompare(b.date || '0') || order[a.tpl.id] - order[b.tpl.id]);
   list.undated = undated;
   return list;
 }
 function rowWho(r) {
   const n = r.sids.length, s = n === 1 ? '' : 's';
-  if (r.pick) return 'you pick who';
+  if (r.pick) return r.tpl.who === 'check' ? n + ' attending · uncheck anyone first' : 'you pick who';
   if (r.custom || n === 1) { const p = emPersonBySid(r.sids[0]); return p ? esc(p.name) : '1 student'; }
   if (r.tpl.when.from === 'enroll') return n + ' new student' + s;
   if (/^unpaid/.test(r.tpl.who)) return n + ' unpaid';
   if (r.tpl.who === 'textbook') return n + ' with Textbook';
   return n + ' student' + s;
 }
+// Only the "you're behind" reminders can be skipped for a cohort (the × on their row).
+const EM_SKIPPABLE = ['next-early', 'next-day', 'final-early', 'final-day', 'coursework-behind'];
 const freeCodes = () => (S.bookCodes || []).filter(c => !c.sid).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.code).localeCompare(String(b.code)));
 
 const MAIL = '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="M4 7l8 6 8-6"/></svg>';
@@ -151,7 +154,7 @@ function emailsBox() {
   const due = rows.filter(r => !r.date || r.date <= t), later = rows.filter(r => r.date && r.date > t);
   const row = r => `<li class="em-row ${r.date && r.date < t ? 'overdue' : ''}">
       <span class="em-main"><span class="em-name">${esc(r.tpl.name)}</span><span class="em-sub">${emSoon(r.date)} · ${rowWho(r)}</span></span>
-      ${r.pick ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed this time" aria-label="Not needed this time">×</button>` : ''}
+      ${EM_SKIPPABLE.includes(r.tpl.id) ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed for this cohort" aria-label="Not needed for this cohort">×</button>` : ''}
       <button class="btn tiny" data-act="emDraft" data-row="${esc(r.key)}">Draft</button></li>`;
   const notes = [];
   if (rows.undated.has('orientation') || rows.undated.has('next') || rows.undated.has('final')) notes.push('Add the orientation date in Course Details to schedule the orientation and payment emails.');
@@ -342,8 +345,9 @@ function emailPickModal() {
       <div class="em-pick-list">${emailTemplates().map(x => `<button class="em-pick" data-act="emPickTpl" data-id="${x.id}"><b>${esc(x.name)}</b><span>${esc(whenText(x.when))} · ${x.send === 'bcc' ? 'BCC' : 'one per student'}</span></button>`).join('')}</div>`;
   } else {
     const people = emPeople();
-    body = `<p class="muted small">${t.send === 'bcc' ? 'One email To: Nick with everyone you check in BCC (just one person gets it addressed to them).' : 'One email per student you check.'}</p>
-      <div class="em-pick-tools"><button class="link" data-act="emPickAll" data-v="1">Check all</button><button class="link" data-act="emPickAll" data-v="0">Uncheck all</button></div>
+    const all = people.length && people.every(p => pk.sids.includes(p.sid));
+    body = `<div class="em-pick-tools"><p class="muted small">${t.send === 'bcc' ? 'One email To: Nick with everyone you check in BCC (just one person gets it addressed to them).' : 'One email per student you check.'}</p>
+      <button class="link" data-act="emPickAll" data-v="${all ? 0 : 1}">${all ? 'Uncheck all' : 'Check all'}</button></div>
       <div class="binder-list">${people.map(p => `<label>${circle(pk.sids.includes(p.sid), `data-act="emPickSid" data-sid="${p.sid}"`)}<span>${esc(p.name)}${p.sent[t.id] ? ` <em class="tag-soft">drafted ${p.sent[t.id] === 'before' ? 'before the app' : monthDay(p.sent[t.id])}</em>` : ''}</span></label>`).join('')}</div>`;
   }
   return `<div class="overlay" data-act="emPickClose"><div class="modal small-modal" data-stop>
@@ -422,6 +426,7 @@ function emailTplModal() {
   const opt = (map, v) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('');
   const days = d ? Number(d.when.days) || 0 : 0;
   const form = d ? `<div class="em-tpl-form">
+      <button class="link em-back" data-act="emtBack">‹ All templates</button>
       <div class="em-tpl-row"><label class="field">Name<input id="emt-name" data-emtpl="name" value="${esc(d.name)}"></label>
         <label class="em-on">${circle(!d.off, 'data-emtpl="on" id="emt-on"')} Shows up in the Emails box</label></div>
       <label class="field">Subject<input id="emt-subject" data-emtpl="subject" value="${esc(d.subject)}"></label>
@@ -444,7 +449,8 @@ function emailTplModal() {
       </div>
       ${EM_HELP}
     </div>` : '<p class="empty pad-top">Pick a template on the left.</p>';
-  return `<div class="overlay" data-act="emtClose"><div class="modal em-tpl" data-stop>
+  // On a narrow window the list and the editor take turns (ed.view: 'list' or 'edit').
+  return `<div class="overlay" data-act="emtClose"><div class="modal em-tpl ${ed.view === 'edit' ? 'editing' : ''}" data-stop>
     <div class="modal-head"><h2>Email Templates</h2><button class="x big" data-act="emtClose" aria-label="Close">×</button></div>
     <div class="em-tpl-grid">
       <div class="em-tpl-list">${list.map(t => `<button class="em-pick ${ed.sel === t.id ? 'on' : ''} ${t.off ? 'off' : ''}" data-act="emtSel" data-id="${t.id}"><b>${esc(t.name)}</b><span>${esc(whenText(t.when))}</span></button>`).join('')}
@@ -517,12 +523,16 @@ async function emCreate() {
 async function emailAct(a, el, e) {
   const d = el.dataset || {};
   switch (a) {
-    case 'emSkip': await Store.set('cohorts/' + S.cohortKey, { emailSkip: { [d.row]: true } }); return true;
+    case 'emSkip': {
+      const r = emailRows().find(x => x.key === d.row);
+      if (!r || !confirm(`${r.tpl.name}${r.date ? ' (' + monthDay(r.date) + ')' : ''} isn't needed for ${S.cohortKey}?\n\nIt comes off the Emails box and won't come back for this cohort.`)) return true;
+      await Store.set('cohorts/' + S.cohortKey, { emailSkip: { [d.row]: true } }); return true;
+    }
     case 'emailDoneToggle': e && e.preventDefault(); S.emailDoneOpen = !S.emailDoneOpen; render(); return true;
     case 'emDraft': {
       const r = emailRows().find(x => x.key === d.row);
       if (!r) { render(); return true; }
-      if (r.pick) { S.emailPick = { tplId: r.tpl.id, sids: [], date: r.date }; render(); return true; }
+      if (r.pick) { S.emailPick = { tplId: r.tpl.id, sids: r.tpl.who === 'check' ? emPeople().map(p => p.sid) : [], date: r.date }; render(); return true; }
       S.emailDraft = { tplId: r.tpl.id, sids: r.sids, date: r.date, custom: r.custom, idx: 0, edits: {} };
       emLateDrafts(); render(); return true;
     }
@@ -606,7 +616,7 @@ async function emailAct(a, el, e) {
 
     case 'emtOpen': {
       const first = emailTemplates({ all: true })[0];
-      S.emailTplEd = { sel: first.id, draft: emtCopy(first), dirty: false, as: 'group' };
+      S.emailTplEd = { sel: first.id, draft: emtCopy(first), dirty: false, as: 'group', view: 'list' };
       S.menuOpen = false; render(); return true;
     }
     case 'emtClose':
@@ -616,16 +626,17 @@ async function emailAct(a, el, e) {
       const ed = S.emailTplEd;
       if (ed.dirty && ed.sel !== d.id && !confirm('Switch templates without saving your changes?')) return true;
       const t = tplById(d.id);
-      Object.assign(ed, { sel: d.id, draft: emtCopy(t), dirty: false, as: t.send === 'bcc' ? 'group' : (emPeople()[0] || {}).sid || 'group' });
+      Object.assign(ed, { sel: d.id, draft: emtCopy(t), dirty: false, view: 'edit', as: t.send === 'bcc' ? 'group' : (emPeople()[0] || {}).sid || 'group' });
       render(); return true;
     }
+    case 'emtBack': S.emailTplEd.view = 'list'; render(); return true;
     case 'emtSend': S.emailTplEd.draft.send = d.v; S.emailTplEd.dirty = true; render(); return true;
     case 'emtNew': {
       const ed = S.emailTplEd;
       if (ed.dirty && !confirm('Start a new template without saving your changes?')) return true;
       const id = 'custom-' + Store.newId(), fresh = emtCopy(NEW_TPL);
       await Store.set('emailTemplates/' + id, fresh, false);
-      Object.assign(ed, { sel: id, draft: emtCopy(NEW_TPL), dirty: false, as: (emPeople()[0] || {}).sid || 'group' });
+      Object.assign(ed, { sel: id, draft: emtCopy(NEW_TPL), dirty: false, view: 'edit', as: (emPeople()[0] || {}).sid || 'group' });
       render(); return true;
     }
     case 'emtSave': {
