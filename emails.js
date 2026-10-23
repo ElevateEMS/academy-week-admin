@@ -8,7 +8,7 @@
 
    Saved in Firebase:
      emailTemplates/{id}             your edits to a template (defaults.js has the starting ones), or a new one
-     bookCodes/{code}                { code, added, order, sid, cohort, name, at }  (sid set = given out, never reused)
+     bookCodes/{code}                { code, added, order, sid, cohort, name, at }  (sid set = issued, never reused)
      cohorts/{key}                   emailsStart: the day the Emails box started for this cohort (anything due
                                      before that was already handled by hand), emailsInit (one-time setup claimed)
      cohorts/{key}/students/{sid}    sent: { templateId: 'yyyy-mm-dd' | 'before' }, bookCode,
@@ -402,13 +402,13 @@ function bookCodesModal() {
   return `<div class="overlay" data-act="bookCodesClose"><div class="modal small-modal em-codes" data-stop>
     <div class="modal-head"><h2>Book Codes</h2><button class="x big" data-act="bookCodesClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top" data-keep-scroll="bookCodes">
-      <p class="em-count"><b>${free.length}</b> unused · ${used.length} given out</p>
+      <p class="em-count"><b>${free.length}</b> unused · ${used.length} issued</p>
       <label class="field">Paste new codes (one per line, or separated by commas or spaces)
         <textarea id="bcPaste" data-draft="bcPaste" rows="4">${esc(S.drafts.bcPaste || '')}</textarea></label>
       <button class="btn primary small" data-act="bookCodesAdd">Add codes</button>
       <p class="muted small">Each code goes to one student, once. A code stays theirs even if the draft is deleted, so it’s never handed out twice.</p>
       ${free.length ? `<p class="mini-head">Unused</p><div class="em-chips">${free.map(c => `<span class="name-chip">${esc(c.code)}<button class="x" data-act="bookCodeDel" data-id="${esc(c.id)}" aria-label="Remove" title="Remove (typo)">×</button></span>`).join('')}</div>` : ''}
-      ${used.length ? `<p class="mini-head">Given out</p><table class="em-used">${used.map(c => `<tr><td>${esc(c.code)}</td><td>${esc(c.name || '')}</td><td class="muted">${esc(c.cohort || '')}</td><td class="muted">${c.at ? monthDay(isoOf(new Date(c.at))) : ''}</td></tr>`).join('')}</table>` : ''}
+      ${used.length ? `<p class="mini-head">Issued</p><table class="em-used">${used.map(c => `<tr><td>${esc(c.code)}</td><td>${esc(c.name || '')}</td><td class="muted">${esc(c.cohort || '')}</td><td class="muted">${c.at ? monthDay(isoOf(new Date(c.at))) : ''}</td></tr>`).join('')}</table>` : ''}
     </div>
   </div></div>`;
 }
