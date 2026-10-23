@@ -11,6 +11,7 @@
      cohorts/{key}/staff/{nameKey}     { name, days: {1: {roster, timesheet}}, paid }
      cohorts/{key}/packing/{id}        { text, packed, order, created, repeat }  (Prep page; repeat ones: id pack-{text})
      cohorts/{key}/todos/{id}          { text, done, day, kind, order, created, repeat }  (repeat ones: id rep-{day}-{text})
+     emailTemplates, bookCodes, cohorts/{key}/emailLog, and the students' sent/late/payDates/bookCode: see emails.js
 
    Paths are written like 'cohorts/Fall 2026/students/frazier-jason'.
    In sample mode everything is kept in this browser (localStorage) instead. */
@@ -49,6 +50,7 @@ const Store = (() => {
       async add(colPath, data) { const id = newId(); await this.set(colPath + '/' + id, data, false); return id; },
       async del(path) { const all = read(); delete all[path]; save(all); emit(); },
       async claim(path, field) { const all = read(); if ((all[path] || {})[field]) return false; await this.set(path, { [field]: true }); return true; },
+      async claimValue(path, field, value) { const all = read(); if ((all[path] || {})[field]) return false; await this.set(path, { [field]: value }); return true; },
       newId,
     };
   }
@@ -89,6 +91,13 @@ const Store = (() => {
       const ref = db.doc(path), snap = await tx.get(ref);
       if (snap.exists && snap.data()[field]) return false;
       tx.set(ref, { [field]: true }, { merge: true });
+      return true;
+    }),
+    // The same, but sets doc.field = value (a book code given to one student). False if it already has one.
+    claimValue: (path, field, value) => db.runTransaction(async tx => {
+      const ref = db.doc(path), snap = await tx.get(ref);
+      if (snap.exists && snap.data()[field]) return false;
+      tx.set(ref, { [field]: value }, { merge: true });
       return true;
     }),
     newId,

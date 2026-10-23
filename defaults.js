@@ -147,3 +147,257 @@ DEFAULTS.schedule = {
     notes: 'Staging/dispatch area with EC as dispatcher and tracking student completion. Actors for patients and assistants.\nThis is also paperwork day! - Scan all pt contacts and skills sheets.\nBe sure to give students their EMT patches after passing.\nRead students last night paperwork, collect signatures, and then sign up for NREMT.\nNotify students of $50 incentive to pass their first attempt within 30 days.\nEncourage students not to wait to test!\nThank them for being with the program and good luck on NREMT\n***\nAfter everyone leaves, scan all instructor hours.\nMark students as passed with VAOEMS!',
   },
 };
+
+/* ---------- Emails (Course page → Emails box; Setup → Email Templates) ----------
+   The app only makes Gmail drafts in gbrown@'s Drafts; nothing is sent by the app.
+   Written the way they're typed in the template editor:
+     {first name} etc.        filled in from the cohort sheet (blank ones say TBD)
+     {if late}…{else}…{end}   only for some students (see the help in the template editor)
+     **bold**  *italic*  [words](link)  "- " at the start of a line = a bullet
+     [[like this]]            something you type in before the draft can be made
+   when.from: enroll (as each student enrolls), orientation / next / final (that student's
+   orientation or payment due date), academy (Academy Week start), manual (only when you pick it).
+   when.days: days after that date (−1 = the day before). who: all, textbook, unpaid-next,
+   unpaid-final, pick. send: bcc (one email To: Nick, everyone in BCC) or each (one per student). */
+DEFAULTS.email = {
+  nick: 'nbrown@elevateemsacademy.com',
+  orientationTime: '11:00 AM', // every cohort's orientation (late enrollees get their own)
+  lowCodes: 5,                 // the Emails box warns when fewer unused book codes than this are left
+};
+const SIGN = `Best regards,
+
+Gabriella Brown
+Elevate EMS, LLC`;
+const JBL_STEPS = `- [Redeeming an access code with a NEW account](https://www.jblearning.com/faq-standalone/lists/student/redeem-an-access-code-as-a-new-user)
+- [Redeeming an access code with an EXISTING account](https://www.jblearning.com/blog/pdfs/2022/06/01/video-redeem-an-access-code-as-an-existing-user)
+- When prompted, enter our course ID code: **{JBL code}**`;
+DEFAULTS.emailTemplates = [
+  { id: 'welcome', name: 'Welcome', subject: '{cohort} Hybrid EMT Course Enrollment',
+    when: { from: 'enroll', days: 0 }, who: 'all', send: 'each', body: `Welcome {first name}!
+
+Thank you for enrolling in the {cohort} Hybrid EMT course. **Please read this email in its entirety, as it includes important information about the program.**
+
+**Please reply to this email to confirm that you have received it.** We just want to ensure our communications are reaching your inbox. If we don't hear from you, we will reach out via phone to verify your contact information before the course begins.
+
+At this time, your access is limited to the **Student Resources Page** of our website, which includes {if owes tuition and needs book}a checklist of what to do before the course starts, links to important materials, and where you can make your remaining tuition payments, as well as buy your book.{end}{if owes tuition and has book}a checklist of what to do before the course starts, links to important materials, and where you can make your remaining tuition payments.{end}{if paid in full and needs book}a checklist of what to do before the course starts, links to important materials, and where you can buy your book.{end}{if paid in full and has book}a checklist of what to do before the course starts and links to important materials.{end}
+
+https://elevateemsacademy.com/student-resources
+**Access Code:** ElevateEMSaccess!
+
+{if needs book}Please be sure to purchase your book before orientation, as you will not be able to begin any coursework until you've done so. Make sure you are buying the [13th Edition with Advantage Access](https://tally.so/r/gDQJQJ), since that is what gives you access to the course materials.
+
+{end}Your digital textbook (if purchased through us), course access code for JB Learning, and orientation meeting link will all be provided before orientation.
+
+{if owes tuition}**Tuition Payment Plan Deadlines**
+{if owes next}- **Next Installment ($500):** due {next due} at 11:59pm
+{end}{if owes final}- **Final Installment (remaining $500):** due {final due} at 11:59pm
+{end}
+Payments can be made on the Student Resources page linked above.
+
+{end}**Orientation**
+
+We're excited to see you at the mandatory virtual orientation on **{orientation date} at {orientation time} Eastern Time**. Please note that your **camera must be on for the duration of orientation** to verify your attendance and participation, per state guidelines.
+
+During orientation, we will:
+- Walk you through setting up and using JB Learning and our Student Portal (LMS)
+- Review the course syllabus and state required paperwork
+- Review the ride-along process for patient contacts
+- Set up VAOEMS accounts (you will need to know your Social Security Number in order to set this up)
+- **Note:** If you already have a VAOEMS account (from a prior EMT class or agency affiliation), verify your login details *before* orientation
+- Answer any questions you may have
+
+**CPR**
+
+As mentioned on our website, CPR is a required component to obtain your EMT certification and we offer two CPR classes during the course for students who need it. Any student is welcome to attend either CPR course. You will have the opportunity to sign up for one once the course begins.
+- **Full in-person CPR Course:** Held on {CPR date} in Richmond, VA. Because this is a full CPR class, no prior online training needs to be completed or purchased (this is fully covered with your tuition). If your ride-alongs will be scheduled with the assistance of ElevateEMS, you will need to utilize this option (or obtain your CPR elsewhere) before you begin scheduling ride alongs.
+- **Skills Check-Off:** CPR check off during Academy Week. This is a condensed CPR class where you'll have to complete online training modules with the AHA beforehand ($37 paid directly to the AHA).
+
+Lastly, we've created a personal referral code just for you: **{referral code}**. If anyone you refer enrolls using your code, you'll receive 10% of their tuition back as a thank-you (paid out after the drop-period has passed for their course)!
+
+Please don't hesitate to reach out to me if you need anything throughout this process. We look forward to having a great course!
+
+${SIGN}` },
+
+  { id: 'bookcode', name: 'Book access code', subject: 'Digital EMT Book Access',
+    when: { from: 'orientation', days: -1 }, who: 'textbook', send: 'each', body: `{first name},
+
+Here is your Navigate Advantage Access for Emergency Care and Transportation of the Sick and Injured, Thirteenth Edition.
+
+Access code: **{book code}**
+
+Activate your textbook using your access code above using the following JB Learning instructions:
+${JBL_STEPS}
+
+Please reach out if you need anything else or have any questions!
+
+${SIGN}` },
+
+  { id: 'access', name: 'Orientation access', subject: 'EMT Course - Orientation & JB Learning Access',
+    when: { from: 'orientation', days: -1 }, who: 'all', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
+
+We're looking forward to meeting you at orientation **tomorrow, {orientation date} at {orientation time} Eastern Time** and getting started with the course. Please review the information below to help ensure everything goes smoothly, including the requirement that your **camera must be on for the duration of orientation** to verify your attendance and participation, per state guidelines.
+
+**Orientation**
+Here is the Google Meet link for orientation: {meet link}
+
+**Student Portal & JB Learning**
+Our Student Portal (https://student.elevateemsacademy.com/) is where our course materials live, including assignments, lectures, study resources, and patient contact paperwork. JB Learning is where you'll access your textbook and take quizzes/exams. We'll go over both in detail at orientation.
+
+**Textbook Access**
+If you have not already done so, please remember that you cannot begin coursework until your book is purchased. You can buy the [13th Edition with Advantage Access](https://tally.so/r/gDQJQJ) [here](https://tally.so/r/gDQJQJ). After purchase, activate your textbook with your access code using the following JB Learning instructions:
+${JBL_STEPS}
+
+**VAOEMS Account Information**
+We will be enrolling you in your VAOEMS account during orientation. Please do **NOT** attempt to enroll on your own ahead of time. You will need to know your **Social Security Number** to set up your account.
+
+If you already have a VAOEMS account (from a prior EMT class or agency affiliation), please confirm your login information before orientation.
+
+To access the VAOEMS portal, you must use one of the following browsers: Google Chrome, Safari, or Microsoft Edge. Firefox and Internet Explorer are *not* supported and the portal will not open correctly using those browsers.
+
+{if group}We look forward to officially meeting you all tomorrow and getting this course started!{else}We look forward to officially meeting you tomorrow and getting you started with the course!{end}
+
+${SIGN}` },
+
+  { id: 'next-early', name: 'Next installment · 5 days before', subject: 'EMT Tuition Payment Reminder',
+    when: { from: 'next', days: -5 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
+
+{if group}If you are receiving this email, you have not made your next tuition payment yet. {end}This is a reminder that your next tuition installment of $500 for the EMT course is due by **{next due} at 11:59pm**. To remain enrolled and in good standing, payment must be submitted by the deadline.
+
+The payment link can be found on the Student Resources page, but here is a direct link as well: [Student Payment Portal](https://tally.so/r/RGZ8A9).
+
+If you have any questions or experience issues submitting payment, please contact us as soon as possible.
+
+${SIGN}` },
+
+  { id: 'next-day', name: 'Next installment · due tonight', subject: 'IMPORTANT: EMT Tuition Payment Due Tonight',
+    when: { from: 'next', days: 0 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Good morning everyone,{else}Good morning {first name},{end}
+
+This is a reminder that your next tuition installment of $500 is **due by 11:59pm tonight**.{if not late} This must be paid before the course start date of {orientation date}.{end}
+
+Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)
+
+{if not late}We look forward to meeting you at orientation!
+
+{end}${SIGN}` },
+
+  { id: 'final-early', name: 'Final installment · 5 days before', subject: 'IMPORTANT: Final Tuition Payment Reminder',
+    when: { from: 'final', days: -5 }, who: 'unpaid-final', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
+
+{if group}If you are receiving this email, you have not made your final tuition payment yet. {end}This is a reminder that the final tuition payment of $500 for the EMT course is due by **{final due} at 11:59pm**. To remain enrolled and in good standing, payment must be submitted by the deadline.
+
+The payment link can be found on the Student Resources page, but here is a direct link as well: [Student Payment Portal](https://tally.so/r/RGZ8A9).
+
+If you have any questions or experience issues submitting payment, please contact us as soon as possible.
+
+${SIGN}` },
+
+  { id: 'final-day', name: 'Final installment · due tonight', subject: 'IMPORTANT: Final Tuition Payment Reminder',
+    when: { from: 'final', days: 0 }, who: 'unpaid-final', send: 'bcc', body: `{if group}Good morning everyone,{else}Good morning {first name},{end}
+
+This is a reminder that your final tuition payment is **due by 11:59pm tonight**.
+
+Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)
+
+${SIGN}` },
+
+  { id: 'six-weeks', name: '1.5 months out', subject: 'Academy Week is 6 Weeks Away: Upcoming Deadlines',
+    when: { from: 'academy', days: -42 }, who: 'all', send: 'bcc', body: `Hi everyone!
+
+Academy Week is officially 6 weeks away! **Please read this email in its entirety, as it includes important upcoming deadlines.**
+
+**Fingerprinting Deadline**
+Your fingerprinting (background check) must be completed by **{fingerprinting deadline}**.
+
+**Stay on Track**
+Please keep up with your coursework and be studying the course content, the skills videos, and the Patient Assessment skills sheet found in the Student Portal.
+
+**Coursework Deadline**
+All coursework is due **{coursework deadline}**, including uploading your BLS CPR card to the Student Portal assignments (unless you are scheduled to attend the CPR skills check-off at Academy Week). If you do not complete your coursework by the deadline, you will not be permitted to attend Academy Week.
+
+Keep up the great work you guys, you're almost there!
+
+${SIGN}` },
+
+  { id: 'coursework-ontrack', name: 'Coursework reminders (on track)', subject: 'EMT Coursework Reminders',
+    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
+
+As we approach Academy Week in just 1 week, I wanted to send out a to-do list for you to make sure nothing gets missed. You've been keeping a steady pace on your coursework and are doing a great job so far, so this is just a quick reminder of what's still outstanding on your end:
+- [[item]]
+
+As a reminder, all coursework is due **{coursework deadline}**, and you need to finish the course with an 80% average as well as score 80% or higher on the final exam, which we'll take in person during Academy Week. This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
+
+We look forward to seeing you at Academy Week, keep up the good work!
+
+${SIGN}` },
+
+  { id: 'coursework-behind', name: 'Coursework reminders (behind)', subject: 'EMT Course Deadline Notice',
+    when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
+
+This is a reminder notice that you have 1 week left to complete all of your coursework before the **{coursework deadline}** deadline, and right now you still have the following outstanding:
+- [[item]]
+
+You also need to finish the course with an 80% average and score 80% or higher on the final exam (which we'll take in person during Academy Week) in order to be successful in the course and be eligible to sit for the NREMT exam. If you don't think you'll be able to get everything done in time and with the minimum grade requirements, please reach out to staff to discuss your options.
+
+This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
+
+We hope to see you at Academy Week, and wish you luck with the coursework!
+
+${SIGN}` },
+
+  { id: 'aw-instructions', name: 'Academy Week instructions', subject: 'IMPORTANT: Academy Week Instructions & Reminders',
+    when: { from: 'academy', days: -14 }, who: 'all', send: 'bcc', body: `Hello to all of our {cohort} EMT students,
+
+Please read this email in its entirety, as it contains important information regarding Academy Week in just 2 weeks!
+
+**Reminders & Requirements**
+- All coursework, quizzes/exams, the final exam, and a minimum of 5 patient contacts must be completed by **{coursework deadline}** (per your syllabus) to allow time for paperwork review.
+- If you do not complete your coursework by the deadline, you will not be permitted to attend Academy Week and will be marked as failed for the course.
+- Be sure to complete the **Academy Week Readiness & Compliance Attestation**
+- **All skills videos must be reviewed prior to Academy Week.** Do not expect to pass the psychomotor exam without thoroughly studying your Patient Assessment sheet (both are found in the Student Portal)
+- Your BLS CPR card must be uploaded (unless signed up for a skills session with us at Academy Week)
+- The shirt mailed to you is your required student uniform and must be worn during Academy Week. Refer to the syllabus for full uniform requirements (long pants, closed-toe shoes, watch, etc.).
+- There will be a shared fridge with the ODEMSA staff for packed lunches, and we also have slotted a 1 hour lunch period each day to allow time to run out.
+- Bring a laptop or tablet on the last day of Academy Week for NREMT registration following the psychomotor exam.
+- 100% attendance is required. **You must arrive on time each day.**
+
+**Academy Week Address & Schedule**
+
+**Old Dominion Emergency Medical Services Alliance (ODEMSA) address:** 7818 E Parham Rd Suite 911, Henrico, VA 23294
+
+Walk into the building through the main entrance, check in with security, take the elevators down to the basement, and follow the signs for ODEMSA (suite 911).
+- **{day 1}** (0800-1700) - Final Exam and Skills
+- **{day 2}** (0800-1700) - Scenarios
+- **{day 3}** (0800-1700) - Review/Sign off skills
+- **{day 4}** (0800-1700) - Final Practice
+- **{day 5}** (0800-DONE) - Psychomotor Exam & NREMT Registration (remember to bring laptop/ipad for this)
+
+Don't hesitate to reach out if you have any questions or need anything as we approach the end of our class. Good luck everyone as you wrap up your coursework, you're almost there!
+
+${SIGN}` },
+
+  { id: 'congrats', name: 'Congratulations (cleared for Academy Week)', subject: 'Congratulations, You\'re Cleared for Academy Week!',
+    when: { from: 'academy', days: -1 }, who: 'pick', send: 'each', body: `Hi {first name},
+
+I wanted to congratulate you on completing all of the required coursework to attend Academy Week! Your current course grade is a **[[grade]]%** and your final course grade will be determined after you take the final exam on {academy week start} at Academy Week. Be sure to bring your physical copies of your patient contact paperwork (including the Clinical Training Record) to turn in on that day as well.
+
+Please let us know if you have any other questions and we look forward to seeing you at Academy Week!
+
+${SIGN}` },
+
+  { id: 'incomplete', name: 'Incomplete', subject: 'EMT Course Incompletion',
+    when: { from: 'manual', days: 0 }, who: 'pick', send: 'each', ccNick: true, body: `{first name},
+
+I am notifying you that you have not completed the {cohort} Hybrid EMT course due to the following reasons:
+- [[reason]]
+
+Unfortunately, due to your failure to abide by the deadlines and expectations set forth in the syllabus and reviewed at orientation and via email, your attempt for this EMT class is being submitted to the state as a failed attempt.
+
+${SIGN}` },
+
+  { id: 'cohort-congrats', name: 'Congratulations to the cohort', subject: 'Congratulations to the {cohort} Cohort',
+    when: { from: 'manual', days: 0 }, who: 'all', send: 'bcc', body: `Students,
+
+I know it was a long week (and long course) but I just wanted to say one more time that I'm proud of all of you and all the work you put in to be here. You all did an amazing job at Academy Week with your skills and patient assessments, and we can tell that you came prepared with the knowledge to be successful and the mindset to learn and improve. You are all going to pass your NREMT exam and become wonderful EMTs, I am confident of this! (Please please please utilize Test Prep...) And be confident in yourselves, while also giving yourselves grace as you enter the world of medicine. Remember to always keep learning, allow yourself to make mistakes and learn from them, and push yourselves to be the providers I know you can be. Go forth and do great things!
+
+Bella & Nick` },
+];

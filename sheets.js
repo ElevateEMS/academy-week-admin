@@ -1,4 +1,4 @@
-/* Talks to the "Academy Week Admin Backend" Apps Script, which reads the Google Sheets:
+/* Talks to the "Elevate EMS Admin" Apps Script (was "Academy Week Admin Backend"), which reads the Google Sheets:
      listCohorts                 -> Student Cohort Config, "Cohorts" tab
      loadCohort(key)             -> that cohort's Student Roster tab (names, column P, Academy Week Start)
                                     and its Staffing tab (who works which day)
@@ -8,7 +8,9 @@
                                     then any course details typed in go into its settings box
      setStatus(key, status)      -> Upcoming / Active / Former in the config sheet (column F)
      saveSettings(key, info)     -> writes course details (only the fields sent) into the settings box
+     createDrafts(drafts)        -> puts emails in gbrown@'s Gmail Drafts ({ to, cc, bcc, subject, html, text }); never sends
 
+   Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes.
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
    review dates) as `info`, plus its status and links to its sheet and folder.
 
@@ -35,6 +37,7 @@ const Sheets = (() => {
     createCohort: (key, info) => call('createCohort', { cohort: key, info }),
     setStatus: (key, status) => call('setStatus', { cohort: key, status }),
     saveSettings: (key, info) => call('saveSettings', { cohort: key, info }).then(o => o.info),
+    createDrafts: drafts => call('createDrafts', { drafts }).then(o => o.count),
   };
 })();
 
@@ -96,10 +99,12 @@ function sampleSheets() {
       sheetUrl: 'https://docs.google.com/spreadsheets/', folderUrl: 'https://drive.google.com/drive/',
       info,
       academyStart: info.academyStart,
-      students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5) })),
+      students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5),
+        email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0 })),
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
     }); },
+    async createDrafts(drafts) { console.log('Sample mode: these would be Gmail drafts', drafts); return wait(drafts.length); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);

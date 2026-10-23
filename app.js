@@ -6,7 +6,8 @@
      to-dos between days), Schedule, Students (skills status, patient contacts + fix notes,
      attendance/warnings).
    Plus Setup (templates and settings). Saving: store.js. Google Sheets: sheets.js.
-   Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js. */
+   Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js.
+   Emails (the Course page's Emails box, Gmail drafts, book codes): emails.js. */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,6 +25,7 @@ const S = {
   schTplOpen: false, schTplTab: 1, schTplDraft: null, schTplDirty: false, schedule: {}, filter: 'all', search: '', drafts: {}, pcBusy: {}, dragging: null,
   // Scenarios: scenDocs = your saved tags, scenLive = Docs in the Drive folders (null until listed)
   scenDocs: {}, scenDocsAt: 0, scenLive: null, scenLiveAt: 0, scenErr: null,
+  emailTpls: {}, bookCodes: [], emailLog: [], // emails.js
   libOpen: false, libTab: 'scen', libSel: null, libDraft: null, libFilter: 'all', addonDraft: null, reqDraft: null, planOpen: false, place: null, match: null,
 };
 let unwatchCohort = [];
@@ -75,14 +77,14 @@ function currentWeekDay() {
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
 const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios',
-  info: 'Course Details', setup: 'Setup Checklist', changes: 'Changes for Future Classes' };
+  info: 'Course Details', setup: 'Setup Checklist', changes: 'Changes for Future Classes', emails: 'Emails' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
-  course: { key: 'courseLayout', v: 3, boxes: ['info', 'setup', 'changes', 'notes'], def: [['info', 'changes'], ['setup'], ['notes']] },
+  course: { key: 'courseLayout', v: 4, boxes: ['info', 'setup', 'changes', 'emails', 'notes'], def: [['info', 'changes'], ['setup'], ['emails', 'notes']] },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
@@ -358,6 +360,8 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
   unwatchGlobal.push(Store.watch('updates', list => { S.updates = list; render(); }));
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
+  unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); render(); }));
+  unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
   render();
   // The last cohort used opens straight away (while the cohort list loads alongside it).
   const last = S.cohortKey;
@@ -413,7 +417,8 @@ function pickSide(key) {
 async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
-  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null });
+  Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
+    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
   const base = 'cohorts/' + key;
@@ -427,6 +432,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   w(base + '/todos', list => { S.todos = list; if (S.sheet) rollOver(); });
   w(base + '/packing', list => { S.packing = list; });
   w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
+  w(base + '/emailLog', list => { S.emailLog = list; });
   await loadSheet();
 }
 
@@ -445,6 +451,7 @@ async function loadSheet() {
     pickSide(key);
     rollOver();
     seedRepeats();
+    emailInit();
     shareHousekeeping();
   } catch (e) {
     S.sheetErr = e.message;
@@ -570,7 +577,8 @@ function shell() {
   ${S.place ? placeModal() : ''}
   ${S.binderList ? binderListModal() : ''}
   ${S.infoEdit ? infoEditModal() : ''}
-  ${S.newCohort ? newCohortModal() : ''}`;
+  ${S.newCohort ? newCohortModal() : ''}
+  ${emailModals()}`;
 }
 
 function pageTitle() {
@@ -1032,6 +1040,9 @@ function box(b, n) {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
   } else if (b === 'info') {
     body = head('Course Details', `<button class="eye" data-act="infoEditOpen" title="Edit course details" aria-label="Edit course details">${ICONS.pencil}</button>`) + infoBox();
+  } else if (b === 'emails') {
+    body = head('Emails', `<button class="eye" data-act="emStuOpen" title="Late enrollees, extensions and who’s paid" aria-label="Student emails">${ICONS.students}</button>
+      <button class="add-plus small-plus" data-act="emPickOpen" title="Draft an email" aria-label="Draft an email">+</button>`) + emailsBox();
   } else if (b === 'setup') {
     const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
     const done = all.filter(t => t.done || setupAuto(t.text).done === true).length;
@@ -1718,6 +1729,18 @@ function settingsView() {
     </section>
 
     <section class="box">
+      <div class="box-head static"><h2>Email Templates</h2></div>
+      <p class="muted small">The emails the Course page’s Emails box drafts for you: what each one says, when it’s due and who it goes to. Drafts land in your Gmail Drafts; nothing is ever sent by the app.</p>
+      <button class="btn primary" data-act="emtOpen">Edit email templates</button>
+    </section>
+
+    <section class="box">
+      <div class="box-head static"><h2>Book Codes</h2></div>
+      <p class="muted small">Digital textbook access codes. Paste new ones in; each goes to one student, once. <b>${freeCodes().length}</b> unused.</p>
+      <button class="btn primary" data-act="bookCodesOpen">Open book codes</button>
+    </section>
+
+    <section class="box">
       <div class="box-head static"><h2>Schedule Template</h2></div>
       <p class="muted small">The class schedule, station content and instructor notes each cohort starts with (Day 1–5). A cohort’s days you haven’t changed yet follow it too; days you’ve edited keep your changes. Scenarios added from the week plan are never saved into it.</p>
       <div class="plan-btns"><button class="btn primary" data-act="schTplOpen">Edit schedule template</button>
@@ -2139,6 +2162,7 @@ document.addEventListener('input', e => {
   // Scenario Library: add-on names and requirement numbers wait for Save.
   if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
   if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
+  if (emailInput(t)) return; // the email draft pop-up and the template editor
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
   if (k === 'libSearch') { S.drafts.libSearch = t.value; render(); return; }
@@ -2195,6 +2219,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
     if (S.datePick) S.datePick = null;
+    else if (emailEscape()) { /* closed an email pop-up */ }
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
@@ -2664,7 +2689,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null });
