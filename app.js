@@ -2247,7 +2247,7 @@ document.addEventListener('click', e => {
   if (el.closest('.sched-more .menu')) { S.schMenu = false; render(); } // picking something closes the ⋯ menu
   // Only the backdrop itself closes a pop-up, and the +/− box doesn't open the student.
   if (el.classList.contains('overlay') && e.target !== el) return;
-  if (el.tagName === 'TR' && e.target.closest('[data-stop]')) return;
+  if (el.tagName === 'TR') { const stop = e.target.closest('[data-stop]'); if (stop && el.contains(stop)) return; } // (a pop-up around the table doesn't count)
   act(el.dataset.act, el, e);
 });
 

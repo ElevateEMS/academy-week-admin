@@ -377,9 +377,9 @@ function emailStudentsModal() {
       <td><b>${esc(p.name)}</b>${p.late ? ' <em class="tag-soft">late enrollee</em>' : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.needsLate ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
         <div class="muted small">${validEmail(p.email) ? esc(p.email) : '<span class="tbd">no email in the sheet</span>'}</div></td>
       <td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
-      <td>${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : '<span class="tbd">TBD</span>'}</td>
-      <td>${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</td>
-      <td>${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</td>
+      <td class="c">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : '<span class="tbd">TBD</span>'}</td>
+      <td class="c">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</td>
+      <td class="c">${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</td>
       <td class="c" title="${esc(sentTip)}">${sentN || '<span class="muted">–</span>'}</td></tr>
       ${open ? `<tr class="em-stu-edit" data-stop><td colspan="8"><div class="em-stu-grid">
         <div><p class="mini-head">Late enrollee</p>
@@ -395,9 +395,8 @@ function emailStudentsModal() {
   }).join('');
   return `<div class="overlay" data-act="emStuClose"><div class="modal em-stu" data-stop>
     <div class="modal-head"><h2>Student Emails</h2><button class="x big" data-act="emStuClose" aria-label="Close">×</button></div>
-    <div class="modal-body" data-keep-scroll="emStu">
-      <p class="muted small pad-top">Email, Textbook and payments come from the cohort sheet (columns C–F). Click a student to set a late enrollee’s orientation or an extension.</p>
-      <table class="roster em-table"><thead><tr><th>Student</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th>Orientation</th><th>Due: Next / Final</th><th>Book code</th><th class="c">Drafted</th></tr></thead>
+    <div class="modal-body pad-top" data-keep-scroll="emStu">
+      <table class="roster em-table"><thead><tr><th>Student</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th><th class="c">Book code</th><th class="c">Drafted</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="8" class="empty">No students yet.</td></tr>'}</tbody></table>
     </div>
   </div></div>`;
