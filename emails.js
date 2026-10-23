@@ -223,6 +223,7 @@ function emValues(p) {
   return v;
 }
 // → { subject, body, missing: [fill-ins that came out TBD] }
+const OLD_SIGNOFF = /\n*Best regards,\s*\n\s*\n?\s*Gabriella Brown\s*\n\s*Elevate EMS, LLC\s*$/;
 function emFill(t, p, group) {
   const vals = emValues(p), missing = new Set();
   const fill = text => applyIfs(String(text || ''), expr => emTest(expr, p, group))
@@ -233,7 +234,7 @@ function emFill(t, p, group) {
       missing.add(k.trim()); return 'TBD';
     })
     .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  return { subject: fill(t.subject).replace(/\s+/g, ' '), body: fill(t.body), missing: [...missing] };
+  return { subject: fill(t.subject).replace(/\s+/g, ' '), body: fill(t.body).replace(OLD_SIGNOFF, ''), missing: [...missing] };
 }
 
 /* ---------- Email text → HTML (bold, italic, links, bullets) ---------- */
@@ -260,6 +261,8 @@ function emHtml(text, opts = {}) {
 }
 const emPlain = text => String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/(^|[^*])\*(?=\S)(.+?)\*(?!\*)/g, '$1$2')
   .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (m, x, u) => x === u ? u : x + ' (' + u + ')');
+
+const EM_SIG = '<p class="em-sig">Your Gmail signature (Best regards, Gabriella Brown, logo) is added here</p>';
 
 /* ---------- The drafts one click makes ---------- */
 // A "To: Nick, BCC everyone" email when it's for a group on the cohort's dates; otherwise one per student.
@@ -326,7 +329,7 @@ function emailDraftModal() {
         <label class="field">Email text <span class="small">${dr.edited ? `changed for this email · <button class="link" data-act="emUndo" data-key="${dr.key}">undo my changes</button>` : 'edit anything here'}</span>
           <textarea id="em-body-${dr.key}" data-emedit="body" data-key="${dr.key}" data-keep-scroll="emBody" rows="18" ${ed.busy ? 'disabled' : ''}>${esc(dr.body)}</textarea></label>
         <div class="field">How it will look${fills.length ? ' <span class="em-fill-note">fill in the highlighted parts</span>' : ''}
-          <div class="em-preview" id="emPreview" data-keep-scroll="emPrev">${emHtml(dr.body, { marks: true })}</div></div>
+          <div class="em-preview" data-keep-scroll="emPrev"><div id="emPreview">${emHtml(dr.body, { marks: true })}</div>${EM_SIG}</div></div>
       </div>` : '<p class="empty">Nobody left to email for this one.</p>'}
       ${ed.err ? `<div class="alert">${esc(ed.err)}</div>` : ''}
     </div>
@@ -445,7 +448,7 @@ function emailTplModal() {
         <label class="field">Email text<textarea id="emt-body" data-emtpl="body" rows="22">${esc(d.body)}</textarea></label>
         <div class="field">Preview as <select id="emt-as" data-emtpl="as"><option value="group" ${ed.as === 'group' ? 'selected' : ''}>the group email</option>
           ${emPeople().map(p => `<option value="${p.sid}" ${sample && sample.sid === p.sid && ed.as !== 'group' ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
-          <div class="em-preview" id="emtPreview"><p class="em-prev-subj">${esc(prev.subject)}</p>${emHtml(prev.body, { marks: true })}</div></div>
+          <div class="em-preview"><div id="emtPreview"><p class="em-prev-subj">${esc(prev.subject)}</p>${emHtml(prev.body, { marks: true })}</div>${EM_SIG}</div></div>
       </div>
       ${EM_HELP}
     </div>` : '<p class="empty pad-top">Pick a template on the left.</p>';
@@ -463,7 +466,7 @@ function emailTplModal() {
       <button class="btn primary" data-act="emtSave" ${ed.dirty ? '' : 'disabled'}>Save</button></div>
   </div></div>`;
 }
-const NEW_TPL = { name: 'New email', subject: '', body: 'Hi {first name}!\n\n\n\nBest regards,\n\nGabriella Brown\nElevate EMS, LLC', when: { from: 'manual', days: 0 }, who: 'pick', send: 'each' };
+const NEW_TPL = { name: 'New email', subject: '', body: 'Hi {first name}!\n\n', when: { from: 'manual', days: 0 }, who: 'pick', send: 'each' };
 const emtCopy = t => t ? { name: t.name, subject: t.subject, body: t.body, when: { ...t.when }, who: t.who, send: t.send, ccNick: !!t.ccNick, note: t.note || '', off: !!t.off } : null;
 
 /* ---------- Doing things ---------- */
@@ -506,7 +509,8 @@ async function emCreate() {
       }
     }
     const out = drafts.map(dr => ({ to: dr.to, cc: dr.cc, bcc: dr.bcc, subject: dr.subject, html: emHtml(dr.body), text: emPlain(dr.body) }));
-    for (let i = 0; i < out.length; i += 20) await Sheets.createDrafts(out.slice(i, i + 20));
+    let warn = '';
+    for (let i = 0; i < out.length; i += 20) { const res = await Sheets.createDrafts(out.slice(i, i + 20)); if (res && res.warning) warn = res.warning; }
     const day = todayIso(), sids = drafts.flatMap(dr => dr.people.filter(p => validEmail(p.email)).map(p => p.sid));
     await Promise.all(sids.map(sid => Store.set(P('students/' + sid), { sent: { [t.id]: day } })));
     const names = drafts.flatMap(dr => dr.people.filter(p => validEmail(p.email)).map(p => p.name));
@@ -514,6 +518,7 @@ async function emCreate() {
     S.emailDraft = null;
     Object.keys(S.drafts).forEach(k => { if (k.startsWith('eml-')) delete S.drafts[k]; });
     toast(out.length === 1 ? 'The draft is in your Gmail Drafts.' : out.length + ' drafts are in your Gmail Drafts.');
+    if (warn) alert(warn);
   } catch (err) {
     ed.busy = false; ed.err = err.message;
   }

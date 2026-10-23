@@ -37,7 +37,7 @@ const Sheets = (() => {
     createCohort: (key, info) => call('createCohort', { cohort: key, info }),
     setStatus: (key, status) => call('setStatus', { cohort: key, status }),
     saveSettings: (key, info) => call('saveSettings', { cohort: key, info }).then(o => o.info),
-    createDrafts: drafts => call('createDrafts', { drafts }).then(o => o.count),
+    createDrafts: drafts => call('createDrafts', { drafts }), // { count, warning } (warning: made without your signature)
   };
 })();
 
@@ -104,7 +104,7 @@ function sampleSheets() {
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
     }); },
-    async createDrafts(drafts) { console.log('Sample mode: these would be Gmail drafts', drafts); return wait(drafts.length); },
+    async createDrafts(drafts) { console.log('Sample mode: these would be Gmail drafts', drafts); return wait({ count: drafts.length }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);

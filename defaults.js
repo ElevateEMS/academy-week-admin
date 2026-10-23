@@ -155,6 +155,7 @@ DEFAULTS.schedule = {
      {if late}…{else}…{end}   only for some students (see the help in the template editor)
      **bold**  *italic*  [words](link)  "- " at the start of a line = a bullet
      [[like this]]            something you type in before the draft can be made
+   Your Gmail signature (with "Best regards,") is added under every draft by the Apps Script.
    when.from: enroll (as each student enrolls), orientation / next / final (that student's
    orientation or payment due date), academy (Academy Week start), manual (only when you pick it).
    when.days: days after that date (−1 = the day before). who: all, textbook, unpaid-next,
@@ -164,10 +165,6 @@ DEFAULTS.email = {
   orientationTime: '11:00 AM', // every cohort's orientation (late enrollees get their own)
   lowCodes: 5,                 // the Emails box warns when fewer unused book codes than this are left
 };
-const SIGN = `Best regards,
-
-Gabriella Brown
-Elevate EMS, LLC`;
 const JBL_STEPS = `- [Redeeming an access code with a NEW account](https://www.jblearning.com/faq-standalone/lists/student/redeem-an-access-code-as-a-new-user)
 - [Redeeming an access code with an EXISTING account](https://www.jblearning.com/blog/pdfs/2022/06/01/video-redeem-an-access-code-as-an-existing-user)
 - When prompted, enter our course ID code: **{JBL code}**`;
@@ -214,9 +211,7 @@ As mentioned on our website, CPR is a required component to obtain your EMT cert
 
 Lastly, we've created a personal referral code just for you: **{referral code}**. If anyone you refer enrolls using your code, you'll receive 10% of their tuition back as a thank-you (paid out after the drop-period has passed for their course)!
 
-Please don't hesitate to reach out to me if you need anything throughout this process. We look forward to having a great course!
-
-${SIGN}` },
+Please don't hesitate to reach out to me if you need anything throughout this process. We look forward to having a great course!` },
 
   { id: 'bookcode', name: 'Book access code', subject: 'Digital EMT Book Access',
     when: { from: 'orientation', days: -1 }, who: 'textbook', send: 'each', body: `{first name},
@@ -228,9 +223,7 @@ Access code: **{book code}**
 Activate your textbook using your access code above using the following JB Learning instructions:
 ${JBL_STEPS}
 
-Please reach out if you need anything else or have any questions!
-
-${SIGN}` },
+Please reach out if you need anything else or have any questions!` },
 
   { id: 'access', name: 'Orientation access', subject: 'EMT Course - Orientation & JB Learning Access',
     when: { from: 'orientation', days: -1 }, who: 'all', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
@@ -254,9 +247,7 @@ If you already have a VAOEMS account (from a prior EMT class or agency affiliati
 
 To access the VAOEMS portal, you must use one of the following browsers: Google Chrome, Safari, or Microsoft Edge. Firefox and Internet Explorer are *not* supported and the portal will not open correctly using those browsers.
 
-{if group}We look forward to officially meeting you all tomorrow and getting this course started!{else}We look forward to officially meeting you tomorrow and getting you started with the course!{end}
-
-${SIGN}` },
+{if group}We look forward to officially meeting you all tomorrow and getting this course started!{else}We look forward to officially meeting you tomorrow and getting you started with the course!{end}` },
 
   { id: 'next-early', name: 'Next installment · 5 days before', subject: 'EMT Tuition Payment Reminder',
     when: { from: 'next', days: -5 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
@@ -265,9 +256,7 @@ ${SIGN}` },
 
 The payment link can be found on the Student Resources page, but here is a direct link as well: [Student Payment Portal](https://tally.so/r/RGZ8A9).
 
-If you have any questions or experience issues submitting payment, please contact us as soon as possible.
-
-${SIGN}` },
+If you have any questions or experience issues submitting payment, please contact us as soon as possible.` },
 
   { id: 'next-day', name: 'Next installment · due tonight', subject: 'IMPORTANT: EMT Tuition Payment Due Tonight',
     when: { from: 'next', days: 0 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Good morning everyone,{else}Good morning {first name},{end}
@@ -278,7 +267,7 @@ Direct link to the payment portal can be found here: [Payment Portal](https://ta
 
 {if not late}We look forward to meeting you at orientation!
 
-{end}${SIGN}` },
+{end}` },
 
   { id: 'final-early', name: 'Final installment · 5 days before', subject: 'IMPORTANT: Final Tuition Payment Reminder',
     when: { from: 'final', days: -5 }, who: 'unpaid-final', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
@@ -287,18 +276,14 @@ Direct link to the payment portal can be found here: [Payment Portal](https://ta
 
 The payment link can be found on the Student Resources page, but here is a direct link as well: [Student Payment Portal](https://tally.so/r/RGZ8A9).
 
-If you have any questions or experience issues submitting payment, please contact us as soon as possible.
-
-${SIGN}` },
+If you have any questions or experience issues submitting payment, please contact us as soon as possible.` },
 
   { id: 'final-day', name: 'Final installment · due tonight', subject: 'IMPORTANT: Final Tuition Payment Reminder',
     when: { from: 'final', days: 0 }, who: 'unpaid-final', send: 'bcc', body: `{if group}Good morning everyone,{else}Good morning {first name},{end}
 
 This is a reminder that your final tuition payment is **due by 11:59pm tonight**.
 
-Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)
-
-${SIGN}` },
+Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)` },
 
   { id: 'six-weeks', name: '1.5 months out', subject: 'Academy Week is 6 Weeks Away: Upcoming Deadlines',
     when: { from: 'academy', days: -42 }, who: 'all', send: 'bcc', body: `Hi everyone!
@@ -314,9 +299,7 @@ Please keep up with your coursework and be studying the course content, the skil
 **Coursework Deadline**
 All coursework is due **{coursework deadline}**, including uploading your BLS CPR card to the Student Portal assignments (unless you are scheduled to attend the CPR skills check-off at Academy Week). If you do not complete your coursework by the deadline, you will not be permitted to attend Academy Week.
 
-Keep up the great work you guys, you're almost there!
-
-${SIGN}` },
+Keep up the great work you guys, you're almost there!` },
 
   { id: 'aw-instructions', name: 'Academy Week instructions', subject: 'IMPORTANT: Academy Week Instructions & Reminders',
     when: { from: 'academy', days: -14 }, who: 'all', send: 'bcc', body: `Hello to all of our {cohort} EMT students,
@@ -345,9 +328,7 @@ Walk into the building through the main entrance, check in with security, take t
 - **{day 4}** (0800-1700) - Final Practice
 - **{day 5}** (0800-DONE) - Psychomotor Exam & NREMT Registration (remember to bring laptop/ipad for this)
 
-Don't hesitate to reach out if you have any questions or need anything as we approach the end of our class. Good luck everyone as you wrap up your coursework, you're almost there!
-
-${SIGN}` },
+Don't hesitate to reach out if you have any questions or need anything as we approach the end of our class. Good luck everyone as you wrap up your coursework, you're almost there!` },
 
   { id: 'coursework-ontrack', name: 'Coursework reminders (on track)', subject: 'EMT Coursework Reminders',
     when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
@@ -357,9 +338,7 @@ As we approach Academy Week in just 1 week, I wanted to send out a to-do list fo
 
 As a reminder, all coursework is due **{coursework deadline}**, and you need to finish the course with an 80% average as well as score 80% or higher on the final exam, which we'll take in person during Academy Week. This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
 
-We look forward to seeing you at Academy Week, keep up the good work!
-
-${SIGN}` },
+We look forward to seeing you at Academy Week, keep up the good work!` },
 
   { id: 'coursework-behind', name: 'Coursework reminders (behind)', subject: 'EMT Course Deadline Notice',
     when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
@@ -371,18 +350,14 @@ You also need to finish the course with an 80% average and score 80% or higher o
 
 This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
 
-We hope to see you at Academy Week, and wish you luck with the coursework!
-
-${SIGN}` },
+We hope to see you at Academy Week, and wish you luck with the coursework!` },
 
   { id: 'congrats', name: 'Congratulations (cleared for Academy Week)', subject: 'Congratulations, You\'re Cleared for Academy Week!',
     when: { from: 'academy', days: -1 }, who: 'pick', send: 'each', body: `Hi {first name},
 
 I wanted to congratulate you on completing all of the required coursework to attend Academy Week! Your current course grade is a **[[grade]]%** and your final course grade will be determined after you take the final exam on {academy week start} at Academy Week. Be sure to bring your physical copies of your patient contact paperwork (including the Clinical Training Record) to turn in on that day as well.
 
-Please let us know if you have any other questions and we look forward to seeing you at Academy Week!
-
-${SIGN}` },
+Please let us know if you have any other questions and we look forward to seeing you at Academy Week!` },
 
   { id: 'incomplete', name: 'Incomplete', subject: 'EMT Course Incompletion',
     when: { from: 'manual', days: 0 }, who: 'pick', send: 'each', ccNick: true, body: `{first name},
@@ -390,9 +365,7 @@ ${SIGN}` },
 I am notifying you that you have not completed the {cohort} Hybrid EMT course due to the following reasons:
 - [[reason]]
 
-Unfortunately, due to your failure to abide by the deadlines and expectations set forth in the syllabus and reviewed at orientation and via email, your attempt for this EMT class is being submitted to the state as a failed attempt.
-
-${SIGN}` },
+Unfortunately, due to your failure to abide by the deadlines and expectations set forth in the syllabus and reviewed at orientation and via email, your attempt for this EMT class is being submitted to the state as a failed attempt.` },
 
   { id: 'cohort-congrats', name: 'Congratulations to the cohort', subject: 'Congratulations to the {cohort} Cohort',
     when: { from: 'academy', days: 5 }, who: 'check', send: 'bcc', body: `Students,

@@ -977,3 +977,4 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-skip { opacity: .4; } .em-skip:hover { opacity: .9; }
 
 .em-back { display: none; }
+.em-sig { margin: 4px 0 0; padding-top: 8px; border-top: 1px dashed #ddd; color: #999; font-size: 12px; font-style: italic; font-family: Jost, sans-serif; }
