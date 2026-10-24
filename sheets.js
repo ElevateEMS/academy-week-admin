@@ -10,6 +10,7 @@
      saveSettings(key, info)     -> writes course details (only the fields sent) into the settings box
      createDrafts(drafts)        -> puts emails in gbrown@'s Gmail Drafts ({ to, cc, bcc, subject, html, text }); never sends
      docPdf(id)                  -> a Google Doc as a PDF (base64), for the shirt-shipping print packet
+     makeCohortDocs(key, fills)  -> the cohort's syllabus (dates filled in), suggested schedule and Admin folder
 
    Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes.
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
@@ -40,6 +41,7 @@ const Sheets = (() => {
     saveSettings: (key, info) => call('saveSettings', { cohort: key, info }).then(o => o.info),
     createDrafts: drafts => call('createDrafts', { drafts }), // { count, warning } (warning: made without your signature)
     docPdf: id => call('docPdf', { id }).then(o => o.pdf), // a Google Doc as a PDF (base64), for the print packet
+    makeCohortDocs: (key, fills) => call('makeCohortDocs', { cohort: key, fills }), // { made, found, docs: { syllabus, schedule, adminFolder, dropped } }
   };
 })();
 
@@ -108,6 +110,7 @@ function sampleSheets() {
     }); },
     async createDrafts(drafts) { console.log('Sample mode: these would be Gmail drafts', drafts); return wait({ count: drafts.length }); },
     async docPdf() { return wait(null); }, // (the packet shows a stand-in page for each Google Doc)
+    async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);

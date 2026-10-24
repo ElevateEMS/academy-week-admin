@@ -944,6 +944,7 @@ function infoBox() {
   <div class="info-links">
     ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener">Cohort folder ↗</a>` : ''}
     ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
+    ${S.sheet.folderUrl ? cohortDocLinks() : ''}
   </div>`;
 }
 
@@ -2350,8 +2351,10 @@ async function act(a, el = {}, e) {
         if (!infoErr) toast(`${key} is set up. Its folder and sheets are in your Drive.`);
         await selectCohort(key, { keepView: true });
         if (infoErr) alert(`${key} is set up, but its course details didn’t save to the sheet:\n\n${infoErr}\n\nAdd them with the pencil on Course Details.`);
+        else if (S.cohortKey === key && S.sheet) makeCohortDocs({ quiet: true }); // its syllabus (dates filled in), schedule and Admin folder
         break;
       }
+      case 'makeDocs': await makeCohortDocs(); break;
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
