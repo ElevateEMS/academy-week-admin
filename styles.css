@@ -1056,3 +1056,13 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .packet-view { width: min(1100px, 100%); }
 .packet-view h2 .small { font-family: Jost, sans-serif; font-size: 13px; margin-left: 6px; }
 .packet-view .panel-actions { display: flex; align-items: center; gap: 10px; }
+/* Calendar: click "May 2026" to pick from the 12 months, ‹ year › to jump years. */
+.dp-jump { background: none; border: 0; padding: 2px 8px; border-radius: 8px; cursor: pointer; font-family: var(--serif); font-size: 17px; font-weight: 600; color: var(--ink); }
+.dp-jump:hover { background: var(--blush-soft); }
+.dp-center .dp-jump, .dp-multi .dp-jump { font-size: 18px; }
+.dp-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px 0 2px; }
+.dp-months button { height: 36px; border-radius: 10px; border: 1px solid transparent; background: none; cursor: pointer; font-size: 14px; color: var(--ink); }
+.dp-months button:hover { background: var(--blush-soft); }
+.dp-months button.today { border-color: var(--taupe); }
+.dp-months button.on { background: var(--taupe-dark); border-color: var(--taupe-dark); color: #fff; }
+.ai-date { display: block; margin-top: 2px; }

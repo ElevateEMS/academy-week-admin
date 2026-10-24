@@ -1386,6 +1386,17 @@ const CAL_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height
 const multiForm = key => { const m = key.match(/^(ie-|nc-)rev-new$/); return m ? courseForm(m[1]) : null; };
 // title: the calendar opens in the middle of the screen with that heading (used in pop-ups,
 // where a calendar under the field would be cut off at the bottom).
+// The calendar's month line; clicking "May 2026" switches to the 12 months with ‹ year › to jump far.
+function dpHead(first) {
+  const yearMode = S.datePick && S.datePick.years;
+  return `<div class="dp-head"><button type="button" class="x" data-act="${yearMode ? 'dpYear' : 'dpMonth'}" data-dir="-1" aria-label="${yearMode ? 'Previous year' : 'Previous month'}">‹</button>
+    <button type="button" class="dp-jump" data-act="dpYears" title="${yearMode ? 'Back to the days' : 'Pick a month and year'}">${yearMode ? first.getFullYear() : first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</button>
+    <button type="button" class="x" data-act="${yearMode ? 'dpYear' : 'dpMonth'}" data-dir="1" aria-label="${yearMode ? 'Next year' : 'Next month'}">›</button></div>`;
+}
+function dpMonths(first) {
+  const y = first.getFullYear(), now = new Date();
+  return `<div class="dp-months">${Array.from({ length: 12 }, (_, m) => `<button type="button" class="${m === first.getMonth() ? 'on' : ''} ${y === now.getFullYear() && m === now.getMonth() ? 'today' : ''}" data-act="dpMonthPick" data-m="${m}">${new Date(y, m, 1).toLocaleDateString('en-US', { month: 'short' })}</button>`).join('')}</div>`;
+}
 function datePicker(key, { optional = false, empty = 'Not set', title = '' } = {}) {
   const multi = multiForm(key);
   const value = S.drafts[key] || (optional ? '' : todayIso());
@@ -1406,19 +1417,15 @@ function datePicker(key, { optional = false, empty = 'Not set', title = '' } = {
       const n = multi.reviews.length;
       cal = `<div class="dp-pop dp-multi">
         <p class="dp-title">Review sessions <span>tap every date, then Done</span></p>
-        <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
-          <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
-          <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
-        <div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>
+        ${dpHead(first)}
+        ${S.datePick.years ? dpMonths(first) : `<div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>`}
         <div class="dp-multi-foot"><span class="muted small">${n} date${n === 1 ? '' : 's'} picked</span><button type="button" class="btn primary small" data-act="dpDone">Done</button></div>
       </div>`;
       return `<span class="dp"><button type="button" class="date-btn empty ${open ? 'on' : ''}" data-act="dpOpen" data-k="${key}">${CAL_ICON}<span>${n ? 'Add or remove dates' : empty}</span></button>${cal}</span>`;
     }
     cal = `<div class="dp-pop ${title ? 'dp-center' : ''}">${title ? `<p class="dp-title">${esc(title)}</p>` : ''}
-      <div class="dp-head"><button type="button" class="x" data-act="dpMonth" data-dir="-1" aria-label="Previous month">‹</button>
-        <b>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
-        <button type="button" class="x" data-act="dpMonth" data-dir="1" aria-label="Next month">›</button></div>
-      <div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>
+      ${dpHead(first)}
+      ${S.datePick.years ? dpMonths(first) : `<div class="dp-grid">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(x => `<i>${x}</i>`).join('')}${cells.join('')}</div>`}
       <div class="dp-foot"><button type="button" class="link" data-act="dpPick" data-k="${key}" data-iso="${todayIso()}">Today</button>
         ${optional && value ? `<button type="button" class="link" data-act="dpClear" data-k="${key}">Clear</button>` : ''}</div>
     </div>`;
@@ -2520,6 +2527,9 @@ async function act(a, el = {}, e) {
         render(); break;
       }
       case 'dpDone': S.datePick = null; render(); break;
+      case 'dpYears': S.datePick.years = !S.datePick.years; render(); break;
+      case 'dpYear': { const [y, m] = S.datePick.month.split('-').map(Number); S.datePick.month = (y + Number(d.dir)) + '-' + String(m).padStart(2, '0'); render(); break; }
+      case 'dpMonthPick': { const y = S.datePick.month.split('-')[0]; S.datePick.month = y + '-' + String(Number(d.m) + 1).padStart(2, '0'); S.datePick.years = false; render(); break; }
       case 'dpMonth': {
         const [y, m] = S.datePick.month.split('-').map(Number), nd = new Date(y, m - 1 + Number(d.dir), 1);
         S.datePick.month = isoOf(nd).slice(0, 7); render(); break;

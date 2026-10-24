@@ -76,8 +76,10 @@ function adminInfoBox() {
 }
 function adminInfoModal() {
   const f = k => { const [, label, type, ph] = INFO_FIELDS[k];
-    return `<div class="ai-row" data-k="${k}"><span class="ai-grip" data-aigrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>
-      <label class="field">${label}<input id="ai-${k}" type="${type}" data-draft="ai-${k}" value="${esc(S.drafts['ai-' + k] ?? '')}" placeholder="${ph}" autocomplete="off"></label></div>`; };
+    const field = type === 'date' // the app's own calendar (cream), not the browser's
+      ? `<div class="field">${label}<span class="ai-date">${datePicker('ai-' + k, { optional: true, title: label })}</span></div>`
+      : `<label class="field">${label}<input id="ai-${k}" type="${type}" data-draft="ai-${k}" value="${esc(S.drafts['ai-' + k] ?? '')}" placeholder="${ph}" autocomplete="off"></label>`;
+    return `<div class="ai-row" data-k="${k}"><span class="ai-grip" data-aigrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>${field}</div>`; };
   return `<div class="overlay" data-act="adminInfoClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Business Info</h2><button class="x big" data-act="adminInfoClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
