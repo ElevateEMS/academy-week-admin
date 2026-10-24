@@ -1721,63 +1721,30 @@ function drawer() {
 function settingsView() {
   const c = cfg();
   const dv = (k, v) => esc(S.drafts[k] ?? v);
+  // A tile: title, one short line, and its button (or its own control).
+  const tile = (title, line, foot) => `<section class="set-tile"><h3>${title}</h3><p>${line}</p><div class="set-foot">${foot}</div></section>`;
+  const open = (act, label = 'Open') => `<button class="btn primary small" data-act="${act}">${label}</button>`;
+  const group = (name, tiles) => `<h2 class="set-group">${name}</h2><div class="set-grid">${tiles.join('')}</div>`;
   return `<div class="settings">
-    <section class="box">
-      <div class="box-head static"><h2>Templates</h2></div>
-      <p class="muted small">The Course page’s Setup Checklist, the to-dos that repeat for every cohort (Prep, Day 1–5, Finalize), the Prep packing list and binder paperwork, and the notes each day starts with.</p>
-      <button class="btn primary" data-act="tplOpen">Edit templates</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Email Templates</h2></div>
-      <p class="muted small">The emails the Course page’s Emails box drafts for you: what each one says, when it’s due and who it goes to. Drafts land in your Gmail Drafts; nothing is ever sent by the app.</p>
-      <button class="btn primary" data-act="emtOpen">Edit email templates</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Book Codes</h2></div>
-      <p class="muted small">Digital textbook access codes. Paste new ones in; each goes to one student, once. <b>${freeCodes().length}</b> unused.</p>
-      <button class="btn primary" data-act="bookCodesOpen">Open book codes</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Schedule Template</h2></div>
-      <p class="muted small">The class schedule, station content and instructor notes each cohort starts with (Day 1–5). A cohort’s days you haven’t changed yet follow it too; days you’ve edited keep your changes. Scenarios added from the week plan are never saved into it.</p>
-      <div class="plan-btns"><button class="btn primary" data-act="schTplOpen">Edit schedule template</button>
-        ${S.sheet ? `<button class="btn" data-act="saveTemplate">Save ${esc(S.cohortKey)}’s week as the template</button>` : ''}</div>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Scenario Library</h2></div>
-      <p class="muted small">Your patient scenario Docs and the skills each one covers, the add-ons, and how many summative sign-offs each student needs. New Docs in the Medical / Trauma folders show up here on their own.</p>
-      <button class="btn primary" data-act="libOpen">Open the Scenario Library</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Bag Contents</h2></div>
-      <p class="muted small">The pockets and pouches in the jump bags, what goes in each, and which bags carry the items only some bags have. The daily bag check uses this list.</p>
-      <button class="btn primary" data-act="bagEdOpen">Edit bag contents</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Staff Paperwork</h2></div>
-      <label class="field">Names on the Staffing tab that don’t need paperwork or pay reminders (comma separated)
-        <input id="set-skip" data-draft="set-skip" value="${dv('set-skip', c.skipStaff.join(', '))}"></label>
-      <button class="btn primary" data-act="saveSkip">Save</button>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Checked Items</h2></div>
-      <p class="muted small">Whether lists start out showing or hiding what’s checked off. The eye on each list still switches it.</p>
-      <div class="seg" style="align-self:flex-start">${[[false, 'Show checked'], [true, 'Hide checked']].map(([v, l]) =>
-        `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>
-    </section>
-
-    <section class="box">
-      <div class="box-head static"><h2>Page Layout</h2></div>
-      <p class="muted small">Drag any box by its title on the Course or Day pages to move it. This puts everything back where it started.</p>
-      <button class="btn" data-act="resetLayout">Reset layout</button>
-    </section>
+    ${group('Emails', [
+      tile('Email Templates', 'What each email says, when it’s due and who it goes to.', open('emtOpen', 'Edit')),
+      tile('Book Codes', `Textbook access codes, each given out once. <b>${freeCodes().length}</b> unused.`, open('bookCodesOpen')),
+    ])}
+    ${group('Course &amp; Academy Week', [
+      tile('Templates', 'Setup Checklist, repeating to-dos, packing list and daily notes.', open('tplOpen', 'Edit')),
+      tile('Schedule Template', 'The Day 1–5 schedule, stations and notes each cohort starts with.', open('schTplOpen', 'Edit')),
+      tile('Scenario Library', 'Your scenario Docs, the skills each covers, and sign-offs needed.', open('libOpen')),
+      tile('Bag Contents', 'What goes in each jump bag pocket, for the daily bag check.', open('bagEdOpen', 'Edit')),
+    ])}
+    ${group('Preferences', [
+      tile('Staff Paperwork', 'Staff who don’t need paperwork or pay reminders.',
+        `<input id="set-skip" data-draft="set-skip" value="${dv('set-skip', c.skipStaff.join(', '))}" placeholder="Names, comma separated" aria-label="Names, comma separated">
+        <button class="btn small" data-act="saveSkip">Save</button>`),
+      tile('Checked Items', 'Whether lists start out showing what’s checked off.',
+        `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
+          `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),
+      tile('Page Layout', 'Put every box you’ve dragged back where it started.', `<button class="btn small" data-act="resetLayout">Reset layout</button>`),
+    ])}
   </div>`;
 }
 
@@ -1827,6 +1794,7 @@ function schTplModal() {
       </div>
     </div></div>
     <div class="modal-foot"><span class="muted small">Used for every cohort. Days a cohort has already changed keep their changes.</span>
+      ${S.sheet ? `<button class="btn" data-act="saveTemplate">Use ${esc(S.cohortKey)}’s week instead</button>` : ''}
       <button class="btn primary" data-act="schTplSave">Save</button></div>
   </div></div>`;
 }
@@ -2636,6 +2604,7 @@ async function act(a, el = {}, e) {
         const tpl = {};
         [1, 2, 3, 4, 5].forEach(x => { tpl[x] = stripScenarios(schedFor(x)); });
         await Store.set('meta/settings', { scheduleTemplate: tpl });
+        if (S.schTplOpen) { S.schTplDraft = JSON.parse(JSON.stringify(tpl)); S.schTplDirty = false; render(); } // the editor shows what was just saved
         toast('Saved as the schedule template.'); break;
       }
       case 'schTplOpen':

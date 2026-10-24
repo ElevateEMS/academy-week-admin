@@ -336,7 +336,15 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .log .x { opacity: .6; }
 
 /* ---------- Settings ---------- */
-.settings { max-width: 980px; margin: 0 auto; display: grid; gap: 18px; }
+.settings { max-width: 1040px; margin: 0 auto; }
+.set-group { font-family: Jost, sans-serif; font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 26px 0 10px 4px; }
+.set-group:first-child { margin-top: 4px; }
+.set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.set-tile { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+.set-tile h3 { font-family: var(--serif); font-size: 19px; font-weight: 600; margin: 0; }
+.set-tile p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); flex: 1; }
+.set-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.set-foot input { flex: 1; min-width: 0; }
 .field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 .day-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 14px; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin-bottom: 10px; }
