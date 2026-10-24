@@ -2004,6 +2004,35 @@ function saveNoteSoon(n, id) {
   }, 700);
 }
 
+/* ---------- Dash lists in Notes and sticky notes ----------
+   Enter after a "- " line starts the next one with "- " (Enter on an empty "- " ends the list);
+   Tab / Shift+Tab on a "- " line moves it in or out two spaces. The text stays plain. */
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t.tagName !== 'TEXTAREA' || !(t.dataset.notes || t.dataset.anote) || e.isComposing) return;
+  if (!(e.key === 'Enter' && !e.shiftKey) && e.key !== 'Tab') return;
+  const v = t.value, at = t.selectionStart;
+  if (at !== t.selectionEnd && e.key === 'Enter') return;
+  const start = v.lastIndexOf('\n', at - 1) + 1, endNl = v.indexOf('\n', at), end = endNl < 0 ? v.length : endNl;
+  const line = v.slice(start, end), m = line.match(/^(\s*)- /);
+  if (!m) return;
+  e.preventDefault();
+  let next, caret;
+  if (e.key === 'Tab') {
+    const pad = e.shiftKey ? Math.min(2, m[1].length) : 2;
+    if (e.shiftKey && !pad) return;
+    next = e.shiftKey ? v.slice(0, start) + line.slice(pad) + v.slice(end) : v.slice(0, start) + '  ' + line + v.slice(end);
+    caret = Math.max(start, at + (e.shiftKey ? -pad : pad));
+  } else if (!line.slice(m[0].length).trim() && at >= start + m[0].length) {
+    next = v.slice(0, start) + v.slice(end); caret = start; // an empty "- " line: end the list
+  } else {
+    const add = '\n' + m[1] + '- ';
+    next = v.slice(0, at) + add + v.slice(at); caret = at + add.length;
+  }
+  t.value = next; t.setSelectionRange(caret, caret);
+  t.dispatchEvent(new Event('input', { bubbles: true })); // saves it, like typing does
+});
+
 /* ---------- Drag and drop ---------- */
 document.addEventListener('dragstart', e => {
   const bagEl = e.target.closest && e.target.closest('.bag-ed li[data-bi], .bag-ed .pocket[data-p]');
