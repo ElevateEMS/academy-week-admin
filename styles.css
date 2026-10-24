@@ -953,7 +953,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .box.setup-bar { flex: 0 0 auto; padding-bottom: 12px; }
 .box.setup-bar .box-head { margin-bottom: 0; }
 .box-setup .head-actions .link { white-space: nowrap; }
-.course-board .box.box-emails { flex: 1 1 auto; }
+@media (min-width: 1101px) { .course-board .box.box-emails { flex: 1 1 0; min-height: 0; } } /* fills the column to the window's bottom, scrolls inside */
 .course-board:not(.setup-done) .box-notes { flex: 0 0 230px; }
 .course-board .box.box-ctodo { flex: 0 1 auto; min-height: 150px; }
 .course-board.setup-done .box-notes { flex: 1 1 0; }
