@@ -374,3 +374,13 @@ I know it was a long week (and long course) but I just wanted to say one more ti
 
 Bella & Nick` },
 ];
+
+/* ---------- Admin page (header → Admin) ----------
+   Quick Links start as these until you add or remove one on the Admin page.
+   Business Info starts with the portal and website filled in. */
+DEFAULTS.adminLinks = [
+  { id: 'certkeeper', name: 'CertKeeper', url: 'https://glaynebrown.github.io/certkeeper/' },
+  { id: 'finances', name: 'Finances', url: 'https://docs.google.com/spreadsheets/d/1RndW9t7N04G9RWRbkXRst-FXoY9NFePo5xiXJqBEf3Y/edit' },
+  { id: 'payroll', name: 'Payroll', url: 'https://docs.google.com/spreadsheets/d/1OHXZrBqAfqAfkyB3tsH9g5VRt0qeuHeDnzRXX1pyriI/edit' },
+];
+DEFAULTS.adminInfo = { portal: 'https://student.elevateemsacademy.com/', website: 'https://www.elevateemsacademy.com/' };

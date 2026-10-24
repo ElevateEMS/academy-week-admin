@@ -5,6 +5,7 @@
    - Academy Week: Day (planner boxes you can drag around), Week (Day 1-5 side by side; drag
      to-dos between days), Schedule, Students (skills status, patient contacts + fix notes,
      attendance/warnings).
+   Admin (the logo or the Admin button): the business side, not tied to a cohort: admin.js.
    Plus Setup (templates and settings). Saving: store.js. Google Sheets: sheets.js.
    Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js.
    Emails (the Course page's Emails box, Gmail drafts, book codes): emails.js. */
@@ -14,7 +15,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
-const VIEWS = ['course', 'day', 'week', 'schedule', 'students', 'settings'];
+const VIEWS = ['admin', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
 const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
@@ -26,6 +27,7 @@ const S = {
   // Scenarios: scenDocs = your saved tags, scenLive = Docs in the Drive folders (null until listed)
   scenDocs: {}, scenDocsAt: 0, scenLive: null, scenLiveAt: 0, scenErr: null,
   emailTpls: {}, bookCodes: [], emailLog: [], // emails.js
+  admin: {}, adminTodos: [], adminDates: [], adminNotes: [], // admin.js
   libOpen: false, libTab: 'scen', libSel: null, libDraft: null, libFilter: 'all', addonDraft: null, reqDraft: null, planOpen: false, place: null, match: null,
 };
 let unwatchCohort = [];
@@ -365,6 +367,7 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); render(); }));
   unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
+  unwatchGlobal.push(...adminWatch());
   render();
   // The last cohort used opens straight away (while the cohort list loads alongside it).
   const last = S.cohortKey;
@@ -524,7 +527,7 @@ function bootShell() {
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
-    <span class="brand"><img src="logo.png" alt=""><span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span></span>
+    <div class="head-left"><span class="brand"><img src="logo.png" alt=""><b>Admin</b></span></div>
     <div class="page-title"></div>
     <nav class="icons">${icon('students')}<div class="menu-wrap">${icon('settings')}</div></nav>
   </header>
@@ -546,10 +549,8 @@ function shell() {
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
     <div class="head-left">
-      <button class="brand" data-act="side" data-s="${sideByDate()}" title="Today’s side">
-        <img src="logo.png" alt="">
-        <span><b>Elevate EMS Admin</b><small>${esc(S.cohortKey || '')}</small></span>
-      </button>
+      <button class="brand ${S.view === 'admin' ? 'on' : ''}" data-act="view" data-v="admin" title="Admin"><img src="logo.png" alt=""><b>Admin</b></button>
+      <span class="head-div" aria-hidden="true"></span>
       ${sideSwitch()}
     </div>
     <div class="page-title">${pageTitle()}</div>
@@ -563,7 +564,7 @@ function shell() {
   </header>
   <main class="wrap">
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${{ admin: adminView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -582,10 +583,12 @@ function shell() {
   ${S.binderList ? binderListModal() : ''}
   ${S.infoEdit ? infoEditModal() : ''}
   ${S.newCohort ? newCohortModal() : ''}
-  ${emailModals()}`;
+  ${emailModals()}
+  ${adminModals()}`;
 }
 
 function pageTitle() {
+  if (S.view === 'admin') return '<h1>Admin</h1><p>Elevate EMS · shared by you and Nick</p>';
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? students().length : 0;
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
@@ -2149,6 +2152,7 @@ document.addEventListener('input', e => {
   if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
   if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
   if (emailInput(t)) return; // the email draft pop-up and the template editor
+  if (adminInput(t)) return; // Admin page sticky notes
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
   if (k === 'libSearch') { S.drafts.libSearch = t.value; render(); return; }
@@ -2206,6 +2210,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.datePick) S.datePick = null;
     else if (emailEscape()) { /* closed an email pop-up */ }
+    else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
@@ -2217,6 +2222,7 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   if (t.dataset.add === 'bagitem') { bagAddItem(Number(t.dataset.p)).catch(err => toast(err.message)); return; }
   if (t.dataset.add === 'bagpocket') { bagAddPocket().catch(err => toast(err.message)); return; }
+  if (adminEnter(t)) return;
   if (t.dataset.add === 'shop') act('addShop');
   else if (t.dataset.add === 'pack') act('addPack');
   else if (t.dataset.add === 'upd') act('addUpd');
@@ -2677,7 +2683,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });
