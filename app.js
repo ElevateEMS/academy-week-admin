@@ -610,7 +610,7 @@ function shell() {
 }
 
 function pageTitle() {
-  if (S.view === 'admin') return '<h1>Admin</h1><p>Elevate EMS · shared by you and Nick</p>';
+  if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? students().length : 0;
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
