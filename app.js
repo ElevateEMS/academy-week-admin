@@ -944,7 +944,6 @@ function infoBox() {
   <div class="info-links">
     ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener">Cohort folder ↗</a>` : ''}
     ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
-    ${S.sheet.folderUrl ? cohortDocLinks() : ''}
   </div>`;
 }
 
@@ -988,7 +987,7 @@ function setupList() {
       const auto = setupAuto(t.text), done = auto.done === true || t.done;
       const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}
         <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
     }).join('') || '<li class="empty">Nothing yet.</li>'}
   </ul>`;

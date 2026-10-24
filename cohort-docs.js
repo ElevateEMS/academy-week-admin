@@ -1,7 +1,8 @@
 /* New cohort documents: "<cohort> Hybrid EMT Syllabus" (dates filled in), "<cohort> Suggested Schedule",
    and an "Admin - <cohort>" folder with "<cohort> Dropped Students Record", made in the cohort's Drive
    folder by the Admin Apps Script (makeCohortDocs). Made right after "+ New cohort"; for any other
-   cohort, Course Details has a "Make syllabus & schedule" button. Links are kept as cohorts/{key}.docs.
+   cohort, the Setup Checklist's Syllabus / Suggested schedule items have a Make button (then Open ↗).
+   Links are kept as cohorts/{key}.docs.
    The dates come from Course Details, written the way the syllabus writes them. Blank ones say TBD. */
 
 const SYL_WD = ['Sun.', 'Mon.', 'Tues.', 'Wed.', 'Thurs.', 'Fri.', 'Sat.'];
@@ -34,14 +35,14 @@ function syllabusFills() {
 }
 const cohortDocs = () => (S.cohortDoc && S.cohortDoc.docs) || null;
 
-// The links (or the button) under Course Details.
-function cohortDocLinks() {
+// On the Setup Checklist's "Syllabus" and "Suggested schedule" items: Make (both at once) until they're made, then Open ↗.
+function setupDocBtn(text) {
+  const kind = /^\s*syllabus\s*$/i.test(text) ? 'syllabus' : /^\s*suggested schedule\s*$/i.test(text) ? 'schedule' : null;
+  if (!kind) return '';
+  if (S.docsBusy === S.cohortKey) return '<span class="muted small">Making…</span>';
   const d = cohortDocs();
-  if (S.docsBusy === S.cohortKey) return '<span class="muted small">Making the syllabus and schedule…</span>';
-  if (!d) return `<button class="btn small" data-act="makeDocs" title="Copies the syllabus (with this cohort’s dates), the suggested schedule and an Admin folder into the cohort folder">Make syllabus & schedule</button>`;
-  return `<a class="btn small" href="${esc(d.syllabus)}" target="_blank" rel="noopener">Syllabus ↗</a>
-    <a class="btn small" href="${esc(d.schedule)}" target="_blank" rel="noopener">Schedule ↗</a>
-    <a class="btn small" href="${esc(d.adminFolder)}" target="_blank" rel="noopener">Admin folder ↗</a>`;
+  if (!d) return `<button class="btn tiny" data-act="makeDocs" title="Makes this cohort’s syllabus (dates filled in), suggested schedule and Admin folder in the cohort folder">Make</button>`;
+  return `<a class="btn tiny" href="${esc(d[kind])}" target="_blank" rel="noopener">Open ↗</a>`;
 }
 async function makeCohortDocs({ quiet = false } = {}) {
   const key = S.cohortKey;
