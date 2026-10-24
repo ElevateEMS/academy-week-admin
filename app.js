@@ -493,14 +493,21 @@ function render() {
     const id = a && a.id;
     const sel = id && typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null;
     const scrolls = [...document.querySelectorAll('[data-keep-scroll]')].map(el => [el.dataset.keepScroll, el.scrollTop]);
+    // Text boxes (Notes, sticky notes) and the boxes around them keep how far they were scrolled.
+    const tScrolls = [...document.querySelectorAll('textarea[id]')].filter(el => el.scrollTop).map(el => [el.id, el.scrollTop]);
+    const bScrolls = [...document.querySelectorAll('.box[data-box-id], section.box')].filter(el => el.scrollTop)
+      .map(el => [el.dataset.boxId || el.className, el.scrollTop]);
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? shell() : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
     if (id) {
       const el = document.getElementById(id);
-      if (el) { el.focus(); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
+      if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
     }
+    // (after the cursor is put back: focusing a text box scrolls it to the top)
+    tScrolls.forEach(([id, top]) => { const el = document.getElementById(id); if (el) el.scrollTop = top; });
+    bScrolls.forEach(([k, top]) => { const el = [...document.querySelectorAll('.box[data-box-id], section.box')].find(b => (b.dataset.boxId || b.className) === k); if (el) el.scrollTop = top; });
     if (S.editFocus) { // just clicked an item's words: cursor at the end
       S.editFocus = false;
       const el = document.querySelector('[data-edit]');

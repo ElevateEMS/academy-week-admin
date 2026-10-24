@@ -165,10 +165,11 @@ function emailsBox() {
   if (free < needCodes || free < DEFAULTS.email.lowCodes) notes.push(`Only ${free} unused book code${free === 1 ? '' : 's'} left${needCodes ? ` (${needCodes} needed)` : ''}. <button class="link" data-act="bookCodesOpen">Add codes</button>`);
   const log = [...(S.emailLog || [])].sort((a, b) => (b.at || 0) - (a.at || 0));
   return `${notes.map(n => `<p class="em-note">${n}</p>`).join('')}
-    <p class="mini-head">Due now <span class="count">${due.length || ''}</span></p>
-    <ul class="em-list">${due.map(row).join('') || '<li class="empty">Nothing due today.</li>'}</ul>
-    ${later.length ? `<p class="mini-head">Coming up</p>
+    ${due.length ? `<p class="mini-head">Due now <span class="count">${due.length}</span></p>
+      <ul class="em-list">${due.map(row).join('')}</ul>` : ''}
+    ${later.length ? `<p class="mini-head">Upcoming</p>
       <ul class="em-list later">${later.map(row).join('')}</ul>` : ''}
+    ${!due.length && !later.length ? '<p class="empty">No emails scheduled.</p>' : ''}
     ${log.length ? `<details class="em-done" ${S.emailDoneOpen ? 'open' : ''}><summary data-act="emailDoneToggle">Drafted <span class="count">${log.length}</span></summary>
       <ul class="em-list done">${log.slice(0, 20).map(x => `<li class="em-row"><span class="em-main"><span class="em-name">✓ ${esc(x.name)}</span>
         <span class="em-sub">${monthDay(isoOf(new Date(x.at)))} · ${x.count === 1 ? esc((x.names || [])[0] || '1 student') : x.count + ' students'}</span></span></li>`).join('')}</ul></details>` : ''}`;
