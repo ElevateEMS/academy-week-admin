@@ -44,33 +44,45 @@ function inBusiness(iso) {
   const parts = [y ? y + (y === 1 ? ' yr' : ' yrs') : '', mo ? mo + (mo === 1 ? ' mo' : ' mos') : ''].filter(Boolean);
   return parts.length ? parts.join(' ') + ' in business' : 'just started';
 }
+// Business Info fields: [label in the box, label in the edit window, input type, placeholder].
+// Their order is yours to set (drag the grip in the edit window); saved as meta/admin.infoOrder.
+const INFO_FIELDS = {
+  started: ['Started', 'Business start date', 'date', ''],
+  phone: ['Phone', 'Business phone', 'tel', '(804) 555-0100'],
+  website: ['Website', 'Website link', 'url', 'www.elevateemsacademy.com'],
+  portal: ['Student Portal', 'Student Portal link', 'url', 'student.elevateemsacademy.com'],
+  insurance: ['Insurance', 'Insurance company', 'text', ''],
+};
+function infoOrder() {
+  const saved = ((S.admin && S.admin.infoOrder) || []).filter(k => INFO_FIELDS[k]);
+  return [...saved, ...Object.keys(INFO_FIELDS).filter(k => !saved.includes(k))];
+}
 function adminInfoBox() {
   const i = adminInfo();
   const none = '<span class="tbd">Not added</span>';
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   const site = (name, url) => url ? `<button class="link-btn" data-act="adminOpenUrl" data-name="${esc(name)}" data-url="${esc(fullUrl(url))}">${esc(url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))}</button>` : none;
+  const val = {
+    started: isIsoDate(i.started) ? `${esc(longDate(i.started))}<span class="muted small info-sub">${inBusiness(i.started)}</span>` : none,
+    phone: i.phone ? `<a href="tel:${esc(i.phone.replace(/[^\d+]/g, ''))}">${esc(i.phone)}</a>` : none,
+    website: site('Website', i.website),
+    portal: site('Student Portal', i.portal),
+    insurance: i.insurance ? esc(i.insurance) : none,
+  };
   return `<section class="box shaded admin-info">
     ${adminHead('Business Info', `<button class="eye" data-act="adminInfoOpen" title="Edit business info" aria-label="Edit business info">${ICONS.pencil}</button>`)}
-    <div class="info-rows">
-      ${row('Started', isIsoDate(i.started) ? `${esc(longDate(i.started))}<span class="muted small info-sub">${inBusiness(i.started)}</span>` : none)}
-      ${row('Insurance', i.insurance ? esc(i.insurance) : none)}
-      ${row('Phone', i.phone ? `<a href="tel:${esc(i.phone.replace(/[^\d+]/g, ''))}">${esc(i.phone)}</a>` : none)}
-      ${row('Student Portal', site('Student Portal', i.portal))}
-      ${row('Website', site('Website', i.website))}
-    </div>
+    <div class="info-rows">${infoOrder().map(k => row(INFO_FIELDS[k][0], val[k])).join('')}</div>
   </section>`;
 }
 function adminInfoModal() {
-  const f = (k, label, type = 'text', ph = '') => `<label class="field">${label}
-    <input id="ai-${k}" type="${type}" data-draft="ai-${k}" value="${esc(S.drafts['ai-' + k] ?? '')}" placeholder="${ph}" autocomplete="off"></label>`;
+  const f = k => { const [, label, type, ph] = INFO_FIELDS[k];
+    return `<div class="ai-row" data-k="${k}"><span class="ai-grip" data-aigrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>
+      <label class="field">${label}<input id="ai-${k}" type="${type}" data-draft="ai-${k}" value="${esc(S.drafts['ai-' + k] ?? '')}" placeholder="${ph}" autocomplete="off"></label></div>`; };
   return `<div class="overlay" data-act="adminInfoClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Business Info</h2><button class="x big" data-act="adminInfoClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
-      ${f('started', 'Business start date', 'date')}
-      ${f('insurance', 'Insurance company')}
-      ${f('phone', 'Business phone', 'tel', '(804) 555-0100')}
-      ${f('portal', 'Student Portal link', 'url', 'student.elevateemsacademy.com')}
-      ${f('website', 'Website link', 'url', 'www.elevateemsacademy.com')}
+      <p class="muted small ai-hint">Drag the grip to change the order.</p>
+      <div class="ai-list">${S.adminOrderDraft.map(f).join('')}</div>
     </div>
     <div class="modal-foot"><button class="btn primary" data-act="adminInfoSave">Save</button></div>
   </div></div>`;
@@ -110,8 +122,8 @@ function adminTodoBox() {
   const open = S.adminTodos.filter(t => !t.done).sort((a, b) => (a.created || 0) - (b.created || 0));
   const done = S.adminTodos.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   return `<section class="box admin-todo">
-    ${adminHead('To Do', done.length ? '<button class="link" data-act="adminTodoClear">Clear checked</button>' : '')}
-    <div class="add-row"><input id="ad-todo" data-draft="ad-todo" data-add="adminTodo" placeholder="+ to do" value="${esc(S.drafts['ad-todo'] || '')}"></div>
+    ${adminHead('To Do', (done.length ? '<button class="link" data-act="adminTodoClear">Clear checked</button>' : '') + '<button class="add-plus small-plus" data-act="adminTodoOpen" title="Add a to-do" aria-label="Add a to-do">+</button>')}
+    ${S.adminTodoAdd ? `<div class="add-row"><input id="ad-todo" data-draft="ad-todo" data-add="adminTodo" data-aclose="todo" placeholder="Type a to-do, then Enter" value="${esc(S.drafts['ad-todo'] || '')}" autocomplete="off"></div>` : ''}
     <ul class="checks">${[...open, ...done].map(t => `<li class="${t.done ? 'done' : ''}">
       <label>${circle(t.done, `data-act="adminTodo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span></span></label>
       <button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
@@ -134,8 +146,9 @@ function adminDatesBox() {
       <button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button></li>`;
   };
   return `<section class="box admin-dates">
-    ${adminHead('Key Dates', past.length ? `<button class="link" data-act="adminPastToggle">${S.adminShowPast ? 'Hide' : 'Show'} past</button>` : '')}
-    <div class="kd-add">${datePicker('ad-date')}<input id="ad-text" data-draft="ad-text" data-add="adminDate" placeholder="What’s happening? Enter to add" value="${esc(S.drafts['ad-text'] || '')}" autocomplete="off"></div>
+    ${adminHead('Key Dates', (past.length ? `<button class="link" data-act="adminPastToggle">${S.adminShowPast ? 'Hide' : 'Show'} past</button>` : '') + '<button class="add-plus small-plus" data-act="adminDateOpen" title="Add a date" aria-label="Add a date">+</button>')}
+    ${S.adminDateAdd ? `<div class="kd-form"><div class="kd-add">${datePicker('ad-date')}<input id="ad-text" data-draft="ad-text" data-add="adminDate" placeholder="What’s happening?" value="${esc(S.drafts['ad-text'] || '')}" autocomplete="off"></div>
+      <div class="link-add-foot"><button class="link" data-act="adminDateCancel">Cancel</button><button class="btn small primary" data-act="adminDateAdd">Add date</button></div></div>` : ''}
     <ul class="checks key-dates">${next.map(item).join('') || '<li class="empty">No dates coming up.</li>'}${S.adminShowPast ? past.map(item).join('') : ''}</ul>
   </section>`;
 }
@@ -180,6 +193,8 @@ function adminInput(t) {
 function adminEscape() {
   if (S.adminPanel) S.adminPanel = null;
   else if (S.adminInfoEd) S.adminInfoEd = false;
+  else if (S.adminTodoAdd) { S.adminTodoAdd = false; delete S.drafts['ad-todo']; }
+  else if (S.adminDateAdd) { S.adminDateAdd = false; delete S.drafts['ad-text']; delete S.drafts['ad-date']; }
   else if (S.adminLinkAdd) { S.adminLinkAdd = false; delete S.drafts['al-name']; delete S.drafts['al-url']; }
   else return false;
   return true;
@@ -199,14 +214,14 @@ async function adminAct(a, el = {}) {
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
     case 'adminInfoOpen': {
       const i = adminInfo();
-      ['started', 'insurance', 'phone', 'portal', 'website'].forEach(k => { S.drafts['ai-' + k] = i[k] || ''; });
-      S.adminInfoEd = true; render(); return true;
+      Object.keys(INFO_FIELDS).forEach(k => { S.drafts['ai-' + k] = i[k] || ''; });
+      S.adminOrderDraft = infoOrder(); S.adminInfoEd = true; render(); return true;
     }
     case 'adminInfoClose': S.adminInfoEd = false; render(); return true;
     case 'adminInfoSave': {
-      const info = Object.fromEntries(['started', 'insurance', 'phone', 'portal', 'website'].map(k => [k, String(S.drafts['ai-' + k] || '').trim()]));
+      const info = Object.fromEntries(Object.keys(INFO_FIELDS).map(k => [k, String(S.drafts['ai-' + k] || '').trim()]));
       info.portal = fullUrl(info.portal); info.website = fullUrl(info.website);
-      await Store.set('meta/admin', { info });
+      await Store.set('meta/admin', { info, infoOrder: S.adminOrderDraft });
       Object.keys(S.drafts).filter(k => k.startsWith('ai-')).forEach(k => delete S.drafts[k]);
       S.adminInfoEd = false; toast('Business info saved.'); render(); return true;
     }
@@ -223,6 +238,9 @@ async function adminAct(a, el = {}) {
       if (!l || !confirm(`Remove ${l.name} from Quick Links?`)) return true;
       await Store.set('meta/admin', { links: adminLinks().filter(x => x.id !== d.id) }); return true;
     }
+    case 'adminTodoOpen': S.adminTodoAdd = true; render(); setTimeout(() => { const i = document.getElementById('ad-todo'); if (i) i.focus(); }, 0); return true;
+    case 'adminDateOpen': S.adminDateAdd = true; render(); setTimeout(() => { const i = document.getElementById('ad-text'); if (i) i.focus(); }, 0); return true;
+    case 'adminDateCancel': S.adminDateAdd = false; delete S.drafts['ad-text']; delete S.drafts['ad-date']; render(); return true;
     case 'adminTodoAdd': {
       const text = String(S.drafts['ad-todo'] || '').trim(); if (!text) return true;
       delete S.drafts['ad-todo'];
@@ -239,8 +257,8 @@ async function adminAct(a, el = {}) {
     case 'adminDateAdd': {
       const text = String(S.drafts['ad-text'] || '').trim(), date = S.drafts['ad-date'] || todayIso();
       if (!text) { toast('Type what the date is for.'); return true; }
-      delete S.drafts['ad-text']; delete S.drafts['ad-date'];
-      await Store.add('adminDates', { date, text, created: Date.now() }); return true;
+      delete S.drafts['ad-text']; delete S.drafts['ad-date']; S.adminDateAdd = false;
+      await Store.add('adminDates', { date, text, created: Date.now() }); render(); return true;
     }
     case 'adminDateDel': await Store.del('adminDates/' + d.id); return true;
     case 'adminPastToggle': S.adminShowPast = !S.adminShowPast; render(); return true;
@@ -262,3 +280,33 @@ async function adminAct(a, el = {}) {
   }
   return false;
 }
+
+// The To Do add line closes again when you click away and it's empty (it stays open after Enter for the next one).
+document.addEventListener('focusout', e => {
+  const t = e.target;
+  if (!t.dataset || t.dataset.aclose !== 'todo' || S.rendering || t.value.trim()) return;
+  setTimeout(() => { if (S.adminTodoAdd && !String(S.drafts['ad-todo'] || '').trim() && document.activeElement !== document.getElementById('ad-todo')) { S.adminTodoAdd = false; render(); } }, 150);
+});
+
+// Business Info edit window: drag a field by its grip to move it (works with a mouse or a finger).
+document.addEventListener('pointerdown', e => {
+  const grip = e.target.closest && e.target.closest('[data-aigrip]');
+  if (!grip) return;
+  e.preventDefault();
+  const row = grip.closest('.ai-row'), list = row.parentElement;
+  S.dragging = { type: 'aiorder' }; // (no redraws mid-drag)
+  row.classList.add('moving');
+  const move = ev => {
+    const after = [...list.children].find(c => c !== row && ev.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
+    if (after) { if (after !== row.nextSibling) list.insertBefore(row, after); } else if (list.lastElementChild !== row) list.appendChild(row);
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    row.classList.remove('moving');
+    S.adminOrderDraft = [...list.children].map(c => c.dataset.k);
+    S.dragging = null; render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+});

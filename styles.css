@@ -1034,6 +1034,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .admin-panel .panel-actions { display: flex; align-items: center; gap: 10px; }
 .panel-note { margin: 0; padding: 6px 22px; font-size: 12.5px; color: var(--muted); background: var(--blush-soft); }
 .kd-add { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; flex-shrink: 0; }
+.kd-form { flex-shrink: 0; margin: 0 0 8px; }
+.kd-form .kd-add { margin-bottom: 4px; }
 .kd-add input { flex: 1; min-width: 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 6px 2px; outline: none; }
 .kd-add input:focus { border-bottom-color: var(--taupe-dark); }
 .kd-add input::placeholder { color: var(--muted); font-style: italic; }
@@ -1058,3 +1060,11 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .sticky.c-blue { background: #e1e8ef; }
 .sticky.c-paper { background: #fff; }
 @media (hover: none) { .sticky .dot, .sticky .x { opacity: 1; } }
+.ai-hint { margin: 10px 0 6px; }
+.ai-row { display: flex; align-items: center; gap: 6px; border-radius: 10px; }
+.ai-row .field { flex: 1; margin-bottom: 10px; }
+.ai-grip { flex: none; width: 22px; height: 22px; color: var(--taupe); cursor: grab; touch-action: none; display: grid; place-items: center; margin-top: 8px; opacity: .7; }
+.ai-grip:hover { opacity: 1; }
+.ai-grip svg { width: 20px; height: 20px; fill: currentColor; }
+.ai-row.moving { background: var(--blush-soft); }
+.ai-row.moving .ai-grip { cursor: grabbing; }
