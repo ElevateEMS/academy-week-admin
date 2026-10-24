@@ -34,7 +34,7 @@ function packetModal() {
   return `<div class="overlay" data-act="packetClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Print Packet</h2>${p.busy ? '' : '<button class="x big" data-act="packetClose" aria-label="Close">×</button>'}</div>
     <div class="modal-body pad-top">
-      <p class="muted small">One PDF, already in order, one packet per student. The two Google Docs are pulled fresh, so your latest edits are in it.</p>
+      <p class="muted small">The two Google Docs are pulled fresh, so your latest edits are in it.</p>
       <ol class="packet-list">${list.map(x => `<li>${x.copies > 1 ? `<b>${x.copies}×</b> ` : ''}${esc(x.name)}${x.doc ? ' <span class="muted small">(Google Doc)</span>' : ''}</li>`).join('')}</ol>
       <div class="packet-count"><span>Students</span>
         <button class="btn tiny" data-act="packetCount" data-by="-1" ${p.busy || p.count <= 1 ? 'disabled' : ''} aria-label="One fewer">−</button>
