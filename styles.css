@@ -1013,7 +1013,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 /* ---------- Admin page ---------- */
 .admin-head { cursor: default; }
 .admin-head:active { cursor: default; }
-.admin-board .admin-info { flex: 0 0 auto; }
+/* Left column mirrors the middle: Business Info lines up with To Do, Quick Links with Key Dates. */
+.admin-board .admin-info, .admin-board .admin-links { flex: 1 1 0; }
 .admin-info .info-row { grid-template-columns: 112px 1fr; }
 .info-sub { display: block; font-weight: 400; }
 .tbd, .admin-info .tbd { color: var(--muted); font-style: italic; font-weight: 400; }
