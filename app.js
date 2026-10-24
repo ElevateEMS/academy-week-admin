@@ -576,7 +576,7 @@ function shell() {
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''}${icon('students', 'Students')}
+      ${S.view === 'admin' ? adminHeaderLinks() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : '') + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}

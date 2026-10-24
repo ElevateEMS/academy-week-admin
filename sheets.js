@@ -11,6 +11,8 @@
      createDrafts(drafts)        -> puts emails in gbrown@'s Gmail Drafts ({ to, cc, bcc, subject, html, text }); never sends
      docPdf(id)                  -> a Google Doc as a PDF (base64), for the shirt-shipping print packet
      makeCohortDocs(key, fills)  -> the cohort's syllabus (dates filled in), suggested schedule and Admin folder
+     listInquiries / checkInquiries / saveInquiry / deleteInquiry / saveInquirySettings
+                                 -> the Info Requests tracker on the Admin page (the config sheet's Info Requests tab)
 
    Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes.
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
@@ -42,9 +44,25 @@ const Sheets = (() => {
     createDrafts: drafts => call('createDrafts', { drafts }), // { count, warning } (warning: made without your signature)
     docPdf: id => call('docPdf', { id }).then(o => o.pdf), // a Google Doc as a PDF (base64), for the print packet
     makeCohortDocs: (key, fills) => call('makeCohortDocs', { cohort: key, fills }), // { made, found, docs: { syllabus, schedule, adminFolder, dropped } }
+    listInquiries: () => call('listInquiries'),     // website info requests: { items, settings, waitingReason, lastCheck, timerOn }
+    checkInquiries: () => call('checkInquiries'),   // check now (makes any drafts), then the same as listInquiries
+    saveInquirySettings: settings => call('saveInquirySettings', { settings }).then(o => o.settings),
+    saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
+    deleteInquiry: id => call('deleteInquiry', { id }),
   };
 })();
 
+const sampleInquiries = {
+  items: [
+    { id: 'a', received: '2026-10-24', source: 'Website', name: 'Daya Bugg', email: 'daya@example.com', phone: '(686) 202-1935', message: 'Looking for more info', cohort: 'Spring 2027', status: 'Needs follow-up', notes: '', reply: 'Drafted 2026-10-24' },
+    { id: 'b', received: '2026-10-20', source: 'Voicemail', name: 'Katie Rich', email: '', phone: '(276) 439-9044', message: 'hi my name is Katie rich I was calling to speak to someone about the program if someone could call me back', cohort: 'Spring 2027', status: 'Needs follow-up', notes: '', reply: '' },
+    { id: 'c', received: '2026-10-02', source: 'Website', name: 'Sam Rivera', email: 'sam@example.com', phone: '', message: 'Can you tell me more about the program?', cohort: 'Spring 2027', status: 'Responded', notes: 'Asked about payment plan', reply: 'Drafted 2026-10-02' },
+    { id: 'd', received: '2026-09-12', source: 'Call', name: 'Jordan Lee', email: 'jordan@example.com', phone: '(804) 555-0182', message: '', cohort: 'Fall 2026', status: 'Enrolled', notes: '', reply: '' },
+  ],
+  cohorts: ['Fall 2026', 'Spring 2027'],
+  settings: { tuition: '$1,500', textbook: '$250', lateFee: '$100', months: { spring: ['January', 'May'], summer: ['May', 'August'], fall: ['August', 'December'] } },
+  waitingReason: 'No upcoming cohort yet. Add the next one with + New cohort (with its dates).', lastCheck: new Date().toISOString(), timerOn: true,
+};
 function sampleSheets() {
   const names = ['Alvarez, Marco', 'Bennett, Kayla', 'Chen, Olivia', 'Dawson, Tyler (TJ)', 'Ellis, Jordan',
     'Foster, Amara', 'Grant, Elijah', 'Hughes, Sophie', 'Iverson, Caleb', 'Jackson, Nia', 'Keller, Ryan',
@@ -110,6 +128,16 @@ function sampleSheets() {
     }); },
     async createDrafts(drafts) { console.log('Sample mode: these would be Gmail drafts', drafts); return wait({ count: drafts.length }); },
     async docPdf() { return wait(null); }, // (the packet shows a stand-in page for each Google Doc)
+    async listInquiries() { return wait(sampleInquiries); },
+    async checkInquiries() { return wait(Object.assign({ drafted: 0, waiting: 0 }, sampleInquiries)); },
+    async saveInquirySettings(st) { sampleInquiries.settings = st; return wait(st); },
+    async saveInquiry(item) {
+      const list = sampleInquiries.items, o = item.id ? list.find(x => x.id === item.id) : null;
+      const row = o || { id: 'call-' + Date.now(), received: item.received, source: 'Call', message: '', reply: '', status: 'Needs follow-up' };
+      Object.assign(row, item); if (!o) list.unshift(row);
+      return wait({ ...row });
+    },
+    async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async changeContacts(key, student, by) {
