@@ -384,3 +384,16 @@ DEFAULTS.adminLinks = [
   { id: 'payroll', name: 'Payroll', url: 'https://docs.google.com/spreadsheets/d/1OHXZrBqAfqAfkyB3tsH9g5VRt0qeuHeDnzRXX1pyriI/edit' },
 ];
 DEFAULTS.adminInfo = { portal: 'https://student.elevateemsacademy.com/', website: 'https://www.elevateemsacademy.com/' };
+
+/* ---------- Course To-Do (Course page, once the Setup Checklist is done) ----------
+   Copied into each cohort. Anything with "ship" and "shirt" gets the Print packet button. */
+DEFAULTS.courseTodoList = ['Ship student shirts'];
+
+/* The print packet that ships with the shirts, in order, for each student.
+   doc = a Google Doc (pulled fresh as a PDF each time); pdf = a file kept with the app. */
+DEFAULTS.printPacket = [
+  { name: 'Ride Along & Academy Week Readiness Guide', doc: '1mOaVm0DU1w76LU_Uu3NRmkW6FiWPpwzVfIbztawgz2s', copies: 1 },
+  { name: 'Patient Contact Instructions', doc: '1KaQtsY9coYLENbxguCd-pXEYs9s91qBRCnPDAR-rfJI', copies: 1 },
+  { name: 'Clinical Training Record', pdf: 'clinical-training-record.pdf', copies: 1 },
+  { name: 'Patient Contact Form', pdf: 'patient-contact-form.pdf', copies: 10 },
+];

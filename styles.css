@@ -842,20 +842,6 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .dp-multi-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 /* Editing an item: the edit line spans the whole row, not just the old text's width */
 .checks label > span:has(> .txt-edit) { flex: 1; min-width: 0; display: block; }
-/* Course page on a smaller window: Course Details, Setup Checklist, Notes, then Changes last.
-   Two columns: Course Details / Notes / Changes down the left, the checklist down the right.
-   One column (phone): straight down in that order. */
-@media (max-width: 1100px) {
-  .course-board { align-items: start; grid-auto-rows: auto; }
-  .course-board > .board-col { display: contents; }
-  .course-board .box-info { order: 1; grid-column: 1; grid-row: 1; }
-  .course-board .box-setup { order: 2; grid-column: 2; grid-row: 1 / span 3; }
-  .course-board .box-notes { order: 3; grid-column: 1; grid-row: 2; }
-  .course-board .box-changes { order: 4; grid-column: 1; grid-row: 3; }
-}
-@media (max-width: 720px) {
-  .course-board .box-info, .course-board .box-setup, .course-board .box-notes, .course-board .box-changes { grid-column: auto; grid-row: auto; }
-}
 /* Notes highlights: the typing box is see-through and a layer behind it draws the lines and
    the highlight color, letter for letter under the same words. */
 .notes-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 140px; }
@@ -962,20 +948,21 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
   .em-tpl:not(.editing) .modal-foot { display: none; }
   .em-back { display: inline-block !important; margin: 0 0 10px; }
 }
-/* Setup Checklist all done (setup-done): Notes fills the middle, the checklist is a bar under it, Emails fills the right. */
+/* Course page: Emails fills the middle. Right column: Setup Checklist with a small Notes under it;
+   once the checklist is done, Course To-Do on top, Notes fills the rest, the checklist is a bar at the bottom. */
 .box.setup-bar { flex: 0 0 auto; padding-bottom: 12px; }
 .box.setup-bar .box-head { margin-bottom: 0; }
 .box-setup .head-actions .link { white-space: nowrap; }
-.course-board.setup-done .box-emails { flex: 1 1 auto; }
-/* Course page on a smaller window: Emails goes under Course Details on the left. */
+.course-board .box.box-emails { flex: 1 1 auto; }
+.course-board:not(.setup-done) .box-notes { flex: 0 0 230px; }
+.course-board .box.box-ctodo { flex: 0 1 auto; min-height: 150px; }
+.course-board.setup-done .box-notes { flex: 1 1 0; }
+.btn-ic { width: 13px; height: 13px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* Smaller window: Course Details + Changes beside Emails, the right column goes across underneath. Phone: straight down. */
 @media (max-width: 1100px) {
-  .course-board .box-emails { order: 2; grid-column: 1; grid-row: 2; }
-  .course-board .box-setup { grid-row: 1 / span 4; }
-  .course-board .box-notes { grid-row: 3; }
-  .course-board .box-changes { grid-row: 4; }
-}
-@media (max-width: 720px) {
-  .course-board .box-emails, .course-board .box-setup, .course-board .box-notes, .course-board .box-changes { grid-column: auto; grid-row: auto; }
+  .course-board > .board-col:nth-child(3) { grid-column: 1 / -1; }
+  .board .box.setup-bar { min-height: 0; }
+  .course-board:not(.setup-done) .box-notes { flex: 0 0 auto; }
 }
 .em-table th.c { width: auto; }
 .em-table th { font-size: 15px; white-space: nowrap; }
@@ -991,15 +978,6 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-due-note { margin: 12px 0 2px; font-size: 14px; }
 .em-ext-fields { display: grid; grid-template-columns: auto auto 1fr; gap: 10px 12px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
 .small-modal .modal-foot .link { margin-right: auto; }
-/* A smaller window with the checklist done: Notes takes the checklist's place, the bar goes across the bottom. */
-@media (max-width: 1100px) {
-  .course-board.setup-done .box-notes { grid-column: 2; grid-row: 1 / span 4; align-self: stretch; }
-  .course-board.setup-done .box-setup { order: 5; grid-column: 1 / -1; grid-row: 5; }
-  .board .box.setup-bar { min-height: 0; }
-}
-@media (max-width: 720px) {
-  .course-board.setup-done .box-notes, .course-board.setup-done .box-setup { grid-column: auto; grid-row: auto; }
-}
 
 /* ---------- Header: logo + Admin | Course / Academy Week ---------- */
 .head-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -1069,3 +1047,12 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .ai-grip svg { width: 20px; height: 20px; fill: currentColor; }
 .ai-row.moving { background: var(--blush-soft); }
 .ai-row.moving .ai-grip { cursor: grabbing; }
+
+/* ---------- Print packet (Course To-Do → Ship student shirts) ---------- */
+.packet-list { margin: 8px 0 14px; padding-left: 22px; line-height: 1.8; }
+.packet-count { display: flex; align-items: center; gap: 10px; }
+.packet-count > span:first-child { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); }
+.packet-count b { min-width: 28px; text-align: center; font-size: 18px; }
+.packet-view { width: min(1100px, 100%); }
+.packet-view h2 .small { font-family: Jost, sans-serif; font-size: 13px; margin-left: 6px; }
+.packet-view .panel-actions { display: flex; align-items: center; gap: 10px; }
