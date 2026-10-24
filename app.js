@@ -85,13 +85,15 @@ const BOARDS = {
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
   course: { key: 'courseLayout', v: 4, boxes: ['info', 'setup', 'changes', 'emails', 'notes'], def: [['info', 'changes'], ['setup'], ['emails', 'notes']] },
+  // Once every Setup Checklist item is checked: Notes takes the middle, the checklist shrinks to a bar under it, Emails gets the right.
+  courseDone: { key: 'courseDoneLayout', v: 1, boxes: ['info', 'setup', 'changes', 'emails', 'notes'], def: [['info', 'changes'], ['notes', 'setup'], ['emails']] },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
 const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v4 = scenarios fit + notes match)
 function cfg() {
   const s = S.settings || {};
-  const board = S.view === 'course' ? BOARDS.course : boardOf(curDay()), saved = s[board.key];
+  const board = S.view === 'course' ? (setupComplete() ? BOARDS.courseDone : BOARDS.course) : boardOf(curDay()), saved = s[board.key];
   return {
     checklist: s.checklist || DEFAULTS.checklist,
     dayNotes: s.dayNotes || {},
@@ -884,7 +886,7 @@ function syncBack(t) {
 /* ---------- Course page ---------- */
 function courseView() {
   if (!S.sheet) return loadingView();
-  return `<div class="board course-board">
+  return `<div class="board course-board ${setupComplete() ? 'setup-done' : ''}">
     ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, 'course')).join('')}</div>`).join('')}
   </div>`;
 }
@@ -948,6 +950,12 @@ function setupAuto(text) {
     out.note = ` <em class="tag-soft">${n} enrolled</em>`;
   }
   return out;
+}
+// Every Setup Checklist item (and the previous cohort's changes) checked off.
+function setupComplete() {
+  if (!S.sheet) return false;
+  const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
+  return all.length > 0 && all.every(t => t.done || setupAuto(t.text).done === true) && S.prevTodos.every(x => x.done);
 }
 function setupList() {
   const items = itemsFor(SETUP, 'setup');
@@ -1046,7 +1054,13 @@ function box(b, n) {
   } else if (b === 'setup') {
     const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
     const done = all.filter(t => t.done || setupAuto(t.text).done === true).length;
-    body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, all.some(t => t.done) || done ? hideToggle('setup') : '')
+    if (!setupComplete()) S.setupShow = null; // so finishing it again shrinks it again
+    else if (S.setupShow !== S.cohortKey) { // all done: just a bar under Notes
+      body = head(`Setup Checklist <span class="count">✓ All ${all.length} done</span>`, '<button class="link" data-act="setupShow">Show list</button>');
+      return `<section class="box box-setup setup-bar" data-box-id="setup">${body}</section>`;
+    }
+    body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, (all.some(t => t.done) || done ? hideToggle('setup') : '')
+      + (setupComplete() ? '<button class="link" data-act="setupShow">Hide list</button>' : ''))
       + setupList() + addRow(SETUP, 'setup', '+ add item') + prevChanges();
   } else if (b === 'changes') {
     const nxt = nextCohort();
@@ -2305,6 +2319,7 @@ async function act(a, el = {}, e) {
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
+      case 'setupShow': S.setupShow = S.setupShow === S.cohortKey ? null : S.cohortKey; render(); break; // a finished checklist, opened for a look
       case 'hideDefault': // a new default applies to every list again, so forget each eye's own choice
         HIDE_KEYS.forEach(k => { try { localStorage.removeItem('aw-hide-' + k); } catch {} });
         await Store.set('meta/settings', { hideCheckedDefault: d.v === '1' }); break;
@@ -2661,7 +2676,7 @@ async function act(a, el = {}, e) {
         if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
-        await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null });
+        await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });
         S.view = sideByDate() === 'course' ? 'course' : 'day'; pref('view', S.view);
         toast('Layout reset.'); break;
     }

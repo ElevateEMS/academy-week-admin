@@ -962,6 +962,11 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
   .em-tpl:not(.editing) .modal-foot { display: none; }
   .em-back { display: inline-block !important; margin: 0 0 10px; }
 }
+/* Setup Checklist all done (setup-done): Notes fills the middle, the checklist is a bar under it, Emails fills the right. */
+.box.setup-bar { flex: 0 0 auto; padding-bottom: 12px; }
+.box.setup-bar .box-head { margin-bottom: 0; }
+.box-setup .head-actions .link { white-space: nowrap; }
+.course-board.setup-done .box-emails { flex: 1 1 auto; }
 /* Course page on a smaller window: Emails goes under Course Details on the left. */
 @media (max-width: 1100px) {
   .course-board .box-emails { order: 2; grid-column: 1; grid-row: 2; }
@@ -986,3 +991,12 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-due-note { margin: 12px 0 2px; font-size: 14px; }
 .em-ext-fields { display: grid; grid-template-columns: auto auto 1fr; gap: 10px 12px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
 .small-modal .modal-foot .link { margin-right: auto; }
+/* A smaller window with the checklist done: Notes takes the checklist's place, the bar goes across the bottom. */
+@media (max-width: 1100px) {
+  .course-board.setup-done .box-notes { grid-column: 2; grid-row: 1 / span 4; align-self: stretch; }
+  .course-board.setup-done .box-setup { order: 5; grid-column: 1 / -1; grid-row: 5; }
+  .board .box.setup-bar { min-height: 0; }
+}
+@media (max-width: 720px) {
+  .course-board.setup-done .box-notes, .course-board.setup-done .box-setup { grid-column: auto; grid-row: auto; }
+}
