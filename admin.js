@@ -4,9 +4,8 @@
      adminTodos/{id}   { text, done, created, doneAt }
      adminDates/{id}   { date (YYYY-MM-DD), text, created }
      adminNotes/{id}   { text, color, created }   (sticky notes)
-   Quick Links and the portal/website open in a big panel inside the app, with "Open in Chrome ↗".
-   Google Sheets only show in the panel when Google allows it (signed in to Google in this browser);
-   otherwise the panel is blank or asks to sign in, and Open in Chrome is the way. */
+   Quick Links and the portal/website open in a big panel inside the app (nearly the whole window),
+   with "Open in Chrome ↗". */
 
 const NOTE_COLORS = ['yellow', 'blush', 'sage', 'blue', 'paper'];
 const ARROW = '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4.5c0 .8-.7 1.5-1.5 1.5h-11c-.8 0-1.5-.7-1.5-1.5v-11C4 6.7 4.7 6 5.5 6H10"/></svg>';
@@ -22,7 +21,6 @@ function adminWatch() {
 const adminInfo = () => ({ ...DEFAULTS.adminInfo, ...((S.admin && S.admin.info) || {}) });
 const adminLinks = () => (S.admin && S.admin.links) || DEFAULTS.adminLinks;
 const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.test(u) ? u : 'https://' + u; };
-const isGoogle = u => /^https:\/\/(docs|drive|sheets)\.google\.com\//i.test(u);
 
 function adminView() {
   return `<div class="board admin-board">
@@ -114,7 +112,6 @@ function adminPanel() {
     <div class="modal-head"><h2>${esc(p.name)}</h2><span class="panel-actions">
       <a class="btn small" href="${esc(p.url)}" target="_blank" rel="noopener" data-act="adminPanelClose">Open in Chrome ↗</a>
       <button class="x big" data-act="adminPanelClose" aria-label="Close">×</button></span></div>
-    ${isGoogle(p.url) ? '<p class="panel-note">Blank, or asking you to sign in? Google doesn’t always allow its pages inside another app. Use <b>Open in Chrome</b>.</p>' : ''}
     <iframe src="${esc(p.url)}" title="${esc(p.name)}" allow="clipboard-read; clipboard-write"></iframe>
   </div></div>`;
 }
