@@ -228,14 +228,14 @@ function prevCohort(key = S.cohortKey) {
   return S.cohorts.map(c => ({ ...c, r: cohortRank(c.key) })).filter(c => c.r != null && c.r < me).sort((a, b) => b.r - a.r)[0] || null;
 }
 // The previous cohort's "Do before next cohort" list shows on this cohort's Setup Checklist.
-let unwatchPrev = null, prevFor = null;
+let unwatchPrev = null, prevFor = null, prevReady = true; // prevReady: that cohort's list has arrived
 function watchPrev() {
   const prev = prevCohort();
   const key = prev ? prev.key : null;
   if (key === prevFor) return;
   if (unwatchPrev) unwatchPrev();
-  unwatchPrev = null; prevFor = key; S.prevTodos = [];
-  if (key) unwatchPrev = Store.watch('cohorts/' + key + '/todos', list => { S.prevTodos = list.filter(x => x.kind === 'next'); render(); });
+  unwatchPrev = null; prevFor = key; S.prevTodos = []; prevReady = !key;
+  if (key) unwatchPrev = Store.watch('cohorts/' + key + '/todos', list => { S.prevTodos = list.filter(x => x.kind === 'next'); prevReady = true; render(); });
 }
 
 // Unfinished to-dos from an earlier day move to today (only while the week is happening).
@@ -356,7 +356,8 @@ Store.onUser(async user => {
   S.user = user;
   unwatchGlobal.forEach(u => u()); unwatchGlobal = [];
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
-  if (unwatchPrev) { unwatchPrev(); unwatchPrev = null; prevFor = null; }
+  if (unwatchPrev) { unwatchPrev(); unwatchPrev = null; prevFor = null; prevReady = true; }
+  S.cohortsLoaded = false;
   if (!user) { clearSheetCopies(); render(); return; }
   unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
@@ -371,6 +372,7 @@ Store.onUser(async user => {
   try {
     S.cohorts = await Sheets.listCohorts();
   } catch (e) { S.sheetErr = e.message; render(); return; }
+  S.cohortsLoaded = true;
   watchPrev();
   loadScenarios(); // which scenario Docs are in the Drive folders (no need to wait)
   // Last one used; otherwise the active cohort that isn't the Test one.
@@ -953,7 +955,8 @@ function setupAuto(text) {
 }
 // Every Setup Checklist item (and the previous cohort's changes) checked off.
 function setupComplete() {
-  if (!S.sheet) return false;
+  // Not until the cohort list and the previous cohort's changes have loaded, or the page flickers to "done" and back.
+  if (!S.sheet || !S.cohortsLoaded || !prevReady) return false;
   const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
   return all.length > 0 && all.every(t => t.done || setupAuto(t.text).done === true) && S.prevTodos.every(x => x.done);
 }
@@ -1021,7 +1024,8 @@ function dayStrip({ phases = true } = {}) {
 }
 
 function box(b, n) {
-  const shaded = b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info' || b === 'changes';
+  const shaded = (b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info' || b === 'changes')
+    && !(b === 'notes' && n === 'course' && setupComplete()); // Notes in the middle (checklist done) is cream, like Emails
   const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
     : b === 'setup' ? 'setup' : b === 'changes' ? 'next' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
