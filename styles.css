@@ -1089,13 +1089,15 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .ql-edit:hover { opacity: 1; }
 .ql-div { margin: 0 4px; }
 .lk-list { display: grid; gap: 8px; margin: 10px 0 12px; }
-.lk-row { display: grid; grid-template-columns: 42px 1fr 1.4fr auto; gap: 8px; align-items: center; }
+.lk-row { display: grid; grid-template-columns: 22px 42px 1fr 1.4fr auto; gap: 8px; align-items: center; border-radius: 10px; }
+.lk-row.moving { background: var(--blush-soft); }
+.lk-grip { margin-top: 0; }
 .lk-row input { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--paper); outline: none; min-width: 0; }
 .lk-row input:focus { border-color: var(--taupe); }
 .lk-row .x { opacity: .6; }
-.lk-icons { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--bg); }
+.lk-icons { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--bg); }
 .lk-icons .icon-btn { width: 36px; height: 36px; }
-@media (max-width: 720px) { .lk-row { grid-template-columns: 42px 1fr auto; } .lk-row input[data-lk$=":url"] { grid-column: 2 / 3; } }
+@media (max-width: 720px) { .lk-row { grid-template-columns: 22px 42px 1fr auto; } .lk-row input[data-lk$=":url"] { grid-column: 3 / 4; } }
 /* Info Requests tracker */
 .inq-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; flex-shrink: 0; }
 .chip.small { padding: 3px 10px; font-size: 12px; }
@@ -1113,3 +1115,14 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .inq-fields.two { grid-template-columns: 1fr 1fr; }
 .inq-fields select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper); }
 .admin-board .admin-dates, .admin-board .admin-inq { flex: 1 1 0; }
+
+.inq-sec { margin: 12px 0 2px; }
+.inq-sec:first-of-type { margin-top: 2px; }
+.inq-sec.toggle { cursor: pointer; color: var(--taupe-dark); }
+.inq-sec.toggle:hover { color: var(--ink); }
+.inq-caret { display: inline-block; width: 14px; font-size: 12px; }
+.inq-ni { margin: 12px 0 0; align-self: flex-start; color: var(--muted); font-size: 12.5px; flex-shrink: 0; }
+.inq-reload svg { width: 17px; height: 17px; }
+.inq-reload.spin svg { animation: inq-spin .9s linear infinite; }
+@keyframes inq-spin { to { transform: rotate(360deg); } }
+.admin-board .admin-inq { flex: 1 1 0; }

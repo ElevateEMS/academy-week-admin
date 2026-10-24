@@ -27,7 +27,7 @@ const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.
 function adminView() {
   return `<div class="board admin-board">
     <div class="board-col">${adminInfoBox()}${adminDatesBox()}</div>
-    <div class="board-col">${adminTodoBox()}${adminInquiryBox()}</div>
+    <div class="board-col">${adminInquiryBox()}</div>
     <div class="board-col">${adminNotesBox()}</div>
   </div>`;
 }
@@ -92,7 +92,7 @@ function adminInfoModal() {
 
 /* ---------- Quick Links ---------- */
 // Quick Links: icon buttons in the header (Admin page only), left of the gear. Each link has an icon
-// (LINK_ICONS); a new one without one shows its first letter. The pencil at the end edits the list.
+// (LINK_ICONS); a new one without one shows its first letter. Edited from the gear menu → Links.
 const LINK_ICONS = {
   dollar: '<svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M16.5 7.5c-.6-1.4-2.3-2.3-4.5-2.3-2.6 0-4.4 1.3-4.4 3.2 0 4.4 9.1 2.3 9.1 6.9 0 2-1.9 3.4-4.7 3.4-2.4 0-4.2-1-4.8-2.6"/></svg>',
   paycheck: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h5M6 14h3"/><path d="M17 9.2v5.6M18.6 10.2c-.3-.6-.9-1-1.7-1-1 0-1.6.5-1.6 1.2 0 1.6 3.4.9 3.4 2.6 0 .7-.7 1.3-1.8 1.3-.9 0-1.6-.4-1.8-1"/></svg>',
@@ -112,15 +112,16 @@ const DEFAULT_LINK_ICON = { certkeeper: 'shield', finances: 'dollar', payroll: '
 const linkIcon = l => LINK_ICONS[l.icon || DEFAULT_LINK_ICON[l.id]] || `<span class="ql-letter">${esc((l.name || '?').trim().charAt(0).toUpperCase())}</span>`;
 function adminHeaderLinks() {
   return adminLinks().map(l => `<button class="icon-btn ql-icon" data-act="adminOpen" data-id="${esc(l.id)}" title="${esc(l.name)}" aria-label="${esc(l.name)}">${linkIcon(l)}</button>`).join('')
-    + `<button class="icon-btn ql-edit" data-act="linksEdOpen" title="Edit links" aria-label="Edit links">${ICONS.pencil}</button><span class="head-div ql-div" aria-hidden="true"></span>`;
+    + '<span class="head-div ql-div" aria-hidden="true"></span>';
 }
 function linksEdModal() {
   const list = S.linksDraft;
   return `<div class="overlay" data-act="linksEdClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Links</h2><button class="x big" data-act="linksEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
-      <p class="muted small">The icons at the top of the Admin page. Each opens inside the app (with Open in Chrome there too). Click an icon to change it.</p>
-      <div class="lk-list">${list.map((l, i) => `<div class="lk-row">
+      <p class="muted small">The icons at the top of the Admin page. Each opens inside the app (with Open in Chrome there too). Drag the grip to reorder; click an icon to change it.</p>
+      <div class="lk-list">${list.map((l, i) => `<div class="lk-row" data-i="${i}">
+        <span class="ai-grip lk-grip" data-lkgrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>
         <button type="button" class="icon-btn lk-ic ${S.lkPick === i ? 'on' : ''}" data-act="lkPick" data-i="${i}" title="Change icon" aria-label="Change icon">${linkIcon(l)}</button>
         <input id="lk-${i}-name" data-lk="${i}:name" value="${esc(l.name)}" placeholder="Name" autocomplete="off">
         <input id="lk-${i}-url" data-lk="${i}:url" value="${esc(l.url)}" placeholder="Link" autocomplete="off">
@@ -200,28 +201,36 @@ const INQ_STATUSES = ['Needs follow-up', 'Responded', 'Enrolled', 'Not intereste
 const INQ_SOURCE_IC = { Website: 'globe', Voicemail: 'phone', 'Missed call': 'phone', Call: 'phone' };
 const inqSlug = st => String(st || '').toLowerCase().replace(/[^a-z]+/g, '-');
 const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+const RELOAD = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
 function adminInquiryBox() {
   if (!S.inq && !S.inqErr && !S.inqBusy) setTimeout(() => loadInquiries(), 0);
   else if (S.inqAt && Date.now() - S.inqAt > 5 * 60e3 && !S.inqBusy) setTimeout(() => loadInquiries(), 0); // fresh every 5 minutes while open
-  const q = S.inq, items = q ? q.items : [], f = S.inqFilter || 'Needs follow-up';
-  const count = st => items.filter(x => x.status === st).length;
-  const shown = f === 'all' ? items : items.filter(x => x.status === f);
+  const q = S.inq, items = q ? q.items : [], open = S.inqOpen || {};
+  const of = st => items.filter(x => x.status === st);
   const waiting = items.filter(x => x.reply === 'Waiting').length;
-  const chip = (v, label, n) => `<button class="chip small ${f === v ? 'on' : ''}" data-act="inqFilter" data-f="${esc(v)}">${label}${n != null ? ` <span>${n}</span>` : ''}</button>`;
+  const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
+      <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
+      <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
+        <span class="inq-sub">${[inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+  // Needs follow-up is always open; Responded and Enrolled open with a click; Not interested hides behind a link.
+  const section = (st, always) => {
+    const list = of(st), isOpen = always || open[st];
+    return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
+        <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
+      ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${always ? 'Nobody to follow up with.' : 'None.'}</li>`}</ul>` : ''}`;
+  };
+  const ni = of('Not interested').length;
   return `<section class="box admin-inq">
     ${adminHead('Info Requests', (q ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
-      + `<button class="link" data-act="inqCheck" ${S.inqBusy ? 'disabled' : ''}>${S.inqBusy === 'check' ? 'Checking…' : 'Check now'}</button>`
+      + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
       + (q ? '<button class="add-plus small-plus" data-act="inqNew" title="Add a call" aria-label="Add a call">+</button>' : ''))}
     ${S.inqErr ? `<p class="em-note">${esc(S.inqErr)}</p>` : ''}
     ${q && !q.timerOn ? '<p class="em-note">The hourly check is off. In the Admin Apps Script, run <b>setupInquiryCheck</b> once.</p>' : ''}
     ${waiting && q.waitingReason ? `<p class="em-note">${waiting} reply draft${waiting === 1 ? '' : 's'} waiting: ${esc(q.waitingReason)}</p>` : ''}
     ${!q && !S.inqErr ? '<p class="empty">Loading…</p>' : ''}
-    ${q ? `<div class="inq-chips">${INQ_STATUSES.map(st => chip(st, st, count(st))).join('')}${chip('all', 'All', items.length)}</div>
-      <ul class="checks inq-list">${shown.map(x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
-        <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
-        <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
-          <span class="inq-sub">${[inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span>
-        <span class="inq-pill ${inqSlug(x.status)}">${esc(x.status)}</span></li>`).join('') || `<li class="empty">${f === 'all' ? 'No info requests yet.' : 'None.'}</li>`}</ul>` : ''}
+    ${q ? section('Needs follow-up', true) + section('Responded') + section('Enrolled')
+      + (open['Not interested'] ? section('Not interested') : '')
+      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Not interested">${open['Not interested'] ? 'Hide' : ni} not interested</button>` : '') : ''}
   </section>`;
 }
 // One request: status, who, cohort, notes (and what they wrote or said). New = a call you're adding.
@@ -360,7 +369,7 @@ async function adminAct(a, el = {}) {
       Object.keys(S.drafts).filter(k => k.startsWith('ai-')).forEach(k => delete S.drafts[k]);
       S.adminInfoEd = false; toast('Business info saved.'); render(); return true;
     }
-    case 'linksEdOpen': S.linksDraft = adminLinks().map(l => ({ ...l, icon: l.icon ?? DEFAULT_LINK_ICON[l.id] ?? '' })); S.lkPick = null; render(); return true;
+    case 'linksEdOpen': S.menuOpen = false; S.linksDraft = adminLinks().map(l => ({ ...l, icon: l.icon ?? DEFAULT_LINK_ICON[l.id] ?? '' })); S.lkPick = null; render(); return true;
     case 'linksEdClose': S.linksDraft = null; S.lkPick = null; render(); return true;
     case 'lkPick': S.lkPick = S.lkPick === Number(d.i) ? null : Number(d.i); render(); return true;
     case 'lkIcon': S.linksDraft[Number(d.i)].icon = d.k; S.lkPick = null; render(); return true;
@@ -372,7 +381,7 @@ async function adminAct(a, el = {}) {
       if (links.some(l => !l.name || !l.url)) { toast('Each link needs a name and a link (or remove it).'); return true; }
       await Store.set('meta/admin', { links }); S.linksDraft = null; S.lkPick = null; toast('Links saved.'); render(); return true;
     }
-    case 'inqFilter': S.inqFilter = d.f; render(); return true;
+    case 'inqSec': S.inqOpen = { ...(S.inqOpen || {}), [d.s]: !(S.inqOpen || {})[d.s] }; render(); return true;
     case 'inqOpen': case 'inqNew': {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
@@ -470,6 +479,30 @@ document.addEventListener('pointerdown', e => {
     document.removeEventListener('pointerup', up);
     row.classList.remove('moving');
     S.adminOrderDraft = [...list.children].map(c => c.dataset.k);
+    S.dragging = null; render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+});
+
+// Links window: drag a link by its grip to move it (mouse or finger).
+document.addEventListener('pointerdown', e => {
+  const grip = e.target.closest && e.target.closest('[data-lkgrip]');
+  if (!grip || !S.linksDraft) return;
+  e.preventDefault();
+  const row = grip.closest('.lk-row'), list = row.parentElement;
+  S.dragging = { type: 'lkorder' }; S.lkPick = null; // (no redraws mid-drag)
+  row.classList.add('moving');
+  const move = ev => {
+    const after = [...list.children].find(c => c !== row && ev.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
+    if (after) { if (after !== row.nextSibling) list.insertBefore(row, after); } else if (list.lastElementChild !== row) list.appendChild(row);
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    row.classList.remove('moving');
+    const order = [...list.children].map(c => Number(c.dataset.i));
+    S.linksDraft = order.map(i => S.linksDraft[i]);
     S.dragging = null; render();
   };
   document.addEventListener('pointermove', move);

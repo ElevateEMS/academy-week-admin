@@ -655,6 +655,7 @@ function menu() {
     <button class="menu-item" data-act="newCohortOpen">+ New cohort</button>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
     <button class="menu-item" data-act="view" data-v="settings">Setup</button>
+    <button class="menu-item" data-act="linksEdOpen">Links <span class="muted small">(Admin page icons)</span></button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
   </div>`;
 }
