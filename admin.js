@@ -428,15 +428,18 @@ function inqSetModal() {
 }
 
 /* ---------- Sticky Notes ---------- */
+// Sticky Notes' order: dragged ones keep `order`; ones never moved go newest first (and a new one goes first).
+const noteKey = n => n.order != null ? n.order : -(n.created || 0);
 function adminNotesBox() {
-  const notes = [...S.adminNotes].sort((a, b) => (b.created || 0) - (a.created || 0));
+  const notes = [...S.adminNotes].sort((a, b) => noteKey(a) - noteKey(b));
   return `<section class="box shaded admin-notes">
     ${adminHead('Sticky Notes', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
     <div class="stickies">${notes.map(n => {
       const id = 'an-' + n.id;
-      return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}">
+      return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}" data-nid="${n.id}">
         <textarea id="${id}" data-draft="${id}" data-anote="${n.id}" data-grow rows="3" placeholder="Type a note">${esc(S.drafts[id] ?? n.text ?? '')}</textarea>
-        <div class="sticky-foot"><button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button>
+        <div class="sticky-foot"><span class="sticky-tools"><span class="ai-grip sticky-grip" data-ngrip title="Drag to move" aria-label="Drag to move">${ICONS.grip}</span>
+          <button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button></span>
           <button class="x" data-act="adminNoteDel" data-id="${n.id}" aria-label="Delete note">×</button></div>
       </div>`;
     }).join('') || '<p class="empty">No sticky notes. Tap + to add one.</p>'}</div>
@@ -617,7 +620,8 @@ async function adminAct(a, el = {}) {
     case 'adminDateDel': await Store.del('adminDates/' + d.id); return true;
     case 'adminPastToggle': S.adminShowPast = !S.adminShowPast; render(); return true;
     case 'adminNoteAdd': {
-      const id = await Store.add('adminNotes', { text: '', color: 'yellow', created: Date.now() });
+      const first = Math.min(0, ...S.adminNotes.map(noteKey));
+      const id = await Store.add('adminNotes', { text: '', color: 'yellow', created: Date.now(), order: first - 1000 });
       setTimeout(() => { const t = document.getElementById('an-' + id); if (t) t.focus(); }, 50); return true;
     }
     case 'adminNoteColor': {
@@ -660,6 +664,38 @@ document.addEventListener('pointerdown', e => {
     row.classList.remove('moving');
     S.adminOrderDraft = [...list.children].map(c => c.dataset.k);
     S.dragging = null; render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+});
+
+// Sticky Notes: drag one by its grip to move it among the others (mouse or finger); the order is saved.
+document.addEventListener('pointerdown', e => {
+  const grip = e.target.closest && e.target.closest('[data-ngrip]');
+  if (!grip) return;
+  e.preventDefault();
+  const note = grip.closest('.sticky'), list = note.parentElement;
+  S.dragging = { type: 'notes' }; // (no redraws mid-drag)
+  note.classList.add('moving');
+  const move = ev => {
+    const over = [...list.children].find(c => c !== note && c.classList.contains('sticky') && (r => ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom)(c.getBoundingClientRect()));
+    if (!over) return;
+    const r = over.getBoundingClientRect(), after = ev.clientX > r.left + r.width / 2;
+    const ref = after ? over.nextSibling : over;
+    if (ref !== note && note.nextSibling !== ref) list.insertBefore(note, ref);
+  };
+  const up = async () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    note.classList.remove('moving');
+    const ids = [...list.querySelectorAll('.sticky')].map(c => c.dataset.nid);
+    S.dragging = null;
+    const was = [...S.adminNotes].sort((a, b) => noteKey(a) - noteKey(b)).map(n => n.id);
+    if (ids.join() !== was.join()) {
+      S.adminNotes = S.adminNotes.map(n => ({ ...n, order: ids.indexOf(n.id) * 1000 }));
+      render();
+      await Promise.all(ids.map((nid, i) => Store.set('adminNotes/' + nid, { order: i * 1000 })));
+    } else render();
   };
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);

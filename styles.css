@@ -1224,3 +1224,11 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .status-opt b { font-weight: 500; font-size: 14px; } .status-opt span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 .status-opt.on b { color: var(--taupe-dark); }
 .box.box-info { overflow: visible; } /* (so the status menu isn't cut off; the box fits its rows anyway) */
+
+/* Sticky Notes: the grip (beside the color dot) shows on hover, like the dot and × */
+.sticky-tools { display: inline-flex; align-items: center; gap: 4px; }
+.sticky .sticky-grip { margin: 0 0 0 -4px; width: 18px; height: 18px; opacity: 0; transition: opacity .15s; }
+.sticky .sticky-grip svg { width: 16px; height: 16px; }
+.sticky:hover .sticky-grip { opacity: .7; } .sticky .sticky-grip:hover { opacity: 1; }
+.sticky.moving { box-shadow: 0 6px 20px rgba(80, 55, 40, .22); transform: scale(1.02); position: relative; z-index: 2; }
+@media (hover: none) { .sticky .sticky-grip { opacity: .45; } }
