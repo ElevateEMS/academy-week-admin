@@ -1026,6 +1026,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .kd-away { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .kd-away.soon { color: var(--rose); font-weight: 500; }
 .key-dates li.past { opacity: .55; }
+.kd-range { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.kd-auto { width: 22px; flex-shrink: 0; } /* (lines up with the × on your own dates) */
 .stickies { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; padding: 2px 2px 6px; }
 .stickies > .empty { grid-column: 1 / -1; margin: 4px 0; }
 .sticky { border-radius: 4px 4px 4px 14px; padding: 10px 10px 4px; box-shadow: 0 1px 2px rgba(80, 55, 40, .08), 0 4px 10px rgba(80, 55, 40, .07); border: 1px solid rgba(125, 101, 88, .12); }

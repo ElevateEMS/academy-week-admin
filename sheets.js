@@ -11,6 +11,8 @@
      createDrafts(drafts)        -> puts emails in gbrown@'s Gmail Drafts ({ to, cc, bcc, subject, html, text }); never sends
      docPdf(id)                  -> a Google Doc as a PDF (base64), for the shirt-shipping print packet
      makeCohortDocs(key, fills)  -> the cohort's syllabus (dates filled in), suggested schedule and Admin folder
+     cohortDates                 -> each Upcoming/Active cohort's Orientation, Full CPR and Academy Week start
+                                    (for Key Dates on the Admin page)
      listInquiries / checkInquiries / saveInquiry / deleteInquiry / saveInquirySettings
                                  -> the Info Requests tracker on the Admin page (the config sheet's Info Requests tab)
 
@@ -49,6 +51,7 @@ const Sheets = (() => {
     saveInquirySettings: settings => call('saveInquirySettings', { settings }).then(o => o.settings),
     saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
     deleteInquiry: id => call('deleteInquiry', { id }),
+    cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
   };
 })();
 
@@ -136,6 +139,10 @@ function sampleSheets() {
       const row = o || { id: 'call-' + Date.now(), received: item.received, source: 'Call', message: '', reply: '', status: 'Needs follow-up' };
       Object.assign(row, item); if (!o) list.unshift(row);
       return wait({ ...row });
+    },
+    async cohortDates() {
+      return wait(cohorts.filter(c => /^(active|upcoming)$/i.test(c.status)).map(c => { const i = infoFor(c.key);
+        return { key: c.key, status: c.status, firstDay: i.firstDay, cpr: i.cpr, academyStart: i.academyStart }; }));
     },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },

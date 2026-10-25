@@ -162,21 +162,54 @@ function daysAway(iso) {
   const n = Math.round((parseIso(iso) - parseIso(todayIso())) / 864e5);
   return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n === -1 ? 'yesterday' : n > 0 ? 'in ' + n + ' days' : -n + ' days ago';
 }
+// Each Upcoming/Active cohort's Orientation, Full CPR and Academy Week come in on their own from its
+// Course Details (the cohort's sheet, via the Apps Script). They have no ×: change them in Course Details.
+async function loadCohortDates() {
+  if (S.kdBusy) return;
+  S.kdBusy = true;
+  try { S.kdCohorts = await Sheets.cohortDates(); S.kdErr = ''; }
+  catch (e) { S.kdErr = /unknown request/i.test(e.message) ? 'Course dates need the new Admin Apps Script version deployed.' : e.message; }
+  S.kdBusy = false; S.kdAt = Date.now(); render();
+}
+const AW_DAYS = 5; // Academy Week: start date + 4 more days
+function cohortKeyDates() {
+  const out = [];
+  (S.kdCohorts || []).forEach(c => {
+    if (/^(test|qa)\b/i.test(c.key)) return;
+    if (isIsoDate(c.firstDay)) out.push({ id: 'o-' + c.key, date: c.firstDay, text: c.key + ' Orientation', auto: true });
+    if (isIsoDate(c.cpr)) out.push({ id: 'c-' + c.key, date: c.cpr, text: c.key + ' Full CPR course', auto: true });
+    if (isIsoDate(c.academyStart)) {
+      const end = new Date(parseIso(c.academyStart)); end.setDate(end.getDate() + AW_DAYS - 1);
+      out.push({ id: 'a-' + c.key, date: c.academyStart, end: isoOf(end), text: c.key + ' Academy Week', auto: true });
+    }
+  });
+  return out;
+}
+// "Nov 9–13" or "Nov 30–Dec 4"
+function dateRange(a, b) {
+  const x = parseIso(a), y = parseIso(b), m = d => d.toLocaleDateString('en-US', { month: 'short' });
+  return m(x) + ' ' + x.getDate() + '–' + (m(x) === m(y) ? '' : m(y) + ' ') + y.getDate();
+}
 function adminDatesBox() {
+  if (!S.kdBusy && (!S.kdAt || Date.now() - S.kdAt > 5 * 60e3)) setTimeout(() => loadCohortDates(), 0); // fresh every 5 minutes while open
   const t = todayIso(), byDate = (a, b) => a.date.localeCompare(b.date);
-  const next = S.adminDates.filter(x => x.date >= t).sort(byDate);
-  const past = S.adminDates.filter(x => x.date < t).sort(byDate).reverse();
+  const all = [...S.adminDates, ...cohortKeyDates()];
+  const over = x => (x.end || x.date) < t; // Academy Week stays up until its last day is over
+  const next = all.filter(x => !over(x)).sort(byDate);
+  const past = all.filter(over).sort(byDate).reverse();
   const item = x => {
-    const away = daysAway(x.date), soon = x.date >= t && Math.round((parseIso(x.date) - parseIso(t)) / 864e5) <= 14;
+    const now = x.end && x.date <= t && t <= x.end;
+    const away = now ? 'this week' : daysAway(x.date), soon = now || (x.date >= t && Math.round((parseIso(x.date) - parseIso(t)) / 864e5) <= 14);
     return `<li class="${x.date < t ? 'past' : ''}"><span class="kd-date">${esc(parseIso(x.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(x.date.slice(0, 4) !== t.slice(0, 4) ? { year: 'numeric' } : {}) }))}</span>
-      <span class="kd-text">${esc(x.text)}</span><span class="kd-away ${soon ? 'soon' : ''}">${away}</span>
-      <button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button></li>`;
+      <span class="kd-text">${esc(x.text)}${x.end ? ` <span class="kd-range">${dateRange(x.date, x.end)}</span>` : ''}</span><span class="kd-away ${soon ? 'soon' : ''}">${away}</span>
+      ${x.auto ? '<span class="kd-auto" title="From Course Details"></span>' : `<button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button>`}</li>`;
   };
   return `<section class="box admin-dates">
     ${adminHead('Key Dates', (past.length ? `<button class="link" data-act="adminPastToggle">${S.adminShowPast ? 'Hide' : 'Show'} past</button>` : '') + '<button class="add-plus small-plus" data-act="adminDateOpen" title="Add a date" aria-label="Add a date">+</button>')}
     ${S.adminDateAdd ? `<div class="kd-form"><div class="kd-add">${datePicker('ad-date')}<input id="ad-text" data-draft="ad-text" data-add="adminDate" placeholder="What’s happening?" value="${esc(S.drafts['ad-text'] || '')}" autocomplete="off"></div>
       <div class="link-add-foot"><button class="link" data-act="adminDateCancel">Cancel</button><button class="btn small primary" data-act="adminDateAdd">Add date</button></div></div>` : ''}
     <ul class="checks key-dates">${next.map(item).join('') || '<li class="empty">No dates coming up.</li>'}${S.adminShowPast ? past.map(item).join('') : ''}</ul>
+    ${S.kdErr ? `<p class="muted small">${esc(S.kdErr)}</p>` : ''}
   </section>`;
 }
 

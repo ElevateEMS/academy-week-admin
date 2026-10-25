@@ -2341,6 +2341,7 @@ async function act(a, el = {}, e) {
           : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub.' : '';
         if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
         await Sheets.setStatus(key, status);
+        S.kdAt = 0; // Key Dates picks up the change
         S.cohorts = S.cohorts.map(c => c.key === key ? { ...c, status } : c);
         if (key === S.cohortKey && S.sheet) { S.sheet = { ...S.sheet, status }; sheetCopy(key, S.sheet); }
         toast(`${key} is now ${status}.`); render(); break;
@@ -2386,6 +2387,7 @@ async function act(a, el = {}, e) {
         let infoErr = '';
         if (Object.keys(info).length && !(res && res.info)) {
           try { await Sheets.saveSettings(key, info); } catch (err) { infoErr = (res && res.settingsError) || err.message; }
+          S.kdAt = 0;
         }
         delete S.drafts.newCohort; clearCourseDrafts('nc-'); S.newCohort = null;
         try { S.cohorts = await Sheets.listCohorts(); } catch {}
@@ -2560,6 +2562,7 @@ async function act(a, el = {}, e) {
         f.busy = true; f.err = ''; render();
         try {
           applyInfo(await Sheets.saveSettings(S.cohortKey, changed));
+          S.kdAt = 0; // Key Dates picks up the change
         } catch (err) { f.busy = false; f.err = err.message; render(); return; }
         S.infoEdit = null; clearCourseDrafts('ie-');
         toast('Saved to ' + S.cohortKey + '’s sheet.'); render(); break;
