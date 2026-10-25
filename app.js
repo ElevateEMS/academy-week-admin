@@ -2367,7 +2367,7 @@ document.addEventListener('keydown', e => {
     else if (emailEscape()) { /* closed an email pop-up */ }
     else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }
-    else if (S.roster) { if (S.roster.busy) return; if (S.roster.url) URL.revokeObjectURL(S.roster.url); S.roster = null; }
+    else if (S.roster) { if (S.roster.busy) return; if (S.roster.redo) S.roster.redo = null; else { if (S.roster.url) URL.revokeObjectURL(S.roster.url); S.roster = null; } }
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;

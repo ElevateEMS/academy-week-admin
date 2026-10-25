@@ -162,18 +162,21 @@ function rosterModal() {
       <iframe src="${ro.url}" title="Roster PDF"></iframe>
     </div></div>`;
   }
+  // Redo / Absent / Copy signing link show when you hover over a row (faintly all the time on an iPad).
   const rows = r.people.map((p, i) => {
     const out = !!(doc.out || {})[p.sid], sig = signed[p.sid];
-    const sigCell = out ? '<span class="muted small">Not attending</span>'
-      : sig && sig.png ? sigImg(sig.png, rosterName(p.name) + ' signature') + `<span class="ro-at ${sig.late ? 'late' : ''}">${sig.late ? 'late · ' : ''}${esc(atText(sig.signedAt))}</span>`
-      : sig ? '<span class="em-yes">✓</span> <span class="muted small">signed (box ticked in the sheet)</span>'
+    const sigCell = out ? '<span class="muted small">Absent</span>'
+      : sig && sig.png ? sigImg(sig.png, rosterName(p.name) + ' signature')
+      : sig ? '<span class="em-yes">✓</span> <span class="muted small">box ticked in the sheet</span>'
       : '<span class="tbd">Not signed yet</span>';
+    const when = !out && sig && sig.signedAt ? `<span class="ro-at ${sig.late ? 'late' : ''}">${esc(atText(sig.signedAt))}${sig.late ? ' · late' : ''}</span>` : '';
     return `<tr class="${out ? 'ro-out' : ''}"><td class="c muted">${i + 1}</td><td><b>${esc(rosterName(p.name))}</b></td><td class="c">${esc(rosterTimes(p)) || '<span class="tbd">time?</span>'}</td>
-      <td class="ro-sig-cell">${sigCell}</td>
+      <td class="ro-sig-cell">${sigCell}</td><td class="ro-when">${when}</td>
       <td class="ro-acts">${!out && !sig ? `<button class="link" data-act="rosterLink" data-sid="${p.sid}">Copy signing link</button>` : ''}
-        ${!out && sig && sig.png ? `<button class="link" data-act="rosterClearSig" data-sid="${p.sid}">Clear</button>` : ''}
-        <button class="link" data-act="rosterOut" data-sid="${p.sid}">${out ? 'Attending' : 'Not attending'}</button></td></tr>`;
+        ${!out && sig && sig.png ? `<button class="link" data-act="rosterRedoAsk" data-sid="${p.sid}">Redo</button>` : ''}
+        <button class="link" data-act="rosterOut" data-sid="${p.sid}">${out ? 'Present' : 'Absent'}</button></td></tr>`;
   }).join('');
+  const redo = ro.redo && r.people.find(p => p.sid === ro.redo);
   // The EC button: whoever has it on, their signature also goes on the bottom line (Instructor, Printed Name / Signature / Date).
   const instRow = x => {
     const s = instSig(doc, x.key), isEc = ecOf(doc) === x.key;
@@ -185,7 +188,8 @@ function rosterModal() {
   const ecWho = INSTRUCTORS.find(x => x.key === ecOf(doc)), ecDone = !!(ecWho && instSig(doc, ecWho.key));
   const unsigned = list.filter(p => !signed[p.sid]);
   const blocked = got.busy ? 'Reading the signatures…' : !list.length ? 'Nobody is on this roster.' : list.length > 30 ? 'The form has room for 30 students.'
-    : !ecWho ? 'Pick the EC.' : !ecDone ? 'The EC signs above.' : '';
+    : !ecWho ? 'Pick the EC.' : '';
+  const canSave = !blocked && ecDone; // (Save waits for the EC's signature)
   return `<div class="overlay" data-act="rosterClose"><div class="modal roster-modal" data-stop>
     <div class="modal-head"><h2>Orientation Roster <span class="muted small">${esc(longDate(r.date))}${r.late ? ' · late enrollees' : ''}</span></h2>
       <span class="panel-actions"><button class="eye inq-reload ${got.busy ? 'spin' : ''}" data-act="rosterRefresh" title="Check for new signatures" aria-label="Check for new signatures" ${got.busy ? 'disabled' : ''}>${RELOAD}</button>
@@ -200,7 +204,7 @@ function rosterModal() {
       ${!courseNo ? '<p class="em-warn">No VAOEMS Course No. yet: add it in Course Details (pencil) so it prints on the roster.</p>' : ''}
       ${got.err ? `<div class="alert">${esc(got.err)}</div>` : ''}
       <p class="mini-head">Students</p>
-      <table class="roster ro-table"><thead><tr><th class="c">#</th><th>Name</th><th class="c">Times</th><th>Signature</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nobody yet.</td></tr>'}</tbody></table>
+      <table class="roster ro-table"><thead><tr><th class="c">#</th><th>Name</th><th class="c">Times</th><th>Signature</th><th>Signed</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">Nobody yet.</td></tr>'}</tbody></table>
       <p class="muted small">Students sign from the Orientation Roster assignment in the Student Portal, or from the link in a reminder email.</p>
       <p class="mini-head">Instructors</p>
       ${INSTRUCTORS.map(instRow).join('')}
@@ -209,8 +213,14 @@ function rosterModal() {
     </div>
     <div class="modal-foot ro-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign' : '')}</span>
       <button class="btn" data-act="rosterPreview" ${ro.busy || !list.length || list.length > 30 ? 'disabled' : ''}>Preview PDF</button>
-      <button class="btn primary" data-act="rosterSave" ${ro.busy || blocked ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
-  </div></div>`;
+      <button class="btn primary" data-act="rosterSave" ${ro.busy || !canSave ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
+  </div></div>
+  ${redo ? `<div class="overlay" data-act="rosterRedoCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Redo Signature</h2><button class="x big" data-act="rosterRedoCancel" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>Redo <b>${esc(rosterName(redo.name))}</b>’s signature?</p>
+      <p class="muted small">Their signature comes off this roster (it goes to the Drive trash) and their Orientation Roster box in the sheet is unticked. Their signing link will let them sign again.</p></div>
+    <div class="modal-foot"><button class="btn" data-act="rosterRedoCancel">Cancel</button><button class="btn primary danger" data-act="rosterClearSig" data-sid="${redo.sid}">Redo</button></div>
+  </div></div>` : ''}`;
 }
 
 // Who's the EC on this roster: Nick until someone picks (no EC once it's turned off).
@@ -323,9 +333,11 @@ async function rosterAct(a, el = {}) {
       } catch (e) { toast(e.message); }
       return true;
     }
-    case 'rosterClearSig': {
-      const p = r && rosterPerson(r, d.sid); if (!p) return true;
-      if (!confirm(`Clear ${rosterName(p.name)}’s signature from this roster?\n\nIt goes to the Drive trash, their Orientation Roster box is unticked, and their link lets them sign again.`)) return true;
+    case 'rosterRedoAsk': ro.redo = d.sid; render(); return true;
+    case 'rosterRedoCancel': ro.redo = null; render(); return true;
+    case 'rosterClearSig': { // (after the Redo confirmation)
+      const p = r && rosterPerson(r, d.sid); ro.redo = null; render();
+      if (!p) return true;
       try {
         await Sheets.clearRosterSig(S.cohortKey, ro.date, sheetStudent(p.sid).name || p.name);
         const s = sheetStudent(p.sid); if (s) s.orientRoster = false;
