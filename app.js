@@ -640,7 +640,7 @@ function pageTitle() {
 }
 
 // The cohort menu lists Active and Upcoming cohorts; Former and Test/QA ones only after
-// "Show former & test cohorts" (they're hidden, not removed: the app still uses them).
+// "Show former & test cohorts" at the bottom of its list (they're hidden, not removed: the app still uses them).
 const isTestCohort = key => /^(test|qa)\b/i.test(key);
 const isOldCohort = c => /former/i.test(c.status || '') || isTestCohort(c.key);
 function menu() {
@@ -651,8 +651,7 @@ function menu() {
   const opts = main.map(opt).join('') + (shownOld.length ? `<optgroup label="Former & test">${shownOld.map(opt).join('')}</optgroup>` : '');
   return `<div class="menu" data-stop>
     <div class="menu-field"><div class="menu-field-head">Cohort<button class="menu-add" data-act="newCohortOpen" title="New cohort" aria-label="New cohort">+</button></div>
-      <select id="cohortSel" data-change="cohort" aria-label="Cohort">${opts || '<option>Loading…</option>'}</select>
-      ${old.length ? `<button class="link menu-old" data-act="toggleOld">${S.showOld ? 'Hide' : 'Show'} former & test cohorts</button>` : ''}</div>
+      <select id="cohortSel" data-change="cohort" aria-label="Cohort"${old.length ? ` data-dd-foot="${S.showOld ? 'Hide' : 'Show'} former &amp; test cohorts" data-dd-foot-act="toggleOld"` : ''}>${opts || '<option>Loading…</option>'}</select></div>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
     <button class="menu-item" data-act="view" data-v="settings">Setup</button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
