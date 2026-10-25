@@ -92,7 +92,7 @@ function adminInfoModal() {
 
 /* ---------- Quick Links ---------- */
 // Quick Links: icon buttons in the header (Admin page only), left of the gear. Each link has an icon
-// (LINK_ICONS); a new one without one shows its first letter. Edited from the gear menu → Links.
+// (LINK_ICONS); a new one without one shows its first letter. Edited from Setup → Quick Links.
 const LINK_ICONS = {
   dollar: '<svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M16.5 7.5c-.6-1.4-2.3-2.3-4.5-2.3-2.6 0-4.4 1.3-4.4 3.2 0 4.4 9.1 2.3 9.1 6.9 0 2-1.9 3.4-4.7 3.4-2.4 0-4.2-1-4.8-2.6"/></svg>',
   paycheck: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h5M6 14h3"/><path d="M17 9.2v5.6M18.6 10.2c-.3-.6-.9-1-1.7-1-1 0-1.6.5-1.6 1.2 0 1.6 3.4.9 3.4 2.6 0 .7-.7 1.3-1.8 1.3-.9 0-1.6-.4-1.8-1"/></svg>',

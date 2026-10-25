@@ -650,12 +650,11 @@ function menu() {
   const shownOld = S.showOld ? old : old.filter(c => c.key === S.cohortKey); // the one you're on always shows
   const opts = main.map(opt).join('') + (shownOld.length ? `<optgroup label="Former & test">${shownOld.map(opt).join('')}</optgroup>` : '');
   return `<div class="menu" data-stop>
-    <label class="menu-field">Cohort<select id="cohortSel" data-change="cohort">${opts || '<option>Loading…</option>'}</select>
-      ${old.length ? `<button class="link menu-old" data-act="toggleOld">${S.showOld ? 'Hide' : 'Show'} former & test cohorts</button>` : ''}</label>
-    <button class="menu-item" data-act="newCohortOpen">+ New cohort</button>
+    <div class="menu-field"><div class="menu-field-head">Cohort<button class="menu-add" data-act="newCohortOpen" title="New cohort" aria-label="New cohort">+</button></div>
+      <select id="cohortSel" data-change="cohort" aria-label="Cohort">${opts || '<option>Loading…</option>'}</select>
+      ${old.length ? `<button class="link menu-old" data-act="toggleOld">${S.showOld ? 'Hide' : 'Show'} former & test cohorts</button>` : ''}</div>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
     <button class="menu-item" data-act="view" data-v="settings">Setup</button>
-    <button class="menu-item" data-act="linksEdOpen">Links <span class="muted small">(Admin page icons)</span></button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
   </div>`;
 }
@@ -1788,6 +1787,7 @@ function settingsView() {
     ${group('Emails', [
       tile('Email Templates', 'What each email says, when it’s due and who it goes to.', open('emtOpen', 'Edit')),
       tile('Book Codes', `Textbook access codes, each given out once. <b>${freeCodes().length}</b> unused.`, open('bookCodesOpen')),
+      tile('Quick Links', 'The icon buttons along the top of the Admin page.', open('linksEdOpen', 'Edit')),
     ])}
     ${group('Course &amp; Academy Week', [
       tile('Templates', 'Setup Checklist, repeating to-dos, packing list and daily notes.', open('tplOpen', 'Edit')),

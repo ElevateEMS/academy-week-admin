@@ -854,6 +854,9 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
   background: repeating-linear-gradient(transparent, transparent 27px, rgba(125, 101, 88, .22) 27px, rgba(125, 101, 88, .22) 28px);
   background-attachment: local; }
 .notes-back mark.nhl { background: #f1dca6; color: transparent; border-radius: 3px; }
+.menu-field-head { display: flex; align-items: center; justify-content: space-between; }
+.menu-add { width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.menu-add:hover { background: var(--line-soft); }
 .menu-field .menu-old { justify-self: start; text-transform: none; letter-spacing: 0; font-size: 12px; margin-top: 2px; }
 /* ---------- Emails (Course page box + pop-ups, emails.js) ---------- */
 .box.box-emails { flex: 0 0 auto; }
