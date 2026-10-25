@@ -259,7 +259,7 @@ function daysAway(iso) {
 async function loadCohortDates() {
   if (S.kdBusy) return;
   S.kdBusy = true;
-  try { S.kdCohorts = await Sheets.cohortDates(); S.kdErr = ''; }
+  try { S.kdCohorts = await Sheets.cohortDates(); S.kdErr = ''; keepCopy('kd', S.kdCohorts); }
   catch (e) { S.kdErr = /unknown request/i.test(e.message) ? 'Course dates need the new Admin Apps Script version deployed.' : e.message; }
   S.kdBusy = false; S.kdAt = Date.now(); render();
 }
@@ -274,7 +274,7 @@ async function loadRecerts() {
     const res = await fetch(CERTKEEPER_URL, { headers: { Authorization: 'Bearer ' + await Store.idToken() } });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'CertKeeper didn’t answer.');
-    S.recerts = out.certs || []; S.rcErr = '';
+    S.recerts = out.certs || []; S.rcErr = ''; keepCopy('rc', S.recerts);
   } catch (e) { S.rcErr = 'Couldn’t check CertKeeper: ' + e.message; }
   S.rcBusy = false; S.rcAt = Date.now(); render();
 }
@@ -301,6 +301,8 @@ function dateRange(a, b) {
   return m(x) + ' ' + x.getDate() + '–' + (m(x) === m(y) ? '' : m(y) + ' ') + y.getDate();
 }
 function adminDatesBox() {
+  if (!S.kdAt && !S.kdCohorts) S.kdCohorts = keepCopy('kd'); // last time's, shown at once while the fresh ones load
+  if (!S.rcAt && !S.recerts) S.recerts = keepCopy('rc');
   if (!S.kdBusy && (!S.kdAt || Date.now() - S.kdAt > 5 * 60e3)) setTimeout(() => loadCohortDates(), 0); // fresh every 5 minutes while open
   if (!S.rcBusy && (!S.rcAt || Date.now() - S.rcAt > 30 * 60e3)) setTimeout(() => loadRecerts(), 0); // CertKeeper: every 30 minutes
   const t = todayIso(), byDate = (a, b) => a.date.localeCompare(b.date);
@@ -338,7 +340,7 @@ async function loadInquiries(check = false) {
   S.inqBusy = check ? 'check' : 'load'; render();
   try {
     const res = await (check ? Sheets.checkInquiries() : Sheets.listInquiries());
-    S.inq = res; S.inqErr = '';
+    S.inq = res; S.inqErr = ''; keepCopy('inq', res);
     if (check) toast([res.added ? `${res.added} new` : '', res.drafted ? `${res.drafted} reply draft${res.drafted === 1 ? '' : 's'} in your Gmail Drafts` : ''].filter(Boolean).join(' · ') || 'Nothing new.');
   } catch (e) {
     S.inqErr = /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message;
@@ -351,7 +353,8 @@ const inqSlug = st => String(st || '').toLowerCase().replace(/[^a-z]+/g, '-');
 const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 const RELOAD = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
 function adminInquiryBox() {
-  if (!S.inq && !S.inqErr && !S.inqBusy) setTimeout(() => loadInquiries(), 0);
+  if (!S.inq && !S.inqAt) S.inq = keepCopy('inq'); // the last list at once; the fresh one replaces it
+  if (!S.inqAt && !S.inqErr && !S.inqBusy) setTimeout(() => loadInquiries(), 0);
   else if (S.inqAt && Date.now() - S.inqAt > 5 * 60e3 && !S.inqBusy) setTimeout(() => loadInquiries(), 0); // fresh every 5 minutes while open
   const q = S.inq, items = q ? q.items : [], open = S.inqOpen || {};
   const of = st => items.filter(x => x.status === st);
@@ -576,6 +579,7 @@ async function adminAct(a, el = {}) {
         const saved = await Sheets.saveInquiry(item);
         const list = S.inq.items, i = list.findIndex(x => x.id === saved.id);
         if (i >= 0) list[i] = saved; else list.unshift(saved);
+        keepCopy('inq', S.inq);
         S.inqEd = null; toast(e.isNew ? 'Call added.' : 'Saved.');
       } catch (err) { e.busy = false; alert('Couldn’t save: ' + err.message); }
       render(); return true;
@@ -584,7 +588,7 @@ async function adminAct(a, el = {}) {
       const it = S.inqEd.item;
       if (!confirm(`Delete ${it.name || it.phone || it.email || 'this request'} from Info Requests?`)) return true;
       S.inqEd.busy = true; render();
-      try { await Sheets.deleteInquiry(it.id); S.inq.items = S.inq.items.filter(x => x.id !== it.id); S.inqEd = null; }
+      try { await Sheets.deleteInquiry(it.id); S.inq.items = S.inq.items.filter(x => x.id !== it.id); keepCopy('inq', S.inq); S.inqEd = null; }
       catch (err) { S.inqEd.busy = false; alert('Couldn’t delete: ' + err.message); }
       render(); return true;
     }

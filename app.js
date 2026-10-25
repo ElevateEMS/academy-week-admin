@@ -387,9 +387,11 @@ Store.onUser(async user => {
   render();
   // The last cohort used opens straight away (while the cohort list loads alongside it).
   const last = S.cohortKey;
+  if (!S.cohorts.length) S.cohorts = keepCopy('cohorts') || []; // last list, until the fresh one arrives
   if (last) selectCohort(last);
   try {
     S.cohorts = await Sheets.listCohorts();
+    keepCopy('cohorts', S.cohorts);
   } catch (e) { S.sheetErr = e.message; render(); return; }
   S.cohortsLoaded = true;
   watchPrev();
@@ -410,8 +412,16 @@ function sheetCopy(key, data) {
     localStorage.setItem(sheetCopyKey(key), JSON.stringify(data));
   } catch { return null; }
 }
-function clearSheetCopies() {
-  try { Object.keys(localStorage).filter(k => k.startsWith('aw-sheet-')).forEach(k => localStorage.removeItem(k)); } catch {}
+function clearSheetCopies() { // (signing out also clears the other saved copies below)
+  try { Object.keys(localStorage).filter(k => k.startsWith('aw-sheet-') || k.startsWith('aw-copy-')).forEach(k => localStorage.removeItem(k)); } catch {}
+}
+// The same for the other things that come from the Google Sheets or CertKeeper and take a few seconds:
+// the cohort list, Key Dates' cohort dates and recerts, Info Requests. keepCopy(name) reads; keepCopy(name, data) saves.
+function keepCopy(name, data) {
+  try {
+    if (data === undefined) { const t = localStorage.getItem('aw-copy-' + name); return t ? JSON.parse(t) : null; }
+    localStorage.setItem('aw-copy-' + name, JSON.stringify(data));
+  } catch { return null; }
 }
 function pickDay(key) {
   if (S.day != null) return;
