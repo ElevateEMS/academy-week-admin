@@ -994,8 +994,10 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .admin-head { cursor: default; }
 .admin-head:active { cursor: default; }
 /* Left column mirrors the middle: Business Info lines up with To Do, Quick Links with Key Dates. */
-.admin-board .admin-info, .admin-board .admin-links { flex: 1 1 0; }
+.admin-board .admin-links { flex: 1 1 0; }
+.admin-board .admin-info { flex: 0 0 auto; } /* only as tall as its rows; Key Dates takes the rest */
 .admin-info .info-row { grid-template-columns: 112px 1fr; }
+.admin-info .info-row > b { font-weight: 400; }
 .info-sub { display: block; font-weight: 400; }
 .tbd, .admin-info .tbd { color: var(--muted); font-style: italic; font-weight: 400; }
 .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(125, 101, 88, .4); text-underline-offset: 3px; overflow-wrap: anywhere; }
@@ -1131,7 +1133,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .inq-reload.spin svg { animation: inq-spin .9s linear infinite; }
 @keyframes inq-spin { to { transform: rotate(360deg); } }
 .admin-board .admin-inq { flex: 1 1 0; }
-.admin-board .admin-todo { flex: 0 0 auto; } /* To Do grows to fit its list; Info Requests takes the rest */
+.admin-board .admin-todo { flex: 0 0 auto; } /* (on a wide screen fitBoard makes it as tall as Business Info; Info Requests takes the rest) */
 
 /* Dropdown lists (dropdown.js): the select stays as the button, our list opens instead of the browser's. */
 html.dd-on select:not([multiple]) { pointer-events: none; }

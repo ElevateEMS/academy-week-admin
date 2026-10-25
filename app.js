@@ -2202,6 +2202,9 @@ function fitBoard() {
   if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
     notes.style.flex = '0 0 auto'; notes.style.height = scen.offsetHeight + 'px';
   }
+  // Admin: To Do is as tall as Business Info beside it (a long list scrolls inside), so Key Dates and Info Requests line up.
+  const info = board.querySelector('.admin-info'), todo = board.querySelector('.admin-todo');
+  if (info && todo) todo.style.height = innerWidth >= 1100 ? info.offsetHeight + 'px' : '';
 }
 addEventListener('resize', fitBoard);
 
