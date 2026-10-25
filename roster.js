@@ -10,12 +10,13 @@
      roster (BoldSign)".
    - The roster pop-up: who's signed, Not attending, your and Nick's signatures, the EC's line at the
      bottom, then the PDF on your form (orientation-roster-1.pdf for up to 15 students, -2 for more),
-     saved into the cohort folder. Saving it with everyone signed checks off the to-do (and, for the
+     saved with the signatures (Admin folder). Saving it with everyone signed checks off the to-do (and, for the
      cohort's own orientation, "Orientation roster" on the Documentation Checklist).
 
    Saved in Firebase: cohorts/{key}/rosters/{date}
      { out: { sid: true }, inst: { nick|bella: { png, at, by } }, ec: { who, png, at }, saved: { url, name, at, by, complete } }
-   The students' signatures are in Drive ("<cohort folder>/Orientation Roster Signatures"), read through the Apps Script. */
+   The students' signatures and the finished rosters are in Drive ("<cohort folder>/Admin - <cohort>/Orientation Roster
+   Signatures"), read and saved through the Apps Script. */
 
 const SIGNING_LIVE = false; // December: true (and the same in the Admin Apps Script), once the Student Hub has the card
 const signingOn = (key = S.cohortKey) => SIGNING_LIVE || isTestCohort(key || '');
@@ -191,9 +192,9 @@ function rosterModal() {
       ${doc.saved ? `<p class="ro-saved">✓ Saved ${esc(atText(doc.saved.at))}${doc.saved.complete ? '' : ' (before everyone signed)'}: <a href="${esc(doc.saved.url)}" target="_blank" rel="noopener">${esc(doc.saved.name)} ↗</a></p>` : ''}
       ${ro.err ? `<div class="alert">${esc(ro.err)}</div>` : ''}
     </div>
-    <div class="modal-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign. You can save now and again later (it replaces the file).' : 'Ready. Saves to the ' + esc(S.cohortKey) + ' folder.')}</span>
+    <div class="modal-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign. You can save now and again later (it replaces the file).' : 'Ready. Saves to Admin - ' + esc(S.cohortKey) + ' → Orientation Roster Signatures.')}</span>
       <button class="btn" data-act="rosterPreview" ${ro.busy || !list.length || list.length > 30 ? 'disabled' : ''}>Preview PDF</button>
-      <button class="btn primary" data-act="rosterSave" ${ro.busy || blocked ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to cohort folder'}</button></div>
+      <button class="btn primary" data-act="rosterSave" ${ro.busy || blocked ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
   </div></div>`;
 }
 
@@ -220,79 +221,22 @@ function sigPadOpen(title, note) {
   });
 }
 
-/* ---------- The PDF (your form, filled in) ---------- */
-// Measured from the two forms (points from the top of the page; pdf-lib counts from the bottom).
-const RO_FORM = {
-  one: { file: 'orientation-roster-1.pdf', info: 138, inst: [[159.4, 187.9], [187.9, 216.4]],
-    rows: [[0, [265.1, 292.1, 319.1, 346.1, 373.9, 400.9, 427.9, 454.9, 482.6, 509.6, 536.6, 563.6, 590.6, 618.4, 645.4, 672.4]]], bottom: { page: 0, base: 728 } },
-  two: { file: 'orientation-roster-2.pdf', info: 147, inst: [[168.5, 197.5], [197.5, 225.5]],
-    rows: [[0, [283.5, 311.5, 338.5, 365.5, 392.5, 419.5, 446.5, 473.5, 501.5, 528.5, 555.5, 582.5, 609.5, 636.5, 664.5, 691.5]],
-      [1, [154.5, 181.5, 208.5, 236.5, 263.5, 290.5, 317.5, 344.5, 371.5, 399.5, 426.5, 453.5, 480.5, 507.5, 534.5, 562.5]]], bottom: { page: 1, base: 715 } },
-};
-const RO_COLS = { name: [74, 210], times: [331, 429], sig: [429.5, 577], instSig: [374, 573], courseNo: [233, 374], topic: [374, 573],
-  bName: [36.5, 242], bSig: [242, 431], bDate: [431, 581] };
+/* ---------- The PDF (your form, filled in: rosterform.js) ---------- */
 const mdy = iso => { const [y, m, d] = iso.split('-'); return m + '/' + d + '/' + y; };
-const pngBytes = png => b64Bytes(png.startsWith('data:') ? png.split(',')[1] : png);
-
 async function rosterPdf(r) {
   const PDFLib = await loadPdfLib();
   const doc = rosterDoc(r.date), list = onRoster(r, doc), signed = signedMap(r), inst = doc.inst || {}, ec = doc.ec || {};
-  const form = list.length > 15 ? RO_FORM.two : RO_FORM.one;
-  const res = await fetch(form.file);
-  if (!res.ok) throw new Error('Couldn’t open the roster form (' + form.file + ').');
-  const pdf = await PDFLib.PDFDocument.load(await res.arrayBuffer()), pages = pdf.getPages();
-  const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica), H = 792;
-  const ink = PDFLib.rgb(0.05, 0.12, 0.23), grey = PDFLib.rgb(0.42, 0.42, 0.42);
-  const text = (page, s, x, top, size = 10, color = ink) => page.drawText(String(s), { x, y: H - top, size, font, color });
-  const center = (page, s, [x0, x1], top, size = 10) => {
-    let sz = size; while (sz > 6 && font.widthOfTextAtSize(String(s), sz) > x1 - x0 - 6) sz -= 0.5;
-    text(page, s, (x0 + x1) / 2 - font.widthOfTextAtSize(String(s), sz) / 2, top, sz);
-  };
-  const left = (page, s, [x0, x1], top, size = 10) => {
-    let sz = size; while (sz > 6 && font.widthOfTextAtSize(String(s), sz) > x1 - x0 - 8) sz -= 0.5;
-    text(page, s, x0 + 5, top, sz);
-  };
-  // A signature fit inside a box (top and bottom from the top of the page).
-  const imgs = {};
-  const sig = async (page, png, [x0, x1], top, bottom, { pad = 3, align = 'left' } = {}) => {
-    const img = imgs[png] || (imgs[png] = await pdf.embedPng(pngBytes(png)));
-    const bw = x1 - x0 - pad * 2, bh = bottom - top - pad * 2, scale = Math.min(bw / img.width, bh / img.height);
-    const w = img.width * scale, h = img.height * scale;
-    const x = align === 'center' ? x0 + (x1 - x0 - w) / 2 : x0 + pad;
-    page.drawImage(img, { x, y: H - bottom + pad + (bh - h) / 2, width: w, height: h });
-  };
-
-  pages.forEach(pg => text(pg, mdy(r.date), 68, 63.5, 10)); // Date: ____ (each page)
-  const p0 = pages[0];
-  center(p0, courseNoFor(r) || '', RO_COLS.courseNo, form.info);
-  center(p0, 'Orientation', RO_COLS.topic, form.info);
-  for (const [i, x] of INSTRUCTORS.entries()) {
-    const s = inst[x.key];
-    if (s && s.png) await sig(p0, s.png, RO_COLS.instSig, form.inst[i][0], form.inst[i][1], { align: 'center' });
-  }
-  const slots = form.rows.flatMap(([pg, lines]) => lines.slice(0, -1).map((top, i) => ({ page: pages[pg], top, bottom: lines[i + 1] })));
-  for (const [i, p] of list.entries()) {
-    const slot = slots[i]; if (!slot) break;
-    const mid = (slot.top + slot.bottom) / 2 + 3.5;
-    left(slot.page, rosterName(p.name), RO_COLS.name, mid);
-    center(slot.page, rosterTimes(p), RO_COLS.times, mid);
-    const s = signed[p.sid];
-    if (s && s.png) {
-      await sig(slot.page, s.png, [RO_COLS.sig[0], RO_COLS.sig[1] - 2], slot.top + 1, slot.bottom - 6);
-      const note = 'e-signed ' + atText(s.signedAt);
-      text(slot.page, note, RO_COLS.sig[1] - 3 - font.widthOfTextAtSize(note, 5), slot.bottom - 1.8, 5, grey);
-    }
-  }
   const ecWho = INSTRUCTORS.find(x => x.key === ec.who);
-  if (ecWho && ec.png) {
-    const pg = pages[form.bottom.page], base = form.bottom.base;
-    center(pg, ecWho.name, RO_COLS.bName, base - 1);
-    await sig(pg, ec.png, RO_COLS.bSig, base - 30, base + 1, { align: 'center', pad: 1 });
-    center(pg, mdy(isoOf(ec.at ? new Date(ec.at) : new Date())), RO_COLS.bDate, base - 1);
-  }
-  pdf.setTitle(S.cohortKey + ' Orientation Roster ' + mdy(r.date));
-  return pdf.save();
+  return RosterForm.fill(PDFLib, {
+    date: mdy(r.date), courseNo: courseNoFor(r), title: S.cohortKey + ' Orientation Roster ' + mdy(r.date),
+    people: list.map(p => ({ name: rosterName(p.name), times: rosterTimes(p), png: (signed[p.sid] || {}).png || '' })),
+    inst: Object.fromEntries(INSTRUCTORS.map(x => [x.key, (inst[x.key] || {}).png || ''])),
+    ec: ecWho && ec.png ? { name: ecWho.name, png: ec.png, date: mdy(isoOf(ec.at ? new Date(ec.at) : new Date())) } : null,
+  });
 }
+// What the student signing page shows: everyone on this roster (names and times, never anyone's signature).
+// Saved with the signatures in Drive each time links are made, so a late enrollee added later shows up too.
+const rosterList = r => ({ late: r.late, people: onRoster(r).map(p => ({ name: sheetStudent(p.sid).name || p.name, print: rosterName(p.name), times: rosterTimes(p) })) });
 const rosterFileName = r => S.cohortKey + ' Orientation Roster ' + mdy(r.date).replace(/\//g, '-') + (r.late ? ' (late enrollees)' : '') + '.pdf';
 function bytesB64(bytes) {
   let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
@@ -325,7 +269,7 @@ async function signLinksFor(r, people) {
   for (const k of Object.keys(groups)) {
     const list = groups[k], start = milTime(list[0].time);
     const names = list.map(p => sheetStudent(p.sid).name || p.name);
-    const links = await Sheets.signLinks(S.cohortKey, { date: r.date, start, end: milPlus(start, ROSTER_HOURS), late: r.late }, names);
+    const links = await Sheets.signLinks(S.cohortKey, { date: r.date, start, end: milPlus(start, ROSTER_HOURS), late: r.late, list: rosterList(r) }, names);
     list.forEach((p, i) => { out[p.sid] = links[names[i]] ? new URL('sign.html?t=' + links[names[i]], location.href).href : ''; });
   }
   return out;
@@ -388,7 +332,7 @@ async function rosterAct(a, el = {}) {
       if (!r || ro.busy) return true;
       const list = onRoster(r), signed = signedMap(r), missing = list.filter(p => !signed[p.sid]);
       if (a === 'rosterSave' && missing.length && !confirm(`${missing.length} still to sign: ${missing.map(p => rosterName(p.name)).join(', ')}.\n\nSave the roster anyway? You can save it again once they sign (it replaces the file), and the to-do stays open until everyone has.`)) return true;
-      ro.busy = a === 'rosterSave' ? 'Saving to the cohort folder…' : 'Making the PDF…'; ro.err = ''; render();
+      ro.busy = a === 'rosterSave' ? 'Saving to Drive…' : 'Making the PDF…'; ro.err = ''; render();
       try {
         if (signingOn() && !((S.rosterSigs || {})[r.date] || {}).list) await loadRosterSigs(r.date);
         const bytes = await rosterPdf(r);
@@ -401,7 +345,7 @@ async function rosterAct(a, el = {}) {
             await Store.set(P('todos/oroster-' + r.date), { done: true });
             if (!r.late) await Store.set('cohorts/' + S.cohortKey, { docChecks: { 'class-orientation-roster': true } });
           }
-          toast(complete ? 'Roster saved to the ' + S.cohortKey + ' folder. The to-do is checked off.' : 'Roster saved. Save it again once everyone has signed.');
+          toast(complete ? 'Roster saved to Admin - ' + S.cohortKey + ' → Orientation Roster Signatures. The to-do is checked off.' : 'Roster saved. Save it again once everyone has signed.');
         }
       } catch (e) {
         ro.err = e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '');

@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- The student's orientation roster signing page: sign.html?t=<their private link code>.
-     It shows only their own line (name, cohort, date, course #, times) and a box to draw their
-     signature. The Admin Apps Script checks the link and saves the signature (signInfo / signSubmit).
+     Like BoldSign: a pop-up with the instructions, then just the roster (your form, filled in by rosterform.js:
+     everyone's names and times, never anyone else's signature). "Sign Here" in their own signature box opens the
+     signature pad; Done saves it (Admin Apps Script signInfo / signSubmit), then they can download a copy.
      Until December only Test cohort links are made; then the Student Hub takes this over. -->
 <html lang="en">
 <head>
@@ -9,64 +10,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orientation Roster · Elevate EMS</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#f3ece6">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=171">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=171">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=177">
 <style>
-  :root { --bg: #f3ece6; --paper: #fbf8f4; --ink: #3d322c; --muted: #8f7f75; --line: #ddcfc5; --line-soft: #e9dfd7;
-    --taupe-dark: #7d6558; --blush-soft: #efe3db; --sage: #6f8a6a; --sage-soft: #e3eadf; --rose: #a8574d; --rose-soft: #f3e0dc;
-    --serif: 'Cormorant Garamond', Georgia, serif; }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  body { font-family: Jost, system-ui, sans-serif; font-size: 16px; color: var(--ink); background: var(--bg); line-height: 1.45;
-    padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
-  .card { max-width: 620px; margin: 0 auto; background: var(--paper); border-radius: 18px; padding: 22px 20px 20px;
-    box-shadow: 0 1px 2px rgba(80, 55, 40, .05), 0 8px 24px rgba(80, 55, 40, .06); }
-  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-  .brand img { width: 52px; height: 52px; object-fit: contain; }
-  h1 { font-family: var(--serif); font-weight: 600; font-size: 30px; line-height: 1.1; margin: 0; }
-  .sub { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
-  .line { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 16px 0; padding: 14px 16px;
-    border: 1px solid var(--line-soft); border-radius: 12px; background: #fff; }
-  .line span { color: var(--muted); font-size: 14px; }
-  .line b { font-weight: 500; }
-  .due { font-size: 14px; padding: 10px 14px; border-radius: 10px; background: var(--blush-soft); margin: 0 0 16px; }
-  .due.past { background: var(--rose-soft); color: var(--rose); }
-  .pad-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
-  .pad { position: relative; height: 190px; border: 1.5px solid var(--taupe-dark); border-radius: 12px; background: #fff; }
-  .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; border-radius: 12px; }
-  .pad .hint { position: absolute; left: 16px; right: 16px; bottom: 34px; border-top: 1px solid var(--line); pointer-events: none; }
-  .pad .hint::before { content: '✕'; position: absolute; left: 0; top: -26px; color: var(--muted); font-size: 16px; }
-  .attest { font-size: 14px; color: var(--muted); margin: 12px 0 16px; }
-  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 20px; cursor: pointer; color: var(--ink); }
-  button.primary { background: var(--taupe-dark); border-color: var(--taupe-dark); color: #fff; font-weight: 500; margin-left: auto; padding: 11px 26px; }
-  button:disabled { opacity: .5; cursor: default; }
-  .link { background: none; border: 0; padding: 0; color: var(--taupe-dark); text-decoration: underline; font-size: 14px; }
-  .msg { text-align: center; padding: 30px 6px 14px; }
-  .msg .big { font-size: 46px; line-height: 1; color: var(--sage); }
-  .msg h2 { font-family: var(--serif); font-size: 28px; font-weight: 600; margin: 10px 0 6px; }
-  .err { background: var(--rose-soft); color: var(--rose); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin: 12px 0 0; }
-  .loading { text-align: center; color: var(--muted); font-family: var(--serif); font-style: italic; font-size: 20px; padding: 40px 0; }
-  .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 16px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; font-size: 16px; color: #1f2328; background: #e7e9ec;
+    padding: max(14px, env(safe-area-inset-top)) 10px max(30px, env(safe-area-inset-bottom)); }
+  .pages { max-width: 820px; margin: 0 auto; display: grid; gap: 14px; }
+  .page { position: relative; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.18); overflow: hidden; }
+  .page canvas { display: block; width: 100%; height: auto; }
+  .loading { text-align: center; color: #6a737d; padding: 60px 0; }
+  .sign-here { position: absolute; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #1f2328; font-family: inherit;
+    background: #ffd84d; border: 1px solid #d9a800; border-radius: 3px; cursor: pointer; padding: 0; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255, 216, 77, .45); } }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
+  .modal { background: #fff; border-radius: 10px; width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 22px 20px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  .modal h2 { font-size: 20px; margin: 0 0 10px; font-weight: 600; }
+  .modal p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; color: #3a3f45; }
+  .modal .meta { font-size: 13px; color: #6a737d; margin-bottom: 14px; }
+  .modal .err { color: #b42318; }
+  .pad { position: relative; height: 180px; border: 1px solid #c4c9cf; border-radius: 6px; background: #fff; margin: 4px 0 12px; }
+  .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pad .hint { position: absolute; left: 16px; right: 16px; bottom: 34px; border-top: 1px solid #d0d4d9; pointer-events: none; }
+  .pad .hint::before { content: '✕'; position: absolute; left: 0; top: -26px; color: #8a929a; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .row .left { margin-right: auto; }
+  .row.center { justify-content: center; }
+  button.btn { font: inherit; font-size: 15px; border: 1px solid #c4c9cf; background: #fff; border-radius: 6px; padding: 9px 18px; cursor: pointer; color: #1f2328; }
+  button.btn.primary { background: #02273D; border-color: #02273D; color: #fff; font-weight: 600; }
+  button.btn:disabled { opacity: .45; cursor: default; }
+  .link { background: none; border: 0; color: #02273D; text-decoration: underline; font: inherit; font-size: 14px; cursor: pointer; padding: 0; }
+  .check { width: 46px; height: 46px; border-radius: 50%; background: #e6f4ea; color: #1e7e34; display: grid; place-items: center; font-size: 26px; margin: 0 auto 12px; }
+  .center { text-align: center; }
 </style>
 </head>
 <body>
-<main class="card" id="app"><p class="loading">Opening your roster…</p></main>
-<p class="foot">Elevate EMS Academy · Questions? Reply to the email this link came in.</p>
+<div class="pages" id="pages"><p class="loading">Opening the roster…</p></div>
 
-<script src="config.js?v=171"></script>
-<script src="sigpad.js?v=171"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="config.js?v=177"></script>
+<script src="sigpad.js?v=177"></script>
+<script src="rosterform.js?v=177"></script>
 <script>
-  const app = document.getElementById('app');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const token = new URLSearchParams(location.search).get('t') || '';
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const when = iso => new Date(iso).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  const head = info => `<div class="brand"><img src="logo.png" alt="Elevate EMS"><div><h1>Orientation Roster</h1>
-    <p class="sub">${info ? esc(info.cohort) + ' · EMS Course Roster' : 'EMS Course Roster'}</p></div></div>`;
+  let info = null, myPng = '', bytes = null;
 
   // The Admin Apps Script, without a sign-in: the link code is what it checks.
   async function call(action, params) {
@@ -75,55 +65,99 @@
     if (!out.ok) throw new Error(out.error || 'Something went wrong. Please try again.');
     return out;
   }
+  function modal(html) {
+    const o = document.createElement('div'); o.className = 'overlay';
+    o.innerHTML = `<div class="modal">${html}</div>`; document.body.appendChild(o); return o;
+  }
+  const problem = msg => modal(`<h2>Orientation Roster</h2><p class="err">${esc(msg)}</p><p>Questions? Reply to the email this link came in.</p>`);
 
-  function done(info, signedAt, already) {
-    app.innerHTML = head(info) + `<div class="msg"><div class="big">✓</div><h2>${already ? 'You’ve already signed' : 'Thank you, you’re signed!'}</h2>
-      <p class="sub">Your signature is on the ${esc(info.date)} orientation roster${signedAt ? ' (signed ' + esc(when(signedAt)) + ')' : ''}.<br>You can close this page.</p></div>`;
+  // The roster: everyone's names and times, and only this student's own signature (once they've signed).
+  async function show() {
+    bytes = await RosterForm.fill(PDFLib, {
+      date: info.dateShort, courseNo: info.courseNo, title: info.cohort + ' Orientation Roster ' + info.dateShort,
+      people: info.people.map((p, i) => ({ name: p.name, times: p.times, png: i === info.mine ? myPng : '' })),
+    });
+    const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise, box = document.getElementById('pages');
+    box.innerHTML = '';
+    const s = RosterForm.slot(info.mine, info.people.length), sig = RosterForm.COLS.sig;
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n), vp = page.getViewport({ scale: 2 }), wrap = document.createElement('div'), c = document.createElement('canvas');
+      wrap.className = 'page'; c.width = vp.width; c.height = vp.height; c.setAttribute('aria-label', 'Orientation roster page ' + n);
+      wrap.appendChild(c); box.appendChild(wrap);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      if (s && s.page === n - 1) {
+        wrap.id = 'mine';
+        if (!myPng) { // "Sign Here" in their own signature box
+          const t = s.top / RosterForm.H * 100, h = (s.bottom - s.top) / RosterForm.H * 100;
+          const btn = document.createElement('button'); btn.className = 'sign-here'; btn.type = 'button'; btn.textContent = 'Sign Here'; btn.onclick = openPad;
+          Object.assign(btn.style, { left: (sig[0] + 3) / RosterForm.W * 100 + '%', width: (sig[1] - sig[0] - 6) / RosterForm.W * 100 + '%', top: (t + h * 0.12) + '%', height: (h * 0.76) + '%' });
+          wrap.appendChild(btn);
+          btn.style.fontSize = Math.max(8, Math.min(14, h / 100 * wrap.clientWidth * RosterForm.H / RosterForm.W * 0.5)) + 'px';
+        }
+      }
+    }
+  }
+  const toMine = () => { const m = document.getElementById('mine'); if (m) m.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+
+  function intro() {
+    const first = info.name.split(/\s+/)[0];
+    const when = info.pastDue ? `This was due <b>${esc(info.due)}</b>. Please sign now: it’s still required for the state records, along with your other first class assignments.`
+      : info.late ? `This must be completed <b>within 24 hours of your orientation (by ${esc(info.due)})</b>, along with your other first class assignments.`
+      : `This must be completed <b>by ${esc(info.due)}</b>, along with your other first class assignments.`;
+    const o = modal(`<h2>Orientation Roster</h2>
+      <p class="meta">From Elevate EMS Academy · ${esc(info.cohort)} EMT · ${esc(info.date)}</p>
+      <p>Hi ${esc(first)}, please sign the course roster for VAOEMS records to verify your attendance at orientation and the first class paperwork overview.</p>
+      <p>A handwritten digital signature is required for these state records: tap <b>Sign Here</b> in your signature box and draw your signature with your finger, stylus or mouse.</p>
+      <p>${when}</p>
+      <div class="row"><button class="btn primary" data-go>Sign Now</button></div>`);
+    o.querySelector('[data-go]').onclick = () => { o.remove(); toMine(); };
   }
 
-  function form(info) {
-    app.innerHTML = head(info) + `
-      <div class="line">
-        <span>Name</span><b>${esc(info.name)}</b>
-        <span>Course</span><b>${esc(info.cohort)} EMT</b>
-        ${info.courseNo ? `<span>Course No.</span><b>#${esc(String(info.courseNo).replace(/#/g, '').trim())}</b>` : ''}
-        <span>Orientation</span><b>${esc(info.date)}</b>
-        ${info.times ? `<span>Times</span><b>${esc(info.times)}</b>` : ''}
-        <span>Topic</span><b>Orientation</b>
-      </div>
-      <p class="due ${info.pastDue ? 'past' : ''}">${info.pastDue
-        ? 'This was due ' + esc(info.due) + '. Please sign now: it’s still required to stay compliant with the course.'
-        : 'Please sign by <b>' + esc(info.due) + '</b>.'}</p>
-      <div class="pad-label"><span>Draw your signature (finger, stylus or mouse)</span><button class="link" id="clear" type="button">Clear</button></div>
-      <div class="pad"><div class="hint"></div><canvas id="pad" aria-label="Signature box"></canvas></div>
-      <p class="attest">By signing, I confirm that I, ${esc(info.name)}, attended the ${esc(info.cohort)} orientation on ${esc(info.date)}.</p>
-      <div class="row"><button class="primary" id="submit" type="button" disabled>Sign the roster</button></div>
-      <div id="err"></div>`;
-    const pad = SigPad(document.getElementById('pad')), btn = document.getElementById('submit');
-    const canvas = document.getElementById('pad');
-    canvas.addEventListener('pointerup', () => { btn.disabled = !pad.hasInk(); });
-    document.getElementById('clear').onclick = () => { pad.clear(); btn.disabled = true; };
-    btn.onclick = async () => {
-      if (!pad.hasInk()) return;
-      btn.disabled = true; btn.textContent = 'Signing…';
-      document.getElementById('err').innerHTML = '';
+  function openPad() {
+    const o = modal(`<h2>Draw your signature</h2>
+      <div class="pad"><div class="hint"></div><canvas aria-label="Signature box"></canvas></div>
+      <p class="err" data-err hidden></p>
+      <div class="row"><button class="link left" data-c>Clear</button><button class="btn" data-x>Cancel</button><button class="btn primary" data-ok disabled>Done</button></div>`);
+    const pad = SigPad(o.querySelector('canvas')), ok = o.querySelector('[data-ok]'), err = o.querySelector('[data-err]');
+    o.querySelector('canvas').addEventListener('pointerup', () => { ok.disabled = !pad.hasInk(); });
+    o.querySelector('[data-c]').onclick = () => { pad.clear(); ok.disabled = true; };
+    o.querySelector('[data-x]').onclick = () => o.remove();
+    ok.onclick = async () => {
+      const png = pad.png(); if (!png) return;
+      ok.disabled = true; ok.textContent = 'Saving…'; err.hidden = true;
       try {
-        const out = await call('signSubmit', { png: pad.png() });
-        done(info, out.signedAt, out.already);
+        const out = await call('signSubmit', { png });
+        myPng = out.already && out.png ? out.png : png; // (already signed on another device: theirs from then)
+        o.remove(); await show(); toMine(); thanks();
       } catch (e) {
-        btn.disabled = false; btn.textContent = 'Sign the roster';
-        document.getElementById('err').innerHTML = `<p class="err">${esc(e.message)}</p>`;
+        ok.disabled = false; ok.textContent = 'Done'; err.textContent = e.message; err.hidden = false;
       }
     };
   }
 
+  function thanks(again) {
+    const o = modal(`<div class="check">✓</div><h2 class="center">${again ? 'You’ve already signed' : 'Thank you, you’re signed!'}</h2>
+      <p class="center">Your signature ${again ? 'is on' : 'has been added to'} the orientation roster. You may close this window, or download a copy for your records.</p>
+      <div class="row center"><button class="btn" data-x>Close</button><button class="btn primary" data-dl>Download a copy</button></div>`);
+    o.querySelector('[data-x]').onclick = () => o.remove();
+    o.querySelector('[data-dl]').onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      a.download = info.cohort + ' Orientation Roster ' + info.dateShort.replace(/\//g, '-') + ' (' + info.name + ').pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+  }
+
   (async () => {
-    if (!token) { app.innerHTML = head() + '<p class="err">This page needs the signing link from your email.</p>'; return; }
+    if (!token) { document.getElementById('pages').innerHTML = ''; problem('This page needs the signing link from your email.'); return; }
     try {
-      const info = await call('signInfo', {});
-      if (info.signed) done(info, info.signedAt, true); else form(info);
+      info = await call('signInfo', {});
+      if (info.signed && info.png) myPng = info.png;
+      await show();
+      if (info.signed) { toMine(); thanks(true); } else intro();
     } catch (e) {
-      app.innerHTML = head() + `<p class="err">${esc(e.message)}</p>`;
+      document.getElementById('pages').innerHTML = '';
+      problem(e.message);
     }
   })();
 </script>
