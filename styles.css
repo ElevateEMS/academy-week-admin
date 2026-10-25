@@ -950,21 +950,20 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
   .em-tpl:not(.editing) .modal-foot { display: none; }
   .em-back { display: inline-block !important; margin: 0 0 10px; }
 }
-/* Course page: Emails fills the middle. Right column: Setup Checklist with a small Notes under it;
-   once the checklist is done, Course To-Do on top, Notes fills the rest, the checklist is a bar at the bottom. */
+/* Course page: Course Details + Notes (to the bottom) on the left, Emails fills the middle. Right column: the
+   Setup Checklist; once it's done, Course To-Do fills it and the checklist is a bar at the bottom. */
 .box.setup-bar { flex: 0 0 auto; padding-bottom: 12px; }
 .box.setup-bar .box-head { margin-bottom: 0; }
 .box-setup .head-actions .link { white-space: nowrap; }
 @media (min-width: 1101px) { .course-board .box.box-emails { flex: 1 1 0; min-height: 0; } } /* fills the column to the window's bottom, scrolls inside */
-.course-board:not(.setup-done) .box-notes { flex: 0 0 230px; }
-.course-board .box.box-ctodo { flex: 0 1 auto; min-height: 150px; }
-.course-board.setup-done .box-notes { flex: 1 1 0; }
+.course-board .box-notes { flex: 1 1 0; }
+.course-board .box.box-ctodo { flex: 1 1 0; min-height: 150px; }
 .btn-ic { width: 13px; height: 13px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-/* Smaller window: Course Details + Changes beside Emails, the right column goes across underneath. Phone: straight down. */
+/* Smaller window: Course Details + Notes beside Emails, the right column goes across underneath. Phone: straight down. */
 @media (max-width: 1100px) {
   .course-board > .board-col:nth-child(3) { grid-column: 1 / -1; }
   .board .box.setup-bar { min-height: 0; }
-  .course-board:not(.setup-done) .box-notes { flex: 0 0 auto; }
+  .course-board .box-notes { flex: 0 0 auto; }
 }
 .em-table th.c { width: auto; }
 .em-table th { font-size: 15px; white-space: nowrap; }
@@ -995,7 +994,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .admin-head:active { cursor: default; }
 /* Left column mirrors the middle: Business Info lines up with To Do, Quick Links with Key Dates. */
 .admin-board .admin-links { flex: 1 1 0; }
-.admin-board .admin-info { flex: 0 0 auto; } /* only as tall as its rows; Key Dates takes the rest */
+.admin-board .admin-info { flex: 1 1 0; } /* half the column; Key Dates the other half */
 .admin-info .info-row { grid-template-columns: 112px 1fr; }
 .info-sub { display: block; font-weight: 400; }
 .tbd, .admin-info .tbd { color: var(--muted); font-style: italic; font-weight: 400; }
@@ -1132,7 +1131,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .inq-reload.spin svg { animation: inq-spin .9s linear infinite; }
 @keyframes inq-spin { to { transform: rotate(360deg); } }
 .admin-board .admin-inq { flex: 1 1 0; }
-.admin-board .admin-changes { flex: 0 0 auto; } /* (on a wide screen fitBoard makes it as tall as Business Info; Info Requests takes the rest) */
+.admin-board .admin-changes { flex: 1 1 0; } /* half the column; Info Requests the other half */
 
 /* Dropdown lists (dropdown.js): the select stays as the button, our list opens instead of the browser's. */
 html.dd-on select:not([multiple]) { pointer-events: none; }

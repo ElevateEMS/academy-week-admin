@@ -680,8 +680,9 @@ function hlRanges(text, phrases) {
   return merged;
 }
 // Clicking an item's words edits them (To Do / priorities, Packing, Shopping); the circle checks it off.
-const EDITABLE = ['todo', 'pack', 'shop', 'upd'];
-const itemPath = (kind, id) => kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : kind === 'upd' ? 'updates/' + id : 'shopping/' + id;
+const EDITABLE = ['todo', 'pack', 'shop', 'upd', 'anext', 'prev']; // anext: Admin page's "before next cohort"; prev: those on the cohort they're for
+const itemPath = (kind, id) => kind === 'todo' ? P('todos/' + id) : kind === 'pack' ? P('packing/' + id) : kind === 'upd' ? 'updates/' + id
+  : kind === 'anext' ? 'cohorts/' + nextFor + '/todos/' + id : kind === 'prev' ? 'cohorts/' + prevFor + '/todos/' + id : 'shopping/' + id;
 function hlTxt(kind, id, text, phrases) {
   if (S.editItem === kind + ':' + id) {
     const k = 'edit-' + kind + '-' + id;
@@ -695,7 +696,8 @@ function hlTxt(kind, id, text, phrases) {
 }
 function hlItem(kind, id) {
   if (kind === 'doc') return { text: (docItems().find(x => x.id === id) || {}).text || '', hl: (((S.cohortDoc || {}).docHl) || {})[id] || [] };
-  const list = kind === 'todo' ? S.todos : kind === 'pack' ? S.packing : kind === 'upd' ? S.updates : S.shopping;
+  const list = kind === 'todo' ? S.todos : kind === 'pack' ? S.packing : kind === 'upd' ? S.updates
+    : kind === 'anext' ? (S.adminNext || []) : kind === 'prev' ? S.prevTodos : S.shopping;
   const x = list.find(i => i.id === id) || {};
   return { text: x.text || '', hl: x.hl || [] };
 }
@@ -1006,7 +1008,7 @@ function prevChanges() {
   if (!prevFor || !S.prevTodos.length) return '';
   const list = [...S.prevTodos].sort((a, b) => orderOf(a) - orderOf(b));
   return `<p class="mini-head">From ${esc(prevFor)}’s changes</p>
-    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label></li>`).join('')}</ul>`;
+    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label></li>`).join('')}</ul>`;
 }
 
 /* ---------- Day page ---------- */
@@ -2189,9 +2191,6 @@ function fitBoard() {
   if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
     notes.style.flex = '0 0 auto'; notes.style.height = scen.offsetHeight + 'px';
   }
-  // Admin: Changes is as tall as Business Info beside it (a long list scrolls inside), so Key Dates and Info Requests line up.
-  const info = board.querySelector('.admin-info'), ch = board.querySelector('.admin-changes');
-  if (info && ch) ch.style.height = innerWidth >= 1100 ? info.offsetHeight + 'px' : '';
 }
 addEventListener('resize', fitBoard);
 
