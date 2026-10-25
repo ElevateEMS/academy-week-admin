@@ -177,7 +177,10 @@ function openPanel(name, url) { // a Drive folder or Meet goes to Chrome instead
   if (inChrome(url)) { window.open(url, '_blank', 'noopener'); return; }
   S.adminPanel = { name, url }; render();
 }
-const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url);
+// Sites that won't show inside the panel: Meet, Drive folders, and the Squarespace website (it says
+// "same site only"). The Student Portal and Docs/Sheets are fine in the panel.
+const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url)
+  || /\/\/(www\.)?elevateemsacademy\.com(\/|$)/i.test(url);
 function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
