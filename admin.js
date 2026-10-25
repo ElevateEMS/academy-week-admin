@@ -212,9 +212,12 @@ function adminDatesBox() {
   const item = x => {
     const now = x.end && x.date <= t && t <= x.end;
     const away = now ? 'this week' : daysAway(x.date), soon = now || (x.date >= t && Math.round((parseIso(x.date) - parseIso(t)) / 864e5) <= 14);
-    return `<li class="${x.date < t ? 'past' : ''}"><span class="kd-date">${esc(parseIso(x.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(x.date.slice(0, 4) !== t.slice(0, 4) ? { year: 'numeric' } : {}) }))}</span>
-      <span class="kd-text">${esc(x.text)}${x.end ? ` <span class="kd-range">${dateRange(x.date, x.end)}</span>` : ''}</span><span class="kd-away ${soon ? 'soon' : ''}">${away}</span>
-      ${x.auto ? '<span class="kd-auto" title="From Course Details"></span>' : `<button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button>`}</li>`;
+    // Cohort dates skip the year (their title has it); your own dates show it when it isn't this year.
+    const when = x.end ? dateRange(x.date, x.end)
+      : parseIso(x.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(!x.auto && x.date.slice(0, 4) !== t.slice(0, 4) ? { year: 'numeric' } : {}) });
+    return `<li class="${x.date < t ? 'past' : ''}"><span class="kd-date">${esc(when)}</span>
+      <span class="kd-text">${esc(x.text)}</span><span class="kd-away ${soon ? 'soon' : ''}">${away}</span>
+      ${x.auto ? '' : `<button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button>`}</li>`;
   };
   return `<section class="box admin-dates">
     ${adminHead('Key Dates', (past.length ? `<button class="link" data-act="adminPastToggle">${S.adminShowPast ? 'Hide' : 'Show'} past</button>` : '') + '<button class="add-plus small-plus" data-act="adminDateOpen" title="Add a date" aria-label="Add a date">+</button>')}
