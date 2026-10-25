@@ -347,8 +347,10 @@ async function loadInquiries(check = false) {
   }
   S.inqBusy = null; S.inqAt = Date.now(); render();
 }
-const INQ_STATUSES = ['Needs follow-up', 'Plans to enroll', 'Responded', 'Enrolled', 'Not interested'];
-const NEW_CALL_STATUSES = ['Needs follow-up', 'Plans to enroll']; // what a call you're adding can be
+const INQ_STATUSES = ['Missed call', 'Needs follow-up', 'Plans to enroll', 'Responded', 'Enrolled', 'Close Out'];
+const NEW_CALL_STATUSES = ['Needs follow-up', 'Plans to enroll', 'Missed call']; // what a call you're adding can be
+const INQ_SECTION = { 'Missed call': 'Missed calls' }; // a section's heading, when it isn't the status itself
+const inqStatus = x => x.status === 'Not interested' ? 'Close Out' : x.status; // (renamed; an older saved list may still say it)
 // Their contact history (newest last) and the last time you talked.
 const inqContacts = x => Array.isArray(x.contacts) ? x.contacts : [];
 const inqLastTalk = x => inqContacts(x).filter(c => c.by !== 'Automatic').map(c => c.d).filter(isIsoDate).sort().pop() || '';
@@ -368,25 +370,27 @@ function adminInquiryBox({ calls = false } = {}) {
   const term = calls ? String(S.drafts['inq-search'] || '').trim().toLowerCase() : '', digits = term.replace(/\D/g, '');
   const found = term ? items.filter(x => [x.name, x.email, x.notes, x.message, x.cohort].some(v => String(v || '').toLowerCase().includes(term))
     || (digits.length >= 3 && String(x.phone || '').replace(/\D/g, '').includes(digits))) : null;
-  const of = st => items.filter(x => x.status === st);
+  const of = st => items.filter(x => inqStatus(x) === st);
   const waiting = items.filter(x => x.reply === 'Waiting').length;
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
-        <span class="inq-sub">${[term ? x.status : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
-  // Needs follow-up is always open; Responded and Enrolled open with a click; Not interested hides behind a link.
+        <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+  // Missed calls (only when there are some) and Needs follow-up are always open, Plans to enroll too when there are some;
+  // Responded and Enrolled open with a click; Close Out hides behind a link.
   const section = (st, always) => {
     const list = of(st), isOpen = always || open[st];
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
-        <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
+        <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${INQ_SECTION[st] || st}</span><span class="count">${list.length}</span></p>
       ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${st === 'Needs follow-up' ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
   };
-  const ni = of('Not interested').length;
+  const ni = of('Close Out').length;
   const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
-    : section('Needs follow-up', true) + (of('Plans to enroll').length ? section('Plans to enroll', true) : '') + section('Responded') + section('Enrolled')
-      + (open['Not interested'] ? section('Not interested') : '')
-      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Not interested">${open['Not interested'] ? 'Hide' : ni} not interested</button>` : '');
+    : (of('Missed call').length ? section('Missed call', true) : '') + section('Needs follow-up', true)
+      + (of('Plans to enroll').length ? section('Plans to enroll', true) : '') + section('Responded') + section('Enrolled')
+      + (open['Close Out'] ? section('Close Out') : '')
+      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Close Out">${open['Close Out'] ? 'Hide' : ni} closed out</button>` : '');
   const tools = calls && q ? `<div class="calls-tools">
       <button class="btn primary calls-add" data-act="inqNew">+ Add a call</button>
       <input id="inq-search" class="calls-search" type="search" data-draft="inq-search" value="${esc(S.drafts['inq-search'] || '')}" placeholder="Search name or phone" autocomplete="off" aria-label="Search name or phone">
@@ -427,7 +431,7 @@ function inqHistory(it, e) {
     ${e.log ? `<div class="inq-log">
         <div class="field">When<span class="ai-date">${datePicker('ie2-cdate', { title: 'Date you talked' })}</span></div>
         <label class="field">What happened<input id="ie2-cnote" data-draft="ie2-cnote" value="${esc(S.drafts['ie2-cnote'] || '')}" placeholder="e.g. Called back, wants Spring 2027 dates" autocomplete="off"></label>
-        <p class="muted small">Logged when you Save. Change the status above too if it changed.</p></div>` : ''}
+        <p class="muted small">Logged when you Save.${S.drafts['ie2-status'] === 'Missed call' ? ' This moves them from Missed calls to Responded.' : ' Change the status above too if it changed.'}</p></div>` : ''}
     <ul class="inq-hist-list">${list.map(c => `<li><b>${esc(inqDate(c.d))}</b> · ${esc(c.by || '')}${c.note ? ' · ' + esc(c.note) : ''}</li>`).join('') || '<li class="muted">Nothing logged yet.</li>'}</ul></div>`;
 }
 // One request: status, who, cohort, notes (and what they wrote or said). New = a call you're adding.
@@ -619,7 +623,7 @@ async function adminAct(a, el = {}) {
     case 'inqOpen': case 'inqNew': {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
-      S.drafts['ie2-status'] = it.status || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
+      S.drafts['ie2-status'] = (it.status && inqStatus(it)) || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
       S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = '';
       S.inqEd = { item: it, isNew: a === 'inqNew', busy: false, log: false }; render(); return true;
     }

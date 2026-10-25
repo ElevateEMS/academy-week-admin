@@ -1252,8 +1252,8 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .eye.inq-gv svg { width: 20px; height: 20px; }
 
 /* Info Requests window: a new call's two statuses side by side; the status dropdown; contact history */
-.inq-status.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.inq-status.two .chip { padding: 8px 6px; text-align: center; white-space: nowrap; }
+.inq-status.two { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } /* a new call's three statuses on one row */
+.inq-status.two .chip { padding: 8px 4px; text-align: center; white-space: nowrap; font-size: 13.5px; }
 .inq-status-pick { margin-bottom: 10px; }
 .inq-hist { margin-top: 6px; }
 .inq-hist .mini-head { margin-top: 4px; }
