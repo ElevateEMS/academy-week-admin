@@ -997,6 +997,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .admin-board .admin-links { flex: 1 1 0; }
 .admin-board .admin-info { flex: 1 1 0; } /* half the column; Key Dates the other half */
 .admin-info .info-row { grid-template-columns: 112px 1fr; }
+.admin-info .info-rows { padding-top: 6px; } /* first row lines up with "Do before next cohort" beside it */
 .info-sub { display: block; font-weight: 400; }
 .tbd, .admin-info .tbd { color: var(--muted); font-style: italic; font-weight: 400; }
 .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(125, 101, 88, .4); text-underline-offset: 3px; overflow-wrap: anywhere; }
@@ -1057,8 +1058,6 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .ai-custom .ai-name { font-weight: 500; }
 .ai-custom > .x { opacity: .6; margin-top: 4px; } .ai-custom > .x:hover { opacity: 1; }
 .ai-list + .btn { margin: 4px 0 4px 28px; }
-/* The laptop logo, small at the bottom of Business Info (in whatever room the rows leave). */
-.ai-logo { display: block; width: 110px; height: auto; margin: auto auto 0; padding-top: 14px; flex-shrink: 0; }
 
 /* ---------- Print packet (Course To-Do → Ship student shirts) ---------- */
 .packet-list { margin: 8px 0 14px; padding-left: 22px; line-height: 1.8; }

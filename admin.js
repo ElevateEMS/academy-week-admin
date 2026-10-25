@@ -87,7 +87,6 @@ function adminInfoBox() {
   return `<section class="box shaded admin-info">
     ${adminHead('Business Info', `<button class="eye" data-act="adminInfoOpen" title="Edit business info" aria-label="Edit business info">${ICONS.pencil}</button>`)}
     <div class="info-rows">${infoOrder().map(rowFor).join('')}</div>
-    <img class="ai-logo" src="logo-laptop.png" alt="">
   </section>`;
 }
 function adminInfoModal() {
