@@ -368,7 +368,7 @@ function adminInquiryBox() {
     const list = of(st), isOpen = always || open[st];
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
         <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
-      ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${always ? 'Nobody to follow up with.' : 'None.'}</li>`}</ul>` : ''}`;
+      ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${always ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
   };
   const ni = of('Not interested').length;
   return `<section class="box admin-inq">
