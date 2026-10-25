@@ -1295,6 +1295,17 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .ro-table tr:hover .ro-acts .link, .ro-acts .link:focus-visible { opacity: 1; }
 @media (hover: none) { .ro-acts .link { opacity: .6; } } /* iPad / iPhone: no hover, so always (faintly) there */
 .ro-when { white-space: nowrap; }
+/* Fixed column widths so the gaps stay even whatever's in the cells (Name takes what's left). */
+@media (min-width: 721px) {
+  .roster.ro-table { table-layout: fixed; }
+  .roster.ro-table th:nth-child(1) { width: 44px; }
+  .roster.ro-table th:nth-child(3) { width: 120px; }
+  .roster.ro-table th:nth-child(4) { width: 190px; }
+  .roster.ro-table th:nth-child(5) { width: 150px; }
+  .roster.ro-table th:nth-child(6) { width: 150px; }
+  .roster.ro-table th:nth-child(4), .roster.ro-table th:nth-child(5), .ro-sig-cell, .ro-when { text-align: center; }
+  .ro-sig-cell { min-width: 0; }
+}
 .roster-modal .modal-head .panel-actions { display: flex; align-items: center; gap: 10px; }
 .roster-modal .modal-head .panel-actions .eye { line-height: 0; }
 .ro-inst, .ro-ec { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 8px 0; border-bottom: 1px dotted var(--line); }
