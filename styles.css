@@ -1157,3 +1157,31 @@ html.dd-hover, html.dd-hover * { cursor: pointer !important; }
 /* Finalize: Final Steps only as tall as its list, Notes fills the rest of the right column. */
 .final-board .box.box-finalsteps { flex: 0 1 auto; min-height: 0; }
 .final-board .box.box-notes { flex: 1 1 0; min-height: 180px; }
+
+/* Shipping file (ship.js) */
+.ship-modal { width: min(640px, 100%); }
+.ship-list li { align-items: flex-start; }
+.ship-list li.ship-off .ship-main { opacity: .55; }
+.ship-main { display: flex; flex-direction: column; gap: 1px; }
+.ship-name { font-weight: 500; }
+.ship-size { font-size: 12px; color: var(--taupe-dark); background: var(--blush-soft); border-radius: 999px; padding: 0 8px; margin-left: 4px; font-weight: 400; }
+.ship-addr { font-size: 13.5px; color: var(--muted); }
+.ship-flag { font-size: 12.5px; color: var(--rose); }
+.ship-skipped { margin: 10px 0 4px; font-size: 14px; }
+.ship-skipped summary { cursor: pointer; color: var(--taupe-dark); }
+.ship-skipped ul { margin: 6px 0 0; padding-left: 20px; }
+.ship-how { margin-top: 12px; }
+.ship-modal .modal-foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+
+/* Due dates (due.js): a chip on the item, or a calendar on hover to set one */
+.due-chip { flex-shrink: 0; border: 0; border-radius: 999px; padding: 1px 9px; font-size: 12px; line-height: 1.6; background: var(--line-soft); color: var(--taupe-dark); cursor: pointer; white-space: nowrap; }
+.due-chip:hover { background: var(--blush); }
+.due-chip.soon { background: var(--rose-soft); color: var(--rose); }
+.due-chip.late { background: var(--rose); color: #fff; }
+li.done .due-chip { background: none; color: var(--muted); text-decoration: line-through; }
+.x.due-add { display: inline-grid; place-items: center; padding: 2px 4px; }
+.x.due-add svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+li.done .x.due-add { display: none; }
+.due-what { font-weight: 500; margin: 0 0 10px; }
+.due-modal .modal-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+@media (hover: none) { .x.due-add { opacity: .5; } }

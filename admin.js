@@ -191,7 +191,7 @@ function adminTodoBox() {
     ${S.adminTodoAdd ? `<div class="add-row"><input id="ad-todo" data-draft="ad-todo" data-add="adminTodo" data-aclose="todo" placeholder="Type a to-do, then Enter" value="${esc(S.drafts['ad-todo'] || '')}" autocomplete="off"></div>` : ''}
     <ul class="checks">${[...open, ...done].map(t => `<li class="${t.done ? 'done' : ''}">
       <label>${circle(t.done, `data-act="adminTodo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span></span></label>
-      <button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+      ${dueBits('admin', t, t.done)}<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
 

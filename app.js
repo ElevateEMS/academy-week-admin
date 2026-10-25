@@ -103,7 +103,7 @@ function cfg() {
     dayNotes: s.dayNotes || {},
     packing: s.packingList || DEFAULTS.packingList || [],
     setup: s.setupList || DEFAULTS.setupList,
-    courseTodo: s.courseTodoList || DEFAULTS.courseTodoList,
+    courseTodo: withDefaultDue('ctodo-', s.courseTodoList || DEFAULTS.courseTodoList),
     binder: s.binderList || DEFAULTS.binderList,
     docs: { ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) },
     weekH: s.weekH || null,
@@ -158,7 +158,7 @@ const itemsFor = (n, kind) => S.todos.filter(t => (t.kind || 'todo') === kind &&
 const repeatId = (n, text) => 'rep-' + n + '-' + slug(text);
 function templateFor(tpl, n) {
   const every = n >= 1 && n <= 5 ? (tpl.everyDay || []) : []; // "every day" means Day 1-5, not Prep/Finalize
-  const all = [...every, ...((tpl.days || {})[n] || [])];
+  const all = [...every, ...((tpl.days || {})[n] || [])].map(tplText); // (without a "[due …]" ending)
   return all.filter((t, i) => all.findIndex(x => slug(x) === slug(t)) === i);
 }
 // Template to-dos this cohort doesn't have yet (skipping ones you deleted on purpose).
@@ -193,7 +193,7 @@ const addPacking = list => Promise.all(list.map(({ id, text, i }) =>
 // highlighting all work as on the Day page. A "# " line is a heading. "Do before next cohort"
 // changes are kind 'next' on the same day.
 const SETUP = -1;
-const setupLine = raw => { const heading = /^#/.test(raw); const text = raw.replace(/^#+\s*/, '').trim(); return { heading, text, id: (heading ? 'setuph-' : 'setup-') + slug(text) }; };
+const setupLine = raw => { const heading = /^#/.test(raw); const text = tplText(raw.replace(/^#+\s*/, '')); return { heading, text, id: (heading ? 'setuph-' : 'setup-') + slug(text) }; };
 function missingSetup(list = cfg().setup) {
   const have = new Set(S.todos.map(x => x.id));
   const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
@@ -210,7 +210,7 @@ function addSetup(list, { done = false } = {}) {
 function missingCtodo(list = cfg().courseTodo) {
   const have = new Set(S.todos.map(x => x.id));
   const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {};
-  return list.map((text, i) => ({ id: 'ctodo-' + slug(text), text: text.trim(), i })).filter(x => x.text && !have.has(x.id) && !removed[x.id])
+  return list.map((raw, i) => ({ id: 'ctodo-' + slug(tplText(raw)), text: tplText(raw), i })).filter(x => x.text && !have.has(x.id) && !removed[x.id])
     .filter((x, j, arr) => arr.findIndex(y => y.id === x.id) === j);
 }
 const addCtodo = list => Promise.all(list.map(({ id, text, i }) =>
@@ -516,6 +516,7 @@ function render() {
       if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
     }
     fitBoard();
+    syncDue(); // template to-dos' due dates follow Course Details
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
@@ -607,6 +608,8 @@ function shell() {
   ${S.infoEdit ? infoEditModal() : ''}
   ${S.newCohort ? newCohortModal() : ''}
   ${emailModals()}
+  ${S.ship ? shipModal() : ''}
+  ${S.dueEd ? dueModal() : ''}
   ${adminModals()}
   ${S.packet ? packetModal() : ''}`;
 }
@@ -852,14 +855,16 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
       if (kind === 'todo' && isBinderList(t.text)) open = `<button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`;
-      if (kind === 'ctodo' && isShirtItem(t.text)) open = `<button class="btn tiny" data-act="packetOpen">${PRINTER_SMALL} Print packet</button>`;
+      if (kind === 'ctodo' && isShirtItem(t.text)) open = `<button class="btn tiny" data-act="packetOpen">${PRINTER_SMALL} Print packet</button>`
+        + `<button class="btn tiny" data-act="shipOpen" title="A Pirate Ship import file from the shirt sheet">Shipping file</button>`
+        + `<a class="btn tiny" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome>Pirate Ship ↗</a>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
       <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
-      ${open}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
+      ${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
     </li>`;
     }).join('') || empty}
   </ul>`;
@@ -998,7 +1003,7 @@ function setupList() {
       const auto = setupAuto(t.text), done = auto.done === true || t.done;
       const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
         <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
     }).join('') || '<li class="empty">Nothing yet.</li>'}
   </ul>`;
@@ -1857,12 +1862,12 @@ function templatesModal() {
   const dv = (k, v) => esc(S.drafts[k] ?? v);
   const tabBtn = (t, label) => `<button class="bag-tab ${tab === t ? 'on' : ''}" data-act="tplTab" data-t="${t}">${label}</button>`;
   const body = tab === 'setup'
-    ? `<p class="muted small">The Setup Checklist on each new cohort’s Course page. One per line; start a line with <b>#</b> to make it a heading. A few items check themselves off from the Google Sheet (in the config sheet, dates/Meet link/JBL code filled in, Former/Active).</p>
+    ? `<p class="muted small">The Setup Checklist on each new cohort’s Course page. One per line; start a line with <b>#</b> to make it a heading. End a line with <b>[due 2 weeks after orientation]</b> to give it a due date (days or weeks, before or after orientation, CPR or academy week). A few items check themselves off from the Google Sheet (in the config sheet, dates/Meet link/JBL code filled in, Former/Active).</p>
        <label class="field">Course setup<textarea id="tpl-setup" data-draft="tpl-setup" rows="16">${dv('tpl-setup', c.setup.join('\n'))}</textarea></label>
-       <p class="muted small">The Course To-Do shows on the Course page once the Setup Checklist is done. One per line. Anything with “ship” and “shirt” in it gets the Print packet button.</p>
+       <p class="muted small">The Course To-Do shows on the Course page once the Setup Checklist is done. One per line; a <b>[due …]</b> ending works here too. Anything with “ship” and “shirt” in it gets the Print packet and Shipping file buttons.</p>
        <label class="field">Course To-Do<textarea id="tpl-ctodo" data-draft="tpl-ctodo" rows="5">${dv('tpl-ctodo', c.courseTodo.join('\n'))}</textarea></label>`
     : tab === 'every'
-    ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line. Anything with “bag check” in it opens the bag pop-up.</p>
+    ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line; a <b>[due 3 days before academy week]</b>-style ending gives one a due date. Anything with “bag check” in it opens the bag pop-up.</p>
        <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
     : `${tab === '6' ? '' : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' ? '' : ', added after the every-day ones'})</span>
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>`}
@@ -2271,9 +2276,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
+    else if (S.dueEd) { S.dueEd = null; delete S.drafts['due-date']; }
     else if (emailEscape()) { /* closed an email pop-up */ }
     else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }
+    else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
@@ -2752,7 +2759,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });

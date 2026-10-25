@@ -52,6 +52,7 @@ const Sheets = (() => {
     saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
     deleteInquiry: id => call('deleteInquiry', { id }),
     cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
+    shirtSheet: key => call('shirtSheet', { cohort: key }), // { name, url, rows: [{ row, printed, full, email, size, street, unit, city, state, zip, shipped, note }] }
   };
 })();
 
@@ -139,6 +140,19 @@ function sampleSheets() {
       const row = o || { id: 'call-' + Date.now(), received: item.received, source: 'Call', message: '', reply: '', status: 'Needs follow-up' };
       Object.assign(row, item); if (!o) list.unshift(row);
       return wait({ ...row });
+    },
+    async shirtSheet(key) {
+      const r = (printed, size, street, unit, city, state, zip, shipped = false, note = '') =>
+        ({ row: 0, full: '', printed, email: slug(printed).replace(/-/g, '.') + '@example.com', size, street, unit, city, state, zip, shipped, note });
+      return wait({ name: key + ' Ride Along Agreements - Shirt Info', url: 'https://docs.google.com/spreadsheets/', rows: [
+        r('Jordan Lee', 'M', '12 oak st', '', 'richmond', 'Virginia', '23220'),
+        r('Sam Rivera', 'L', '400 Pine Ave', '110', 'Randolph', 'NJ', '7869', false, '2 shirts'),
+        r('Alex Kim', 'S', '9 Elm Ct', '(already have one)', 'Chester', 'VA', '23831', false, 'Doesn’t need'),
+        r('Casey Moore', 'XL', '3 Birch Rd', '', 'Midlothian', 'VA', '23112', true),
+        r('Taylor Reed', 'L', '50 Old Rd', '', 'Clemson', 'SC', '29631'),
+        r('Taylor Reed', 'L', '77 New Rd', '', 'Midlothian', 'VA', '23112'),
+        r('Morgan Hale', 'M', '', '', 'Henrico', 'VA', '23228'),
+      ] });
     },
     async cohortDates() {
       return wait(cohorts.filter(c => /^(active|upcoming)$/i.test(c.status)).map(c => { const i = infoFor(c.key);
