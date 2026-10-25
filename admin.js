@@ -160,18 +160,24 @@ function linksEdModal() {
     <div class="modal-foot"><button class="btn primary" data-act="lkSave">Save</button></div>
   </div></div>`;
 }
-// Every link that would open a new Chrome tab (Docs, Sheets, Drive folders, the instructor link…)
-// opens in this panel instead, with "Open in Chrome ↗" there. Google Meet (it needs the camera) and
-// links marked data-chrome still go straight to Chrome, and so does ⌘/Ctrl-click.
+// Every link that would open a new Chrome tab (Docs, Sheets, the instructor link…) opens in this panel
+// instead, with "Open in Chrome ↗" there. Google Meet (it needs the camera), Drive folders (Google won't
+// show them in a panel: "you need access") and links marked data-chrome still go straight to Chrome,
+// and so does ⌘/Ctrl-click.
 document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[target="_blank"][href]');
   if (!a || a.hasAttribute('data-chrome') || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
   const url = a.href;
-  if (!/^https?:/i.test(url) || /\/\/meet\.google\.com\//i.test(url)) return;
+  if (!/^https?:/i.test(url) || inChrome(url)) return;
   e.preventDefault();
   const name = a.dataset.name || a.textContent.replace(/↗/g, '').trim() || 'Link';
   S.adminPanel = { name, url }; render();
 });
+function openPanel(name, url) { // a Drive folder or Meet goes to Chrome instead (see above)
+  if (inChrome(url)) { window.open(url, '_blank', 'noopener'); return; }
+  S.adminPanel = { name, url }; render();
+}
+const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url);
 function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
@@ -455,8 +461,8 @@ function adminEnter(t) {
 async function adminAct(a, el = {}) {
   const d = el.dataset || {};
   switch (a) {
-    case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) { S.adminPanel = { name: l.name, url: fullUrl(l.url) }; render(); } return true; }
-    case 'adminOpenUrl': S.adminPanel = { name: d.name, url: d.url }; render(); return true;
+    case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) openPanel(l.name, fullUrl(l.url)); return true; }
+    case 'adminOpenUrl': openPanel(d.name, d.url); return true;
     case 'adminSide': await Store.set('meta/settings', { adminSide: d.v === 'todo' ? 'todo' : 'notes' }); return true;
     case 'adminNextAdd': {
       const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;
