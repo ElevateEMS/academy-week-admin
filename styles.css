@@ -125,6 +125,7 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
 .board-col { display: flex; flex-direction: column; gap: 18px; min-height: 120px; border-radius: 16px; transition: background .15s; }
 /* Finalize: narrow left column (To Do, Notes), wide right one (Documentation Checklist). */
 .board.wide { grid-template-columns: 1fr 2.15fr; }
+.board.wide-left { grid-template-columns: 2.15fr 1fr; } /* Finalize: the checklist on the left two-thirds */
 .box-head h2 .count { font-family: Jost, sans-serif; font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
 .docs-sub { text-align: center; font-size: 13px; color: var(--muted); margin: -4px 0 6px; line-height: 1.5; }
 .docs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin-bottom: 4px; }
@@ -132,7 +133,7 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
 .docs-skills span { font-style: italic; }
 .box-docs > .docs-grid, .box-docs > .docs-sub, .box-docs > .mini-head { flex-shrink: 0; }
 .box-docs .mini-head { display: block; }
-.box.box-docs { flex: 1 0 auto; } /* tall enough for the whole list unless you drag it shorter */
+.box.box-docs { flex: 1 1 0; min-height: 0; } /* fills to the window's bottom; a long list scrolls inside */
 .tpl-group { font-family: var(--serif); font-size: 18px; font-weight: 600; margin: 6px 0 6px; }
 .board-col.drop-here { background: rgba(230, 211, 200, .35); }
 .box { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 16px; box-shadow: var(--shadow);
@@ -357,7 +358,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 #toast.show { opacity: 1; transform: translateX(-50%); }
 
 @media (max-width: 1100px) {
-  .board, .board.wide { grid-template-columns: 1fr 1fr; }
+  .board, .board.wide, .board.wide-left { grid-template-columns: 1fr 1fr; }
   .board .box { flex: 0 0 auto; min-height: 180px; } /* the board isn't stretched to the window here, so each box fits what's in it */
   .top { grid-template-columns: auto 1fr auto; }
 }
@@ -368,7 +369,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
   .page-title { grid-column: 1 / -1; grid-row: 2; }
   .page-title h1 { font-size: 30px; }
   .daystrip button { padding: 6px 12px; }
-  .board, .board.wide, .docs-grid { grid-template-columns: 1fr; }
+  .board, .board.wide, .board.wide-left, .docs-grid { grid-template-columns: 1fr; }
   .bag-items { grid-template-columns: 1fr; }
   .modal-foot { flex-wrap: wrap; }
 }
@@ -1153,3 +1154,7 @@ html.dd-hover, html.dd-hover * { cursor: pointer !important; }
 .dd-foot { border-top: 1px solid var(--line-soft); margin-top: 4px; padding: 7px 10px 3px; }
 .dd-foot .link { font-size: 12.5px; }
 @media (max-width: 640px) { .dd-opt { padding: 10px 12px 10px 6px; font-size: 15px; } }
+
+/* Finalize: Final Steps only as tall as its list, Notes fills the rest of the right column. */
+.final-board .box.box-finalsteps { flex: 0 1 auto; min-height: 0; }
+.final-board .box.box-notes { flex: 1 1 0; min-height: 180px; }

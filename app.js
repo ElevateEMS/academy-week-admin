@@ -79,13 +79,13 @@ function currentWeekDay() {
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
 const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios',
-  info: 'Course Details', setup: 'Setup Checklist', emails: 'Emails', ctodo: 'Course To-Do' };
+  info: 'Course Details', setup: 'Setup Checklist', emails: 'Emails', ctodo: 'Course To-Do', finalsteps: 'Final Steps' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
-// Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
+// Finalize: the Documentation Checklist across the left two-thirds, Final Steps over Notes on the right (no To Do).
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
-  final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
+  final: { key: 'finalLayout', v: 3, boxes: ['docs', 'finalsteps', 'notes'], def: [['docs'], ['finalsteps', 'notes']], wideLeft: true },
   // Course page: Course Details + Notes on the left, Emails down the middle, the Setup Checklist down the right.
   // (Changes for Future Classes lives on the Admin page.)
   course: { key: 'courseLayout', v: 6, boxes: ['info', 'setup', 'emails', 'notes', 'ctodo'], def: [['info', 'notes'], ['emails'], ['setup']] },
@@ -1032,7 +1032,7 @@ function dayView() {
     ${behind ? `<button class="pill" data-act="goStudents" data-f="behind">${behind} behind on skills</button>` : ''}
     ${fixes ? `<button class="pill" data-act="goStudents" data-f="fixes">${fixes} contact${fixes === 1 ? '' : 's'} waiting on fixes</button>` : ''}
   </div>` : ''}
-  <div class="board ${cfg().board.wide ? 'wide' : ''}">
+  <div class="board ${cfg().board.wide ? 'wide' : ''} ${cfg().board.wideLeft ? 'wide-left final-board' : ''}">
     ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, n)).join('')}</div>`).join('')}
   </div>`;
 }
@@ -1056,7 +1056,7 @@ function dayStrip({ phases = true } = {}) {
 function box(b, n) {
   const shaded = (b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info')
     && !(b === 'notes' && n === 'course'); // the Course page's right column (Notes, Setup, Course To-Do) is cream, like Emails
-  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
+  const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : (b === 'docs' || b === 'finalsteps') ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
     : b === 'setup' ? 'setup' : b === 'ctodo' ? 'ctodo' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
@@ -1114,8 +1114,12 @@ function box(b, n) {
         <div><p class="mini-head">Records for the Class</p>${list('class')}</div>
         <div><p class="mini-head">Records for <em>each</em> Student</p>${list('student')}
           <p class="docs-skills">The following skills sheets: <span>(physical copies only)</span></p>${list('skills')}</div>
-      </div>
-      <p class="mini-head">Final Steps</p>${list('final')}`;
+      </div>`;
+  } else if (b === 'finalsteps') {
+    const all = docItems('final'), done = all.filter(x => x.on).length;
+    body = head(`Final Steps <span class="count">${done}/${all.length}</span>`, done ? hideToggle('docs') : '')
+      + `<ul class="checks">${all.map(x => `<li class="${x.on ? 'done' : ''}">
+        <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
   } else if (b === 'scenarios') {
     body = head('Academy Week Scenarios', `<button class="eye" data-act="libOpen" title="Scenario Library" aria-label="Scenario Library">${BOOK}</button>`) + scenBox();
   } else if (b === 'packing') {
@@ -1860,8 +1864,8 @@ function templatesModal() {
     : tab === 'every'
     ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line. Anything with “bag check” in it opens the bag pop-up.</p>
        <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
-    : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' || tab === '6' ? '' : ', added after the every-day ones'})</span>
-         <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>
+    : `${tab === '6' ? '' : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' ? '' : ', added after the every-day ones'})</span>
+         <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>`}
        ${tab === '0' ? `<label class="field">Packing list <span class="small">(one per line)</span>
          <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>
        <label class="field">Binder paperwork <span class="small">(one per line; the list icon on a “Prepare binders” to-do shows it)</span>

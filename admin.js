@@ -292,7 +292,7 @@ function adminDatesBox() {
       ${x.auto ? '' : `<button class="x" data-act="adminDateDel" data-id="${x.id}" aria-label="Delete">×</button>`}</li>`;
   };
   return `<section class="box admin-dates">
-    ${adminHead('Key Dates', (past.length ? `<button class="link" data-act="adminPastToggle">${S.adminShowPast ? 'Hide' : 'Show'} past</button>` : '') + '<button class="add-plus small-plus" data-act="adminDateOpen" title="Add a date" aria-label="Add a date">+</button>')}
+    ${adminHead('Key Dates', (past.length ? `<button class="eye ${S.adminShowPast ? '' : 'off'}" data-act="adminPastToggle" title="${S.adminShowPast ? 'Hide' : 'Show'} past dates" aria-label="${S.adminShowPast ? 'Hide' : 'Show'} past dates">${S.adminShowPast ? EYE : EYE_OFF}</button>` : '') + '<button class="add-plus small-plus" data-act="adminDateOpen" title="Add a date" aria-label="Add a date">+</button>')}
     ${S.adminDateAdd ? `<div class="kd-form"><div class="kd-add">${datePicker('ad-date')}<input id="ad-text" data-draft="ad-text" data-add="adminDate" placeholder="What’s happening?" value="${esc(S.drafts['ad-text'] || '')}" autocomplete="off"></div>
       <div class="link-add-foot"><button class="link" data-act="adminDateCancel">Cancel</button><button class="btn small primary" data-act="adminDateAdd">Add date</button></div></div>` : ''}
     <ul class="checks key-dates">${next.map(item).join('') || '<li class="empty">No dates coming up.</li>'}${S.adminShowPast ? past.map(item).join('') : ''}</ul>
