@@ -411,6 +411,13 @@ function callsShell() {
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>
   ${adminModals()}${S.dueEd ? dueModal() : ''}`;
 }
+// Calling someone back goes through Google Voice (on gbrown@), with their number ready to call.
+// On a computer that's the Google Voice site; on an iPhone the link should open the Voice app.
+const GV_ACCOUNT = 'gbrown@elevateemsacademy.com';
+function gvUrl(phone) {
+  const d = String(phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  return d.length === 10 ? `https://voice.google.com/calls?a=nc,%2B1${d}&authuser=${encodeURIComponent(GV_ACCOUNT)}` : '';
+}
 // Contact history in a request's window: every time you talked (newest first), and + Log a contact.
 function inqHistory(it, e) {
   const list = [...inqContacts(it)].reverse();
@@ -427,7 +434,9 @@ function inqEdModal() {
   const e = S.inqEd, it = e.item || {}, v = k => esc(S.drafts['ie2-' + k] ?? '');
   const cohorts = [...new Set([...(S.inq ? S.inq.cohorts : []), it.cohort].filter(Boolean))];
   return `<div class="overlay" data-act="inqEdClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>${e.isNew ? 'Add a Call' : esc(it.name || it.phone || it.email || 'Info Request')}</h2><button class="x big" data-act="inqEdClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>${e.isNew ? 'Add a Call' : esc(it.name || it.phone || it.email || 'Info Request')}${!e.isNew && gvUrl(it.phone)
+      ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
+      <button class="x big" data-act="inqEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${e.isNew ? '' : `<p class="muted small">${esc(it.source)} · ${esc(inqDate(it.received))}${it.reply ? ' · reply ' + esc(it.reply.toLowerCase()) : ''}</p>`}
       ${it.message ? `<p class="inq-msg">${esc(it.message)}</p>` : ''}
@@ -435,7 +444,7 @@ function inqEdModal() {
         : `<label class="field inq-status-pick">Status<select id="ie2-status" data-draft="ie2-status">${INQ_STATUSES.map(st => `<option ${S.drafts['ie2-status'] === st ? 'selected' : ''}>${st}</option>`).join('')}</select></label>`}
       <div class="inq-fields two">
         <label class="field">Name<input id="ie2-name" data-draft="ie2-name" value="${v('name')}" autocomplete="off"></label>
-        <label class="field">Phone${it.phone ? ` <a class="inq-call" href="tel:${esc(String(it.phone).replace(/[^\d+]/g, ''))}">Call ${esc(it.phone)}</a>` : ''}<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
+        <label class="field">Phone<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
         <label class="field">Email<input id="ie2-email" data-draft="ie2-email" value="${v('email')}" autocomplete="off"></label>
         <label class="field">Interested in<select id="ie2-cohort" data-draft="ie2-cohort"><option value="">Not sure yet</option>${cohorts.map(c => `<option ${S.drafts['ie2-cohort'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
       </div>
