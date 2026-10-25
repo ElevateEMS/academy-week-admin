@@ -1128,6 +1128,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .inq-reload.spin svg { animation: inq-spin .9s linear infinite; }
 @keyframes inq-spin { to { transform: rotate(360deg); } }
 .admin-board .admin-inq { flex: 1 1 0; }
+.admin-board .admin-todo { flex: 0 0 auto; } /* To Do grows to fit its list; Info Requests takes the rest */
 
 /* Dropdown lists (dropdown.js): the select stays as the button, our list opens instead of the browser's. */
 html.dd-on select:not([multiple]) { pointer-events: none; }

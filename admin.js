@@ -27,7 +27,7 @@ const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.
 function adminView() {
   return `<div class="board admin-board">
     <div class="board-col">${adminInfoBox()}${adminDatesBox()}</div>
-    <div class="board-col">${adminInquiryBox()}</div>
+    <div class="board-col">${adminTodoBox()}${adminInquiryBox()}</div>
     <div class="board-col">${adminNotesBox()}</div>
   </div>`;
 }
