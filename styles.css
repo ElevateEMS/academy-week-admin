@@ -1052,6 +1052,12 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .ai-grip svg { width: 20px; height: 20px; fill: currentColor; }
 .ai-row.moving { background: var(--blush-soft); }
 .ai-row.moving .ai-grip { cursor: grabbing; }
+.ai-custom .field { display: grid; gap: 6px; }
+.ai-custom .ai-name { font-weight: 500; }
+.ai-custom > .x { opacity: .6; margin-top: 4px; } .ai-custom > .x:hover { opacity: 1; }
+.ai-list + .btn { margin: 4px 0 4px 28px; }
+/* The laptop logo, small at the bottom of Business Info (in whatever room the rows leave). */
+.ai-logo { display: block; width: 110px; height: auto; margin: auto auto 0; padding-top: 14px; flex-shrink: 0; }
 
 /* ---------- Print packet (Course To-Do → Ship student shirts) ---------- */
 .packet-list { margin: 8px 0 14px; padding-left: 22px; line-height: 1.8; }

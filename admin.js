@@ -47,6 +47,7 @@ function inBusiness(iso) {
   return parts.length ? parts.join(' ') + ' in business' : 'just started';
 }
 // Business Info fields: [label in the box, label in the edit window, input type, placeholder].
+// Plus any you add yourself (meta/admin.custom: [{ id, label, value }], keyed 'c:' + id in the order).
 // Their order is yours to set (drag the grip in the edit window); saved as meta/admin.infoOrder.
 const INFO_FIELDS = {
   started: ['Started', 'Business start date', 'date', ''],
@@ -54,10 +55,14 @@ const INFO_FIELDS = {
   website: ['Website', 'Website link', 'url', 'www.elevateemsacademy.com'],
   portal: ['Student Portal', 'Student Portal link', 'url', 'student.elevateemsacademy.com'],
   insurance: ['Insurance', 'Insurance company', 'text', ''],
+  address: ['Address', 'Business address', 'text', 'Street, city, state ZIP'],
+  ein: ['EIN', 'EIN', 'text', '12-3456789'],
 };
+const infoCustom = () => (S.admin && S.admin.custom) || [];
 function infoOrder() {
-  const saved = ((S.admin && S.admin.infoOrder) || []).filter(k => INFO_FIELDS[k]);
-  return [...saved, ...Object.keys(INFO_FIELDS).filter(k => !saved.includes(k))];
+  const keys = [...Object.keys(INFO_FIELDS), ...infoCustom().map(c => 'c:' + c.id)];
+  const saved = ((S.admin && S.admin.infoOrder) || []).filter(k => keys.includes(k));
+  return [...saved, ...keys.filter(k => !saved.includes(k))];
 }
 function adminInfoBox() {
   const i = adminInfo();
@@ -70,14 +75,33 @@ function adminInfoBox() {
     website: site('Website', i.website),
     portal: site('Student Portal', i.portal),
     insurance: i.insurance ? esc(i.insurance) : none,
+    address: i.address ? esc(i.address) : none,
+    ein: i.ein ? esc(i.ein) : none,
+  };
+  const custom = Object.fromEntries(infoCustom().map(c => [c.id, c]));
+  const rowFor = k => {
+    if (INFO_FIELDS[k]) return row(INFO_FIELDS[k][0], val[k]);
+    const c = custom[k.slice(2)], v = String(c.value || '');
+    return row(esc(c.label), !v ? none : /^(https?:\/\/|www\.)\S+$/i.test(v) ? site(c.label, v) : esc(v)); // a link opens in the panel
   };
   return `<section class="box shaded admin-info">
     ${adminHead('Business Info', `<button class="eye" data-act="adminInfoOpen" title="Edit business info" aria-label="Edit business info">${ICONS.pencil}</button>`)}
-    <div class="info-rows">${infoOrder().map(k => row(INFO_FIELDS[k][0], val[k])).join('')}</div>
+    <div class="info-rows">${infoOrder().map(rowFor).join('')}</div>
+    <img class="ai-logo" src="logo-laptop.png" alt="">
   </section>`;
 }
 function adminInfoModal() {
-  const f = k => { const [, label, type, ph] = INFO_FIELDS[k];
+  const f = k => {
+    if (k.startsWith('c:')) { // one you added: its own name and what it says, and a × to take it out
+      const id = k.slice(2), lk = 'aic-label-' + id, vk = 'aic-value-' + id;
+      return `<div class="ai-row ai-custom" data-k="${k}"><span class="ai-grip" data-aigrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>
+        <div class="field">
+          <input id="${lk}" data-draft="${lk}" class="ai-name" value="${esc(S.drafts[lk] ?? '')}" placeholder="Name it (e.g. OEMS program #)" aria-label="Field name" autocomplete="off">
+          <input id="${vk}" data-draft="${vk}" value="${esc(S.drafts[vk] ?? '')}" placeholder="What it says" aria-label="Field value" autocomplete="off">
+        </div>
+        <button class="x" data-act="aiCustomDel" data-id="${esc(id)}" title="Remove this field" aria-label="Remove this field">×</button></div>`;
+    }
+    const [, label, type, ph] = INFO_FIELDS[k];
     const field = type === 'date' // the app's own calendar (cream), not the browser's
       ? `<div class="field">${label}<span class="ai-date">${datePicker('ai-' + k, { optional: true, title: label })}</span></div>`
       : `<label class="field">${label}<input id="ai-${k}" type="${type}" data-draft="ai-${k}" value="${esc(S.drafts['ai-' + k] ?? '')}" placeholder="${ph}" autocomplete="off"></label>`;
@@ -87,6 +111,7 @@ function adminInfoModal() {
     <div class="modal-body pad-top">
       <p class="muted small ai-hint">Drag the grip to change the order.</p>
       <div class="ai-list">${S.adminOrderDraft.map(f).join('')}</div>
+      <button class="btn small" data-act="aiCustomAdd">+ Add a field</button>
     </div>
     <div class="modal-foot"><button class="btn primary" data-act="adminInfoSave">Save</button></div>
   </div></div>`;
@@ -468,14 +493,28 @@ async function adminAct(a, el = {}) {
     case 'adminInfoOpen': {
       const i = adminInfo();
       Object.keys(INFO_FIELDS).forEach(k => { S.drafts['ai-' + k] = i[k] || ''; });
+      infoCustom().forEach(c => { S.drafts['aic-label-' + c.id] = c.label || ''; S.drafts['aic-value-' + c.id] = c.value || ''; });
       S.adminOrderDraft = infoOrder(); S.adminInfoEd = true; render(); return true;
     }
+    case 'aiCustomAdd': {
+      const id = Store.newId();
+      S.drafts['aic-label-' + id] = ''; S.drafts['aic-value-' + id] = '';
+      S.adminOrderDraft = [...S.adminOrderDraft, 'c:' + id]; render();
+      setTimeout(() => { const el = document.getElementById('aic-label-' + id); if (el) el.focus(); }, 0); return true;
+    }
+    case 'aiCustomDel': S.adminOrderDraft = S.adminOrderDraft.filter(k => k !== 'c:' + d.id); render(); return true;
     case 'adminInfoClose': S.adminInfoEd = false; render(); return true;
     case 'adminInfoSave': {
       const info = Object.fromEntries(Object.keys(INFO_FIELDS).map(k => [k, String(S.drafts['ai-' + k] || '').trim()]));
       info.portal = fullUrl(info.portal); info.website = fullUrl(info.website);
-      await Store.set('meta/admin', { info, infoOrder: S.adminOrderDraft });
-      Object.keys(S.drafts).filter(k => k.startsWith('ai-')).forEach(k => delete S.drafts[k]);
+      // Fields you added: a blank one (no name, nothing in it) is dropped; one with only a value is called "Other".
+      const custom = S.adminOrderDraft.filter(k => k.startsWith('c:')).map(k => { const id = k.slice(2);
+        return { id, label: String(S.drafts['aic-label-' + id] || '').trim(), value: String(S.drafts['aic-value-' + id] || '').trim() }; })
+        .filter(c => c.label || c.value).map(c => ({ ...c, label: c.label || 'Other' }));
+      const keep = new Set(custom.map(c => 'c:' + c.id));
+      const order = S.adminOrderDraft.filter(k => !k.startsWith('c:') || keep.has(k));
+      await Store.set('meta/admin', { info, custom, infoOrder: order });
+      Object.keys(S.drafts).filter(k => k.startsWith('ai-') || k.startsWith('aic-')).forEach(k => delete S.drafts[k]);
       S.adminInfoEd = false; toast('Business info saved.'); render(); return true;
     }
     case 'linksEdOpen': S.menuOpen = false; S.linksDraft = adminLinks().map(l => ({ ...l, icon: l.icon ?? DEFAULT_LINK_ICON[l.id] ?? '' })); S.lkPick = null; render(); return true;
