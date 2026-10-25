@@ -1013,10 +1013,14 @@ function setupAuto(text) {
 // Every Setup Checklist item checked off. The previous cohort's changes don't hold it open:
 // any still unchecked move to the Course To-Do.
 function setupComplete() {
-  // Not until the cohort list and the previous cohort's changes have loaded, or the page flickers to "done" and back.
-  if (!S.sheet || !S.cohortsLoaded || !prevReady) return false;
-  const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
-  return all.length > 0 && all.every(t => t.done || setupAuto(t.text).done === true);
+  // Until the cohort list, the previous cohort's changes and the checklist itself have loaded, it's what it
+  // was last time on this device (remembered per cohort), so a refresh doesn't show the list and then fold it.
+  const key = 'setupDone-' + S.cohortKey;
+  const all = S.sheet ? itemsFor(SETUP, 'setup').filter(t => !t.heading) : [];
+  if (!S.sheet || !S.cohortsLoaded || !prevReady || !all.length) return pref(key) === '1';
+  const done = all.every(t => t.done || setupAuto(t.text).done === true);
+  if (pref(key) !== (done ? '1' : '0')) pref(key, done ? '1' : '0');
+  return done;
 }
 function setupList() {
   const items = itemsFor(SETUP, 'setup');
