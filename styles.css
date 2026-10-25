@@ -761,7 +761,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .info-row { display: grid; grid-template-columns: 128px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
 .info-row:last-child { border-bottom: 0; }
 .info-row > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); }
-.info-row > b { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.info-row > b { font-weight: 400; min-width: 0; overflow-wrap: anywhere; }
 .info-row a { color: var(--ink); text-underline-offset: 2px; }
 .info-row details summary { cursor: pointer; }
 .info-row details .small { display: block; font-weight: 400; margin-top: 2px; }
@@ -825,7 +825,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 .box-sep { border: 0; border-top: 1px solid rgba(125, 101, 88, .3); margin: 16px 0 4px; flex-shrink: 0; width: 100%; }
 .box-changes .mini-head:not(:first-of-type) { margin-top: 10px; }
 /* Course Details: the one reference box on the Course page, set apart with a thin taupe edge */
-.box.box-info.shaded { border-color: var(--taupe); }
+.box.box-info.shaded, .box.admin-info.shaded { border-color: var(--taupe); } /* Course Details + Business Info */
 /* Header: the Course / Academy Week switch sits right after the logo and name */
 .head-left { display: flex; align-items: center; gap: 10px 22px; flex-wrap: wrap; min-width: 0; }
 .head-left .side-switch { margin-right: 0; }
@@ -997,7 +997,6 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .admin-board .admin-links { flex: 1 1 0; }
 .admin-board .admin-info { flex: 0 0 auto; } /* only as tall as its rows; Key Dates takes the rest */
 .admin-info .info-row { grid-template-columns: 112px 1fr; }
-.admin-info .info-row > b { font-weight: 400; }
 .info-sub { display: block; font-weight: 400; }
 .tbd, .admin-info .tbd { color: var(--muted); font-style: italic; font-weight: 400; }
 .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(125, 101, 88, .4); text-underline-offset: 3px; overflow-wrap: anywhere; }
