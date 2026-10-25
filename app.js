@@ -2344,13 +2344,13 @@ async function act(a, el = {}, e) {
       case 'setStatus': {
         const key = d.k, status = d.s;
         const why = status === 'Active' ? 'Students on its roster will be able to log in to the Student Hub.'
-          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub.' : '';
+          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub, and its folder moves to Former Cohorts.' : '';
         if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
-        await Sheets.setStatus(key, status);
+        const res = await Sheets.setStatus(key, status);
         S.kdAt = 0; // Key Dates picks up the change
         S.cohorts = S.cohorts.map(c => c.key === key ? { ...c, status } : c);
         if (key === S.cohortKey && S.sheet) { S.sheet = { ...S.sheet, status }; sheetCopy(key, S.sheet); }
-        toast(`${key} is now ${status}.`); render(); break;
+        toast(`${key} is now ${status}.${res && res.folderNote ? ' ' + res.folderNote : ''}`); render(); break;
       }
       case 'prevTodo': {
         const x = S.prevTodos.find(i => i.id === d.id);

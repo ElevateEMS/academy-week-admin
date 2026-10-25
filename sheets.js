@@ -6,7 +6,8 @@
      listScenarios               -> the scenario Docs in the Medical and Trauma folders (names, links)
      createCohort(key, info)     -> adds a cohort to the config sheet; the Student Hub script makes its folder + sheets,
                                     then any course details typed in go into its settings box
-     setStatus(key, status)      -> Upcoming / Active / Former in the config sheet (column F)
+     setStatus(key, status)      -> Upcoming / Active / Former in the config sheet (column F); Former moves the
+                                    cohort folder into "Former Cohorts" (and back to My Drive if made current again)
      saveSettings(key, info)     -> writes course details (only the fields sent) into the settings box
      createDrafts(drafts)        -> puts emails in gbrown@'s Gmail Drafts ({ to, cc, bcc, subject, html, text }); never sends
      docPdf(id)                  -> a Google Doc as a PDF (base64), for the shirt-shipping print packet
