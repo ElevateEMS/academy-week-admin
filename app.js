@@ -1037,7 +1037,7 @@ function dayView() {
     ${behind ? `<button class="pill" data-act="goStudents" data-f="behind">${behind} behind on skills</button>` : ''}
     ${fixes ? `<button class="pill" data-act="goStudents" data-f="fixes">${fixes} contact${fixes === 1 ? '' : 's'} waiting on fixes</button>` : ''}
   </div>` : ''}
-  <div class="board ${cfg().board.wide ? 'wide' : ''} ${cfg().board.wideLeft ? 'wide-left final-board' : ''}">
+  <div class="board ${cfg().board.wide ? 'wide' : ''} ${cfg().board.wideLeft ? 'wide-left final-board' : ''} ${n === PREP ? 'prep-board' : ''}">
     ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, n)).join('')}</div>`).join('')}
   </div>`;
 }

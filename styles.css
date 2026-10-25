@@ -1185,3 +1185,19 @@ li.done .x.due-add { display: none; }
 .due-what { font-weight: 500; margin: 0 0 10px; }
 .due-modal .modal-foot { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
 @media (hover: none) { .x.due-add { opacity: .5; } }
+
+/* One column (phone / slim window): the Course and Prep pages stack in a set order, whatever the
+   columns are on a wide screen. The columns step aside (display: contents) so the boxes can be ordered. */
+@media (max-width: 720px) {
+  .course-board > .board-col, .prep-board > .board-col { display: contents; }
+  .course-board .box-info { order: 1; }
+  .course-board .box-setup, .course-board .box-ctodo { order: 2; }
+  .course-board .box-emails { order: 3; }
+  .course-board .box-notes { order: 4; }
+  .course-board .box-setup.setup-bar { order: 5; } /* done and collapsed: at the bottom */
+  .prep-board .box-todo { order: 1; }
+  .prep-board .box-notes { order: 2; }
+  .prep-board .box-shopping { order: 3; }
+  .prep-board .box-packing { order: 4; }
+  .prep-board .box-scenarios { order: 5; }
+}
