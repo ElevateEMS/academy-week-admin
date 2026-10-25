@@ -858,7 +858,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       // Ship student shirts: Print Packet and Shipping File as icons (names on hover), so it all fits on one row.
       if (kind === 'ctodo' && isShirtItem(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="packetOpen" title="Print Packet" aria-label="Print Packet">${PRINTER}</button>`
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
-        + `<a class="btn tiny" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome>Pirate Ship ↗</a></span>`;
+        + `<a class="eye pirate-link" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome title="Pirate Ship ↗" aria-label="Pirate Ship (opens in Chrome)">${PIRATE}${ARROW_OUT}</a></span>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -893,6 +893,9 @@ const RESET = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/
 const SHEET = '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 12.5l2 2 4-4.5"/></svg>';
 const EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
+// Pirate Ship's skull and crossbones (in our thin-line style), and a small ↗ for "opens a website".
+const PIRATE = '<svg viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="4.6"/><path d="M5.5 13.8l13 6.4M18.5 13.8l-13 6.4"/><circle cx="4.6" cy="13.4" r="1.1"/><circle cx="19.4" cy="13.4" r="1.1"/><circle cx="4.6" cy="20.6" r="1.1"/><circle cx="19.4" cy="20.6" r="1.1"/></svg>';
+const ARROW_OUT = '<svg class="arrow-out" viewBox="0 0 24 24"><path d="M8 16L16 8M9.5 8H16v6.5"/></svg>';
 const FILE_DOWN = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4"/><path d="M12 10.5v6M9.5 14l2.5 2.5 2.5-2.5"/></svg>';
 const PRINTER = '<svg viewBox="0 0 24 24"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6.5H7z"/></svg>';
 const hideToggle = k => { const h = hidden(k), label = h ? 'Show checked' : 'Hide checked';

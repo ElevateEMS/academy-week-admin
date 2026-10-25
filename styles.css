@@ -1207,3 +1207,5 @@ li.done .x.due-add { display: none; }
 .ship-btns .eye { opacity: .7; } .ship-btns .eye:hover { opacity: 1; }
 .checks li:has(.ship-btns) { flex-wrap: nowrap; }
 .checks li:has(.ship-btns) label { min-width: 0; }
+.eye.pirate-link { display: inline-flex; align-items: center; gap: 0; text-decoration: none; }
+.eye.pirate-link svg.arrow-out { width: 11px; height: 11px; margin-left: -1px; stroke-width: 2; align-self: flex-start; }
