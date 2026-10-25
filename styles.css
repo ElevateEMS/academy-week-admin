@@ -1178,7 +1178,9 @@ html.dd-hover, html.dd-hover * { cursor: pointer !important; }
 .due-chip:hover { background: var(--blush); }
 .due-chip.soon { background: var(--rose-soft); color: var(--rose); }
 .due-chip.late { background: var(--rose); color: #fff; }
-li.done .due-chip { background: none; color: var(--muted); text-decoration: line-through; }
+/* Crossed out like the item's words: the same drawn line at the same height (not the browser's, which sits high), across the text only */
+li.done .due-chip { background: none; color: var(--muted); }
+li.done .due-chip .due-txt { background: linear-gradient(var(--taupe), var(--taupe)) 0 62% / 100% 1px no-repeat; } /* same as .txt above */
 .x.due-add { display: inline-grid; place-items: center; padding: 2px 4px; }
 .x.due-add svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 li.done .x.due-add { display: none; }

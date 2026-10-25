@@ -69,7 +69,7 @@ function dueBits(kind, t, done) {
   if (!due) return `<button class="x due-add" ${attrs} title="Set a due date" aria-label="Set a due date">${CAL_ICON}</button>`;
   const days = Math.round((parseIso(due) - parseIso(todayIso())) / 864e5);
   const label = days === 0 ? 'due today' : days === 1 ? 'due tomorrow' : 'due ' + dueDay(due);
-  return `<button class="due-chip ${!done && days <= 2 ? 'soon' : ''} ${!done && days < 0 ? 'late' : ''}" ${attrs} title="Change the due date">${label}</button>`;
+  return `<button class="due-chip ${!done && days <= 2 ? 'soon' : ''} ${!done && days < 0 ? 'late' : ''}" ${attrs} title="Change the due date"><span class="due-txt">${label}</span></button>`;
 }
 const dueDay = iso => { const d = parseIso(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
 
