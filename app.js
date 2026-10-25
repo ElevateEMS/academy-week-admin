@@ -661,7 +661,7 @@ function shell() {
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
   if (S.view === 'course') {
-    const f = cohortInfo().firstDay, n = S.sheet ? students().length : 0;
+    const f = cohortInfo().firstDay, n = S.sheet ? attending().length : 0; // (enrolled: dropped / not attending aren't counted)
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
     return `<h1>${esc(S.cohortKey || 'Course')}</h1><p>${S.sheet ? when + ' · ' + n + ' student' + (n === 1 ? '' : 's') + ' enrolled' : ''}</p>`;
   }
@@ -1003,7 +1003,9 @@ function infoBox() {
   const meet = i.meet ? `<a href="${esc(/^https?:/i.test(i.meet) ? i.meet : 'https://' + i.meet)}" target="_blank" rel="noopener">${esc(i.meet.replace(/^https?:\/\//i, ''))}</a>` : tbd;
   const rev = (i.reviews || []).map(v => isIsoDate(v) ? shortDate(v) : v);
   const upcoming = (i.reviews || []).filter(v => isIsoDate(v) && v >= todayIso());
-  const list = students(), paused = list.filter(x => /paused/i.test(x.status)).length;
+  // Enrolled includes paused students. Dropped = Blocked in the sheet + Not attending / Dropped · Day N in the app (not counted as enrolled).
+  const list = attending(), paused = list.filter(x => /paused/i.test(x.status)).length;
+  const dropped = students().filter(x => x.out).length + S.sheet.students.filter(x => /^blocked$/i.test(x.status)).length;
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   return `<div class="info-rows">
     ${row('Orientation', date(i.firstDay))}
@@ -1013,7 +1015,7 @@ function infoBox() {
     ${row('Google Meet', meet)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
     ${row('VAOEMS Course No.', i.courseNos ? esc(courseNoText(i.courseNos)) : tbd)}
-    ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
+    ${row('Students', `<button class="cell-link info-go" data-act="view" data-v="students" title="Open the Students page">${list.length} enrolled${paused ? ` · ${paused} paused` : ''}${dropped ? ` · ${dropped} dropped` : ''}</button>`)}
   </div>
   <div class="info-links">
     ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Folder">Cohort folder ↗</a>` : ''}
@@ -1044,7 +1046,7 @@ function setupAuto(text) {
     if (i.courseNo) { out.done = true; out.note = ` <em class="tag-soft">${esc(courseNoText(i.courseNos))}</em>`; }
     else out.btn = '<button class="btn tiny" data-act="courseNoOpen">Enter Course No.</button>';
   } else if (/as they enroll|student information/i.test(text)) {
-    const n = students().length;
+    const n = attending().length;
     out.note = ` <em class="tag-soft">${n} enrolled</em>`;
   }
   return out;

@@ -759,7 +759,7 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 
 /* ---------- Course page ---------- */
 .info-rows { display: grid; gap: 0; }
-.info-row { display: grid; grid-template-columns: 128px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
+.info-row { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
 .info-row:last-child { border-bottom: 0; }
 .info-row > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); }
 .info-row > b { font-weight: 400; min-width: 0; overflow-wrap: anywhere; }
@@ -977,6 +977,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-table th.c, .em-table td.c { text-align: center; }
 .cell-link { border: 0; background: none; padding: 2px 4px; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
 .cell-link:hover { text-decoration: underline; text-underline-offset: 3px; background: var(--blush-soft); }
+.cell-link.info-go { padding: 0; margin: -2px 0; text-align: left; font-weight: inherit; }
+.cell-link.info-go:hover { background: none; }
 .em-due-note { margin: 12px 0 2px; font-size: 14px; }
 .em-ext-fields { display: grid; grid-template-columns: auto auto 1fr; gap: 10px 12px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
 .small-modal .modal-foot .link { margin-right: auto; }
