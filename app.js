@@ -867,6 +867,7 @@ document.addEventListener('click', e => {
     return;
   }
   // On those items only the circle checks it off (not the rest of the row).
+  if (e.target.closest && e.target.closest('.ro-label') && !e.target.matches('input')) { e.preventDefault(); return; }
   const lab = e.target.closest && e.target.closest('label');
   const own = lab && lab.querySelector('.txt[data-hl], .txt-edit');
   if (own && !e.target.matches('input') && EDITABLE.includes((own.dataset.hl || own.dataset.edit).split(':')[0])) { e.preventDefault(); e.stopPropagation(); }
@@ -909,7 +910,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
+      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
       ${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
     </li>`;
     }).join('') || empty}
