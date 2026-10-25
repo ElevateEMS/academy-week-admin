@@ -1246,3 +1246,16 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .calls-seg { justify-self: start; }
 .calls-foot { text-align: center; margin: 18px 0 0; font-size: 13px; color: var(--muted); }
 .inq-call { float: right; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--taupe-dark); }
+
+/* Info Requests window: a new call's two statuses side by side; the status dropdown; contact history */
+.inq-status.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inq-status.two .chip { padding: 8px 6px; text-align: center; white-space: nowrap; }
+.inq-status-pick { margin-bottom: 10px; }
+.inq-hist { margin-top: 6px; }
+.inq-hist .mini-head { margin-top: 4px; }
+.inq-log { background: var(--blush-soft); border-radius: 12px; padding: 10px 12px 4px; margin-bottom: 8px; }
+.inq-hist-list { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
+.inq-hist-list li { padding: 5px 0; border-bottom: 1px dotted var(--line); }
+.inq-hist-list li:last-child { border-bottom: 0; }
+.inq-hist-list b { font-weight: 500; color: var(--taupe-dark); }
+.eye.inq-filter.on { opacity: 1; background: var(--blush-soft); border-radius: 8px; }

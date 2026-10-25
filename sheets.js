@@ -139,7 +139,10 @@ function sampleSheets() {
     async saveInquiry(item) {
       const list = sampleInquiries.items, o = item.id ? list.find(x => x.id === item.id) : null;
       const row = o || { id: 'call-' + Date.now(), received: item.received, source: 'Call', message: '', reply: '', status: 'Needs follow-up' };
-      Object.assign(row, item); if (!o) list.unshift(row);
+      const { contact, ...rest } = item;
+      Object.assign(row, rest);
+      row.contacts = [...(row.contacts || []), ...(o ? [] : [{ d: row.received, by: 'Bella', note: 'Call' }]), ...(contact ? [{ ...contact, by: 'Bella' }] : [])];
+      if (!o) list.unshift(row);
       return wait({ ...row });
     },
     async shirtSheet(key) {

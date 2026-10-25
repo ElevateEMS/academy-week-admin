@@ -347,7 +347,12 @@ async function loadInquiries(check = false) {
   }
   S.inqBusy = null; S.inqAt = Date.now(); render();
 }
-const INQ_STATUSES = ['Needs follow-up', 'Responded', 'Enrolled', 'Not interested'];
+const INQ_STATUSES = ['Needs follow-up', 'Plans to enroll', 'Responded', 'Enrolled', 'Not interested'];
+const NEW_CALL_STATUSES = ['Needs follow-up', 'Plans to enroll']; // what a call you're adding can be
+// Their contact history (newest last) and the last time you talked.
+const inqContacts = x => Array.isArray(x.contacts) ? x.contacts : [];
+const inqLastTalk = x => inqContacts(x).filter(c => c.by !== 'Automatic').map(c => c.d).filter(isIsoDate).sort().pop() || '';
+const INQ_ALL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z"/><path d="M3.5 12l8.5 4.5 8.5-4.5"/><path d="M3.5 16l8.5 4.5 8.5-4.5"/></svg>';
 const INQ_SOURCE_IC = { Website: 'globe', Voicemail: 'phone', 'Missed call': 'phone', Call: 'phone' };
 const inqSlug = st => String(st || '').toLowerCase().replace(/[^a-z]+/g, '-');
 const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -368,27 +373,28 @@ function adminInquiryBox({ calls = false } = {}) {
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
-        <span class="inq-sub">${[term ? x.status : '', inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+        <span class="inq-sub">${[term ? x.status : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   // Needs follow-up is always open; Responded and Enrolled open with a click; Not interested hides behind a link.
   const section = (st, always) => {
     const list = of(st), isOpen = always || open[st];
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
         <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
-      ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${always ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
+      ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${st === 'Needs follow-up' ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
   };
   const ni = of('Not interested').length;
   const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
-    : section('Needs follow-up', true) + section('Responded') + section('Enrolled')
+    : section('Needs follow-up', true) + (of('Plans to enroll').length ? section('Plans to enroll', true) : '') + section('Responded') + section('Enrolled')
       + (open['Not interested'] ? section('Not interested') : '')
       + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Not interested">${open['Not interested'] ? 'Hide' : ni} not interested</button>` : '');
   const tools = calls && q ? `<div class="calls-tools">
       <button class="btn primary calls-add" data-act="inqNew">+ Add a call</button>
       <input id="inq-search" class="calls-search" type="search" data-draft="inq-search" value="${esc(S.drafts['inq-search'] || '')}" placeholder="Search name or phone" autocomplete="off" aria-label="Search name or phone">
-      <div class="seg calls-seg">${[[false, 'All'], [true, 'Calls']].map(([v, l]) => `<button class="${!!S.inqCallsOnly === v ? 'on' : ''}" data-act="inqCallsOnly" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>
     </div>` : '';
   return `<section class="box admin-inq ${calls ? 'calls-box' : ''}">
-    ${adminHead('Info Requests', (q ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
+    ${adminHead('Info Requests', (q && calls ? `<button class="eye inq-filter ${S.inqCallsOnly ? 'on' : ''}" data-act="inqCallsOnly" data-v="${S.inqCallsOnly ? 0 : 1}"
+        title="${S.inqCallsOnly ? 'Showing calls and voicemails · tap for all' : 'Showing all · tap for calls and voicemails only'}" aria-label="${S.inqCallsOnly ? 'Show all' : 'Show calls only'}">${S.inqCallsOnly ? LINK_ICONS.phone : INQ_ALL_ICON}</button>`
+      : q ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
       + (q ? '<button class="add-plus small-plus" data-act="inqNew" title="Add a call" aria-label="Add a call">+</button>' : ''))}
     ${S.inqErr ? `<p class="em-note">${esc(S.inqErr)}</p>` : ''}
@@ -405,6 +411,17 @@ function callsShell() {
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>
   ${adminModals()}${S.dueEd ? dueModal() : ''}`;
 }
+// Contact history in a request's window: every time you talked (newest first), and + Log a contact.
+function inqHistory(it, e) {
+  const list = [...inqContacts(it)].reverse();
+  return `<div class="inq-hist"><p class="mini-head with-plus">Contact history
+      ${e.log ? '' : '<button class="add-plus small-plus" data-act="inqLogOpen" title="Log a contact" aria-label="Log a contact">+</button>'}</p>
+    ${e.log ? `<div class="inq-log">
+        <div class="field">When<span class="ai-date">${datePicker('ie2-cdate', { title: 'Date you talked' })}</span></div>
+        <label class="field">What happened<input id="ie2-cnote" data-draft="ie2-cnote" value="${esc(S.drafts['ie2-cnote'] || '')}" placeholder="e.g. Called back, wants Spring 2027 dates" autocomplete="off"></label>
+        <p class="muted small">Logged when you Save. Change the status above too if it changed.</p></div>` : ''}
+    <ul class="inq-hist-list">${list.map(c => `<li><b>${esc(inqDate(c.d))}</b> · ${esc(c.by || '')}${c.note ? ' · ' + esc(c.note) : ''}</li>`).join('') || '<li class="muted">Nothing logged yet.</li>'}</ul></div>`;
+}
 // One request: status, who, cohort, notes (and what they wrote or said). New = a call you're adding.
 function inqEdModal() {
   const e = S.inqEd, it = e.item || {}, v = k => esc(S.drafts['ie2-' + k] ?? '');
@@ -414,7 +431,8 @@ function inqEdModal() {
     <div class="modal-body pad-top">
       ${e.isNew ? '' : `<p class="muted small">${esc(it.source)} · ${esc(inqDate(it.received))}${it.reply ? ' · reply ' + esc(it.reply.toLowerCase()) : ''}</p>`}
       ${it.message ? `<p class="inq-msg">${esc(it.message)}</p>` : ''}
-      <div class="inq-status">${INQ_STATUSES.map(st => `<button class="chip ${S.drafts['ie2-status'] === st ? 'on' : ''}" data-act="inqStatus" data-s="${esc(st)}">${st}</button>`).join('')}</div>
+      ${e.isNew ? `<div class="inq-status two">${NEW_CALL_STATUSES.map(st => `<button class="chip ${S.drafts['ie2-status'] === st ? 'on' : ''}" data-act="inqStatus" data-s="${esc(st)}">${st}</button>`).join('')}</div>`
+        : `<label class="field inq-status-pick">Status<select id="ie2-status" data-draft="ie2-status">${INQ_STATUSES.map(st => `<option ${S.drafts['ie2-status'] === st ? 'selected' : ''}>${st}</option>`).join('')}</select></label>`}
       <div class="inq-fields two">
         <label class="field">Name<input id="ie2-name" data-draft="ie2-name" value="${v('name')}" autocomplete="off"></label>
         <label class="field">Phone${it.phone ? ` <a class="inq-call" href="tel:${esc(String(it.phone).replace(/[^\d+]/g, ''))}">Call ${esc(it.phone)}</a>` : ''}<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
@@ -423,6 +441,7 @@ function inqEdModal() {
       </div>
       ${e.isNew ? `<div class="field">Date of the call<span class="ai-date">${datePicker('ie2-received', { title: 'Date of the call' })}</span></div>` : ''}
       <label class="field">Notes<textarea id="ie2-notes" data-draft="ie2-notes" rows="4" placeholder="What they asked, when to call back…">${v('notes')}</textarea></label>
+      ${e.isNew ? '' : inqHistory(it, e)}
     </div>
     <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="inqDelete">Delete</button>'}
       <button class="btn primary" data-act="inqSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add call' : 'Save'}</button></div>
@@ -591,15 +610,20 @@ async function adminAct(a, el = {}) {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
       S.drafts['ie2-status'] = it.status || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
-      S.inqEd = { item: it, isNew: a === 'inqNew', busy: false }; render(); return true;
+      S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = '';
+      S.inqEd = { item: it, isNew: a === 'inqNew', busy: false, log: false }; render(); return true;
     }
+    case 'inqLogOpen': S.inqEd.log = true; render(); setTimeout(() => { const el = document.getElementById('ie2-cnote'); if (el) el.focus(); }, 0); return true;
     case 'inqStatus': S.drafts['ie2-status'] = d.s; render(); return true;
     case 'inqEdClose': if (!S.inqEd.busy) { S.inqEd = null; render(); } return true;
     case 'inqSave': {
       const e = S.inqEd, g = k => String(S.drafts['ie2-' + k] ?? '').trim();
       const item = { name: g('name'), phone: g('phone'), email: g('email'), notes: g('notes'), cohort: g('cohort'), status: g('status') };
       if (e.isNew) { item.received = g('received') || todayIso(); if (!item.name && !item.phone) { toast('Add a name or phone number.'); return true; } }
-      else item.id = e.item.id;
+      else {
+        item.id = e.item.id;
+        if (e.log) item.contact = { d: g('cdate') || todayIso(), note: g('cnote') };
+      }
       e.busy = true; render();
       try {
         const saved = await Sheets.saveInquiry(item);

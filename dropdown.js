@@ -116,6 +116,22 @@
     }
     if (pop) close();
   }, true);
+  // iPhone/iPad: a tap on a select (or its label) would also open Apple's own picker (it opens on the focus
+  // the tap causes, before "click"). So a tap is handled at touchend, and its click and focus are cancelled.
+  let touch = null;
+  addEventListener('touchstart', e => { const t = e.touches[0]; touch = t ? { x: t.clientX, y: t.clientY } : null; }, { capture: true, passive: true });
+  addEventListener('touchend', e => {
+    const t = e.changedTouches[0];
+    if (!t || !touch || Math.hypot(t.clientX - touch.x, t.clientY - touch.y) > 10) return; // a scroll, not a tap
+    if (pop && pop.contains(e.target)) return; // (taps inside the list go through as clicks)
+    const s = hitSelect({ target: e.target, clientX: t.clientX, clientY: t.clientY });
+    if (!s) return;
+    e.preventDefault(); // no click, no focus → no Apple picker
+    if (pop && cur === s) close(); else open(s);
+  }, { capture: true, passive: false });
+  // (and if a select gets focus some other way on a touch screen, let go of it so the picker doesn't open)
+  addEventListener('focusin', e => { if (usable(e.target) && matchMedia('(hover: none)').matches) e.target.blur(); }, true);
+
   // (the list isn't part of the page, so its presses mustn't reach the page's drag/highlight handlers)
   ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend'].forEach(t =>
     addEventListener(t, e => { if (pop && pop.contains(e.target)) { e.stopPropagation(); if (t === 'mousedown') e.preventDefault(); } }, true));
