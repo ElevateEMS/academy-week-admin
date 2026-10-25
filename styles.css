@@ -1201,3 +1201,9 @@ li.done .x.due-add { display: none; }
   .prep-board .box-packing { order: 4; }
   .prep-board .box-scenarios { order: 5; }
 }
+
+/* Ship student shirts: the icons, Pirate Ship and the due chip stay on the item's row; the words wrap instead. */
+.ship-btns { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ship-btns .eye { opacity: .7; } .ship-btns .eye:hover { opacity: 1; }
+.checks li:has(.ship-btns) { flex-wrap: nowrap; }
+.checks li:has(.ship-btns) label { min-width: 0; }
