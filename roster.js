@@ -110,11 +110,19 @@ function syncRosters() {
 }
 const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => t.roster && !t.done);
 // The button on a roster to-do (only where students sign in the app).
+const SIG_ICON = '<svg viewBox="0 0 24 24"><path d="M3 17c2.5-6 4.5-9 6-9 2 0 0 8 2 8 1.5 0 2.5-4 4-4 1.2 0 1 2.5 2.5 2.5 1 0 2-1 3-2"/><path d="M3 21h18"/></svg>';
 function rosterBtn(t) {
   if (!signingOn() || !t.roster) return '';
   const r = rosterFor(t.roster);
   const c = r ? rosterCount(r) : { signed: 0, total: 0 };
-  return `<button class="btn tiny" data-act="rosterOpen" data-date="${t.roster}">Roster · ${c.signed}/${c.total}</button>`;
+  return `<button class="btn tiny ro-btn" data-act="rosterOpen" data-date="${t.roster}" title="Orientation roster: ${c.signed} of ${c.total} signed" aria-label="Open the orientation roster">${SIG_ICON}${c.signed}/${c.total}</button>`;
+}
+// On the to-do: "Orientation roster" with the date small beside it, and a late roster's names on a line underneath.
+// (The saved text keeps everything, for the Morning Email.)
+function rosterLabel(t) {
+  const [what] = String(t.text || '').split(' · ');
+  const names = (String(t.text || '').match(/ · late: (.+)$/) || [])[1];
+  return `<span class="txt ro-label">${esc(what || 'Orientation roster')} <span class="ro-date">${monthDay(t.roster)}</span>${names ? `<span class="ro-names">${esc(names)}</span>` : ''}</span>`;
 }
 
 /* ---------- The roster pop-up ---------- */
