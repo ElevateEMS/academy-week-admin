@@ -83,6 +83,9 @@ const rosterTodoText = r => (signingOn() ? 'Orientation roster' : 'Send orientat
 const rosterSyncing = new Set();
 let rosterStartClaimed = null;
 // After each render: a to-do for each roster from the day this started, kept in step (names, date moves).
+// Each one shows up ROSTER_LEAD_DAYS before its orientation (until then the Setup Checklist has the room),
+// and from then on its student list is kept saved in Drive for the signing page.
+const ROSTER_LEAD_DAYS = 2;
 function syncRosters() {
   const key = S.cohortKey, doc = S.cohortDoc;
   if (!S.sheet || !key || !doc || !S.todosLoaded) return;
@@ -90,7 +93,8 @@ function syncRosters() {
     if (rosterStartClaimed !== key) { rosterStartClaimed = key; Store.claimValue('cohorts/' + key, 'rostersStart', todayIso()).catch(() => { rosterStartClaimed = null; }); }
     return;
   }
-  const removed = doc.removedRepeats || {}, list = rosters().filter(r => r.date >= doc.rostersStart && r.people.length);
+  const removed = doc.removedRepeats || {}, soon = addDays(todayIso(), ROSTER_LEAD_DAYS);
+  const list = rosters().filter(r => r.date >= doc.rostersStart && r.date <= soon && r.people.length);
   const want = new Set(list.map(r => 'oroster-' + r.date));
   const put = (id, data) => {
     if (rosterSyncing.has(id)) return;
@@ -102,12 +106,25 @@ function syncRosters() {
     if (!have && !removed[id]) put(id, { text, done: false, day: SETUP, kind: 'ctodo', order: -2000 + list.indexOf(r), created: Date.now(), repeat: true, roster: r.date, due: r.date, dueAuto: false });
     else if (have && !have.done && have.text !== text && /^(orientation roster|send orientation roster)/i.test(have.text || '')) put(id, { text }); // (unless you retyped it)
   });
-  // A late enrollee's date moved (or they came off it): an unfinished roster with nobody left goes away.
+  if (signingOn()) list.forEach(saveListSoon);
+  // A late enrollee's date moved (or they came off it), or it isn't 2 days out yet: an unfinished roster goes away.
   S.todos.filter(t => t.roster && !t.done && !want.has(t.id) && !rosterDoc(t.roster).saved).forEach(t => {
     if (rosterSyncing.has(t.id)) return;
     rosterSyncing.add(t.id);
     Store.del(P('todos/' + t.id)).catch(() => {}).finally(() => rosterSyncing.delete(t.id));
   });
+}
+// The roster's student list, saved to Drive whenever it changes (rosters/{date}.listKey remembers what was last saved,
+// so opening the app on two computers doesn't save it twice).
+const listSaving = new Set();
+function saveListSoon(r) {
+  const list = rosterList(r), key = JSON.stringify(list), have = rosterDoc(r.date).listKey, id = S.cohortKey + '|' + r.date;
+  if (have === key || listSaving.has(id)) return;
+  listSaving.add(id);
+  Sheets.saveRosterList(S.cohortKey, r.date, list)
+    .then(() => Store.set(rosterPath(r.date), { listKey: key }))
+    .then(() => listSaving.delete(id))
+    .catch(e => { console.warn('Roster list not saved yet:', e.message); setTimeout(() => listSaving.delete(id), 30000); }); // (tries again in a bit)
 }
 const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => t.roster && !t.done);
 // The button on a roster to-do (only where students sign in the app).

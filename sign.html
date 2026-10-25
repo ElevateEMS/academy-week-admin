@@ -10,7 +10,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orientation Roster · Elevate EMS</title>
 <meta name="robots" content="noindex">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=177">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=178">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -49,9 +49,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="config.js?v=177"></script>
-<script src="sigpad.js?v=177"></script>
-<script src="rosterform.js?v=177"></script>
+<script src="config.js?v=178"></script>
+<script src="sigpad.js?v=178"></script>
+<script src="rosterform.js?v=178"></script>
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const token = new URLSearchParams(location.search).get('t') || '';
@@ -87,7 +87,7 @@
       await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
       if (s && s.page === n - 1) {
         wrap.id = 'mine';
-        if (!myPng) { // "Sign Here" in their own signature box
+        if (!myPng && !info.locked) { // "Sign Here" in their own signature box
           const t = s.top / RosterForm.H * 100, h = (s.bottom - s.top) / RosterForm.H * 100;
           const btn = document.createElement('button'); btn.className = 'sign-here'; btn.type = 'button'; btn.textContent = 'Sign Here'; btn.onclick = openPad;
           Object.assign(btn.style, { left: (sig[0] + 3) / RosterForm.W * 100 + '%', width: (sig[1] - sig[0] - 6) / RosterForm.W * 100 + '%', top: (t + h * 0.12) + '%', height: (h * 0.76) + '%' });
@@ -111,6 +111,23 @@
       <p>${when}</p>
       <div class="row"><button class="btn primary" data-go>Sign Now</button></div>`);
     o.querySelector('[data-go]').onclick = () => { o.remove(); toMine(); };
+  }
+
+  // Before their orientation starts: just when it opens, and Close (closes the tab if the browser allows it;
+  // otherwise the roster clears and only a short note is left).
+  function locked() {
+    const o = modal(`<h2>Orientation Roster</h2>
+      <p class="meta">From Elevate EMS Academy · ${esc(info.cohort)} EMT · ${esc(info.date)}</p>
+      <p>This roster opens for signing on <b>${esc(info.opens)}</b>, when your orientation starts. Please come back to this link then to sign.</p>
+      <div class="row"><button class="btn primary" data-x>Close</button></div>`);
+    o.querySelector('[data-x]').onclick = () => {
+      window.close();
+      setTimeout(() => {
+        o.remove();
+        document.getElementById('pages').innerHTML = `<div class="modal" style="margin:40px auto"><h2>Orientation Roster</h2>
+          <p>You can close this window now. Come back to this link on <b>${esc(info.opens)}</b> to sign.</p></div>`;
+      }, 150);
+    };
   }
 
   function openPad() {
@@ -154,7 +171,7 @@
       info = await call('signInfo', {});
       if (info.signed && info.png) myPng = info.png;
       await show();
-      if (info.signed) { toMine(); thanks(true); } else intro();
+      if (info.signed) { toMine(); thanks(true); } else if (info.locked) locked(); else intro();
     } catch (e) {
       document.getElementById('pages').innerHTML = '';
       problem(e.message);

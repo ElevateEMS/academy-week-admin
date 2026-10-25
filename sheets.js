@@ -18,6 +18,7 @@
                                  -> the Info Requests tracker on the Admin page (the config sheet's Info Requests tab)
      signLinks(key, roster, names) -> each student's private orientation roster signing link code (Test cohorts until December)
      rosterSigs(key, date)       -> the signatures on one orientation roster so far (Drive), with the images
+     saveRosterList(key, date, list) -> who's on that roster (names, times), for the student signing page
      clearRosterSig(key, date, name) -> takes one off (Drive trash) and unticks their Orientation Roster box (H)
      saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort folder (replaces one of the same name)
 
@@ -63,6 +64,7 @@ const Sheets = (() => {
     shirtSheet: key => call('shirtSheet', { cohort: key }), // { name, url, rows: [{ row, printed, full, email, size, street, unit, city, state, zip, shipped, note }] }
     signLinks: (key, roster, names) => call('signLinks', { cohort: key, roster, names }).then(o => o.links), // { name: code }
     rosterSigs: (key, date) => call('rosterSigs', { cohort: key, date }).then(o => o.sigs), // [{ name, signedAt, late, png (base64) }]
+    saveRosterList: (key, date, list) => call('saveRosterList', { cohort: key, date, list }), // who's on it, for the signing page
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
   };
@@ -178,6 +180,7 @@ function sampleSheets() {
         return { key: c.key, status: c.status, firstDay: i.firstDay, cpr: i.cpr, academyStart: i.academyStart }; }));
     },
     async signLinks(key, roster, names) { return wait(Object.fromEntries(names.map(n => [n, 'sample.' + btoa(JSON.stringify({ c: key, d: roster.date, n }))]))); },
+    async saveRosterList(key, date, list) { return wait({ saved: true }); },
     async rosterSigs(key, date) { return wait(Object.entries(sampleSigs).filter(([, v]) => v.date === date).map(([name, v]) => ({ name, signedAt: v.at, late: false, png: v.png }))); },
     async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
