@@ -10,13 +10,14 @@
      roster (BoldSign)".
    - The roster pop-up: who's signed, Not attending, your and Nick's signatures, the EC's line at the
      bottom, then the PDF on your form (orientation-roster-1.pdf for up to 15 students, -2 for more),
-     saved with the signatures (Admin folder). Saving it with everyone signed checks off the to-do (and, for the
-     cohort's own orientation, "Orientation roster" on the Documentation Checklist).
+     saved to the cohort's Admin folder in Drive. Saving it with everyone signed (students and both of you) checks
+     off the to-do (and, for the cohort's own orientation, "Orientation roster" on the Documentation Checklist).
 
    Saved in Firebase: cohorts/{key}/rosters/{date}
-     { out: { sid: true }, inst: { nick|bella: { png, at, by } }, ec: { who, png, at }, saved: { url, name, at, by, complete } }
-   The students' signatures and the finished rosters are in Drive ("<cohort folder>/Admin - <cohort>/Orientation Roster
-   Signatures"), read and saved through the Apps Script. */
+     { out: { sid: true }, inst: { nick|bella: { png, at, by } }, ec: { who, png, at }, saved: { url, name, at, by, complete },
+       list (who's on it, for the signing page: written by the Apps Script) }
+   The students' signatures are in cohorts/{key}/rosters/{date}/sigs, read and written only through the Apps Script.
+   Making a cohort Former clears the signatures and lists out (the finished PDFs in Drive stay). */
 
 const SIGNING_LIVE = false; // December: true (and the same in the Admin Apps Script), once the Student Hub has the card
 const signingOn = (key = S.cohortKey) => SIGNING_LIVE || isTestCohort(key || '');
@@ -57,6 +58,10 @@ function rosters() {
   return out;
 }
 const rosterFor = date => rosters().find(r => r.date === date) || null;
+// Numbered by date when there's more than one: the cohort's own is plain "Orientation Roster", then "Orientation #2 Roster"…
+// (Only in the app: the to-dos, Morning Email, pop-up and Drive file. The students' signing page never shows the #.)
+const rosterNo = r => { const i = rosters().findIndex(x => x.date === r.date); return i > 0 ? ' #' + (i + 1) : ''; };
+const rosterTitle = r => 'Orientation' + rosterNo(r) + ' Roster';
 // The name as it goes on a state roster: "Dawson, Tyler (TJ)" → "Tyler Dawson" (no nickname).
 const rosterName = name => { const c = String(name).replace(/\s*\([^)]*\)/g, '').trim(); if (!c.includes(',')) return c; const [last, ...first] = c.split(','); return (first.join(',').trim() + ' ' + last.trim()).trim(); };
 const rosterDoc = date => (S.rosterDocs || {})[date] || {};
@@ -79,7 +84,7 @@ function rosterCount(r) {
 }
 
 /* ---------- The to-dos ---------- */
-const rosterTodoText = r => (signingOn() ? 'Orientation roster' : 'Send orientation roster (BoldSign)') + ' · ' + monthDay(r.date)
+const rosterTodoText = r => (signingOn() ? (rosterNo(r) ? rosterTitle(r) : 'Orientation roster') : 'Send orientation' + rosterNo(r) + ' roster (BoldSign)') + ' · ' + monthDay(r.date)
   + (r.late ? ' · late: ' + r.people.map(p => rosterName(p.name)).join(', ') : '');
 const rosterSyncing = new Set();
 let rosterStartClaimed = null;
@@ -105,7 +110,7 @@ function syncRosters() {
   list.forEach(r => {
     const id = 'oroster-' + r.date, have = S.todos.find(t => t.id === id), text = rosterTodoText(r);
     if (!have && !removed[id]) put(id, { text, done: false, day: SETUP, kind: 'ctodo', order: -2000 + list.indexOf(r), created: Date.now(), repeat: true, roster: r.date, due: r.date, dueAuto: false });
-    else if (have && !have.done && have.text !== text && /^(orientation roster|send orientation roster)/i.test(have.text || '')) put(id, { text }); // (unless you retyped it)
+    else if (have && !have.done && have.text !== text && /^(send )?orientation (#\d+ )?roster/i.test(have.text || '')) put(id, { text }); // (unless you retyped it)
   });
   if (signingOn()) list.forEach(saveListSoon);
   // A late enrollee's date moved (or they came off it), or it isn't 2 days out yet: an unfinished roster goes away.
@@ -115,7 +120,7 @@ function syncRosters() {
     Store.del(P('todos/' + t.id)).catch(() => {}).finally(() => rosterSyncing.delete(t.id));
   });
 }
-// The roster's student list, saved to Drive whenever it changes (rosters/{date}.listKey remembers what was last saved,
+// The roster's student list, saved (for the signing page) whenever it changes (rosters/{date}.listKey remembers what was last saved,
 // so opening the app on two computers doesn't save it twice).
 const listSaving = new Set();
 function saveListSoon(r) {
@@ -176,22 +181,22 @@ function rosterModal() {
         ${!out && sig && sig.png ? `<button class="link" data-act="rosterRedoAsk" data-sid="${p.sid}">Redo</button>` : ''}
         <button class="link" data-act="rosterOut" data-sid="${p.sid}">${out ? 'Present' : 'Absent'}</button></td></tr>`;
   }).join('');
-  const redo = ro.redo && r.people.find(p => p.sid === ro.redo);
+  const redo = ro.redo && r.people.find(p => p.sid === ro.redo), redoInst = INSTRUCTORS.find(x => x.key === ro.redoInst);
   // The EC button: whoever has it on, their signature also goes on the bottom line (Instructor, Printed Name / Signature / Date).
   const instRow = x => {
     const s = instSig(doc, x.key), isEc = ecOf(doc) === x.key;
     return `<div class="ro-inst"><span class="ro-inst-name"><b>${x.name}</b> <span class="muted small">${x.cert}</span></span>
       <button class="ro-ec-btn ${isEc ? 'on' : ''}" data-act="rosterEcWho" data-who="${x.key}" title="${isEc ? 'The EC: their signature also goes on the bottom line' : 'Make ' + x.name + ' the EC'}" aria-pressed="${isEc}">EC</button>
-      ${s ? `${sigImg(s.png, x.name + ' signature')}<button class="link" data-act="rosterInstClear" data-who="${x.key}">Clear</button>`
+      ${s ? `${sigImg(s.png, x.name + ' signature')}<button class="link ro-redo" data-act="rosterInstRedoAsk" data-who="${x.key}">Redo</button>`
         : `<button class="btn small" data-act="rosterInstSign" data-who="${x.key}">Sign</button>`}</div>`;
   };
-  const ecWho = INSTRUCTORS.find(x => x.key === ecOf(doc)), ecDone = !!(ecWho && instSig(doc, ecWho.key));
-  const unsigned = list.filter(p => !signed[p.sid]);
+  const ecWho = INSTRUCTORS.find(x => x.key === ecOf(doc));
+  const unsigned = rosterMissing(r, doc);
   const blocked = got.busy ? 'Reading the signatures…' : !list.length ? 'Nobody is on this roster.' : list.length > 30 ? 'The form has room for 30 students.'
     : !ecWho ? 'Pick the EC.' : '';
-  const canSave = !blocked && ecDone; // (Save waits for the EC's signature)
+  const canSave = !blocked; // (it looks greyed out until everyone has signed, but still asks "Save anyway?")
   return `<div class="overlay" data-act="rosterClose"><div class="modal roster-modal" data-stop>
-    <div class="modal-head"><h2>Orientation Roster <span class="muted small">${esc(longDate(r.date))}${r.late ? ' · late enrollees' : ''}</span></h2>
+    <div class="modal-head"><h2>${rosterTitle(r)} <span class="muted small">${esc(longDate(r.date))}${r.late ? ' · late enrollees' : ''}</span></h2>
       <span class="panel-actions"><button class="eye inq-reload ${got.busy ? 'spin' : ''}" data-act="rosterRefresh" title="Check for new signatures" aria-label="Check for new signatures" ${got.busy ? 'disabled' : ''}>${RELOAD}</button>
       ${ro.busy ? '' : '<button class="x big" data-act="rosterClose" aria-label="Close">×</button>'}</span></div>
     <div class="modal-body pad-top" data-keep-scroll="roster">
@@ -208,21 +213,39 @@ function rosterModal() {
       <p class="muted small">Students sign from the Orientation Roster assignment in the Student Portal, or from the link in a reminder email.</p>
       <p class="mini-head">Instructors</p>
       ${INSTRUCTORS.map(instRow).join('')}
-      ${doc.saved ? `<p class="ro-saved">✓ Saved ${esc(atText(doc.saved.at))}${doc.saved.complete ? '' : ' (before everyone signed)'}: <a href="${esc(doc.saved.url)}" target="_blank" rel="noopener">${esc(doc.saved.name)} ↗</a></p>` : ''}
+      ${doc.saved ? `<p class="ro-saved">✓ Saved ${esc(atText(doc.saved.at))}${doc.saved.complete ? '' : ' (before everyone signed)'}: <button class="link-btn" data-act="rosterDownload" title="Download to this computer">${esc(doc.saved.name)}</button></p>` : ''}
       ${ro.err ? `<div class="alert">${esc(ro.err)}</div>` : ''}
     </div>
     <div class="modal-foot ro-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign' : '')}</span>
       <button class="btn" data-act="rosterPreview" ${ro.busy || !list.length || list.length > 30 ? 'disabled' : ''}>Preview PDF</button>
-      <button class="btn primary" data-act="rosterSave" ${ro.busy || !canSave ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
+      <button class="btn primary ${unsigned.length ? 'dim' : ''}" data-act="rosterSave" ${ro.busy || !canSave ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
   </div></div>
   ${redo ? `<div class="overlay" data-act="rosterRedoCancel"><div class="modal confirm" data-stop>
     <div class="modal-head"><h2>Redo Signature</h2><button class="x big" data-act="rosterRedoCancel" aria-label="Close">×</button></div>
     <div class="modal-body"><p>Redo <b>${esc(rosterName(redo.name))}</b>’s signature?</p>
-      <p class="muted small">Their signature comes off this roster (it goes to the Drive trash) and their Orientation Roster box in the sheet is unticked. Their signing link will let them sign again.</p></div>
+      <p class="muted small">Their signature comes off this roster and their Orientation Roster box in the sheet is unticked. Their signing link will let them sign again.</p></div>
     <div class="modal-foot"><button class="btn" data-act="rosterRedoCancel">Cancel</button><button class="btn primary danger" data-act="rosterClearSig" data-sid="${redo.sid}">Redo</button></div>
+  </div></div>` : ''}
+  ${redoInst ? `<div class="overlay" data-act="rosterRedoCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Redo Signature</h2><button class="x big" data-act="rosterRedoCancel" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>Redo <b>${esc(redoInst.name)}</b>’s signature?</p>
+      <p class="muted small">It comes off this roster${ecOf(doc) === redoInst.key ? ' (and off the EC line at the bottom)' : ''}. Tap Sign to sign again.</p></div>
+    <div class="modal-foot"><button class="btn" data-act="rosterRedoCancel">Cancel</button><button class="btn primary danger" data-act="rosterInstClear" data-who="${redoInst.key}">Redo</button></div>
+  </div></div>` : ''}
+  ${ro.saveAsk && unsigned.length ? `<div class="overlay" data-act="rosterSaveCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Save Anyway?</h2><button class="x big" data-act="rosterSaveCancel" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>${unsigned.length === 1 ? '1 hasn’t' : unsigned.length + ' haven’t'} signed yet: <b>${esc(unsigned.join(', '))}</b>.</p>
+      <p class="muted small">You can save it again once they sign (it replaces the file), and the to-do stays open until everyone has.</p></div>
+    <div class="modal-foot"><button class="btn" data-act="rosterSaveCancel">Cancel</button><button class="btn primary" data-act="rosterSave" data-go="1">Save anyway</button></div>
   </div></div>` : ''}`;
 }
 
+// Who still has to sign (names): students not marked absent, then you and Nick.
+function rosterMissing(r, doc = rosterDoc(r.date)) {
+  const signed = signedMap(r);
+  return onRoster(r, doc).filter(p => !signed[p.sid]).map(p => rosterName(p.name))
+    .concat(INSTRUCTORS.filter(x => !instSig(doc, x.key)).map(x => x.name));
+}
 // Who's the EC on this roster: Nick until someone picks (no EC once it's turned off).
 const ecOf = doc => { const ec = doc.ec || {}; return ec.who === undefined ? DEFAULT_EC : ec.who; };
 // An instructor's signature on this roster: { png, at }. (Before the EC button, the EC signed the bottom line
@@ -263,7 +286,7 @@ async function rosterPdf(r) {
   const doc = rosterDoc(r.date), list = onRoster(r, doc), signed = signedMap(r), ec = doc.ec || {};
   const ecWho = INSTRUCTORS.find(x => x.key === ecOf(doc)), ecSig = ecWho && instSig(doc, ecWho.key);
   return RosterForm.fill(PDFLib, {
-    date: mdy(r.date), courseNo: courseNoFor(r), title: S.cohortKey + ' Orientation Roster ' + mdy(r.date),
+    date: mdy(r.date), courseNo: courseNoFor(r), title: S.cohortKey + ' ' + rosterTitle(r) + ' ' + mdy(r.date),
     people: list.map(p => ({ name: rosterName(p.name), times: rosterTimes(p), png: (signed[p.sid] || {}).png || '' })),
     inst: Object.fromEntries(INSTRUCTORS.map(x => [x.key, (instSig(doc, x.key) || {}).png || ''])),
     ec: ecSig ? { name: ecWho.name, png: ecSig.png, date: mdy(isoOf(ecSig.at ? new Date(ecSig.at) : new Date())) } : null, // the EC's own signature, in both places
@@ -272,7 +295,7 @@ async function rosterPdf(r) {
 // What the student signing page shows: everyone on this roster (names and times, never anyone's signature).
 // Saved with the signatures in Drive each time links are made, so a late enrollee added later shows up too.
 const rosterList = r => ({ late: r.late, people: onRoster(r).map(p => ({ name: sheetStudent(p.sid).name || p.name, print: rosterName(p.name), times: rosterTimes(p) })) });
-const rosterFileName = r => S.cohortKey + ' Orientation Roster ' + mdy(r.date).replace(/\//g, '-') + (r.late ? ' (late enrollees)' : '') + '.pdf';
+const rosterFileName = r => S.cohortKey + ' ' + rosterTitle(r) + ' ' + mdy(r.date).replace(/\//g, '-') + (r.late ? ' (late enrollees)' : '') + '.pdf';
 function bytesB64(bytes) {
   let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   return btoa(s);
@@ -334,7 +357,24 @@ async function rosterAct(a, el = {}) {
       return true;
     }
     case 'rosterRedoAsk': ro.redo = d.sid; render(); return true;
-    case 'rosterRedoCancel': ro.redo = null; render(); return true;
+    case 'rosterRedoCancel': ro.redo = null; ro.redoInst = null; render(); return true;
+    case 'rosterInstRedoAsk': ro.redoInst = d.who; render(); return true;
+    case 'rosterSaveCancel': ro.saveAsk = false; render(); return true;
+    case 'rosterDownload': {
+      const saved = rosterDoc(ro.date).saved;
+      if (!saved || ro.busy) return true;
+      ro.busy = 'Downloading…'; render();
+      try {
+        const f = await Sheets.rosterPdfFile(saved.url);
+        const bin = atob(f.pdf), bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), a = document.createElement('a');
+        a.href = url; a.download = f.name || saved.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        toast('Downloaded ' + (f.name || saved.name) + '.');
+      } catch (e) { toast('Couldn’t download it: ' + e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
+      ro.busy = ''; render(); return true;
+    }
     case 'rosterClearSig': { // (after the Redo confirmation)
       const p = r && rosterPerson(r, d.sid); ro.redo = null; render();
       if (!p) return true;
@@ -352,7 +392,8 @@ async function rosterAct(a, el = {}) {
       await Store.set(rosterPath(ro.date), { inst: { [who.key]: { png, at: new Date().toISOString(), by: (S.user && S.user.email) || '' } } });
       return true;
     }
-    case 'rosterInstClear': {
+    case 'rosterInstClear': { // (after the Redo confirmation)
+      ro.redoInst = null;
       const ec = rosterDoc(ro.date).ec || {};
       await Store.set(rosterPath(ro.date), { inst: { [d.who]: null }, ...(ecOf(rosterDoc(ro.date)) === d.who && ec.png ? { ec: { png: null, at: null } } : {}) }); return true;
     }
@@ -365,8 +406,9 @@ async function rosterAct(a, el = {}) {
     }
     case 'rosterPreview': case 'rosterSave': {
       if (!r || ro.busy) return true;
-      const list = onRoster(r), signed = signedMap(r), missing = list.filter(p => !signed[p.sid]);
-      if (a === 'rosterSave' && missing.length && !confirm(`${missing.length} still to sign: ${missing.map(p => rosterName(p.name)).join(', ')}.\n\nSave the roster anyway? You can save it again once they sign (it replaces the file), and the to-do stays open until everyone has.`)) return true;
+      const missing = rosterMissing(r);
+      if (a === 'rosterSave' && missing.length && !d.go) { ro.saveAsk = true; render(); return true; } // "Save anyway?"
+      ro.saveAsk = false;
       ro.busy = a === 'rosterSave' ? 'Saving to Drive…' : 'Making the PDF…'; ro.err = ''; render();
       try {
         if (signingOn() && !((S.rosterSigs || {})[r.date] || {}).list) await loadRosterSigs(r.date);
@@ -380,7 +422,7 @@ async function rosterAct(a, el = {}) {
             await Store.set(P('todos/oroster-' + r.date), { done: true });
             if (!r.late) await Store.set('cohorts/' + S.cohortKey, { docChecks: { 'class-orientation-roster': true } });
           }
-          toast(complete ? 'Roster saved to Admin - ' + S.cohortKey + ' → Orientation Roster Signatures. The to-do is checked off.' : 'Roster saved. Save it again once everyone has signed.');
+          toast(complete ? 'Roster saved to the Admin - ' + S.cohortKey + ' folder. The to-do is checked off.' : 'Roster saved. Save it again once everyone has signed.');
         }
       } catch (e) {
         ro.err = e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '');

@@ -17,10 +17,11 @@
      listInquiries / checkInquiries / saveInquiry / deleteInquiry / saveInquirySettings
                                  -> the Info Requests tracker on the Admin page (the config sheet's Info Requests tab)
      signLinks(key, roster, names) -> each student's private orientation roster signing link code (Test cohorts until December)
-     rosterSigs(key, date)       -> the signatures on one orientation roster so far (Drive), with the images
+     rosterSigs(key, date)       -> the signatures on one orientation roster so far (app database), with the images
      saveRosterList(key, date, list) -> who's on that roster (names, times), for the student signing page
-     clearRosterSig(key, date, name) -> takes one off (Drive trash) and unticks their Orientation Roster box (H)
-     saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort folder (replaces one of the same name)
+     clearRosterSig(key, date, name) -> takes one off and unticks their Orientation Roster box (H)
+     saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort's Admin folder (replaces one of the same name)
+     rosterPdfFile(url)          -> a saved roster PDF back out of Drive ({ pdf (base64), name }), for Download
 
    Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes, and
    their first class assignments: First Class Paperwork (G) as fcp, Orientation Roster (H) as orientRoster,
@@ -67,6 +68,7 @@ const Sheets = (() => {
     saveRosterList: (key, date, list) => call('saveRosterList', { cohort: key, date, list }), // who's on it, for the signing page
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
+    rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
   };
 })();
 
@@ -183,6 +185,7 @@ function sampleSheets() {
     async saveRosterList(key, date, list) { return wait({ saved: true }); },
     async rosterSigs(key, date) { return wait(Object.entries(sampleSigs).filter(([, v]) => v.date === date).map(([name, v]) => ({ name, signedAt: v.at, late: false, png: v.png }))); },
     async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
+    async rosterPdfFile() { throw new Error('Sample mode has no Drive file.'); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },

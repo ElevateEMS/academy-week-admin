@@ -1295,6 +1295,12 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .ro-table tr:hover .ro-acts .link, .ro-acts .link:focus-visible { opacity: 1; }
 @media (hover: none) { .ro-acts .link { opacity: .6; } } /* iPad / iPhone: no hover, so always (faintly) there */
 .ro-when { white-space: nowrap; }
+.btn.primary.dim { opacity: .45; } /* roster Save: still clickable before everyone has signed (asks first) */
+.btn.primary.dim:hover { opacity: .7; background: var(--taupe-dark); }
+.ro-inst .ro-sig { width: 170px; height: 34px; } /* same box for both of you, so Redo lines up */
+.ro-inst .ro-redo { font-size: 12.5px; opacity: 0; transition: opacity .15s; }
+.ro-inst:hover .ro-redo, .ro-inst .ro-redo:focus-visible { opacity: 1; }
+@media (hover: none) { .ro-inst .ro-redo { opacity: .6; } }
 /* Fixed column widths so the gaps stay even whatever's in the cells (Name takes what's left). */
 @media (min-width: 721px) {
   .roster.ro-table { table-layout: fixed; }
