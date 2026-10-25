@@ -225,7 +225,7 @@ function adminChangesBox() {
   const upd = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
   const k = 'add-anext-' + SETUP;
   const where = home.target ? esc(home.target) + '’s' : 'the next cohort’s';
-  return `<section class="box shaded admin-changes ${hidden('next') ? 'hide-done' : ''}">
+  return `<section class="box admin-changes ${hidden('next') ? 'hide-done' : ''}">
     ${adminHead('Changes for Future Classes', nxt.some(t => t.done) || S.updates.some(x => x.done) ? hideToggle('next') : '')}
     <p class="mini-head with-plus">Do before next cohort ${home.src ? plus('anext', 'Add a change') : ''}</p>
     <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
@@ -399,7 +399,7 @@ function inqSetModal() {
 /* ---------- Sticky Notes ---------- */
 function adminNotesBox() {
   const notes = [...S.adminNotes].sort((a, b) => (b.created || 0) - (a.created || 0));
-  return `<section class="box admin-notes">
+  return `<section class="box shaded admin-notes">
     ${adminHead('Sticky Notes', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
     <div class="stickies">${notes.map(n => {
       const id = 'an-' + n.id;
