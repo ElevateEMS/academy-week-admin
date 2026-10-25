@@ -1247,7 +1247,8 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .calls-search:focus { border-color: var(--taupe); }
 .calls-seg { justify-self: start; }
 .calls-foot { text-align: center; margin: 14px 0 0; font-size: 13px; color: var(--muted); flex-shrink: 0; }
-.eye.inq-gv { opacity: .85; vertical-align: 3px; margin-left: 6px; } .eye.inq-gv:hover { opacity: 1; }
+.modal-head h2:has(.inq-gv) { display: flex; align-items: center; gap: 8px; } /* the call icon sits on the name's middle */
+.eye.inq-gv { opacity: .85; flex-shrink: 0; } .eye.inq-gv:hover { opacity: 1; }
 .eye.inq-gv svg { width: 20px; height: 20px; }
 
 /* Info Requests window: a new call's two statuses side by side; the status dropdown; contact history */

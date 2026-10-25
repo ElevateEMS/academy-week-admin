@@ -406,6 +406,7 @@ function adminInquiryBox({ calls = false } = {}) {
 }
 // The whole Inquiries page (calls.html): just Info Requests, sized for a phone.
 function callsShell() {
+  if (S.inqCallsOnly === undefined) S.inqCallsOnly = pref('inqCallsOnly') === '1'; // this device's last choice (All until switched)
   return `<header class="calls-top"><img src="logo.png" alt=""><h1>Inquiries</h1></header>
   <main class="calls-wrap">${adminInquiryBox({ calls: true })}
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>
@@ -542,7 +543,7 @@ async function adminAct(a, el = {}) {
   switch (a) {
     case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) openPanel(l.name, fullUrl(l.url)); return true; }
     case 'adminOpenUrl': openPanel(d.name, d.url); return true;
-    case 'inqCallsOnly': S.inqCallsOnly = d.v === '1'; render(); return true;
+    case 'inqCallsOnly': S.inqCallsOnly = d.v === '1'; pref('inqCallsOnly', d.v === '1' ? '1' : '0'); render(); return true; // remembered on this device
     case 'adminSide': await Store.set('meta/settings', { adminSide: d.v === 'todo' ? 'todo' : 'notes' }); return true;
     case 'adminNextAdd': {
       const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;
