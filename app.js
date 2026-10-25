@@ -79,17 +79,18 @@ function currentWeekDay() {
 
 /* ---------- Settings (saved ones win over defaults.js) ---------- */
 const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping List', notes: 'Notes', packing: 'Packing List', docs: 'Documentation Checklist', scenarios: 'Academy Week Scenarios',
-  info: 'Course Details', setup: 'Setup Checklist', changes: 'Changes for Future Classes', emails: 'Emails', ctodo: 'Course To-Do' };
+  info: 'Course Details', setup: 'Setup Checklist', emails: 'Emails', ctodo: 'Course To-Do' };
 // Prep and Finalize have their own boxes and saved layouts; Day 1-5 share one.
 // Finalize has two columns: To Do + Notes on the left, the wide checklist on the right.
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
   prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
   final: { key: 'finalLayout', boxes: ['todo', 'notes', 'docs'], def: [['todo', 'notes'], ['docs']], wide: true },
-  // Course page: Emails down the middle; on the right the Setup Checklist with a small Notes under it.
-  course: { key: 'courseLayout', v: 5, boxes: ['info', 'setup', 'changes', 'emails', 'notes', 'ctodo'], def: [['info', 'changes'], ['emails'], ['setup', 'notes', 'ctodo']] },
-  // Once every Setup Checklist item is checked: Course To-Do on top, Notes grows under it, the checklist shrinks to a bar at the bottom.
-  courseDone: { key: 'courseDoneLayout', v: 2, boxes: ['info', 'setup', 'changes', 'emails', 'notes', 'ctodo'], def: [['info', 'changes'], ['emails'], ['ctodo', 'notes', 'setup']] },
+  // Course page: Course Details + Notes on the left, Emails down the middle, the Setup Checklist down the right.
+  // (Changes for Future Classes lives on the Admin page.)
+  course: { key: 'courseLayout', v: 6, boxes: ['info', 'setup', 'emails', 'notes', 'ctodo'], def: [['info', 'notes'], ['emails'], ['setup']] },
+  // Once every Setup Checklist item is checked: Course To-Do fills the right, the checklist shrinks to a bar under it.
+  courseDone: { key: 'courseDoneLayout', v: 3, boxes: ['info', 'setup', 'emails', 'notes', 'ctodo'], def: [['info', 'notes'], ['emails'], ['ctodo', 'setup']] },
 };
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
@@ -373,6 +374,7 @@ Store.onUser(async user => {
   unwatchGlobal.forEach(u => u()); unwatchGlobal = [];
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   if (unwatchPrev) { unwatchPrev(); unwatchPrev = null; prevFor = null; prevReady = true; }
+  watchAdminNext(null);
   S.cohortsLoaded = false;
   if (!user) { clearSheetCopies(); render(); return; }
   unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
@@ -978,12 +980,13 @@ function setupAuto(text) {
   }
   return out;
 }
-// Every Setup Checklist item (and the previous cohort's changes) checked off.
+// Every Setup Checklist item checked off. The previous cohort's changes don't hold it open:
+// any still unchecked move to the Course To-Do.
 function setupComplete() {
   // Not until the cohort list and the previous cohort's changes have loaded, or the page flickers to "done" and back.
   if (!S.sheet || !S.cohortsLoaded || !prevReady) return false;
   const all = itemsFor(SETUP, 'setup').filter(t => !t.heading);
-  return all.length > 0 && all.every(t => t.done || setupAuto(t.text).done === true) && S.prevTodos.every(x => x.done);
+  return all.length > 0 && all.every(t => t.done || setupAuto(t.text).done === true);
 }
 function setupList() {
   const items = itemsFor(SETUP, 'setup');
@@ -1049,10 +1052,10 @@ function dayStrip({ phases = true } = {}) {
 }
 
 function box(b, n) {
-  const shaded = (b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info' || b === 'changes')
+  const shaded = (b === 'priorities' || b === 'shopping' || b === 'notes' || b === 'packing' || b === 'scenarios' || b === 'info')
     && !(b === 'notes' && n === 'course'); // the Course page's right column (Notes, Setup, Course To-Do) is cream, like Emails
   const hideKey = b === 'shopping' ? 'shop' : b === 'packing' ? 'pack' : b === 'docs' ? 'docs' : (b === 'todo' || b === 'priorities') ? 'todo'
-    : b === 'setup' ? 'setup' : b === 'changes' ? 'next' : b === 'ctodo' ? 'ctodo' : null;
+    : b === 'setup' ? 'setup' : b === 'ctodo' ? 'ctodo' : null;
   const head = (title, extra = '') => `<div class="box-head" draggable="true" data-drag="box" data-box="${b}" title="Drag to move this box">
     <span class="grip">${ICONS.grip}</span><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
   let body = '';
@@ -1090,30 +1093,14 @@ function box(b, n) {
     }
     body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, (all.some(t => t.done) || done ? hideToggle('setup') : '')
       + (setupComplete() ? '<button class="link" data-act="setupShow">Hide list</button>' : ''))
-      + setupList() + addRow(SETUP, 'setup', '+ add item') + prevChanges();
+      + setupList() + addRow(SETUP, 'setup', '+ add item') + (setupComplete() ? '' : prevChanges());
   } else if (b === 'ctodo') {
     if (!setupComplete()) return ''; // shows once the Setup Checklist is done
     const k = 'add-ctodo-' + SETUP;
     body = head('Course To-Do', (itemsFor(SETUP, 'ctodo').some(t => t.done) ? hideToggle('ctodo') : '')
       + '<button class="add-plus small-plus" data-act="chAdd" data-k="ctodo" title="Add a to-do" aria-label="Add a to-do">+</button>')
       + (S.changesAdd === 'ctodo' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="ctodo" data-day="${SETUP}" data-chadd="ctodo" placeholder="Type a to-do, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : '')
-      + itemList(SETUP, 'ctodo');
-  } else if (b === 'changes') {
-    const nxt = nextCohort();
-    // A + by each heading opens its add line (it closes again when left empty).
-    const plus = (k, label) => `<button class="add-plus small-plus" data-act="chAdd" data-k="${k}" title="${label}" aria-label="${label}">+</button>`;
-    const byNew = (a, c) => (a.created || 0) - (c.created || 0);
-    const upd = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
-    body = head('Changes for Future Classes', itemsFor(SETUP, 'next').some(t => t.done) || S.updates.some(x => x.done) ? hideToggle('next') : '')
-      + `<p class="mini-head with-plus">Do before next cohort ${plus('next', 'Add a change')}</p>
-        <p class="muted small changes-foot">Shows up on ${nxt ? esc(nxt.key) + '’s' : 'the next cohort’s'} Setup Checklist.</p>`
-      + (S.changesAdd === 'next' ? `<div class="add-row"><input id="add-next-${SETUP}" data-draft="add-next-${SETUP}" data-add="next" data-day="${SETUP}" data-chadd="next" placeholder="Type a change, then Enter" value="${esc(S.drafts['add-next-' + SETUP] || '')}"></div>` : '')
-      + itemList(SETUP, 'next')
-      + `<hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
-        ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
-        <ul class="checks">${upd.map(x => `<li class="${x.done ? 'done' : ''}">
-          <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
-          <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
+      + itemList(SETUP, 'ctodo') + prevChanges();
   } else if (b === 'docs') {
     const all = docItems(), done = all.filter(x => x.on).length;
     const list = sec => `<ul class="checks">${docItems(sec).map(x => `<li class="${x.on ? 'done' : ''}">
@@ -1795,9 +1782,9 @@ function settingsView() {
       tile('Bag Contents', 'What goes in each jump bag pocket, for the daily bag check.', open('bagEdOpen', 'Edit')),
     ])}
     ${group('Preferences', [
-      tile('Staff Paperwork', 'Staff who don’t need paperwork or pay reminders.',
-        `<input id="set-skip" data-draft="set-skip" value="${dv('set-skip', c.skipStaff.join(', '))}" placeholder="Names, comma separated" aria-label="Names, comma separated">
-        <button class="btn small" data-act="saveSkip">Save</button>`),
+      tile('Admin Page', 'What fills the right side of the Admin page. The other one is kept, just hidden.',
+        `<div class="seg">${[['notes', 'Sticky Notes'], ['todo', 'To Do']].map(([v, l]) =>
+          `<button class="${adminSide() === v ? 'on' : ''}" data-act="adminSide" data-v="${v}">${l}</button>`).join('')}</div>`),
       tile('Checked Items', 'Whether lists start out showing what’s checked off.',
         `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
           `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),
@@ -2202,9 +2189,9 @@ function fitBoard() {
   if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
     notes.style.flex = '0 0 auto'; notes.style.height = scen.offsetHeight + 'px';
   }
-  // Admin: To Do is as tall as Business Info beside it (a long list scrolls inside), so Key Dates and Info Requests line up.
-  const info = board.querySelector('.admin-info'), todo = board.querySelector('.admin-todo');
-  if (info && todo) todo.style.height = innerWidth >= 1100 ? info.offsetHeight + 'px' : '';
+  // Admin: Changes is as tall as Business Info beside it (a long list scrolls inside), so Key Dates and Info Requests line up.
+  const info = board.querySelector('.admin-info'), ch = board.querySelector('.admin-changes');
+  if (info && ch) ch.style.height = innerWidth >= 1100 ? info.offsetHeight + 'px' : '';
 }
 addEventListener('resize', fitBoard);
 
@@ -2666,11 +2653,6 @@ async function act(a, el = {}, e) {
         const b = Number(d.b);
         const next = cur.includes(b) ? cur.filter(x => x !== b) : [...cur, b].sort((x, y) => x - y);
         await Store.set('meta/settings', { someBags: { [d.id]: next } }); break;
-      }
-      case 'saveSkip': {
-        const skipStaff = String(S.drafts['set-skip'] ?? cfg().skipStaff.join(', ')).split(',').map(x => x.trim()).filter(Boolean);
-        await Store.set('meta/settings', { skipStaff });
-        delete S.drafts['set-skip']; toast('Saved.'); break;
       }
       case 'schAdd': {
         const sd = schedFor(n), list = [...sd[d.list], d.list === 'blocks' ? { time: '', activity: '' } : { topic: '', content: '' }];

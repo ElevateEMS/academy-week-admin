@@ -24,11 +24,13 @@ const adminInfo = () => ({ ...DEFAULTS.adminInfo, ...((S.admin && S.admin.info) 
 const adminLinks = () => (S.admin && S.admin.links) || DEFAULTS.adminLinks;
 const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.test(u) ? u : 'https://' + u; };
 
+// The right column is Sticky Notes or To Do (Setup → Preferences → Admin Page); the other is only hidden.
+const adminSide = () => (S.settings && S.settings.adminSide) === 'todo' ? 'todo' : 'notes';
 function adminView() {
   return `<div class="board admin-board">
     <div class="board-col">${adminInfoBox()}${adminDatesBox()}</div>
-    <div class="board-col">${adminTodoBox()}${adminInquiryBox()}</div>
-    <div class="board-col">${adminNotesBox()}</div>
+    <div class="board-col">${adminChangesBox()}${adminInquiryBox()}</div>
+    <div class="board-col">${adminSide() === 'todo' ? adminTodoBox() : adminNotesBox()}</div>
   </div>`;
 }
 const adminHead = (title, extra = '') => `<div class="box-head admin-head"><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
@@ -166,6 +168,51 @@ function adminTodoBox() {
     <ul class="checks">${[...open, ...done].map(t => `<li class="${t.done ? 'done' : ''}">
       <label>${circle(t.done, `data-act="adminTodo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span></span></label>
       <button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+  </section>`;
+}
+
+/* ---------- Changes for Future Classes ----------
+   "Do before next cohort" items are kept the way they always were: as kind 'next' to-dos in the cohort
+   before the one they're for, which shows them on its Setup Checklist (and in its Course To-Do once the
+   rest of the checklist is done). New ones here go to the soonest Upcoming cohort, so they're kept in
+   the cohort just before it; with no Upcoming cohort yet, in the newest cohort, so they land on the next
+   one you add. "Future updates" is one shared list (updates/). */
+function changesHome() {
+  const ranked = S.cohorts.map(c => ({ ...c, r: cohortRank(c.key) })).filter(c => c.r != null).sort((a, b) => a.r - b.r);
+  const up = ranked.find(c => /upcoming/i.test(c.status || ''));
+  if (up) { const before = ranked.filter(c => c.r < up.r).pop(); return { src: before ? before.key : null, target: up.key }; }
+  const last = ranked[ranked.length - 1];
+  return { src: last ? last.key : null, target: null };
+}
+let unwatchNext = null, nextFor = null;
+function watchAdminNext(key) {
+  if (key === nextFor) return;
+  if (unwatchNext) unwatchNext();
+  unwatchNext = null; nextFor = key; S.adminNext = [];
+  if (key) unwatchNext = Store.watch('cohorts/' + key + '/todos', list => { S.adminNext = list.filter(x => x.kind === 'next'); render(); });
+}
+function adminChangesBox() {
+  const home = changesHome();
+  watchAdminNext(home.src);
+  const plus = (k, label) => `<button class="add-plus small-plus" data-act="chAdd" data-k="${k}" title="${label}" aria-label="${label}">+</button>`;
+  const byOrder = (a, c) => (a.order || a.created || 0) - (c.order || c.created || 0), byNew = (a, c) => (a.created || 0) - (c.created || 0);
+  const nxt = [...(S.adminNext || [])].sort(byOrder);
+  const upd = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
+  const k = 'add-anext-' + SETUP;
+  const where = home.target ? esc(home.target) + '’s' : 'the next cohort’s';
+  return `<section class="box shaded admin-changes ${hidden('next') ? 'hide-done' : ''}">
+    ${adminHead('Changes for Future Classes', nxt.some(t => t.done) || S.updates.some(x => x.done) ? hideToggle('next') : '')}
+    <p class="mini-head with-plus">Do before next cohort ${home.src ? plus('anext', 'Add a change') : ''}</p>
+    <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
+    ${S.changesAdd === 'anext' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="adminNext" data-chadd="anext" placeholder="Type a change, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : ''}
+    <ul class="checks">${nxt.map(x => `<li class="${x.done ? 'done' : ''}">
+      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span><span class="txt">${esc(x.text)}</span></span></label>
+      <button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+    <hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
+    ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
+    <ul class="checks">${upd.map(x => `<li class="${x.done ? 'done' : ''}">
+      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
+      <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
 
@@ -376,7 +423,7 @@ function adminEscape() {
 }
 // Enter in one of the Admin page's add lines.
 function adminEnter(t) {
-  const a = { adminTodo: 'adminTodoAdd', adminDate: 'adminDateAdd' }[t.dataset.add];
+  const a = { adminTodo: 'adminTodoAdd', adminDate: 'adminDateAdd', adminNext: 'adminNextAdd' }[t.dataset.add];
   if (!a) return false;
   adminAct(a, t);
   return true;
@@ -386,6 +433,20 @@ async function adminAct(a, el = {}) {
   switch (a) {
     case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) { S.adminPanel = { name: l.name, url: fullUrl(l.url) }; render(); } return true; }
     case 'adminOpenUrl': S.adminPanel = { name: d.name, url: d.url }; render(); return true;
+    case 'adminSide': await Store.set('meta/settings', { adminSide: d.v === 'todo' ? 'todo' : 'notes' }); return true;
+    case 'adminNextAdd': {
+      const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;
+      if (!text || !src) return true;
+      S.drafts[k] = ''; render();
+      await Store.add('cohorts/' + src + '/todos', { text, done: false, day: SETUP, kind: 'next', order: Date.now(), created: Date.now() });
+      return true;
+    }
+    case 'adminNextDone': {
+      const x = (S.adminNext || []).find(i => i.id === d.id);
+      if (x && nextFor) await Store.set('cohorts/' + nextFor + '/todos/' + d.id, { done: !x.done });
+      return true;
+    }
+    case 'adminNextDel': if (nextFor) await Store.del('cohorts/' + nextFor + '/todos/' + d.id); return true;
     case 'inqCheck': await loadInquiries(true); return true;
     case 'inqSetOpen': {
       const st = (S.inq && S.inq.settings) || {};
