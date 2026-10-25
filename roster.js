@@ -173,20 +173,21 @@ function rosterModal() {
         ${!out && sig && sig.png ? `<button class="link" data-act="rosterClearSig" data-sid="${p.sid}">Clear</button>` : ''}
         <button class="link" data-act="rosterOut" data-sid="${p.sid}">${out ? 'Attending' : 'Not attending'}</button></td></tr>`;
   }).join('');
+  // The EC button: whoever has it on, their signature also goes on the bottom line (Instructor, Printed Name / Signature / Date).
   const instRow = x => {
-    const s = inst[x.key];
-    return `<div class="ro-inst"><span><b>${x.name}</b> <span class="muted small">${x.cert}</span></span>
-      ${s && s.png ? `${sigImg(s.png, x.name + ' signature')}<button class="link" data-act="rosterInstClear" data-who="${x.key}">Clear</button>`
-        : `<button class="btn small" data-act="rosterInstSign" data-who="${x.key}">Sign</button><span class="muted small">if you taught it</span>`}</div>`;
+    const s = instSig(doc, x.key), isEc = ec.who === x.key;
+    return `<div class="ro-inst"><span class="ro-inst-name"><b>${x.name}</b> <span class="muted small">${x.cert}</span></span>
+      <button class="ro-ec-btn ${isEc ? 'on' : ''}" data-act="rosterEcWho" data-who="${x.key}" title="${isEc ? 'The EC: their signature also goes on the bottom line' : 'Make ' + x.name + ' the EC'}" aria-pressed="${isEc}">EC</button>
+      ${s ? `${sigImg(s.png, x.name + ' signature')}<button class="link" data-act="rosterInstClear" data-who="${x.key}">Clear</button>`
+        : `<button class="btn small" data-act="rosterInstSign" data-who="${x.key}">Sign</button>`}</div>`;
   };
-  const ecWho = INSTRUCTORS.find(x => x.key === ec.who), same = ecWho && inst[ecWho.key] && inst[ecWho.key].png;
+  const ecWho = INSTRUCTORS.find(x => x.key === ec.who), ecDone = !!(ecWho && instSig(doc, ecWho.key));
   const unsigned = list.filter(p => !signed[p.sid]);
-  const instDone = INSTRUCTORS.some(x => inst[x.key] && inst[x.key].png), ecDone = !!(ecWho && ec.png);
   const blocked = got.busy ? 'Reading the signatures…' : !list.length ? 'Nobody is on this roster.' : list.length > 30 ? 'The form has room for 30 students.'
-    : !instDone ? 'Sign as the instructor (Nicholas or Gabriella) first.' : !ecDone ? 'The EC signs the bottom line first.' : '';
+    : !ecWho ? 'Pick the EC.' : !ecDone ? 'The EC signs above.' : '';
   return `<div class="overlay" data-act="rosterClose"><div class="modal roster-modal" data-stop>
     <div class="modal-head"><h2>Orientation Roster <span class="muted small">${esc(longDate(r.date))}${r.late ? ' · late enrollees' : ''}</span></h2>
-      <span class="panel-actions"><button class="link" data-act="rosterRefresh" ${got.busy ? 'disabled' : ''}>${got.busy ? 'Refreshing…' : 'Refresh'}</button>
+      <span class="panel-actions"><button class="eye inq-reload ${got.busy ? 'spin' : ''}" data-act="rosterRefresh" title="Check for new signatures" aria-label="Check for new signatures" ${got.busy ? 'disabled' : ''}>${RELOAD}</button>
       ${ro.busy ? '' : '<button class="x big" data-act="rosterClose" aria-label="Close">×</button>'}</span></div>
     <div class="modal-body pad-top" data-keep-scroll="roster">
       <div class="ro-top">
@@ -199,20 +200,24 @@ function rosterModal() {
       ${got.err ? `<div class="alert">${esc(got.err)}</div>` : ''}
       <p class="mini-head">Students</p>
       <table class="roster ro-table"><thead><tr><th class="c">#</th><th>Name</th><th class="c">Times</th><th>Signature</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nobody yet.</td></tr>'}</tbody></table>
-      <p class="muted small">Students sign from the link in their “First class assignments due” email. Not attending takes them off this roster only.</p>
-      <p class="mini-head">Instructors <span class="count">whoever taught it</span></p>
+      <p class="muted small">Students sign from the Orientation Roster assignment in the Student Portal, or from the link in a reminder email.</p>
+      <p class="mini-head">Instructors</p>
       ${INSTRUCTORS.map(instRow).join('')}
-      <p class="mini-head">Instructor (EC) · bottom of the form</p>
-      <div class="ro-ec"><div class="seg">${INSTRUCTORS.map(x => `<button class="${ec.who === x.key ? 'on' : ''}" data-act="rosterEcWho" data-who="${x.key}">${x.name}</button>`).join('')}</div>
-        ${ecWho ? (ec.png ? `${sigImg(ec.png, ecWho.name + ' signature')}<span class="muted small">${esc(atText(ec.at))}</span><button class="link" data-act="rosterEcClear">Clear</button>`
-          : `<button class="btn small" data-act="rosterEcSign">Sign</button>${same ? '<button class="link" data-act="rosterEcSame">Use my signature from above</button>' : ''}`) : '<span class="muted small">Who’s registered with the state as the EC</span>'}</div>
       ${doc.saved ? `<p class="ro-saved">✓ Saved ${esc(atText(doc.saved.at))}${doc.saved.complete ? '' : ' (before everyone signed)'}: <a href="${esc(doc.saved.url)}" target="_blank" rel="noopener">${esc(doc.saved.name)} ↗</a></p>` : ''}
       ${ro.err ? `<div class="alert">${esc(ro.err)}</div>` : ''}
     </div>
-    <div class="modal-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign. You can save now and again later (it replaces the file).' : 'Ready. Saves to Admin - ' + esc(S.cohortKey) + ' → Orientation Roster Signatures.')}</span>
+    <div class="modal-foot ro-foot"><span class="muted small">${ro.busy ? esc(ro.busy) : blocked || (unsigned.length ? unsigned.length + ' still to sign' : '')}</span>
       <button class="btn" data-act="rosterPreview" ${ro.busy || !list.length || list.length > 30 ? 'disabled' : ''}>Preview PDF</button>
       <button class="btn primary" data-act="rosterSave" ${ro.busy || blocked ? 'disabled' : ''}>${doc.saved ? 'Save again' : 'Save to Drive'}</button></div>
   </div></div>`;
+}
+
+// An instructor's signature on this roster: { png, at }. (Before the EC button, the EC signed the bottom line
+// separately: that signature counts as theirs if they hadn't signed their own line.)
+function instSig(doc, key) {
+  const s = (doc.inst || {})[key], ec = doc.ec || {};
+  if (s && s.png) return s;
+  return ec.who === key && ec.png ? { png: ec.png, at: ec.at } : null;
 }
 
 /* ---------- Drawing a signature (its own pop-up on top, so redraws don't wipe it) ---------- */
@@ -242,13 +247,13 @@ function sigPadOpen(title, note) {
 const mdy = iso => { const [y, m, d] = iso.split('-'); return m + '/' + d + '/' + y; };
 async function rosterPdf(r) {
   const PDFLib = await loadPdfLib();
-  const doc = rosterDoc(r.date), list = onRoster(r, doc), signed = signedMap(r), inst = doc.inst || {}, ec = doc.ec || {};
-  const ecWho = INSTRUCTORS.find(x => x.key === ec.who);
+  const doc = rosterDoc(r.date), list = onRoster(r, doc), signed = signedMap(r), ec = doc.ec || {};
+  const ecWho = INSTRUCTORS.find(x => x.key === ec.who), ecSig = ecWho && instSig(doc, ecWho.key);
   return RosterForm.fill(PDFLib, {
     date: mdy(r.date), courseNo: courseNoFor(r), title: S.cohortKey + ' Orientation Roster ' + mdy(r.date),
     people: list.map(p => ({ name: rosterName(p.name), times: rosterTimes(p), png: (signed[p.sid] || {}).png || '' })),
-    inst: Object.fromEntries(INSTRUCTORS.map(x => [x.key, (inst[x.key] || {}).png || ''])),
-    ec: ecWho && ec.png ? { name: ecWho.name, png: ec.png, date: mdy(isoOf(ec.at ? new Date(ec.at) : new Date())) } : null,
+    inst: Object.fromEntries(INSTRUCTORS.map(x => [x.key, (instSig(doc, x.key) || {}).png || ''])),
+    ec: ecSig ? { name: ecWho.name, png: ecSig.png, date: mdy(isoOf(ecSig.at ? new Date(ecSig.at) : new Date())) } : null, // the EC's own signature, in both places
   });
 }
 // What the student signing page shows: everyone on this roster (names and times, never anyone's signature).
@@ -324,27 +329,25 @@ async function rosterAct(a, el = {}) {
       } catch (e) { toast(e.message); }
       loadRosterSigs(ro.date); return true;
     }
-    case 'rosterInstSign': case 'rosterEcSign': {
-      const person = a === 'rosterEcSign' ? INSTRUCTORS.find(x => x.key === (rosterDoc(ro.date).ec || {}).who) : who;
-      if (!person) return true;
-      const png = await sigPadOpen(person.name, a === 'rosterEcSign' ? 'The bottom line of the roster (Instructor, EC). Today’s date goes next to it.' : 'Your signature on the Instructors line.');
+    case 'rosterInstSign': {
+      if (!who) return true;
+      const isEc = (rosterDoc(ro.date).ec || {}).who === who.key;
+      const png = await sigPadOpen(who.name, 'Your signature on the Instructors line' + (isEc ? ', and on the bottom line as the EC (with today’s date).' : '.'));
       if (!png) return true;
-      const sig = { png, at: new Date().toISOString(), by: (S.user && S.user.email) || '' };
-      await Store.set(rosterPath(ro.date), a === 'rosterEcSign' ? { ec: { who: person.key, ...sig } } : { inst: { [person.key]: sig } });
+      await Store.set(rosterPath(ro.date), { inst: { [who.key]: { png, at: new Date().toISOString(), by: (S.user && S.user.email) || '' } } });
       return true;
     }
-    case 'rosterInstClear': await Store.set(rosterPath(ro.date), { inst: { [d.who]: null } }); return true;
-    case 'rosterEcWho': {
+    case 'rosterInstClear': {
       const ec = rosterDoc(ro.date).ec || {};
-      if (ec.who === d.who) return true;
-      await Store.set(rosterPath(ro.date), { ec: { who: d.who, png: null, at: null } }); return true;
+      await Store.set(rosterPath(ro.date), { inst: { [d.who]: null }, ...(ec.who === d.who && ec.png ? { ec: { png: null, at: null } } : {}) }); return true;
     }
-    case 'rosterEcSame': {
-      const ec = rosterDoc(ro.date).ec || {}, s = (rosterDoc(ro.date).inst || {})[ec.who];
-      if (s && s.png) await Store.set(rosterPath(ro.date), { ec: { who: ec.who, png: s.png, at: new Date().toISOString(), by: (S.user && S.user.email) || '' } });
-      return true;
+    case 'rosterEcWho': { // only one EC: pressing theirs again turns it off
+      const ec = rosterDoc(ro.date).ec || {}, inst = rosterDoc(ro.date).inst || {};
+      if (ec.who === d.who) { await Store.set(rosterPath(ro.date), { ec: { who: null, png: null, at: null } }); return true; }
+      // (an EC signature from before keeps counting as theirs: copied onto their own line)
+      const keep = ec.png && ec.who && !(inst[ec.who] && inst[ec.who].png) ? { inst: { [ec.who]: { png: ec.png, at: ec.at || null } } } : {};
+      await Store.set(rosterPath(ro.date), { ...keep, ec: { who: d.who, png: null, at: null } }); return true;
     }
-    case 'rosterEcClear': await Store.set(rosterPath(ro.date), { ec: { png: null, at: null } }); return true;
     case 'rosterPreview': case 'rosterSave': {
       if (!r || ro.busy) return true;
       const list = onRoster(r), signed = signedMap(r), missing = list.filter(p => !signed[p.sid]);
