@@ -972,8 +972,17 @@ function syncBack(t) {
 /* ---------- Course page ---------- */
 function courseView() {
   if (!S.sheet) return loadingView();
-  return `<div class="board course-board ${setupComplete() ? 'setup-done' : ''}">
-    ${cfg().layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, 'course')).join('')}</div>`).join('')}
+  // Setup Checklist not done yet but an orientation roster is waiting: Course To-Do sits on top of the
+  // checklist's column, as tall as its items, and the checklist scrolls in what's left (all on one screen).
+  const waiting = !setupComplete() && hasRosterTodos();
+  let layout = cfg().layout;
+  if (waiting) {
+    layout = layout.map(col => col.filter(b => b !== 'ctodo'));
+    const col = layout.find(c => c.includes('setup')) || layout[layout.length - 1];
+    col.splice(Math.max(0, col.indexOf('setup')), 0, 'ctodo');
+  }
+  return `<div class="board course-board ${setupComplete() ? 'setup-done' : ''} ${waiting ? 'roster-waiting' : ''}">
+    ${layout.map((col, i) => `<div class="board-col" data-drop="boxes" data-col="${i}">${col.map(b => box(b, 'course')).join('')}</div>`).join('')}
   </div>`;
 }
 const nextCohort = (key = S.cohortKey) => {

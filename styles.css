@@ -959,6 +959,8 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 @media (min-width: 1101px) { .course-board .box.box-emails { flex: 1 1 0; min-height: 0; } } /* fills the column to the window's bottom, scrolls inside */
 .course-board .box-notes { flex: 1 1 0; }
 .course-board .box.box-ctodo { flex: 1 1 0; min-height: 150px; }
+.course-board.roster-waiting .box.box-ctodo { flex: 0 0 auto; min-height: 0; max-height: 45vh; }
+.course-board.roster-waiting .box.box-setup { flex: 1 1 0; min-height: 0; }
 .btn-ic { width: 13px; height: 13px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* Smaller window: Course Details + Notes beside Emails, the right column goes across underneath. Phone: straight down. */
 @media (max-width: 1100px) {
