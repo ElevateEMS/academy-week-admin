@@ -51,6 +51,7 @@ const DEFAULTS = {
     'Add the following to the cohort sheet: dates, google meet link, JBL course code',
     'Upload syllabus and schedule to cohort folder', 'Add student information to cohort sheet as they enroll (verify emails)',
     '# ODEMSA', 'Verify dates availability with ODEMSA (including CPR class day)',
+    'Register course with VAOEMS (course #)', // its button types the course # into Course Details (AF4)
     '# Once previous cohort is over & this one is about to start',
     'Flip previous cohort to “former” in config sheet', 'Flip upcoming cohort to “active” in config sheet',
     'Create gmail group for emails for students', 'Orientation morning: send Student Portal link and JBL access code to students',
@@ -158,8 +159,9 @@ DEFAULTS.schedule = {
    Your Gmail signature (with "Best regards,") is added under every draft by the Apps Script.
    when.from: enroll (as each student enrolls), orientation / next / final (that student's
    orientation or payment due date), academy (Academy Week start), manual (only when you pick it).
-   when.days: days after that date (−1 = the day before). who: all, textbook, unpaid-next,
-   unpaid-final, pick. send: bcc (one email To: Nick, everyone in BCC) or each (one per student). */
+   when.days: days after that date (−1 = the day before). when.hour: shows up at that hour (19 = 7 PM);
+   when.lateDays / lateHour: late enrollees' own timing. who: all, textbook, unpaid-next,
+   unpaid-final, firstclass (missing a first class assignment), pick. send: bcc (one email To: Nick, everyone in BCC) or each (one per student). */
 DEFAULTS.email = {
   nick: 'nbrown@elevateemsacademy.com',
   orientationTime: '11:00 AM', // every cohort's orientation (late enrollees get their own)
@@ -248,6 +250,17 @@ If you already have a VAOEMS account (from a prior EMT class or agency affiliati
 To access the VAOEMS portal, you must use one of the following browsers: Google Chrome, Safari, or Microsoft Edge. Firefox and Internet Explorer are *not* supported and the portal will not open correctly using those browsers.
 
 {if group}We look forward to officially meeting you all tomorrow and getting this course started!{else}We look forward to officially meeting you tomorrow and getting you started with the course!{end}` },
+
+  // Orientation night, to anyone still missing a first class assignment (only the ones they're missing).
+  // Late enrollees get theirs the next day at noon. {sign link}: their orientation roster signing link (Test cohorts until December).
+  { id: 'firstclass-due', name: 'First class assignments due', subject: 'Reminder: First Class Assignments Due {if late}Within 24 Hours{else}Tonight{end}',
+    when: { from: 'orientation', days: 0, hour: 19, lateDays: 1, lateHour: 12 }, who: 'firstclass', send: 'each', since: '2026-10-25', body: `Hi {first name},
+
+Just a reminder that your first class {if one missing}assignment{else}assignments{end} ({missing items}) {if one missing}is{else}are all{end} due **{if late}within 24 hours of your orientation{else}by 11:59pm tonight{end}** to remain compliant with the course.
+
+{if signing}You can sign the orientation roster here: [Orientation Roster]({sign link})
+
+{end}Please reach out if you have any questions!` },
 
   { id: 'next-early', name: 'Next installment · 5 days before', subject: 'EMT Tuition Payment Reminder',
     when: { from: 'next', days: -5 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}

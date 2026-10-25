@@ -1,0 +1,131 @@
+<!doctype html>
+<!-- The student's orientation roster signing page: sign.html?t=<their private link code>.
+     It shows only their own line (name, cohort, date, course #, times) and a box to draw their
+     signature. The Admin Apps Script checks the link and saves the signature (signInfo / signSubmit).
+     Until December only Test cohort links are made; then the Student Hub takes this over. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orientation Roster · Elevate EMS</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f3ece6">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=170">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=170">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f3ece6; --paper: #fbf8f4; --ink: #3d322c; --muted: #8f7f75; --line: #ddcfc5; --line-soft: #e9dfd7;
+    --taupe-dark: #7d6558; --blush-soft: #efe3db; --sage: #6f8a6a; --sage-soft: #e3eadf; --rose: #a8574d; --rose-soft: #f3e0dc;
+    --serif: 'Cormorant Garamond', Georgia, serif; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: Jost, system-ui, sans-serif; font-size: 16px; color: var(--ink); background: var(--bg); line-height: 1.45;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
+  .card { max-width: 620px; margin: 0 auto; background: var(--paper); border-radius: 18px; padding: 22px 20px 20px;
+    box-shadow: 0 1px 2px rgba(80, 55, 40, .05), 0 8px 24px rgba(80, 55, 40, .06); }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .brand img { width: 52px; height: 52px; object-fit: contain; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: 30px; line-height: 1.1; margin: 0; }
+  .sub { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+  .line { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 16px 0; padding: 14px 16px;
+    border: 1px solid var(--line-soft); border-radius: 12px; background: #fff; }
+  .line span { color: var(--muted); font-size: 14px; }
+  .line b { font-weight: 500; }
+  .due { font-size: 14px; padding: 10px 14px; border-radius: 10px; background: var(--blush-soft); margin: 0 0 16px; }
+  .due.past { background: var(--rose-soft); color: var(--rose); }
+  .pad-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .pad { position: relative; height: 190px; border: 1.5px solid var(--taupe-dark); border-radius: 12px; background: #fff; }
+  .pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; border-radius: 12px; }
+  .pad .hint { position: absolute; left: 16px; right: 16px; bottom: 34px; border-top: 1px solid var(--line); pointer-events: none; }
+  .pad .hint::before { content: '✕'; position: absolute; left: 0; top: -26px; color: var(--muted); font-size: 16px; }
+  .attest { font-size: 14px; color: var(--muted); margin: 12px 0 16px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 10px 20px; cursor: pointer; color: var(--ink); }
+  button.primary { background: var(--taupe-dark); border-color: var(--taupe-dark); color: #fff; font-weight: 500; margin-left: auto; padding: 11px 26px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .link { background: none; border: 0; padding: 0; color: var(--taupe-dark); text-decoration: underline; font-size: 14px; }
+  .msg { text-align: center; padding: 30px 6px 14px; }
+  .msg .big { font-size: 46px; line-height: 1; color: var(--sage); }
+  .msg h2 { font-family: var(--serif); font-size: 28px; font-weight: 600; margin: 10px 0 6px; }
+  .err { background: var(--rose-soft); color: var(--rose); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin: 12px 0 0; }
+  .loading { text-align: center; color: var(--muted); font-family: var(--serif); font-style: italic; font-size: 20px; padding: 40px 0; }
+  .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 16px; }
+</style>
+</head>
+<body>
+<main class="card" id="app"><p class="loading">Opening your roster…</p></main>
+<p class="foot">Elevate EMS Academy · Questions? Reply to the email this link came in.</p>
+
+<script src="config.js?v=170"></script>
+<script src="sigpad.js?v=170"></script>
+<script>
+  const app = document.getElementById('app');
+  const token = new URLSearchParams(location.search).get('t') || '';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const when = iso => new Date(iso).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const head = info => `<div class="brand"><img src="logo.png" alt="Elevate EMS"><div><h1>Orientation Roster</h1>
+    <p class="sub">${info ? esc(info.cohort) + ' · EMS Course Roster' : 'EMS Course Roster'}</p></div></div>`;
+
+  // The Admin Apps Script, without a sign-in: the link code is what it checks.
+  async function call(action, params) {
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, t: token, ...params }) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'Something went wrong. Please try again.');
+    return out;
+  }
+
+  function done(info, signedAt, already) {
+    app.innerHTML = head(info) + `<div class="msg"><div class="big">✓</div><h2>${already ? 'You’ve already signed' : 'Thank you, you’re signed!'}</h2>
+      <p class="sub">Your signature is on the ${esc(info.date)} orientation roster${signedAt ? ' (signed ' + esc(when(signedAt)) + ')' : ''}.<br>You can close this page.</p></div>`;
+  }
+
+  function form(info) {
+    app.innerHTML = head(info) + `
+      <div class="line">
+        <span>Name</span><b>${esc(info.name)}</b>
+        <span>Course</span><b>${esc(info.cohort)} EMT</b>
+        ${info.courseNo ? `<span>Course #</span><b>${esc(info.courseNo)}</b>` : ''}
+        <span>Orientation</span><b>${esc(info.date)}</b>
+        ${info.times ? `<span>Times</span><b>${esc(info.times)}</b>` : ''}
+        <span>Topic</span><b>Orientation</b>
+      </div>
+      <p class="due ${info.pastDue ? 'past' : ''}">${info.pastDue
+        ? 'This was due ' + esc(info.due) + '. Please sign now: it’s still required to stay compliant with the course.'
+        : 'Please sign by <b>' + esc(info.due) + '</b>.'}</p>
+      <div class="pad-label"><span>Draw your signature (finger, stylus or mouse)</span><button class="link" id="clear" type="button">Clear</button></div>
+      <div class="pad"><div class="hint"></div><canvas id="pad" aria-label="Signature box"></canvas></div>
+      <p class="attest">By signing, I confirm that I, ${esc(info.name)}, attended the ${esc(info.cohort)} orientation on ${esc(info.date)}.</p>
+      <div class="row"><button class="primary" id="submit" type="button" disabled>Sign the roster</button></div>
+      <div id="err"></div>`;
+    const pad = SigPad(document.getElementById('pad')), btn = document.getElementById('submit');
+    const canvas = document.getElementById('pad');
+    canvas.addEventListener('pointerup', () => { btn.disabled = !pad.hasInk(); });
+    document.getElementById('clear').onclick = () => { pad.clear(); btn.disabled = true; };
+    btn.onclick = async () => {
+      if (!pad.hasInk()) return;
+      btn.disabled = true; btn.textContent = 'Signing…';
+      document.getElementById('err').innerHTML = '';
+      try {
+        const out = await call('signSubmit', { png: pad.png() });
+        done(info, out.signedAt, out.already);
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Sign the roster';
+        document.getElementById('err').innerHTML = `<p class="err">${esc(e.message)}</p>`;
+      }
+    };
+  }
+
+  (async () => {
+    if (!token) { app.innerHTML = head() + '<p class="err">This page needs the signing link from your email.</p>'; return; }
+    try {
+      const info = await call('signInfo', {});
+      if (info.signed) done(info, info.signedAt, true); else form(info);
+    } catch (e) {
+      app.innerHTML = head() + `<p class="err">${esc(e.message)}</p>`;
+    }
+  })();
+</script>
+</body>
+</html>

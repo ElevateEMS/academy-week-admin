@@ -1263,3 +1263,34 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .inq-hist-list li:last-child { border-bottom: 0; }
 .inq-hist-list b { font-weight: 500; color: var(--taupe-dark); }
 .eye.inq-filter.on { opacity: 1; background: var(--blush-soft); border-radius: 8px; }
+
+/* ---------- Orientation roster (roster.js) ---------- */
+.modal.roster-modal { width: min(940px, 100%); }
+.ro-top { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; margin: 2px 0 10px; }
+.ro-count { margin-left: auto; font-weight: 500; color: var(--taupe-dark); background: var(--blush-soft); border-radius: 999px; padding: 2px 12px; }
+.ro-count.all { background: var(--sage-soft); color: #4f6b4b; }
+.roster.ro-table th.c { width: auto; }
+.roster.ro-table tbody tr { cursor: default; }
+.roster.ro-table td { padding: 6px 10px; }
+.roster.ro-table tr.ro-out td { color: var(--muted); }
+.roster.ro-table tr.ro-out b { text-decoration: line-through; font-weight: 400; }
+.ro-sig-cell { min-width: 170px; }
+.ro-sig { display: inline-block; height: 34px; max-width: 170px; object-fit: contain; vertical-align: middle; background: #fff; border-radius: 4px; }
+.ro-at { display: block; font-size: 11px; color: var(--muted); }
+.ro-at.late { color: var(--rose); }
+.ro-acts { text-align: right; white-space: nowrap; }
+.ro-acts .link { margin-left: 10px; font-size: 12.5px; }
+.ro-inst, .ro-ec { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 8px 0; border-bottom: 1px dotted var(--line); }
+.ro-inst > span:first-child { min-width: 230px; }
+.ro-ec .seg button { padding: 5px 13px; }
+.ro-saved { margin: 14px 0 0; padding: 9px 12px; border-radius: 10px; background: var(--sage-soft); font-size: 14px; }
+.sigpad-overlay { z-index: 60; }
+.modal.sigpad-modal { width: min(560px, 100%); }
+.sig-box { position: relative; height: 200px; border: 1.5px solid var(--taupe-dark); border-radius: 12px; background: #fff; margin-top: 6px; }
+.sig-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; border-radius: 12px; }
+.sig-line { position: absolute; left: 18px; right: 18px; bottom: 36px; border-top: 1px solid var(--line); pointer-events: none; }
+.sig-line::before { content: '✕'; position: absolute; left: 0; top: -26px; color: var(--muted); }
+@media (max-width: 640px) {
+  .ro-acts { white-space: normal; }
+  .ro-inst > span:first-child { min-width: 0; }
+}

@@ -8,7 +8,8 @@
    Admin (the logo or the Admin button): the business side, not tied to a cohort: admin.js.
    Plus Setup (templates and settings). Saving: store.js. Google Sheets: sheets.js.
    Scenarios (library, week plan, Additional Scenarios): scenario-ui.js + matcher.js.
-   Emails (the Course page's Emails box, Gmail drafts, book codes): emails.js. */
+   Emails (the Course page's Emails box, Gmail drafts, book codes): emails.js.
+   Orientation rosters (to-dos, students' signatures, the roster PDF): roster.js + sigpad.js. */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,6 +28,7 @@ const S = {
   // Scenarios: scenDocs = your saved tags, scenLive = Docs in the Drive folders (null until listed)
   scenDocs: {}, scenDocsAt: 0, scenLive: null, scenLiveAt: 0, scenErr: null,
   emailTpls: {}, bookCodes: [], emailLog: [], // emails.js
+  rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false, // roster.js
   admin: {}, adminTodos: [], adminDates: [], adminNotes: [], // admin.js
   libOpen: false, libTab: 'scen', libSel: null, libDraft: null, libFilter: 'all', addonDraft: null, reqDraft: null, planOpen: false, place: null, match: null,
 };
@@ -230,6 +232,35 @@ async function seedRepeats() {
     if (!doc.ctodoAdded && await Store.claim(path, 'ctodoAdded') && key === S.cohortKey) await addCtodo(missingCtodo());
   } catch (e) { console.warn('Repeat to-dos not added yet:', e.message); }
   finally { seeding = false; }
+}
+
+// "Register course with VAOEMS" came after most cohorts' Setup Checklists were copied: it's added once to each
+// (checked already when orientation has passed, so a running cohort's list doesn't open back up), and once to
+// a saved Course Setup template. Its button types the course # into Course Details (AF4).
+const VAOEMS_ITEM = 'Register course with VAOEMS (course #)';
+let vaoemsTried = null, vaoemsTplTried = false;
+async function seedVaoems() {
+  const key = S.cohortKey, doc = S.cohortDoc, st = S.settings;
+  if (st && st.setupList && !st.vaoemsAdded && !st.setupList.some(l => /vaoems/i.test(l)) && !vaoemsTplTried) {
+    vaoemsTplTried = true;
+    try {
+      if (await Store.claim('meta/settings', 'vaoemsAdded')) {
+        const list = [...st.setupList], at = list.findIndex(l => /odemsa/i.test(l) && !/^#/.test(l));
+        list.splice(at >= 0 ? at + 1 : list.length, 0, VAOEMS_ITEM);
+        await Store.set('meta/settings', { setupList: list });
+      }
+    } catch (e) { console.warn('VAOEMS template item not added:', e.message); }
+  }
+  if (!S.sheet || !doc || !S.todosLoaded || doc.vaoemsAdded || vaoemsTried === key) return;
+  vaoemsTried = key;
+  try {
+    if (!(await Store.claim('cohorts/' + key, 'vaoemsAdded')) || key !== S.cohortKey || !doc.setupAdded) return; // a new cohort gets it from the template
+    const id = setupLine(VAOEMS_ITEM).id;
+    if (S.todos.some(t => t.kind === 'setup' && /vaoems/i.test(t.text || '')) || (doc.removedRepeats || {})[id]) return;
+    const ref = itemsFor(SETUP, 'setup').find(t => !t.heading && /odemsa/i.test(t.text || ''));
+    await Store.set(P('todos/' + id), { text: VAOEMS_ITEM, heading: false, done: pastOrientation(), day: SETUP, kind: 'setup',
+      order: ref ? orderOf(ref) + 1 : 99000, created: Date.now(), repeat: true }, false);
+  } catch (e) { console.warn('VAOEMS item not added:', e.message); }
 }
 
 /* ---------- Cohorts in order (for "the previous cohort") ---------- */
@@ -451,7 +482,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
-    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null });
+    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
   const base = 'cohorts/' + key;
@@ -462,10 +493,11 @@ async function selectCohort(key, { keepView = false } = {}) {
   w(base + '/warnings', list => { S.warnings = list; });
   w(base + '/days', list => { S.days = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/staff', list => { S.staff = Object.fromEntries(list.map(d => [d.id, d])); });
-  w(base + '/todos', list => { S.todos = list; if (S.sheet) rollOver(); });
+  w(base + '/todos', list => { S.todos = list; S.todosLoaded = true; if (S.sheet) rollOver(); });
   w(base + '/packing', list => { S.packing = list; });
   w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/emailLog', list => { S.emailLog = list; });
+  w(base + '/rosters', list => { S.rosterDocs = Object.fromEntries(list.map(d => [d.id, d])); });
   await loadSheet();
 }
 
@@ -527,6 +559,7 @@ function render() {
     }
     fitBoard();
     syncDue(); // template to-dos' due dates follow Course Details
+    syncRosters(); seedVaoems(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
@@ -621,7 +654,8 @@ function shell() {
   ${S.ship ? shipModal() : ''}
   ${S.dueEd ? dueModal() : ''}
   ${adminModals()}
-  ${S.packet ? packetModal() : ''}`;
+  ${S.packet ? packetModal() : ''}
+  ${S.roster ? rosterModal() : ''}`;
 }
 
 function pageTitle() {
@@ -869,6 +903,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       if (kind === 'ctodo' && isShirtItem(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="packetOpen" title="Print Packet" aria-label="Print Packet">${PRINTER}</button>`
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
         + `<a class="eye pirate-link" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome title="Pirate Ship ↗" aria-label="Pirate Ship (opens in Chrome)">${PIRATE}${ARROW_OUT}</a></span>`;
+      if (kind === 'ctodo' && t.roster) open = rosterBtn(t);
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -976,6 +1011,7 @@ function infoBox() {
     ${row('Academy Week', aw)}
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
     ${row('Google Meet', meet)}
+    ${row('VAOEMS course #', i.courseNos ? esc(i.courseNos) : tbd)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
     ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
   </div>
@@ -1004,6 +1040,9 @@ function setupAuto(text) {
   } else if (/active/i.test(text) && /(upcoming|flip|this)/i.test(text)) {
     out.done = /active/i.test(st);
     if (!out.done && st) out.btn = statusBtn(S.cohortKey, 'Active');
+  } else if (/vaoems/i.test(text) && /register/i.test(text)) { // the course # goes in AF4 (Course Details)
+    if (i.courseNo) { out.done = true; out.note = ` <em class="tag-soft">#${esc(i.courseNos)}</em>`; }
+    else out.btn = '<button class="btn tiny" data-act="courseNoOpen">Enter course #</button>';
   } else if (/as they enroll|student information/i.test(text)) {
     const n = students().length;
     out.note = ` <em class="tag-soft">${n} enrolled</em>`;
@@ -1130,7 +1169,7 @@ function box(b, n) {
       + (setupComplete() ? '<button class="link" data-act="setupShow">Hide list</button>' : ''))
       + setupList() + addRow(SETUP, 'setup', '+ add item') + (setupComplete() ? '' : prevChanges());
   } else if (b === 'ctodo') {
-    if (!setupComplete()) return ''; // shows once the Setup Checklist is done
+    if (!setupComplete() && !hasRosterTodos()) return ''; // shows once the Setup Checklist is done (or an orientation roster is waiting)
     const k = 'add-ctodo-' + SETUP;
     body = head('Course To-Do', (itemsFor(SETUP, 'ctodo').some(t => t.done) ? hideToggle('ctodo') : '')
       + '<button class="add-plus small-plus" data-act="chAdd" data-k="ctodo" title="Add a to-do" aria-label="Add a to-do">+</button>')
@@ -1554,14 +1593,15 @@ function newCohortModal() {
 
 // Course details: the cohort sheet's settings box (AG5:AG34), typed here instead of in the sheet.
 // prefix = 'ie-' (Course Details pencil) or 'nc-' (New Cohort); form.reviews = review dates (yyyy-MM-dd).
+// courseNos: the VAOEMS course # (AF4), and " / " the late one (AG4) when the state assigns a second.
 const COURSE_FIELDS = [['firstDay', 'Orientation', 'date'], ['cpr', 'Full CPR course', 'date'], ['academyStart', 'Academy Week start', 'date'],
-  ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text']];
+  ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text'], ['courseNos', 'VAOEMS course #', 'text']];
 function courseFields(prefix, form) {
   const dis = form.busy ? 'disabled' : '';
   return `<div class="course-fields">
     ${COURSE_FIELDS.map(([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
       ? datePicker(prefix + k, { optional: true, title: label })
-      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : ''}" autocomplete="off" ${dis}>`}</div>`).join('')}
+      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 12345 (late one: 12345 / 67890)' : ''}" autocomplete="off" ${dis}>`}</div>`).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
       ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
       ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
@@ -2308,6 +2348,7 @@ document.addEventListener('keydown', e => {
     else if (emailEscape()) { /* closed an email pop-up */ }
     else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }
+    else if (S.roster) { if (S.roster.busy) return; if (S.roster.url) URL.revokeObjectURL(S.roster.url); S.roster = null; }
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
@@ -2584,6 +2625,9 @@ async function act(a, el = {}, e) {
         S.infoEdit = { busy: false, err: '', reviews: [...orig.reviews], orig };
         render(); break;
       }
+      case 'courseNoOpen': // Setup Checklist → "Enter course #": Course Details with the course # box ready to type in
+        await act('infoEditOpen');
+        setTimeout(() => { const el = document.getElementById('ie-courseNos'); if (el) el.focus(); }, 30); break;
       case 'infoEditClose': if (S.infoEdit && S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); render(); break;
       case 'infoEditSave': {
         const f = S.infoEdit; if (!f || f.busy) return;
@@ -2790,7 +2834,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });

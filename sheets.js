@@ -16,10 +16,17 @@
                                     (for Key Dates on the Admin page)
      listInquiries / checkInquiries / saveInquiry / deleteInquiry / saveInquirySettings
                                  -> the Info Requests tracker on the Admin page (the config sheet's Info Requests tab)
+     signLinks(key, roster, names) -> each student's private orientation roster signing link code (Test cohorts until December)
+     rosterSigs(key, date)       -> the signatures on one orientation roster so far (Drive), with the images
+     clearRosterSig(key, date, name) -> takes one off (Drive trash) and unticks their Orientation Roster box (H)
+     saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort folder (replaces one of the same name)
 
-   Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes.
+   Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes, and
+   their first class assignments: First Class Paperwork (G) as fcp, Orientation Roster (H) as orientRoster,
+   Ride Along Agreement (L) as rideAgreement.
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
-   review dates) as `info`, plus its status and links to its sheet and folder.
+   review dates, and the VAOEMS course # in AF4 / late course # in AG4) as `info`, plus its status and links
+   to its sheet and folder.
 
    In sample mode it answers with pretend data instead. */
 const Sheets = (() => {
@@ -54,6 +61,10 @@ const Sheets = (() => {
     deleteInquiry: id => call('deleteInquiry', { id }),
     cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
     shirtSheet: key => call('shirtSheet', { cohort: key }), // { name, url, rows: [{ row, printed, full, email, size, street, unit, city, state, zip, shipped, note }] }
+    signLinks: (key, roster, names) => call('signLinks', { cohort: key, roster, names }).then(o => o.links), // { name: code }
+    rosterSigs: (key, date) => call('rosterSigs', { cohort: key, date }).then(o => o.sigs), // [{ name, signedAt, late, png (base64) }]
+    clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
+    saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
   };
 })();
 
@@ -73,6 +84,7 @@ function sampleSheets() {
     'Foster, Amara', 'Grant, Elijah', 'Hughes, Sophie', 'Iverson, Caleb', 'Jackson, Nia', 'Keller, Ryan',
     'Lopez, Isabella', 'Morgan, Avery', 'Nguyen, Daniel', 'Owens, Harper', 'Patel, Riya', 'Test Student'];
   const KEY = 'academy-week-sample-pc';
+  const sampleSigs = {}; // sample mode: no student signs (Copy signing link opens nothing real)
   const counts = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
   const start = new Date(); start.setDate(start.getDate() - 1); // "today" is Day 2 in sample mode
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -98,7 +110,7 @@ function sampleSheets() {
   const orient = new Date(start); orient.setDate(orient.getDate() - 119);
   const reviews = [7, 14, 28, 42].map(n => { const d = new Date(orient); d.setDate(d.getDate() + n); return iso(d); });
 
-  const blank = { jbl: '', firstDay: '', cpr: '', academyStart: '', meet: '', reviews: [] };
+  const blank = { jbl: '', firstDay: '', cpr: '', academyStart: '', meet: '', reviews: [], courseNo: '', lateCourseNo: '', courseNos: '' };
   const saved = {}; // course details "written to the sheet" in sample mode
   const fresh = key => (cohorts.find(c => c.key === key) || {}).status === 'Upcoming' && !saved[key];
   const infoFor = key => saved[key] || (fresh(key) ? { ...blank }
@@ -113,7 +125,9 @@ function sampleSheets() {
       return wait({ cohort: key, info: saved[key] || null });
     },
     async saveSettings(key, info) {
-      saved[key] = { ...infoFor(key), ...info };
+      const next = { ...infoFor(key), ...info };
+      if ('courseNos' in info) { const [a = '', b = ''] = String(info.courseNos || '').split('/').map(x => x.trim()); Object.assign(next, { courseNo: a, lateCourseNo: b, courseNos: [a, b].filter(Boolean).join(' / ') }); }
+      saved[key] = next;
       return wait(saved[key]);
     },
     async setStatus(key, status) {
@@ -127,7 +141,8 @@ function sampleSheets() {
       info,
       academyStart: info.academyStart,
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5),
-        email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0 })),
+        email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0,
+        fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2 })),
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
     }); },
@@ -162,6 +177,10 @@ function sampleSheets() {
       return wait(cohorts.filter(c => /^(active|upcoming)$/i.test(c.status)).map(c => { const i = infoFor(c.key);
         return { key: c.key, status: c.status, firstDay: i.firstDay, cpr: i.cpr, academyStart: i.academyStart }; }));
     },
+    async signLinks(key, roster, names) { return wait(Object.fromEntries(names.map(n => [n, 'sample.' + btoa(JSON.stringify({ c: key, d: roster.date, n }))]))); },
+    async rosterSigs(key, date) { return wait(Object.entries(sampleSigs).filter(([, v]) => v.date === date).map(([name, v]) => ({ name, signedAt: v.at, late: false, png: v.png }))); },
+    async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
+    async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),

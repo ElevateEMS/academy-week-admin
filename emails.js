@@ -26,7 +26,13 @@ function emailTemplates({ all = false } = {}) {
 const tplById = id => emailTemplates({ all: true }).find(t => t.id === id);
 
 // check (Cohort Graduates): everyone attending Academy Week, all checked; you uncheck anyone when you draft it.
-const WHO = { all: 'Whole cohort', check: 'Cohort Graduates', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final', pick: 'Students you pick' };
+const WHO = { all: 'Whole cohort', check: 'Cohort Graduates', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final',
+  firstclass: 'Missing a first class assignment', pick: 'Students you pick' };
+// The first class assignments (cohort sheet columns G, L, H), in the order the reminder lists them.
+const FIRST_CLASS = [['fcp', 'first class paperwork/syllabus signatures'], ['rideAgreement', 'ride along agreement'], ['orientRoster', 'orientation roster']];
+const andList = a => a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ', and ' + a[a.length - 1];
+// A template's time of day (when.hour, 0-23; when.lateHour for late enrollees, who can also be when.lateDays later).
+const hourText = h => h === 12 ? 'noon' : h === 0 ? 'midnight' : (h > 12 ? h - 12 : h) + (h >= 12 ? ' PM' : ' AM');
 const FROM = { enroll: 'As each student enrolls', orientation: 'Orientation', next: 'Next installment due', final: 'Final installment due', academy: 'Academy Week start', manual: 'Only when you pick it' };
 function whenText(w) {
   if (w.from === 'enroll' || w.from === 'manual') return FROM[w.from];
@@ -36,6 +42,9 @@ function whenText(w) {
   const span = a >= 14 && a % 7 === 0 ? (a / 7) + ' weeks' : a + ' day' + (a === 1 ? '' : 's');
   return span + (n < 0 ? ' before ' : ' after ') + name;
 }
+const whenFull = w => whenText(w) + (w.hour != null ? ' · ' + hourText(w.hour) : '')
+  + (w.lateDays || w.lateHour != null ? ' (late enrollees: ' + (w.lateDays ? w.lateDays + ' day' + (w.lateDays === 1 ? '' : 's') + ' later' : 'same day')
+    + (w.lateHour != null ? ', ' + hourText(w.lateHour) : '') + ')' : '');
 
 /* ---------- Dates the way the emails write them ---------- */
 // Dec 12 → Nov 12 (the last day of the month when that month is shorter)
@@ -50,7 +59,10 @@ function emDate(iso, { short = false } = {}) {
   const yr = d.getFullYear() !== new Date().getFullYear() ? ', ' + d.getFullYear() : '';
   return wd + (short ? '., ' : ', ') + d.toLocaleDateString('en-US', { month: 'long' }) + ' ' + ordinal(d.getDate()) + yr;
 }
-const emSoon = iso => { const t = todayIso(); return !iso ? 'new' : iso === t ? 'today' : iso === addDays(t, 1) ? 'tomorrow' : iso < t ? 'was due ' + monthDay(iso) : monthDay(iso); };
+const emSoon = (iso, hour) => { const t = todayIso(), at = hour != null && iso >= t ? ' at ' + hourText(hour) : '';
+  return !iso ? 'new' : iso === t ? 'today' + at : iso === addDays(t, 1) ? 'tomorrow' + at : iso < t ? 'was due ' + monthDay(iso) : monthDay(iso) + at; };
+// Due now: a dated email is due from the start of its day, or from its time of day when it has one.
+const emDueNow = r => !r.date || r.date < todayIso() || (r.date === todayIso() && new Date().getHours() >= (r.hour || 0));
 
 /* ---------- Students, as the emails see them ---------- */
 // Blocked (in the sheet) and not attending (in the app) are left out; Paused stay in.
@@ -72,6 +84,9 @@ function emPerson(s) {
     sent, bookCode: doc.bookCode || '',
     // Enrolled after the cohort's orientation and their own date isn't in yet.
     needsLate: !late && !sent.welcome && pastOrientation(),
+    // First class assignments not ticked in the sheet yet (null until the Admin Apps Script sends those columns).
+    missing: s.fcp === undefined ? null : FIRST_CLASS.filter(([k]) => !s[k]).map(([, label]) => label),
+    orientRoster: !!s.orientRoster,
   };
 }
 const emPeople = () => students().filter(s => !s.out).map(emPerson);
@@ -86,6 +101,7 @@ function whoFits(t, p) {
   if (t.who === 'textbook') return p.textbook;
   if (t.who === 'unpaid-next') return !p.paidNext;
   if (t.who === 'unpaid-final') return !p.paidFinal;
+  if (t.who === 'firstclass') return !!(p.missing && p.missing.length);
   if (t.who === 'pick') return false;
   return true;
 }
@@ -122,11 +138,12 @@ function emailRows() {
         if (p.needsLate && from !== 'academy') return; // waits for their own orientation date (asked on their Welcome)
         const a = emAnchor(from, p);
         if (!a.date) { undated.add(from); return; }
-        date = addDays(a.date, Number(t.when.days) || 0); custom = a.custom;
-        if (date < start) return; // before the Emails box started: already handled by hand
+        date = addDays(a.date, (Number(t.when.days) || 0) + (a.custom && p.late ? Number(t.when.lateDays) || 0 : 0)); custom = a.custom;
+        if (date < start || (t.since && date < t.since)) return; // before the Emails box (or this template) started: already handled by hand
       }
       const key = t.id + '|' + (custom ? p.sid : 'cohort') + '|' + date;
-      (rows[key] = rows[key] || { key, tpl: t, date, custom, sids: [] }).sids.push(p.sid);
+      const hour = custom && p.late && t.when.lateHour != null ? t.when.lateHour : t.when.hour;
+      (rows[key] = rows[key] || { key, tpl: t, date, custom, hour, sids: [] }).sids.push(p.sid);
     });
   });
   // Same day: in the order of the template list (on track before behind, etc.).
@@ -142,6 +159,7 @@ function rowWho(r) {
   if (r.custom || n === 1) { const p = emPersonBySid(r.sids[0]); return p ? esc(p.name) : '1 student'; }
   if (r.tpl.when.from === 'enroll') return n + ' new student' + s;
   if (/^unpaid/.test(r.tpl.who)) return n + ' unpaid';
+  if (r.tpl.who === 'firstclass') return n + ' missing something';
   if (r.tpl.who === 'textbook') return n + ' with Textbook';
   return n + ' student' + s;
 }
@@ -152,9 +170,9 @@ const freeCodes = () => (S.bookCodes || []).filter(c => !c.sid).sort((a, b) => (
 const MAIL = '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="M4 7l8 6 8-6"/></svg>';
 function emailsBox() {
   const rows = emailRows(), t = todayIso();
-  const due = rows.filter(r => !r.date || r.date <= t), later = rows.filter(r => r.date && r.date > t);
+  const due = rows.filter(emDueNow), later = rows.filter(r => !emDueNow(r));
   const row = r => `<li class="em-row ${r.date && r.date < t ? 'overdue' : ''}">
-      <span class="em-main"><span class="em-name">${esc(r.tpl.name)}</span><span class="em-sub">${emSoon(r.date)} · ${rowWho(r)}</span></span>
+      <span class="em-main"><span class="em-name">${esc(r.tpl.name)}</span><span class="em-sub">${emSoon(r.date, r.hour)} · ${rowWho(r)}</span></span>
       ${EM_SKIPPABLE.includes(r.tpl.id) ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed for this cohort" aria-label="Not needed for this cohort">×</button>` : ''}
       <button class="btn tiny" data-act="emDraft" data-row="${esc(r.key)}">Draft</button></li>`;
   const notes = [];
@@ -182,6 +200,8 @@ const EM_IFS = {
   'owes next': p => !!(p && !p.paidNext), 'owes final': p => !!(p && !p.paidFinal),
   'owes tuition': p => !!(p && (!p.paidNext || !p.paidFinal)), 'paid in full': p => !!(p && p.paidNext && p.paidFinal),
   'has book': p => !!(p && p.textbook), 'needs book': p => !!(p && !p.textbook), extension: p => !!(p && (p.ext.next || p.ext.final)),
+  'one missing': p => !!(p && p.missing && p.missing.length === 1),
+  signing: p => !!(p && p.signLink), // their orientation roster signing link is in (Test cohorts until December)
 };
 function emTest(expr, p, group) {
   return expr.split(/\s+and\s+/i).every(term => {
@@ -220,11 +240,12 @@ function emValues(p) {
     'fingerprinting deadline': isIsoDate(aw) ? emDate(monthBefore(aw)) : '',
     'meet link': meet, 'jbl code': i.jbl || '',
     'referral code': p ? referralCode(p.name) : '', 'book code': p ? (p.code || p.bookCode || '') : '',
+    'missing items': p && p.missing ? andList(p.missing) : '', 'sign link': p ? p.signLink || '' : '',
   };
   [1, 2, 3, 4, 5].forEach(n => { const d = days.find(x => x.n === n); v['day ' + n] = d ? emDate(d.iso, { short: true }) : ''; });
   return v;
 }
-const EM_PERSONAL = ['first name', 'full name', 'referral code', 'book code'];
+const EM_PERSONAL = ['first name', 'full name', 'referral code', 'book code', 'missing items', 'sign link'];
 // → { subject, body, missing: [fill-ins that came out TBD] }
 const OLD_SIGNOFF = /\n*Best regards,\s*\n\s*\n?\s*Gabriella Brown\s*\n\s*Elevate EMS, LLC\s*$/;
 function emFill(t, p, group) {
@@ -275,6 +296,7 @@ function emBuild(ed) {
   const t = tplById(ed.tplId);
   if (!t) return [];
   const people = ed.sids.map(emPersonBySid).filter(Boolean);
+  people.forEach(p => { p.signLink = (ed.links || {})[p.sid] || ''; });
   if (t.id === 'bookcode') { // the codes these students would get (the real ones are claimed when the drafts are made)
     const free = freeCodes();
     people.filter(p => !p.bookCode).forEach((p, i) => { p.code = free[i] ? free[i].code : '[[no unused book code left]]'; });
@@ -321,12 +343,14 @@ function emailDraftModal() {
       <button class="x" data-act="emIdx" data-dir="1" ${ed.idx < drafts.length - 1 ? '' : 'disabled'} aria-label="Next">›</button></div>` : '';
   const ready = drafts.filter(x => x.to), skipped = drafts.length - ready.length;
   const blocked = !drafts.length ? 'Nobody to email.' : lateList.length ? 'Add their orientation date and time first.'
+    : ed.linksBusy ? 'Making their orientation roster signing links…'
     : !ready.length ? 'Nobody here has an email in the cohort sheet.' : ready.some(x => /\[\[[^\]]+\]\]/.test(x.subject + x.body)) ? 'Fill in the highlighted parts first.' : '';
   return `<div class="overlay" data-act="emDraftClose"><div class="modal em-draft" data-stop>
     <div class="modal-head"><h2>${esc(t.name)}</h2>${ed.busy ? '' : '<button class="x big" data-act="emDraftClose" aria-label="Close">×</button>'}</div>
     <div class="modal-body pad-top" data-keep-scroll="emDraft">
       ${latePanel}
       ${t.note ? `<p class="em-note">${esc(t.note)}</p>` : ''}
+      ${ed.linksErr ? `<p class="em-warn">Couldn’t make the signing links, so the emails go without them: ${esc(ed.linksErr)}</p>` : ''}
       ${nav}
       ${dr ? `${recips}
       <label class="field">Subject<input id="em-subj-${dr.key}" data-emedit="subject" data-key="${dr.key}" value="${esc(dr.subject)}" ${ed.busy ? 'disabled' : ''}></label>
@@ -350,7 +374,7 @@ function emailPickModal() {
   let body;
   if (!t) {
     body = `<p class="muted small">Any template, any time: send someone their book code early, a congratulations, an incomplete.</p>
-      <div class="em-pick-list">${emailTemplates().map(x => `<button class="em-pick" data-act="emPickTpl" data-id="${x.id}"><b>${esc(x.name)}</b><span>${esc(whenText(x.when))} · ${x.send === 'bcc' ? 'BCC' : 'one per student'}</span></button>`).join('')}</div>`;
+      <div class="em-pick-list">${emailTemplates().map(x => `<button class="em-pick" data-act="emPickTpl" data-id="${x.id}"><b>${esc(x.name)}</b><span>${esc(whenFull(x.when))} · ${x.send === 'bcc' ? 'BCC' : 'one per student'}</span></button>`).join('')}</div>`;
   } else {
     const people = emPeople();
     const all = people.length && people.every(p => pk.sids.includes(p.sid));
@@ -462,8 +486,8 @@ function bookCodesModal() {
 
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
-  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code}</p>
-  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension. Join with “and”; put “not” in front to flip one.</p>
+  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {sign link} (their orientation roster signing link)</p>
+  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 function emailTplModal() {
   const ed = S.emailTplEd, list = emailTemplates({ all: true });
@@ -500,7 +524,7 @@ function emailTplModal() {
   return `<div class="overlay" data-act="emtClose"><div class="modal em-tpl ${ed.view === 'edit' ? 'editing' : ''}" data-stop>
     <div class="modal-head"><h2>Email Templates</h2><button class="x big" data-act="emtClose" aria-label="Close">×</button></div>
     <div class="em-tpl-grid">
-      <div class="em-tpl-list">${list.map(t => `<button class="em-pick ${ed.sel === t.id ? 'on' : ''} ${t.off ? 'off' : ''}" data-act="emtSel" data-id="${t.id}"><b>${esc(t.name)}</b><span>${esc(whenText(t.when))}</span></button>`).join('')}
+      <div class="em-tpl-list">${list.map(t => `<button class="em-pick ${ed.sel === t.id ? 'on' : ''} ${t.off ? 'off' : ''}" data-act="emtSel" data-id="${t.id}"><b>${esc(t.name)}</b><span>${esc(whenFull(t.when))}</span></button>`).join('')}
         <button class="link em-new" data-act="emtNew">+ New template</button></div>
       <div class="modal-body" data-keep-scroll="emTpl">${form}</div>
     </div>
@@ -583,7 +607,7 @@ async function emailAct(a, el, e) {
       if (!r) { render(); return true; }
       if (r.pick) { S.emailPick = { tplId: r.tpl.id, sids: r.tpl.who === 'check' ? emPeople().map(p => p.sid) : [], date: r.date }; render(); return true; }
       S.emailDraft = { tplId: r.tpl.id, sids: r.sids, date: r.date, custom: r.custom, idx: 0, edits: {} };
-      emLateDrafts(); render(); return true;
+      emLateDrafts(); render(); emSignLinks(); return true;
     }
     case 'emDraftClose':
       if (S.emailDraft && S.emailDraft.busy) return true;
@@ -612,7 +636,7 @@ async function emailAct(a, el, e) {
     case 'emPickGo': {
       const pk = S.emailPick;
       S.emailDraft = { tplId: pk.tplId, sids: [...pk.sids], date: pk.date || '', custom: false, idx: 0, edits: {} };
-      S.emailPick = null; emLateDrafts(); render(); return true;
+      S.emailPick = null; emLateDrafts(); render(); emSignLinks(); return true;
     }
 
     case 'emStuOpen': S.emailStuOpen = true; S.emailStu = null; render(); return true;
@@ -693,7 +717,7 @@ async function emailAct(a, el, e) {
     case 'emtSave': {
       const ed = S.emailTplEd, dr = ed.draft;
       if (!dr.name.trim()) { toast('Give it a name.'); return true; }
-      await Store.set('emailTemplates/' + ed.sel, { ...dr, name: dr.name.trim(), when: { from: dr.when.from, days: Number(dr.when.days) || 0 } }, false);
+      await Store.set('emailTemplates/' + ed.sel, { ...dr, name: dr.name.trim(), when: { ...dr.when, from: dr.when.from, days: Number(dr.when.days) || 0 } }, false); // (keeps a time of day)
       ed.dirty = false; toast('Template saved.'); render(); return true;
     }
     case 'emtReset': {
@@ -715,6 +739,25 @@ async function emailAct(a, el, e) {
   }
   return false;
 }
+// A draft that can carry {sign link}: each student who hasn't signed their orientation roster gets their own
+// private link (roster.js; only Test cohorts until December).
+async function emSignLinks() {
+  const ed = S.emailDraft, t = ed && tplById(ed.tplId);
+  if (!t || !signingOn() || !/\{sign link\}/i.test(t.body + t.subject)) return;
+  const people = ed.sids.map(emPersonBySid).filter(p => p && !p.orientRoster && isIsoDate(p.orient));
+  if (!people.length) return;
+  ed.linksBusy = true; ed.linksErr = ''; render();
+  try {
+    const links = {};
+    for (const d of [...new Set(people.map(p => p.orient))]) {
+      const r = rosterFor(d); if (!r) continue;
+      Object.assign(links, await signLinksFor(r, people.filter(p => p.orient === d)));
+    }
+    if (S.emailDraft === ed) ed.links = links;
+  } catch (e) { ed.linksErr = e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''); }
+  ed.linksBusy = false; render();
+}
+
 // The late-enrollee date/time boxes in the draft pop-up start from whatever's saved.
 function emLateDrafts() {
   (S.emailDraft ? S.emailDraft.sids : []).forEach(sid => {
