@@ -10,8 +10,8 @@
 <title>Orientation Roster · Elevate EMS</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#f3ece6">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=170">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=170">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=171">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=171">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
@@ -58,8 +58,8 @@
 <main class="card" id="app"><p class="loading">Opening your roster…</p></main>
 <p class="foot">Elevate EMS Academy · Questions? Reply to the email this link came in.</p>
 
-<script src="config.js?v=170"></script>
-<script src="sigpad.js?v=170"></script>
+<script src="config.js?v=171"></script>
+<script src="sigpad.js?v=171"></script>
 <script>
   const app = document.getElementById('app');
   const token = new URLSearchParams(location.search).get('t') || '';
@@ -86,7 +86,7 @@
       <div class="line">
         <span>Name</span><b>${esc(info.name)}</b>
         <span>Course</span><b>${esc(info.cohort)} EMT</b>
-        ${info.courseNo ? `<span>Course #</span><b>${esc(info.courseNo)}</b>` : ''}
+        ${info.courseNo ? `<span>Course No.</span><b>#${esc(String(info.courseNo).replace(/#/g, '').trim())}</b>` : ''}
         <span>Orientation</span><b>${esc(info.date)}</b>
         ${info.times ? `<span>Times</span><b>${esc(info.times)}</b>` : ''}
         <span>Topic</span><b>Orientation</b>

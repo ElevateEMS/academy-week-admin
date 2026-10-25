@@ -1012,7 +1012,7 @@ function infoBox() {
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
     ${row('Google Meet', meet)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
-    ${row('VAOEMS course #', i.courseNos ? esc(i.courseNos) : tbd)}
+    ${row('VAOEMS Course No.', i.courseNos ? esc(courseNoText(i.courseNos)) : tbd)}
     ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
   </div>
   <div class="info-links">
@@ -1041,8 +1041,8 @@ function setupAuto(text) {
     out.done = /active/i.test(st);
     if (!out.done && st) out.btn = statusBtn(S.cohortKey, 'Active');
   } else if (/vaoems/i.test(text) && /register/i.test(text)) { // the course # goes in AF4 (Course Details)
-    if (i.courseNo) { out.done = true; out.note = ` <em class="tag-soft">#${esc(i.courseNos)}</em>`; }
-    else out.btn = '<button class="btn tiny" data-act="courseNoOpen">Enter course #</button>';
+    if (i.courseNo) { out.done = true; out.note = ` <em class="tag-soft">${esc(courseNoText(i.courseNos))}</em>`; }
+    else out.btn = '<button class="btn tiny" data-act="courseNoOpen">Enter Course No.</button>';
   } else if (/as they enroll|student information/i.test(text)) {
     const n = students().length;
     out.note = ` <em class="tag-soft">${n} enrolled</em>`;
@@ -1594,14 +1594,17 @@ function newCohortModal() {
 // Course details: the cohort sheet's settings box (AG5:AG34), typed here instead of in the sheet.
 // prefix = 'ie-' (Course Details pencil) or 'nc-' (New Cohort); form.reviews = review dates (yyyy-MM-dd).
 // courseNos: the VAOEMS course # (AF4), and " / " the late one (AG4) when the state assigns a second.
+// Kept as plain numbers in the sheet; shown with a # in front of each: "#242999 / #8375636".
+const plainCourseNos = v => String(v || '').split('/').map(x => x.replace(/#/g, '').trim()).filter(Boolean).join(' / ');
+const courseNoText = v => plainCourseNos(v).split(' / ').filter(Boolean).map(x => '#' + x).join(' / ');
 const COURSE_FIELDS = [['firstDay', 'Orientation', 'date'], ['cpr', 'Full CPR course', 'date'], ['academyStart', 'Academy Week start', 'date'],
-  ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text'], ['courseNos', 'VAOEMS course #', 'text']];
+  ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text'], ['courseNos', 'VAOEMS Course No.', 'text']];
 function courseFields(prefix, form) {
   const dis = form.busy ? 'disabled' : '';
   // (the course # box comes after Review sessions, the same order as the Course Details box)
   const field = ([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
       ? datePicker(prefix + k, { optional: true, title: label })
-      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 12345 (late one: 12345 / 67890)' : ''}" autocomplete="off" ${dis}>`}</div>`;
+      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 242999 (late one: 242999 / 8375636)' : ''}" autocomplete="off" ${dis}>`}</div>`;
   return `<div class="course-fields">
     ${COURSE_FIELDS.filter(([k]) => k !== 'courseNos').map(field).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
@@ -1615,6 +1618,7 @@ const courseForm = prefix => prefix === 'ie-' ? S.infoEdit : S.newCohort;
 function courseValues(prefix) {
   const out = {};
   COURSE_FIELDS.forEach(([k]) => { out[k] = String(S.drafts[prefix + k] || '').trim(); });
+  out.courseNos = plainCourseNos(out.courseNos); // (a typed # isn't saved: the sheet keeps the plain number)
   out.reviews = [...courseForm(prefix).reviews];
   return out;
 }
@@ -2628,7 +2632,7 @@ async function act(a, el = {}, e) {
         S.infoEdit = { busy: false, err: '', reviews: [...orig.reviews], orig };
         render(); break;
       }
-      case 'courseNoOpen': // Setup Checklist → "Enter course #": Course Details with the course # box ready to type in
+      case 'courseNoOpen': // Setup Checklist → "Enter Course No.": Course Details with the course # box ready to type in
         await act('infoEditOpen');
         setTimeout(() => { const el = document.getElementById('ie-courseNos'); if (el) el.focus(); }, 30); break;
       case 'infoEditClose': if (S.infoEdit && S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); render(); break;

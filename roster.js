@@ -60,7 +60,7 @@ const rosterName = name => { const c = String(name).replace(/\s*\([^)]*\)/g, '')
 const rosterDoc = date => (S.rosterDocs || {})[date] || {};
 const onRoster = (r, doc = rosterDoc(r.date)) => r.people.filter(p => !(doc.out || {})[p.sid]);
 const sheetStudent = sid => (S.sheet && S.sheet.students || []).find(s => slug(s.name) === sid) || {};
-const courseNoFor = r => { const i = cohortInfo(); return (r.late && i.lateCourseNo) || i.courseNo || ''; };
+const courseNoFor = r => { const i = cohortInfo(); return String((r.late && i.lateCourseNo) || i.courseNo || '').replace(/#/g, '').trim(); }; // (plain: the form's column already says Course #)
 // Signed: from the signatures in Drive once they've been read, otherwise the Orientation Roster box (column H).
 function signedMap(r) {
   const got = (S.rosterSigs || {})[r.date], out = {};
@@ -169,7 +169,7 @@ function rosterModal() {
         <span><span class="muted small">Topic</span> <b>Orientation</b></span>
         <span class="ro-count ${c.signed === c.total && c.total ? 'all' : ''}">${c.signed}/${c.total} signed</span>
       </div>
-      ${!courseNo ? '<p class="em-warn">No VAOEMS course # yet: add it in Course Details (pencil) so it prints on the roster.</p>' : ''}
+      ${!courseNo ? '<p class="em-warn">No VAOEMS Course No. yet: add it in Course Details (pencil) so it prints on the roster.</p>' : ''}
       ${got.err ? `<div class="alert">${esc(got.err)}</div>` : ''}
       <p class="mini-head">Students</p>
       <table class="roster ro-table"><thead><tr><th class="c">#</th><th>Name</th><th class="c">Times</th><th>Signature</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nobody yet.</td></tr>'}</tbody></table>
