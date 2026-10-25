@@ -263,6 +263,24 @@ async function loadCohortDates() {
   catch (e) { S.kdErr = /unknown request/i.test(e.message) ? 'Course dates need the new Admin Apps Script version deployed.' : e.message; }
   S.kdBusy = false; S.kdAt = Date.now(); render();
 }
+// Bella's and Nick's recerts from CertKeeper (its elevateCerts function, which only answers our two
+// staff sign-ins): certs that expire, once they're inside their earliest CertKeeper reminder.
+// CertKeeper sends the reminder emails; this only shows them here. They stay up until renewed there.
+const CERTKEEPER_URL = 'https://us-central1-certkeeper-e198e.cloudfunctions.net/elevateCerts';
+async function loadRecerts() {
+  if (S.rcBusy || !Store.configured) return;
+  S.rcBusy = true;
+  try {
+    const res = await fetch(CERTKEEPER_URL, { headers: { Authorization: 'Bearer ' + await Store.idToken() } });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'CertKeeper didn’t answer.');
+    S.recerts = out.certs || []; S.rcErr = '';
+  } catch (e) { S.rcErr = 'Couldn’t check CertKeeper: ' + e.message; }
+  S.rcBusy = false; S.rcAt = Date.now(); render();
+}
+const recertKeyDates = () => (S.recerts || []).filter(c => isIsoDate(c.expiresOn))
+  .map(c => ({ id: 'ck-' + c.id, date: c.expiresOn, text: `${c.who}: ${c.abbr || c.name} expires`, auto: true, recert: true }));
+
 const AW_DAYS = 5; // Academy Week: start date + 4 more days
 function cohortKeyDates() {
   const out = [];
@@ -284,14 +302,16 @@ function dateRange(a, b) {
 }
 function adminDatesBox() {
   if (!S.kdBusy && (!S.kdAt || Date.now() - S.kdAt > 5 * 60e3)) setTimeout(() => loadCohortDates(), 0); // fresh every 5 minutes while open
+  if (!S.rcBusy && (!S.rcAt || Date.now() - S.rcAt > 30 * 60e3)) setTimeout(() => loadRecerts(), 0); // CertKeeper: every 30 minutes
   const t = todayIso(), byDate = (a, b) => a.date.localeCompare(b.date);
-  const all = [...S.adminDates, ...cohortKeyDates()];
-  const over = x => (x.end || x.date) < t; // Academy Week stays up until its last day is over
+  const all = [...S.adminDates, ...cohortKeyDates(), ...recertKeyDates()];
+  const over = x => !x.recert && (x.end || x.date) < t; // Academy Week stays up until its last day is over; a recert until it's renewed
   const next = all.filter(x => !over(x)).sort(byDate);
   const past = all.filter(over).sort(byDate).reverse();
   const item = x => {
     const now = x.end && x.date <= t && t <= x.end;
-    const away = now ? 'this week' : daysAway(x.date), soon = now || (x.date >= t && Math.round((parseIso(x.date) - parseIso(t)) / 864e5) <= 14);
+    const away = now ? 'this week' : x.recert && x.date < t ? 'expired' : daysAway(x.date);
+    const soon = now || (x.recert && x.date < t) || (x.date >= t && Math.round((parseIso(x.date) - parseIso(t)) / 864e5) <= (x.recert ? 30 : 14));
     // Cohort dates skip the year (their title has it); your own dates show it when it isn't this year.
     const when = x.end ? dateRange(x.date, x.end)
       : parseIso(x.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(!x.auto && x.date.slice(0, 4) !== t.slice(0, 4) ? { year: 'numeric' } : {}) });
@@ -304,7 +324,7 @@ function adminDatesBox() {
     ${S.adminDateAdd ? `<div class="kd-form"><div class="kd-add">${datePicker('ad-date')}<input id="ad-text" data-draft="ad-text" data-add="adminDate" placeholder="What’s happening?" value="${esc(S.drafts['ad-text'] || '')}" autocomplete="off"></div>
       <div class="link-add-foot"><button class="link" data-act="adminDateCancel">Cancel</button><button class="btn small primary" data-act="adminDateAdd">Add date</button></div></div>` : ''}
     <ul class="checks key-dates">${next.map(item).join('') || '<li class="empty">No dates coming up.</li>'}${S.adminShowPast ? past.map(item).join('') : ''}</ul>
-    ${S.kdErr ? `<p class="muted small">${esc(S.kdErr)}</p>` : ''}
+    ${S.kdErr ? `<p class="muted small">${esc(S.kdErr)}</p>` : ''}${S.rcErr ? `<p class="muted small">${esc(S.rcErr)}</p>` : ''}
   </section>`;
 }
 
