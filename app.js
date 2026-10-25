@@ -1011,8 +1011,8 @@ function infoBox() {
     ${row('Academy Week', aw)}
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
     ${row('Google Meet', meet)}
-    ${row('VAOEMS course #', i.courseNos ? esc(i.courseNos) : tbd)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
+    ${row('VAOEMS course #', i.courseNos ? esc(i.courseNos) : tbd)}
     ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
   </div>
   <div class="info-links">
@@ -1598,13 +1598,16 @@ const COURSE_FIELDS = [['firstDay', 'Orientation', 'date'], ['cpr', 'Full CPR co
   ['jbl', 'JBL course code', 'text'], ['meet', 'Google Meet link', 'text'], ['courseNos', 'VAOEMS course #', 'text']];
 function courseFields(prefix, form) {
   const dis = form.busy ? 'disabled' : '';
-  return `<div class="course-fields">
-    ${COURSE_FIELDS.map(([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
+  // (the course # box comes after Review sessions, the same order as the Course Details box)
+  const field = ([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
       ? datePicker(prefix + k, { optional: true, title: label })
-      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 12345 (late one: 12345 / 67890)' : ''}" autocomplete="off" ${dis}>`}</div>`).join('')}
+      : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 12345 (late one: 12345 / 67890)' : ''}" autocomplete="off" ${dis}>`}</div>`;
+  return `<div class="course-fields">
+    ${COURSE_FIELDS.filter(([k]) => k !== 'courseNos').map(field).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
       ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
       ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
+    ${COURSE_FIELDS.filter(([k]) => k === 'courseNos').map(field).join('')}
   </div>`;
 }
 const courseForm = prefix => prefix === 'ie-' ? S.infoEdit : S.newCohort;
