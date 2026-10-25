@@ -25,7 +25,7 @@ function packetModal() {
   if (p.url) {
     return `<div class="overlay" data-act="packetClose"><div class="modal pdf packet-view" data-stop>
       <div class="modal-head"><h2>Print Packet <span class="muted small">${p.count} student${p.count === 1 ? '' : 's'} · ${p.pages} pages</span></h2>
-        <span class="panel-actions"><a class="btn small" href="${p.url}" target="_blank" rel="noopener">Open in new tab ↗</a>
+        <span class="panel-actions"><a class="btn small" href="${p.url}" target="_blank" rel="noopener" data-chrome>Open in new tab ↗</a>
         <button class="btn small primary" data-act="packetPrint">${PRINTER_SMALL} Print</button>
         <button class="x big" data-act="packetClose" aria-label="Close">×</button></span></div>
       <iframe id="packetFrame" src="${p.url}" title="Print packet"></iframe>

@@ -948,8 +948,8 @@ function infoBox() {
     ${row('Students', list.length + ' enrolled' + (paused ? ` · ${paused} paused` : ''))}
   </div>
   <div class="info-links">
-    ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener">Cohort folder ↗</a>` : ''}
-    ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener">Cohort sheet ↗</a>` : ''}
+    ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Folder">Cohort folder ↗</a>` : ''}
+    ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet">Cohort sheet ↗</a>` : ''}
   </div>`;
 }
 
@@ -1348,7 +1348,7 @@ function shareModal() {
           <input class="share-url" readonly value="${esc(shareUrl(token))}" onclick="this.select()">
           <div class="share-btns">
             <button class="btn primary" data-act="shareCopy">Copy link</button>
-            <a class="btn" href="${esc(shareUrl(token))}" target="_blank" rel="noopener">Open it</a>
+            <a class="btn" href="${esc(shareUrl(token))}" target="_blank" rel="noopener" data-name="Instructor Schedule">Open it</a>
           </div>
           <p class="muted small">Anyone with this link can see the schedule, including squad names. The QR code is also printed on each Day page.${shareExpires() ? ` <b>It works until ${shareExpires().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</b>, then shuts off by itself.` : ''}</p>
           <div class="share-btns">
@@ -2276,7 +2276,8 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
-    if (S.datePick) S.datePick = null;
+    if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
+    else if (S.datePick) S.datePick = null;
     else if (emailEscape()) { /* closed an email pop-up */ }
     else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }

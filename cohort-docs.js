@@ -42,7 +42,7 @@ function setupDocBtn(text) {
   if (S.docsBusy === S.cohortKey) return '<span class="muted small">Making…</span>';
   const d = cohortDocs();
   if (!d) return `<button class="btn tiny" data-act="makeDocs" title="Makes this cohort’s syllabus (dates filled in), suggested schedule and Admin folder in the cohort folder">Make</button>`;
-  return `<a class="btn tiny" href="${esc(d[kind])}" target="_blank" rel="noopener">Open ↗</a>`;
+  return `<a class="btn tiny" href="${esc(d[kind])}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey + (kind === 'syllabus' ? ' Syllabus' : ' Suggested Schedule'))}">Open ↗</a>`;
 }
 async function makeCohortDocs({ quiet = false } = {}) {
   const key = S.cohortKey;

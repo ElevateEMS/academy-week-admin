@@ -134,11 +134,23 @@ function linksEdModal() {
     <div class="modal-foot"><button class="btn primary" data-act="lkSave">Save</button></div>
   </div></div>`;
 }
+// Every link that would open a new Chrome tab (Docs, Sheets, Drive folders, the instructor link…)
+// opens in this panel instead, with "Open in Chrome ↗" there. Google Meet (it needs the camera) and
+// links marked data-chrome still go straight to Chrome, and so does ⌘/Ctrl-click.
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[target="_blank"][href]');
+  if (!a || a.hasAttribute('data-chrome') || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  const url = a.href;
+  if (!/^https?:/i.test(url) || /\/\/meet\.google\.com\//i.test(url)) return;
+  e.preventDefault();
+  const name = a.dataset.name || a.textContent.replace(/↗/g, '').trim() || 'Link';
+  S.adminPanel = { name, url }; render();
+});
 function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
     <div class="modal-head"><h2>${esc(p.name)}</h2><span class="panel-actions">
-      <a class="btn small" href="${esc(p.url)}" target="_blank" rel="noopener" data-act="adminPanelClose">Open in Chrome ↗</a>
+      <a class="btn small" href="${esc(p.url)}" target="_blank" rel="noopener" data-chrome data-act="adminPanelClose">Open in Chrome ↗</a>
       <button class="x big" data-act="adminPanelClose" aria-label="Close">×</button></span></div>
     <iframe src="${esc(p.url)}" title="${esc(p.name)}" allow="clipboard-read; clipboard-write"></iframe>
   </div></div>`;
