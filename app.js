@@ -388,7 +388,7 @@ Store.onUser(async user => {
   // The last cohort used opens straight away (while the cohort list loads alongside it).
   const last = S.cohortKey;
   if (!S.cohorts.length) S.cohorts = keepCopy('cohorts') || []; // last list, until the fresh one arrives
-  if (last) selectCohort(last);
+  if (last && !window.CALLS_ONLY) selectCohort(last); // (the Inquiries page doesn't open a cohort)
   try {
     S.cohorts = await Sheets.listCohorts();
     keepCopy('cohorts', S.cohorts);
@@ -400,7 +400,7 @@ Store.onUser(async user => {
   const pick = S.cohorts.find(c => c.key === S.cohortKey)
     || S.cohorts.find(c => /active/i.test(c.status) && !/^test/i.test(c.key))
     || S.cohorts.find(c => /active/i.test(c.status)) || S.cohorts[0];
-  if (pick && pick.key !== last) selectCohort(pick.key); else render();
+  if (pick && pick.key !== last && !window.CALLS_ONLY) selectCohort(pick.key); else render();
 });
 
 // The last sheet data for each cohort is kept in this browser, so a refresh can show the
@@ -510,7 +510,7 @@ function render() {
     const bScrolls = [...document.querySelectorAll('.box[data-box-id], section.box')].filter(el => el.scrollTop)
       .map(el => [el.dataset.boxId || el.className, el.scrollTop]);
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
-    $('#app').innerHTML = S.user ? shell() : S.authKnown ? signInView() : bootShell();
+    $('#app').innerHTML = S.user ? (window.CALLS_ONLY ? callsShell() : shell()) : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
     if (id) {

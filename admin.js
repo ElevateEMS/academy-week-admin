@@ -352,17 +352,23 @@ const INQ_SOURCE_IC = { Website: 'globe', Voicemail: 'phone', 'Missed call': 'ph
 const inqSlug = st => String(st || '').toLowerCase().replace(/[^a-z]+/g, '-');
 const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 const RELOAD = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
-function adminInquiryBox() {
+// calls: the Inquiries page (calls.html, Nick's phone shortcut): a search box, a big "Add a call",
+// and a Calls / All switch (Calls = phone calls and voicemails, not the website forms).
+function adminInquiryBox({ calls = false } = {}) {
   if (!S.inq && !S.inqAt) S.inq = keepCopy('inq'); // the last list at once; the fresh one replaces it
   if (!S.inqAt && !S.inqErr && !S.inqBusy) setTimeout(() => loadInquiries(), 0);
   else if (S.inqAt && Date.now() - S.inqAt > 5 * 60e3 && !S.inqBusy) setTimeout(() => loadInquiries(), 0); // fresh every 5 minutes while open
-  const q = S.inq, items = q ? q.items : [], open = S.inqOpen || {};
+  const q = S.inq, open = S.inqOpen || {};
+  const items = (q ? q.items : []).filter(x => !calls || !S.inqCallsOnly || x.source !== 'Website');
+  const term = calls ? String(S.drafts['inq-search'] || '').trim().toLowerCase() : '', digits = term.replace(/\D/g, '');
+  const found = term ? items.filter(x => [x.name, x.email, x.notes, x.message, x.cohort].some(v => String(v || '').toLowerCase().includes(term))
+    || (digits.length >= 3 && String(x.phone || '').replace(/\D/g, '').includes(digits))) : null;
   const of = st => items.filter(x => x.status === st);
   const waiting = items.filter(x => x.reply === 'Waiting').length;
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
-        <span class="inq-sub">${[inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+        <span class="inq-sub">${[term ? x.status : '', inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   // Needs follow-up is always open; Responded and Enrolled open with a click; Not interested hides behind a link.
   const section = (st, always) => {
     const list = of(st), isOpen = always || open[st];
@@ -371,7 +377,17 @@ function adminInquiryBox() {
       ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${always ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
   };
   const ni = of('Not interested').length;
-  return `<section class="box admin-inq">
+  const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
+      <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
+    : section('Needs follow-up', true) + section('Responded') + section('Enrolled')
+      + (open['Not interested'] ? section('Not interested') : '')
+      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Not interested">${open['Not interested'] ? 'Hide' : ni} not interested</button>` : '');
+  const tools = calls && q ? `<div class="calls-tools">
+      <button class="btn primary calls-add" data-act="inqNew">+ Add a call</button>
+      <input id="inq-search" class="calls-search" type="search" data-draft="inq-search" value="${esc(S.drafts['inq-search'] || '')}" placeholder="Search name or phone" autocomplete="off" aria-label="Search name or phone">
+      <div class="seg calls-seg">${[[false, 'All'], [true, 'Calls']].map(([v, l]) => `<button class="${!!S.inqCallsOnly === v ? 'on' : ''}" data-act="inqCallsOnly" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>
+    </div>` : '';
+  return `<section class="box admin-inq ${calls ? 'calls-box' : ''}">
     ${adminHead('Info Requests', (q ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
       + (q ? '<button class="add-plus small-plus" data-act="inqNew" title="Add a call" aria-label="Add a call">+</button>' : ''))}
@@ -379,10 +395,15 @@ function adminInquiryBox() {
     ${q && !q.timerOn ? '<p class="em-note">The hourly check is off. In the Admin Apps Script, run <b>setupInquiryCheck</b> once.</p>' : ''}
     ${waiting && q.waitingReason ? `<p class="em-note">${waiting} reply draft${waiting === 1 ? '' : 's'} waiting: ${esc(q.waitingReason)}</p>` : ''}
     ${!q && !S.inqErr ? '<p class="empty">Loading…</p>' : ''}
-    ${q ? section('Needs follow-up', true) + section('Responded') + section('Enrolled')
-      + (open['Not interested'] ? section('Not interested') : '')
-      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Not interested">${open['Not interested'] ? 'Hide' : ni} not interested</button>` : '') : ''}
+    ${tools}${q ? lists : ''}
   </section>`;
+}
+// The whole Inquiries page (calls.html): just Info Requests, sized for a phone.
+function callsShell() {
+  return `<header class="calls-top"><img src="logo.png" alt=""><h1>Inquiries</h1></header>
+  <main class="calls-wrap">${adminInquiryBox({ calls: true })}
+    <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>
+  ${adminModals()}${S.dueEd ? dueModal() : ''}`;
 }
 // One request: status, who, cohort, notes (and what they wrote or said). New = a call you're adding.
 function inqEdModal() {
@@ -396,7 +417,7 @@ function inqEdModal() {
       <div class="inq-status">${INQ_STATUSES.map(st => `<button class="chip ${S.drafts['ie2-status'] === st ? 'on' : ''}" data-act="inqStatus" data-s="${esc(st)}">${st}</button>`).join('')}</div>
       <div class="inq-fields two">
         <label class="field">Name<input id="ie2-name" data-draft="ie2-name" value="${v('name')}" autocomplete="off"></label>
-        <label class="field">Phone<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
+        <label class="field">Phone${it.phone ? ` <a class="inq-call" href="tel:${esc(String(it.phone).replace(/[^\d+]/g, ''))}">Call ${esc(it.phone)}</a>` : ''}<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
         <label class="field">Email<input id="ie2-email" data-draft="ie2-email" value="${v('email')}" autocomplete="off"></label>
         <label class="field">Interested in<select id="ie2-cohort" data-draft="ie2-cohort"><option value="">Not sure yet</option>${cohorts.map(c => `<option ${S.drafts['ie2-cohort'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
       </div>
@@ -463,6 +484,7 @@ function adminModals() {
     + (S.inqEd ? inqEdModal() : '') + (S.linksDraft ? linksEdModal() : '');
 }
 function adminInput(t) {
+  if (t.id === 'inq-search') { S.drafts['inq-search'] = t.value; render(); return true; } // Inquiries page: filter as you type
   if (t.dataset.lk && S.linksDraft) { const [i, k] = t.dataset.lk.split(':'); S.linksDraft[Number(i)][k] = t.value; return true; }
   if (!t.dataset.anote) return false;
   S.drafts[t.id] = t.value; grow(t);
@@ -492,6 +514,7 @@ async function adminAct(a, el = {}) {
   switch (a) {
     case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) openPanel(l.name, fullUrl(l.url)); return true; }
     case 'adminOpenUrl': openPanel(d.name, d.url); return true;
+    case 'inqCallsOnly': S.inqCallsOnly = d.v === '1'; render(); return true;
     case 'adminSide': await Store.set('meta/settings', { adminSide: d.v === 'todo' ? 'todo' : 'notes' }); return true;
     case 'adminNextAdd': {
       const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;

@@ -1232,3 +1232,17 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .sticky:hover .sticky-grip { opacity: .7; } .sticky .sticky-grip:hover { opacity: 1; }
 .sticky.moving { box-shadow: 0 6px 20px rgba(80, 55, 40, .22); transform: scale(1.02); position: relative; z-index: 2; }
 @media (hover: none) { .sticky .sticky-grip { opacity: .45; } }
+
+/* Inquiries page (calls.html): Info Requests alone, sized for a phone */
+.calls-top { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 16px 6px; }
+.calls-top img { width: 40px; height: 40px; }
+.calls-top h1 { font-size: 30px; }
+.calls-wrap { max-width: 640px; margin: 0 auto; padding: 8px 16px 32px; }
+.calls-box { min-height: 60vh; }
+.calls-tools { display: grid; gap: 10px; margin: 2px 0 6px; flex-shrink: 0; }
+.calls-add { width: 100%; padding: 12px; font-size: 16px; }
+.calls-search { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); font-size: 16px; outline: none; }
+.calls-search:focus { border-color: var(--taupe); }
+.calls-seg { justify-self: start; }
+.calls-foot { text-align: center; margin: 18px 0 0; font-size: 13px; color: var(--muted); }
+.inq-call { float: right; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--taupe-dark); }
