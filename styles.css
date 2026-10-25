@@ -1237,14 +1237,16 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .calls-top { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 16px 6px; }
 .calls-top img { width: 40px; height: 40px; }
 .calls-top h1 { font-size: 30px; }
-.calls-wrap { max-width: 640px; margin: 0 auto; padding: 8px 16px 32px; }
-.calls-box { min-height: 60vh; }
+/* The page fills the screen: the box stretches so "Open the full app · Sign out" sits at the bottom (a long list just scrolls). */
+#app:has(.calls-wrap) { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+.calls-wrap { max-width: 640px; width: 100%; margin: 0 auto; padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); flex: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+.calls-box { flex: 1 0 auto; min-height: 0; overflow: visible; }
 .calls-tools { display: grid; gap: 10px; margin: 2px 0 6px; flex-shrink: 0; }
 .calls-add { width: 100%; padding: 12px; font-size: 16px; }
 .calls-search { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); font-size: 16px; outline: none; }
 .calls-search:focus { border-color: var(--taupe); }
 .calls-seg { justify-self: start; }
-.calls-foot { text-align: center; margin: 18px 0 0; font-size: 13px; color: var(--muted); }
+.calls-foot { text-align: center; margin: 14px 0 0; font-size: 13px; color: var(--muted); flex-shrink: 0; }
 .inq-call { float: right; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--taupe-dark); }
 
 /* Info Requests window: a new call's two statuses side by side; the status dropdown; contact history */
