@@ -1209,3 +1209,16 @@ li.done .x.due-add { display: none; }
 .checks li:has(.ship-btns) label { min-width: 0; }
 .eye.pirate-link { display: inline-flex; align-items: center; gap: 0; text-decoration: none; }
 .eye.pirate-link svg.arrow-out { width: 11px; height: 11px; margin-left: -1px; stroke-width: 2; align-self: flex-start; }
+
+/* Course Details: the status on the left of the header, a menu under it to change it */
+.status-wrap { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 5; }
+.box-info .box-head .grip { display: none; } /* (the status sits where the grip would) */
+button.status-pill { border: 0; font-family: Jost, sans-serif; cursor: pointer; line-height: 1.6; }
+button.status-pill:hover { filter: brightness(.96); }
+.status-menu { position: absolute; left: 0; top: calc(100% + 6px); width: 270px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(80, 55, 40, .06), 0 12px 32px rgba(80, 55, 40, .14); padding: 5px; text-align: left; cursor: default; }
+.status-opt { display: grid; gap: 1px; width: 100%; border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; color: var(--ink); font-family: Jost, sans-serif; }
+button.status-opt { cursor: pointer; } button.status-opt:hover { background: var(--line-soft); }
+.status-opt b { font-weight: 500; font-size: 14px; } .status-opt span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.status-opt.on b { color: var(--taupe-dark); }
+.box.box-info { overflow: visible; } /* (so the status menu isn't cut off; the box fits its rows anyway) */

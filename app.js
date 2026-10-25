@@ -946,6 +946,16 @@ const nextCohort = (key = S.cohortKey) => {
   if (me == null) return null;
   return S.cohorts.map(c => ({ ...c, r: cohortRank(c.key) })).filter(c => c.r != null && c.r > me).sort((a, b) => a.r - b.r)[0] || null;
 };
+// Course Details: the status pill on the left of the header; clicking it opens a menu to change it.
+const STATUS_HELP = { Upcoming: 'Not started. Students can’t log in yet.', Active: 'Students can log in to the Student Hub.',
+  Former: 'Only the Resources tab in the Student Hub; its folder moves to Former Cohorts.' };
+function statusMenu() {
+  const st = S.sheet.status || '';
+  return `<span class="status-wrap"><button class="status-pill ${slug(st)}" data-act="statusMenu" title="Change the status" aria-haspopup="true" aria-expanded="${!!S.statusMenu}">${esc(st || 'Unknown')}</button>
+    ${S.statusMenu ? `<div class="status-menu" role="menu">${Object.keys(STATUS_HELP).map(x => x === st
+      ? `<div class="status-opt on"><b>${x} ✓</b><span>${STATUS_HELP[x]}</span></div>`
+      : `<button class="status-opt" role="menuitem" data-act="setStatus" data-k="${esc(S.cohortKey)}" data-s="${x}"><b>${x}</b><span>${STATUS_HELP[x]}</span></button>`).join('')}</div>` : ''}</span>`;
+}
 const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}">Make ${key === S.cohortKey ? '' : esc(key) + ' '}${status}</button>`;
 
 // Course Details box: what's in the sheet's settings box, TBD where it's blank.
@@ -959,10 +969,8 @@ function infoBox() {
   const rev = (i.reviews || []).map(v => isIsoDate(v) ? shortDate(v) : v);
   const upcoming = (i.reviews || []).filter(v => isIsoDate(v) && v >= todayIso());
   const list = students(), paused = list.filter(x => /paused/i.test(x.status)).length;
-  const next = st === 'Upcoming' ? statusBtn(S.cohortKey, 'Active') : st === 'Active' ? statusBtn(S.cohortKey, 'Former') : st === 'Former' ? statusBtn(S.cohortKey, 'Active') : '';
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   return `<div class="info-rows">
-    ${row('Status', `<span class="status-pill ${slug(st)}">${esc(st || 'Unknown')}</span> ${next}`)}
     ${row('Orientation', date(i.firstDay))}
     ${row('Full CPR course', date(i.cpr))}
     ${row('Academy Week', aw)}
@@ -1101,7 +1109,8 @@ function box(b, n) {
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
   } else if (b === 'info') {
-    body = head('Course Details', `<button class="eye" data-act="infoEditOpen" title="Edit course details" aria-label="Edit course details">${ICONS.pencil}</button>`) + infoBox();
+    body = head('Course Details', `<button class="eye" data-act="infoEditOpen" title="Edit course details" aria-label="Edit course details">${ICONS.pencil}</button>`)
+      .replace('<h2>', statusMenu() + '<h2>') + infoBox();
   } else if (b === 'emails') {
     body = head('Emails', `<button class="eye" data-act="emStuOpen" title="Late enrollees, extensions and who’s paid" aria-label="Student emails">${ICONS.students}</button>
       <button class="add-plus small-plus" data-act="emPickOpen" title="Draft an email" aria-label="Draft an email">+</button>`) + emailsBox();
@@ -2318,6 +2327,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('click', e => {
   if (S.menuOpen && !e.target.closest('.menu-wrap')) { S.menuOpen = false; render(); }
   if (S.schMenu && !e.target.closest('.sched-more')) { S.schMenu = false; render(); }
+  if (S.statusMenu && !e.target.closest('.status-wrap')) { S.statusMenu = false; render(); }
   if (S.datePick && !e.target.closest('.dp')) { S.datePick = null; render(); }
   const el = e.target.closest('[data-act]');
   if (!el) return;
@@ -2351,8 +2361,10 @@ async function act(a, el = {}, e) {
         S.day = Number(d.n); pref('day-' + S.cohortKey, d.n);
         if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
         render(); break;
+      case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
       case 'setStatus': {
         const key = d.k, status = d.s;
+        S.statusMenu = false;
         const why = status === 'Active' ? 'Students on its roster will be able to log in to the Student Hub.'
           : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub, and its folder moves to Former Cohorts.' : '';
         if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
