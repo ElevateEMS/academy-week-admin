@@ -146,6 +146,7 @@ function adminHeaderLinks() {
    (Admin header button, and quicklog.html.) Expense is picked to start. */
 // Date (today unless you change it), category (that tab's own dropdown, read from the sheet), amount, notes, and a
 // receipt photo if you have one (saved in Finances → "<year> receipts"; the row's Notes link to it).
+const CASH_ICON = '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>';
 const RECEIPT_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/></svg>';
 const qlKind = () => S.drafts['ql-kind'] === 'Income' ? 'Income' : 'Expenses';
 function qlStart() {
@@ -170,14 +171,13 @@ function qlForm() {
   const q = S.ql, v = k => esc(S.drafts['ql-' + k] ?? '');
   const cats = [...new Set([...q.cats, S.drafts['ql-cat']].filter(Boolean))];
   const kind = qlKind();
-  return `<div class="side-switch ql-kind" role="group" aria-label="Expense or income">
-      <button class="${kind === 'Expenses' ? 'on' : ''}" data-act="qlKind" data-k="Expenses">Expense</button>
-      <button class="${kind === 'Income' ? 'on' : ''}" data-act="qlKind" data-k="Income">Income</button></div>
+  const pick = (k, label, icon) => `<button class="ql-k ${kind === k ? 'on' : ''}" data-act="qlKind" data-k="${k}" aria-pressed="${kind === k}">${icon}<span>${label}</span></button>`;
+  return `<div class="ql-kind" role="group" aria-label="Expense or income">${pick('Expenses', 'Expense', RECEIPT_ICON)}${pick('Income', 'Income', CASH_ICON)}</div>
     ${q.err ? `<p class="em-note">${esc(q.err)}</p>` : ''}
     ${q.done ? `<p class="ql-done">✓ ${esc(q.done)}</p>` : ''}
     <div class="inq-fields two">
       <div class="field">Date<span class="ai-date">${datePicker('ql-date', { title: 'Date of the expense' })}</span></div>
-      <label class="field">Amount<span class="ql-amount"><span>$</span><input id="ql-amount" data-draft="ql-amount" value="${v('amount')}" inputmode="decimal" placeholder="0.00" autocomplete="off"></span></label>
+      <label class="field">Amount<span class="ql-amount"><i>$</i><input id="ql-amount" data-draft="ql-amount" value="${v('amount')}" inputmode="decimal" placeholder="0.00" autocomplete="off"></span></label>
     </div>
     <label class="field">Category<select id="ql-cat" data-draft="ql-cat"><option value="">${q.loading && !cats.length ? 'Loading…' : 'Pick a category'}</option>${cats.map(c => `<option ${S.drafts['ql-cat'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
     <label class="field">Notes<input id="ql-notes" data-draft="ql-notes" value="${v('notes')}" placeholder="${kind === 'Income' ? 'Who and what for, e.g. Beeson - deposit' : 'What it was, e.g. Amazon folders x10'}" autocomplete="off"></label>

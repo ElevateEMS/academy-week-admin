@@ -1352,15 +1352,19 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 /* Quick Log (Admin header button, and quicklog.html) */
 .field select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 28px 8px 10px; background-color: var(--paper); font: inherit; font-size: 14px; color: var(--ink); }
 .field > span { display: block; }
-.ql-kind { margin: 0 0 14px; box-shadow: none; }
-.ql-kind button { padding: 6px 18px; font-size: 14px; }
+.ql-kind { display: flex; justify-content: center; gap: 18px; margin: 0 0 16px; }
+.ql-k { display: grid; justify-items: center; gap: 4px; background: none; border: 0; border-radius: 12px; padding: 8px 14px 6px; cursor: pointer; color: var(--taupe-dark); opacity: .5; font: inherit; }
+.ql-k svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ql-k span { font-size: 12.5px; letter-spacing: .03em; }
+.ql-k:hover { opacity: .85; }
+.ql-k.on { opacity: 1; background: var(--blush-soft); }
 /* the phone page: no pinch or double-tap zoom, and text boxes big enough that iPhone doesn't zoom into them */
 html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .ql-wrap input, .ql-wrap select, .ql-wrap textarea, .calls-wrap input, .calls-wrap select, .calls-wrap textarea { font-size: 16px; }
 @media (max-width: 720px) { .modal input, .modal select, .modal textarea { font-size: 16px; } } /* (phone pop-ups: no zoom into a box) */
-.ql-amount { display: flex; align-items: center; gap: 6px; }
-.ql-amount span { color: var(--muted); }
-.ql-amount input { flex: 1; min-width: 0; }
+.field > span.ql-amount { position: relative; display: block; }
+.ql-amount i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); pointer-events: none; }
+.field .ql-amount input { padding-left: 24px; }
 .ql-pick { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer; }
 .ql-pick svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .ql-photo { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
