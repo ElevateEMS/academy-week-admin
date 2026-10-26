@@ -1355,8 +1355,9 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .ql-kind { margin: 0 0 14px; box-shadow: none; }
 .ql-kind button { padding: 6px 18px; font-size: 14px; }
 /* the phone page: no pinch or double-tap zoom, and text boxes big enough that iPhone doesn't zoom into them */
-html:has(.ql-wrap) { touch-action: pan-x pan-y; }
-.ql-wrap input, .ql-wrap select, .ql-wrap textarea { font-size: 16px; }
+html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
+.ql-wrap input, .ql-wrap select, .ql-wrap textarea, .calls-wrap input, .calls-wrap select, .calls-wrap textarea { font-size: 16px; }
+@media (max-width: 720px) { .modal input, .modal select, .modal textarea { font-size: 16px; } } /* (phone pop-ups: no zoom into a box) */
 .ql-amount { display: flex; align-items: center; gap: 6px; }
 .ql-amount span { color: var(--muted); }
 .ql-amount input { flex: 1; min-width: 0; }
