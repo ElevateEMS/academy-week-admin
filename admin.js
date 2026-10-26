@@ -199,11 +199,11 @@ function qlModal() {
 function qlShell() {
   if (!S.ql) qlStart();
   const q = S.ql;
-  return `<header class="calls-top"><img src="logo.png" alt=""><h1>Quick Log</h1></header>
-  <main class="calls-wrap ql-wrap">${qlForm()}
+  // (the title down to the Open button sit in the middle of the screen; the two small links stay at the bottom)
+  return `<main class="calls-wrap ql-wrap"><div class="ql-body"><header class="calls-top"><img src="logo.png" alt=""><h1>Quick Log</h1></header>${qlForm()}
     <button class="btn primary wide ql-save" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button>
     ${q.tab ? `<p class="muted small ql-tab">Adds a row to ${esc(q.tab)} in $ Finances.</p>` : ''}
-    ${q.url ? `<a class="btn ql-open" href="${esc(q.url)}" target="_blank" rel="noopener" data-chrome>Open ${esc(q.tab)} ↗</a>` : ''}
+    ${q.url ? `<a class="btn ql-open" href="${esc(q.url)}" target="_blank" rel="noopener" data-chrome>Open ${esc(q.tab)} ↗</a>` : ''}</div>
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>`;
 }
 // A photo: made smaller (longest side 1600px, JPEG) so it uploads quickly; a PDF (or one the browser can't draw) goes as it is.
