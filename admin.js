@@ -137,8 +137,8 @@ const LINK_ICONS = {
 const DEFAULT_LINK_ICON = { certkeeper: 'shield', finances: 'dollar', payroll: 'paycheck' };
 const linkIcon = l => LINK_ICONS[l.icon || DEFAULT_LINK_ICON[l.id]] || `<span class="ql-letter">${esc((l.name || '?').trim().charAt(0).toUpperCase())}</span>`;
 function adminHeaderLinks() {
-  return adminLinks().map(l => `<button class="icon-btn ql-icon" data-act="adminOpen" data-id="${esc(l.id)}" title="${esc(l.name)}" aria-label="${esc(l.name)}">${linkIcon(l)}</button>`).join('')
-    + `<button class="icon-btn" data-act="qlOpen" title="Quick Log: add an expense" aria-label="Quick Log: add an expense">${RECEIPT_ICON}</button>`
+  return `<button class="icon-btn" data-act="qlOpen" title="Quick Log: add an expense or income" aria-label="Quick Log: add an expense or income">${RECEIPT_ICON}</button>`
+    + adminLinks().map(l => `<button class="icon-btn ql-icon" data-act="adminOpen" data-id="${esc(l.id)}" title="${esc(l.name)}" aria-label="${esc(l.name)}">${linkIcon(l)}</button>`).join('')
     + '<span class="head-div ql-div" aria-hidden="true"></span>';
 }
 
@@ -162,7 +162,7 @@ async function qlLoad() {
   try {
     const r = await Sheets.financeInfo(S.drafts['ql-date'] || todayIso(), kind);
     if (kind !== qlKind() || S.ql !== q) return; // (switched while it loaded)
-    q.cats = r.categories || []; q.tab = r.tab; q.err = ''; keepCopy('qlCats-' + kind, q.cats);
+    q.cats = r.categories || []; q.tab = r.tab; q.url = r.url || ''; q.err = ''; keepCopy('qlCats-' + kind, q.cats);
   }
   catch (e) { q.err = e.message; }
   q.loading = false; render();
@@ -191,7 +191,7 @@ function qlModal() {
   return `<div class="overlay" data-act="qlClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Quick Log</h2><button class="x big" data-act="qlClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">${qlForm()}</div>
-    <div class="modal-foot"><span class="muted small">${q.tab ? 'Adds a row to ' + esc(q.tab) : ''}</span>
+    <div class="modal-foot"><span class="muted small">${q.tab ? 'Adds a row to ' + esc(q.tab) : ''}${q.url ? ` · <a class="link" href="${esc(q.url)}" target="_blank" rel="noopener">Open ${esc(q.tab)} ↗</a>` : ''}</span>
       <button class="btn primary" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button></div>
   </div></div>`;
 }
@@ -203,6 +203,7 @@ function qlShell() {
   <main class="calls-wrap ql-wrap">${qlForm()}
     <button class="btn primary wide ql-save" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button>
     ${q.tab ? `<p class="muted small ql-tab">Adds a row to ${esc(q.tab)} in $ Finances.</p>` : ''}
+    ${q.url ? `<a class="btn ql-open" href="${esc(q.url)}" target="_blank" rel="noopener" data-chrome>Open ${esc(q.tab)} ↗</a>` : ''}
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>`;
 }
 // A photo: made smaller (longest side 1600px, JPEG) so it uploads quickly; a PDF (or one the browser can't draw) goes as it is.
@@ -642,7 +643,7 @@ async function adminAct(a, el = {}) {
   if (a === 'qlKind') { // Expense / Income: that tab's categories
     if (!S.ql || qlKind() === el.dataset.k) return true;
     S.drafts['ql-kind'] = el.dataset.k; S.drafts['ql-cat'] = '';
-    Object.assign(S.ql, { cats: keepCopy('qlCats-' + qlKind()) || [], tab: '', err: '', done: '' });
+    Object.assign(S.ql, { cats: keepCopy('qlCats-' + qlKind()) || [], tab: '', url: '', err: '', done: '' });
     render(); qlLoad(); return true;
   }
   if (a === 'qlSave') {

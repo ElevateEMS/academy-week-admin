@@ -1376,3 +1376,4 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .ql-wrap .field { margin-bottom: 12px; }
 .ql-wrap .ql-save { margin-top: 6px; }
 .ql-tab { text-align: center; margin: 8px 0 0; }
+.ql-open { display: block; width: fit-content; margin: 14px auto 0; padding: 10px 22px; font-size: 15px; text-decoration: none; color: var(--taupe-dark); }
