@@ -1344,4 +1344,8 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
   .ro-acts { white-space: normal; }
   .ro-inst-name { min-width: 0; }
 }
-.chips.inq-source { margin: 0 0 10px; }
+/* Add an Inquiry: call / email / text icons beside the title */
+.inq-src { display: inline-flex; gap: 4px; margin-left: 12px; vertical-align: middle; }
+.inq-src .eye { padding: 6px; border-radius: 8px; opacity: .4; }
+.inq-src .eye svg { width: 19px; height: 19px; }
+.inq-src .eye.on { opacity: 1; background: var(--blush-soft); }

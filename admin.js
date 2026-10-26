@@ -350,6 +350,8 @@ async function loadInquiries(check = false) {
 const INQ_STATUSES = ['Missed call', 'Needs follow-up', 'Plans to enroll', 'Responded', 'Enrolled', 'Close Out'];
 const NEW_CALL_STATUSES = ['Needs follow-up', 'Plans to enroll', 'Missed call']; // what an inquiry you're adding can be (Missed call: calls only)
 const NEW_INQ_SOURCES = ['Call', 'Email', 'Text']; // how they reached out (Website forms and voicemails come in by themselves)
+const TEXT_ICON = '<svg viewBox="0 0 24 24"><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M8 10h8M8 13h5"/></svg>';
+const SOURCE_ICONS = { Call: () => LINK_ICONS.phone, Email: () => LINK_ICONS.mail, Text: () => TEXT_ICON };
 const INQ_SECTION = { 'Missed call': 'Missed calls' }; // a section's heading, when it isn't the status itself
 const inqStatus = x => x.status === 'Not interested' ? 'Close Out' : x.status; // (renamed; an older saved list may still say it)
 // Their contact history (newest last) and the last time you talked.
@@ -440,13 +442,12 @@ function inqEdModal() {
   const e = S.inqEd, it = e.item || {}, v = k => esc(S.drafts['ie2-' + k] ?? '');
   const cohorts = [...new Set([...(S.inq ? S.inq.cohorts : []), it.cohort].filter(Boolean))];
   return `<div class="overlay" data-act="inqEdClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>${e.isNew ? 'Add an Inquiry' : esc(it.name || it.phone || it.email || 'Info Request')}${!e.isNew && gvUrl(it.phone)
+    <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['ie2-source'] === x ? 'on' : ''}" data-act="inqSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['ie2-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.name || it.phone || it.email || 'Info Request')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
       <button class="x big" data-act="inqEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${e.isNew ? '' : `<p class="muted small">${esc(it.source)} · ${esc(inqDate(it.received))}${it.reply ? ' · reply ' + esc(it.reply.toLowerCase()) : ''}</p>`}
       ${it.message ? `<p class="inq-msg">${esc(it.message)}</p>` : ''}
-      ${e.isNew ? `<div class="chips inq-source">${NEW_INQ_SOURCES.map(x => `<button class="chip ${S.drafts['ie2-source'] === x ? 'on' : ''}" data-act="inqSource" data-s="${x}">${x}</button>`).join('')}</div>` : ''}
       ${e.isNew ? `<div class="inq-status two">${NEW_CALL_STATUSES.filter(st => st !== 'Missed call' || S.drafts['ie2-source'] === 'Call').map(st => `<button class="chip ${S.drafts['ie2-status'] === st ? 'on' : ''}" data-act="inqStatus" data-s="${esc(st)}">${st}</button>`).join('')}</div>`
         : `<label class="field inq-status-pick">Status<select id="ie2-status" data-draft="ie2-status">${INQ_STATUSES.map(st => `<option ${S.drafts['ie2-status'] === st ? 'selected' : ''}>${st}</option>`).join('')}</select></label>`}
       <div class="inq-fields two">
