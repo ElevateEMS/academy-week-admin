@@ -2456,10 +2456,16 @@ async function act(a, el = {}, e) {
       case 'toggleOld': S.showOld = !S.showOld; render(); break;
       case 'schMenu': S.schMenu = !S.schMenu; render(); break;
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
-      case 'view':
-        S.view = d.v; pref('view', d.v); S.open = null; S.menuOpen = false;
-        if (['day', 'week', 'schedule'].includes(d.v)) pref('awView', d.v);
+      case 'view': {
+        // The Students icon again: back to the page you came from (Course, or the Academy Week page you were on).
+        const back = ['course', 'day', 'week', 'schedule'];
+        let v = d.v;
+        if (v === 'students' && S.view === 'students') v = back.includes(pref('studentsFrom')) ? pref('studentsFrom') : 'course';
+        else if (v === 'students' && back.includes(S.view)) pref('studentsFrom', S.view);
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
+        if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
+      }
       case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
         const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
