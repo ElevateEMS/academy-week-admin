@@ -1344,3 +1344,4 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
   .ro-acts { white-space: normal; }
   .ro-inst-name { min-width: 0; }
 }
+.chips.inq-source { margin: 0 0 10px; }
