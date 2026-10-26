@@ -623,7 +623,8 @@ function shell() {
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${S.view === 'admin' ? adminHeaderLinks() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : '') + icon('students', 'Students')}
+      ${S.view === 'admin' ? adminHeaderLinks() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
+        ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '') + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -919,10 +920,15 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
   </ul>`;
 }
 
+// A list's + (top right, or by a small heading): opens a box at the top; type, Enter to add (and keep going).
+// Esc, or clicking away with it empty, closes it. k: which list (S.changesAdd); inId: the box's id.
+const plusBtn = (k, inId, label) => `<button class="add-plus small-plus" data-act="chAdd" data-k="${esc(k)}" data-in="${esc(inId)}" title="${label}" aria-label="${label}">+</button>`;
 function addRow(n, kind, placeholder) {
-  const k = 'add-' + kind + '-' + n;
-  return `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="${kind}" data-day="${n}" placeholder="${placeholder}" value="${esc(S.drafts[k] || '')}"></div>`;
+  const k = 'add-' + kind + '-' + n, key = kind + '-' + n;
+  if (S.changesAdd !== key) return '';
+  return `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="${kind}" data-day="${n}" data-chadd="${key}" placeholder="${placeholder}" value="${esc(S.drafts[k] || '')}"></div>`;
 }
+const addPlus = (n, kind, label) => plusBtn(kind + '-' + n, 'add-' + kind + '-' + n, label);
 
 // The day's to-dos, then staff paperwork (from the Staffing tab) as plain lines at the end.
 function todoList(n, { compact = false, carry = true } = {}) {
@@ -938,6 +944,7 @@ const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs', 'setup', 'next', 'upd', 'ctod
 const hidden = k => { const v = pref('hide-' + k); return v != null ? v === '1' : !!(S.settings && S.settings.hideCheckedDefault); };
 const BOOK = '<svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5c-.8 0-1.5.7-1.5 1.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/><path d="M4 20.5V5.5M20 20.5V5.5"/></svg>';
 const RESET = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.8h3.8"/></svg>';
+const GSHEET_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 9h16M4 14.5h16M10 9v11.5"/></svg>'; // the cohort's Google Sheet
 const SHEET = '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 12.5l2 2 4-4.5"/></svg>';
 const EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
@@ -1174,12 +1181,12 @@ function box(b, n) {
     }).join('');
     body = head('Priorities') + itemList(n, 'priority') + (slots ? `<ul class="checks slots">${slots}</ul>` : '');
   } else if (b === 'todo') {
-    body = head('To Do', hideToggle('todo')) + addRow(n, 'todo', '+ to do') + todoList(n);
+    body = head('To Do', hideToggle('todo') + addPlus(n, 'todo', 'Add a to-do')) + addRow(n, 'todo', 'Type a to-do, then Enter') + todoList(n);
   } else if (b === 'shopping') {
     const open = S.shopping.filter(x => !x.bought).sort((a, c) => a.created - c.created);
     const bought = S.shopping.filter(x => x.bought).sort((a, c) => c.created - a.created);
-    body = head('Shopping List', bought.length ? hideToggle('shop') + '<button class="link" data-act="clearBought">Clear bought</button>' : '')
-      + `<div class="add-row"><input id="shopIn" data-draft="shop" data-add="shop" placeholder="Add something to buy" value="${esc(S.drafts.shop || '')}"></div>`
+    body = head('Shopping List', (bought.length ? hideToggle('shop') + '<button class="link" data-act="clearBought">Clear bought</button>' : '') + plusBtn('shop', 'shopIn', 'Add something to buy'))
+      + (S.changesAdd === 'shop' ? `<div class="add-row"><input id="shopIn" data-draft="shop" data-add="shop" data-chadd="shop" placeholder="Type something to buy, then Enter" value="${esc(S.drafts.shop || '')}"></div>` : '')
       + `<ul class="checks">${[...open, ...bought].map(x => `<li class="${x.bought ? 'done' : ''}">
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
@@ -1200,8 +1207,8 @@ function box(b, n) {
       return `<section class="box box-setup setup-bar" data-box-id="setup">${body}</section>`;
     }
     body = head(`Setup Checklist <span class="count">${done}/${all.length}</span>`, (all.some(t => t.done) || done ? hideToggle('setup') : '')
-      + (setupComplete() ? '<button class="link" data-act="setupShow">Hide list</button>' : ''))
-      + setupList() + addRow(SETUP, 'setup', '+ add item') + (setupComplete() ? '' : prevChanges());
+      + (setupComplete() ? '<button class="link" data-act="setupShow">Hide list</button>' : '') + addPlus(SETUP, 'setup', 'Add an item'))
+      + addRow(SETUP, 'setup', 'Type an item, then Enter') + setupList() + (setupComplete() ? '' : prevChanges());
   } else if (b === 'ctodo') {
     if (!setupComplete() && !hasRosterTodos()) return ''; // shows once the Setup Checklist is done (or an orientation roster is waiting)
     const k = 'add-ctodo-' + SETUP;
@@ -1232,8 +1239,8 @@ function box(b, n) {
     // Unpacked first; packed ones drop to the bottom (or hide).
     const byOrder = (a, c) => orderOf(a) - orderOf(c);
     const list = [...S.packing.filter(x => !x.packed).sort(byOrder), ...S.packing.filter(x => x.packed).sort(byOrder)];
-    body = head('Packing List', list.some(x => x.packed) ? hideToggle('pack') : '')
-      + `<div class="add-row"><input id="packIn" data-draft="pack" data-add="pack" placeholder="+ add item" value="${esc(S.drafts.pack || '')}"></div>`
+    body = head('Packing List', (list.some(x => x.packed) ? hideToggle('pack') : '') + plusBtn('pack', 'packIn', 'Add something to pack'))
+      + (S.changesAdd === 'pack' ? `<div class="add-row"><input id="packIn" data-draft="pack" data-add="pack" data-chadd="pack" placeholder="Type an item, then Enter" value="${esc(S.drafts.pack || '')}"></div>` : '')
       + `<ul class="checks">${list.map(x => `<li class="${x.packed ? 'done' : ''}">
           <label>${circle(x.packed, `data-act="packed" data-id="${x.id}"`)}<span>${hlTxt('pack', x.id, x.text, x.hl)}</span></label>
           <button class="x" data-act="delPack" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing on the list yet.</li>'}</ul>`;
@@ -1253,7 +1260,7 @@ function weekView() {
       <button class="week-head" data-act="day" data-n="${d.n}" data-open="1" title="Open Day ${d.n}">
         <small>${esc(d.label)}${d.iso ? ' ' + shortDate(d.iso) : ''}</small><b>Day ${d.n}</b>${d.sub ? `<small>${esc(d.sub)}</small>` : ''}
       </button>
-      <div class="week-part"><p class="mini-head">To Do</p>${todoList(d.n, { compact: true, carry: false })}${addRow(d.n, 'todo', '+ to do')}</div>
+      <div class="week-part"><p class="mini-head with-plus">To Do ${addPlus(d.n, 'todo', 'Add a to-do for Day ' + d.n)}</p>${addRow(d.n, 'todo', 'Type a to-do, then Enter')}${todoList(d.n, { compact: true, carry: false })}</div>
       <div class="week-part shaded"><p class="mini-head">Notes</p>${notesArea(d.n, 'Notes')}</div>
       <div class="resize" data-resize="week" title="Drag to make all five days taller or shorter · double-click to reset"></div>
     </section>`).join('')}
@@ -2523,7 +2530,7 @@ async function act(a, el = {}, e) {
       case 'delUpd': await Store.del('updates/' + d.id); break;
       case 'chAdd': {
         S.changesAdd = S.changesAdd === d.k ? null : d.k; render();
-        const id = d.k === 'upd' ? 'updIn' : 'add-' + d.k + '-' + SETUP;
+        const id = d.in || (d.k === 'upd' ? 'updIn' : 'add-' + d.k + '-' + SETUP);
         if (S.changesAdd) setTimeout(() => { const el = document.getElementById(id); if (el) el.focus(); }, 0);
         break;
       }
