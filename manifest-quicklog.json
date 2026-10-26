@@ -1,0 +1,16 @@
+{
+  "name": "Quick Log · Elevate EMS",
+  "short_name": "Finances",
+  "start_url": "./quicklog.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3ece6",
+  "theme_color": "#f3ece6",
+  "icons": [
+    {
+      "src": "apple-touch-icon-quicklog.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

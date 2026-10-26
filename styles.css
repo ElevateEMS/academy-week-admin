@@ -1349,3 +1349,15 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .inq-src .eye { padding: 6px; border-radius: 8px; opacity: .4; }
 .inq-src .eye svg { width: 19px; height: 19px; }
 .inq-src .eye.on { opacity: 1; background: var(--blush-soft); }
+/* Quick Log (Admin header button, and quicklog.html) */
+.ql-amount { display: flex; align-items: center; gap: 6px; }
+.ql-amount span { color: var(--muted); }
+.ql-amount input { flex: 1; min-width: 0; }
+.ql-pick { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer; }
+.ql-pick svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ql-photo { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.ql-photo img { max-height: 90px; max-width: 140px; border-radius: 8px; border: 1px solid var(--line); object-fit: cover; }
+.ql-done { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: var(--sage-soft); font-size: 14px; }
+.ql-wrap .field { margin-bottom: 12px; }
+.ql-wrap .ql-save { margin-top: 6px; }
+.ql-tab { text-align: center; margin: 8px 0 0; }

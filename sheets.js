@@ -22,6 +22,8 @@
      clearRosterSig(key, date, name) -> takes one off and unticks their Orientation Roster box (H)
      saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort's Admin folder (replaces one of the same name)
      rosterPdfFile(url)          -> a saved roster PDF back out of Drive ({ pdf (base64), name }), for Download
+     financeInfo(date)           -> the Quick Log's expense categories ({ tab, categories }) from "<year> Expenses" in $ Finances
+     logExpense(item)            -> one expense as a row there ({ date, category, amount, notes, photo }) -> { tab, row, receipt }
      resetTestCohort(key, typed) -> a Test cohort back to brand new (app data, its sheet's rows, its folder's files to the trash)
 
    Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes, and
@@ -70,6 +72,8 @@ const Sheets = (() => {
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
+    financeInfo: date => call('financeInfo', { date }),
+    logExpense: item => call('logExpense', { item }),
     resetTestCohort: (key, typed) => call('resetTestCohort', { cohort: key, confirm: typed }), // { docs, trashed, sheetsCleared }
   };
 })();
@@ -189,6 +193,8 @@ function sampleSheets() {
     async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
     async rosterPdfFile() { throw new Error('Sample mode has no Drive file.'); },
     async resetTestCohort() { throw new Error('Sample mode has nothing to reset.'); },
+    async financeInfo() { return wait({ tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
+    async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
