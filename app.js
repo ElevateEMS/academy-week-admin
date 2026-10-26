@@ -655,7 +655,8 @@ function shell() {
   ${S.dueEd ? dueModal() : ''}
   ${adminModals()}
   ${S.packet ? packetModal() : ''}
-  ${S.roster ? rosterModal() : ''}`;
+  ${S.roster ? rosterModal() : ''}
+  ${S.resetAsk ? resetModal() : ''}`;
 }
 
 function pageTitle() {
@@ -999,7 +1000,26 @@ function statusMenu() {
   return `<span class="status-wrap"><button class="status-pill ${slug(st)}" data-act="statusMenu" title="Change the status" aria-haspopup="true" aria-expanded="${!!S.statusMenu}">${esc(st || 'Unknown')}</button>
     ${S.statusMenu ? `<div class="status-menu" role="menu">${Object.keys(STATUS_HELP).map(x => x === st
       ? `<div class="status-opt on"><b>${x} ✓</b><span>${STATUS_HELP[x]}</span></div>`
-      : `<button class="status-opt" role="menuitem" data-act="setStatus" data-k="${esc(S.cohortKey)}" data-s="${x}"><b>${x}</b><span>${STATUS_HELP[x]}</span></button>`).join('')}</div>` : ''}</span>`;
+      : `<button class="status-opt" role="menuitem" data-act="setStatus" data-k="${esc(S.cohortKey)}" data-s="${x}"><b>${x}</b><span>${STATUS_HELP[x]}</span></button>`).join('')}
+      ${isTestCohort(S.cohortKey) ? `<button class="status-opt reset-opt" role="menuitem" data-act="resetAsk"><b>Reset test cohort</b><span>Back to brand new: clears its app data, its sheet’s rows and Course Details, and trashes its folder’s files.</span></button>` : ''}</div>` : ''}</span>`;
+}
+// Reset test cohort (Test/QA cohorts only; the Admin Apps Script checks again, and checks the folder and sheet names).
+function resetModal() {
+  const key = S.cohortKey, typed = String(S.drafts.resetName || '').trim();
+  if (S.resetBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>Resetting ${esc(key)}…</h2></div>
+    <div class="modal-body"><p class="muted">Clearing the app, the sheet and the folder. This can take a minute; the app reloads when it’s done.</p></div></div></div>`;
+  return `<div class="overlay" data-act="resetCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Reset Test Cohort</h2><button class="x big" data-act="resetCancel" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>Reset <b>${esc(key)}</b> back to brand new?</p>
+      <ul class="reset-list">
+        <li><b>App:</b> all of its to-dos, checklist ticks, notes, emails sent, rosters and signatures, Academy Week days, packing and schedule. Status goes back to Upcoming.</li>
+        <li><b>Its sheet:</b> every student row and the Course Details are emptied.</li>
+        <li><b>Its Drive folder:</b> docs and PDFs (syllabus, schedule, Admin folder) go to the Drive trash. Other sheets keep their headers, with their rows emptied.</li>
+      </ul>
+      <p class="muted small">Nothing outside ${esc(key)} is touched. Type <b>${esc(key)}</b> to reset it.</p>
+      <input id="resetName" class="reset-name" autocomplete="off" placeholder="${esc(key)}" value="${esc(S.drafts.resetName || '')}"></div>
+    <div class="modal-foot"><button class="btn" data-act="resetCancel">Cancel</button><button class="btn primary danger" data-act="resetGo" ${typed === key ? '' : 'disabled'}>Reset</button></div>
+  </div></div>`;
 }
 const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}">Make ${key === S.cohortKey ? '' : esc(key) + ' '}${status}</button>`;
 
@@ -2294,6 +2314,11 @@ addEventListener('resize', fitBoard);
 /* ---------- Events ---------- */
 document.addEventListener('input', e => {
   const t = e.target, k = t.dataset.draft;
+  if (t.id === 'resetName') { // Reset test cohort: the button unlocks once the name is typed exactly
+    S.drafts.resetName = t.value;
+    const b = document.querySelector('[data-act="resetGo"]'); if (b) b.disabled = t.value.trim() !== S.cohortKey;
+    return;
+  }
   // Schedule template pop-up: typing changes the draft until Save.
   if (t.dataset.stpl && S.schTplDraft) {
     const d = S.schTplDraft[S.schTplTab], f = t.dataset.stpl;
@@ -2362,6 +2387,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
+    if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
     else if (S.dueEd) { S.dueEd = null; delete S.drafts['due-date']; }
@@ -2427,6 +2453,26 @@ async function act(a, el = {}, e) {
         if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
         render(); break;
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
+      case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;
+      case 'resetCancel': if (S.resetBusy) return; S.resetAsk = false; delete S.drafts.resetName; render(); break;
+      case 'resetGo': {
+        const key = S.cohortKey, typed = String(S.drafts.resetName || '').trim();
+        if (!isTestCohort(key) || typed !== key || S.resetBusy) return;
+        S.resetBusy = true; render();
+        unwatchCohort.forEach(u => u()); unwatchCohort = []; // (so nothing re-seeds while it's being cleared)
+        try {
+          const res = await Sheets.resetTestCohort(key, typed);
+          // This device's own memory of the cohort (which day, setup done, the sheet's last copy) goes too.
+          try { Object.keys(localStorage).filter(k => k.startsWith('aw-') && k.endsWith('-' + key)).forEach(k => localStorage.removeItem(k)); } catch {}
+          toast(`${key} reset (${res.trashed || 0} file${res.trashed === 1 ? '' : 's'} to the Drive trash). Reloading…`);
+          setTimeout(() => location.reload(), 1200);
+        } catch (err) {
+          S.resetBusy = false; S.resetAsk = false; delete S.drafts.resetName;
+          toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+          selectCohort(key, { keepView: true });
+        }
+        break;
+      }
       case 'setStatus': {
         const key = d.k, status = d.s;
         S.statusMenu = false;
