@@ -1091,7 +1091,8 @@ function prevChanges() {
   if (!prevFor || !S.prevTodos.length) return '';
   const list = [...S.prevTodos].sort((a, b) => orderOf(a) - orderOf(b));
   return `<p class="mini-head">From ${esc(prevFor)}’s changes</p>
-    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label></li>`).join('')}</ul>`;
+    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label>${dueBits('prev', x, x.done)}
+      <button class="x" data-act="prevDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('')}</ul>`;
 }
 
 /* ---------- Day page ---------- */
@@ -2443,6 +2444,7 @@ async function act(a, el = {}, e) {
         if (x && prevFor) await Store.set('cohorts/' + prevFor + '/todos/' + d.id, { done: !x.done });
         break;
       }
+      case 'prevDel': if (prevFor) await Store.del('cohorts/' + prevFor + '/todos/' + d.id); break; // (off the Admin page's Changes too)
       case 'addUpd': {
         const text = (S.drafts.upd || '').trim(); if (!text) return;
         S.drafts.upd = ''; render();

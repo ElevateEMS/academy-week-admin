@@ -41,12 +41,16 @@ function dueRules() {
   return map;
 }
 // The date an item is due ('' = none). kind: 'admin' for the Admin To Do, anything else = a cohort to-do.
+// kinds: a cohort's own to-dos ('todo', 'ctodo', 'setup'…), 'admin' (Admin To Do), and a cohort's
+// "Do before next cohort" changes: 'prev' (the previous cohort's, on the Course page) / 'anext' (on the Admin page).
+const plainDue = kind => kind === 'admin' || kind === 'prev' || kind === 'anext'; // (no template dates)
 function dueOf(kind, t) {
-  if (kind === 'admin' || t.dueAuto === false) return t.due || '';
+  if (plainDue(kind) || t.dueAuto === false) return t.due || '';
   const r = dueRules()[t.id];
   return r ? ruleDate(r) || t.due || '' : t.due || '';
 }
-const duePath = (kind, id) => kind === 'admin' ? 'adminTodos/' + id : P('todos/' + id);
+const duePath = (kind, id) => kind === 'admin' ? 'adminTodos/' + id : kind === 'prev' ? 'cohorts/' + prevFor + '/todos/' + id
+  : kind === 'anext' ? 'cohorts/' + nextFor + '/todos/' + id : P('todos/' + id);
 
 // Keep the saved `due` of template items in step with Course Details (so the Morning Email has it).
 const dueSyncing = new Set();
@@ -73,11 +77,11 @@ function dueBits(kind, t, done) {
 }
 const dueDay = iso => { const d = parseIso(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
 
-function dueItem(kind, id) { return (kind === 'admin' ? S.adminTodos : S.todos).find(x => x.id === id); }
+function dueItem(kind, id) { return (kind === 'admin' ? S.adminTodos : kind === 'prev' ? S.prevTodos : kind === 'anext' ? S.adminNext || [] : S.todos).find(x => x.id === id); }
 function dueModal() {
   const e = S.dueEd, t = dueItem(e.kind, e.id);
   if (!t) return '';
-  const rule = e.kind === 'admin' ? null : dueRules()[t.id];
+  const rule = plainDue(e.kind) ? null : dueRules()[t.id];
   return `<div class="overlay" data-act="dueClose"><div class="modal small-modal due-modal" data-stop>
     <div class="modal-head"><h2>Due Date</h2><button class="x big" data-act="dueClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
