@@ -12,7 +12,8 @@
      cohorts/{key}                   emailsStart: the day the Emails box started for this cohort (anything due
                                      before that was already handled by hand), emailsInit (one-time setup claimed)
      cohorts/{key}/students/{sid}    sent: { templateId: 'yyyy-mm-dd' | 'before' }, bookCode,
-                                     late: { date, time } (their own orientation), payDates: { next, final } (extension)
+                                     late: { date, time, makeup } (their own orientation; makeup = an original student
+                                     on a make-up orientation, whose payment dates stay the cohort's), payDates: { next, final } (extension)
      cohorts/{key}/emailLog/{id}     { tpl, name, date, at, names, count, by }  (drafts made, newest first in the box) */
 
 /* ---------- Templates ---------- */
@@ -66,7 +67,7 @@ const emDueNow = r => !r.date || r.date < todayIso() || (r.date === todayIso() &
 
 /* ---------- Students, as the emails see them ---------- */
 // Blocked (in the sheet) and not attending (in the app) are left out; Paused stay in.
-// late: their own orientation date and time (late enrollees). payDates: an extension.
+// late: their own orientation date and time (late enrollees, and make-up orientations). payDates: an extension.
 const validEmail = e => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
 function emPerson(s) {
   const doc = S.studentsDoc[s.sid] || {}, sent = doc.sent || {};
@@ -74,12 +75,14 @@ function emPerson(s) {
   const base = cohortInfo().firstDay;
   const orient = late ? late.date : isIsoDate(base) ? base : '';
   const pd = doc.payDates || {};
+  // Payments follow a late enrollee's own orientation; a make-up orientation keeps the cohort's.
+  const makeup = !!(late && late.makeup), payLate = late && !makeup, payFrom = payLate ? late.date : isIsoDate(base) ? base : '';
   return {
     sid: s.sid, name: s.name, email: String(s.email || '').trim(),
     textbook: !!s.textbook, paidNext: !!s.paidNext, paidFinal: !!s.paidFinal,
-    late: !!late, orient, time: late ? String(late.time || '') : DEFAULTS.email.orientationTime,
-    next: isIsoDate(pd.next) ? pd.next : orient ? addDays(orient, late ? 14 : -1) : '',
-    final: isIsoDate(pd.final) ? pd.final : orient ? addDays(orient, late ? 28 : 29) : '',
+    late: !!late, makeup, orient, time: late ? String(late.time || '') : DEFAULTS.email.orientationTime,
+    next: isIsoDate(pd.next) ? pd.next : payFrom ? addDays(payFrom, payLate ? 14 : -1) : '',
+    final: isIsoDate(pd.final) ? pd.final : payFrom ? addDays(payFrom, payLate ? 28 : 29) : '',
     ext: { next: isIsoDate(pd.next), final: isIsoDate(pd.final) },
     sent, bookCode: doc.bookCode || '',
     // Enrolled after the cohort's orientation and their own date isn't in yet.
@@ -108,8 +111,8 @@ function whoFits(t, p) {
 // The date this email is due for this student, and whether it's their own (late enrollee / extension).
 function emAnchor(from, p) {
   if (from === 'orientation') return { date: p.orient, custom: p.late };
-  if (from === 'next') return { date: p.next, custom: p.late || p.ext.next };
-  if (from === 'final') return { date: p.final, custom: p.late || p.ext.final };
+  if (from === 'next') return { date: p.next, custom: (p.late && !p.makeup) || p.ext.next };
+  if (from === 'final') return { date: p.final, custom: (p.late && !p.makeup) || p.ext.final };
   if (from === 'academy') return { date: (S.sheet && S.sheet.academyStart) || '', custom: false };
   return { date: '', custom: false };
 }
@@ -400,7 +403,7 @@ function emailStudentsModal() {
     const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before'), sentN = drafted.length;
     const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');
     return `<tr>
-      <td><b>${esc(p.name)}</b>${p.late ? ' <em class="tag-soft">late enrollee</em>' : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.needsLate ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
+      <td><b>${esc(p.name)}</b>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
         <div class="muted small">${validEmail(p.email) ? esc(p.email) : '<span class="tbd">no email in the sheet</span>'}</div></td>
       <td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
@@ -429,15 +432,18 @@ function emStuEditModal() {
   const k = x => 'ems-' + x + '-' + p.sid;
   let title, body, undo = '';
   if (ed.kind === 'late') {
-    const date = S.drafts[k('date')], due = usualDue(date), pd = (S.studentsDoc[p.sid] || {}).payDates || {};
-    title = 'Late Enrollee';
-    body = `<p class="muted small">${esc(p.name)}’s own orientation. Their emails use it.</p>
+    const date = S.drafts[k('date')], makeup = S.drafts[k('kind')] === 'makeup', due = usualDue(makeup ? '' : date), pd = (S.studentsDoc[p.sid] || {}).payDates || {};
+    const pill = (v, label) => `<button class="chip ${(S.drafts[k('kind')] || 'late') === v ? 'on' : ''}" data-act="emLateKind" data-sid="${p.sid}" data-v="${v}">${label}</button>`;
+    title = makeup ? 'Make-up Orientation' : 'Late Enrollee';
+    body = `<p class="muted small">${esc(p.name)}’s own orientation. Their emails and orientation roster use it.</p>
+      <div class="chips em-late-kind">${pill('late', 'Enrolled late')}${pill('makeup', 'Make-up (original student)')}</div>
       <div class="em-late-fields">${datePicker(k('date'), { optional: true, empty: 'Pick a date', title: 'Their orientation' })}
         <input id="${k('time')}" data-draft="${k('time')}" class="${S.drafts[k('time')] ? '' : 'need'}" placeholder="Time, e.g. 6:30 PM" value="${esc(S.drafts[k('time')] || '')}" autocomplete="off"></div>
-      ${isIsoDate(date) ? `<p class="em-due-note">Next due <b>${monthDay(due.next)}</b> · Final due <b>${monthDay(due.final)}</b>, set automatically.${isIsoDate(pd.next) || isIsoDate(pd.final) ? ' (Their extension dates still apply.)' : ''}</p>` : ''}`;
+      ${makeup ? `<p class="em-due-note">Payments stay on the cohort’s dates${due.next ? `: Next <b>${monthDay(due.next)}</b> · Final <b>${monthDay(due.final)}</b>` : ''}.${isIsoDate(pd.next) || isIsoDate(pd.final) ? ' (Their extension dates still apply.)' : ''}</p>`
+        : isIsoDate(date) ? `<p class="em-due-note">Next due <b>${monthDay(due.next)}</b> · Final due <b>${monthDay(due.final)}</b>, set automatically.${isIsoDate(pd.next) || isIsoDate(pd.final) ? ' (Their extension dates still apply.)' : ''}</p>` : ''}`;
     if (p.late) undo = `<button class="link" data-act="emLateClear" data-sid="${p.sid}">Back to the cohort’s orientation</button>`;
   } else {
-    const late = (S.studentsDoc[p.sid] || {}).late || {}, due = usualDue(late.date);
+    const late = (S.studentsDoc[p.sid] || {}).late || {}, due = usualDue(late.makeup ? '' : late.date);
     title = 'Extension';
     body = `<p class="muted small">${esc(p.name)}’s payment deadlines. Change only the one you’re extending; their reminders move to the new date.</p>
       <div class="em-ext-fields"><span>Next installment</span>${datePicker(k('next'), { optional: true, empty: 'TBD', title: 'Next installment due' })}
@@ -465,7 +471,7 @@ async function emSaveStudent(sid, upd) {
   });
   if (Object.keys(resend).length) await Store.set(P('students/' + sid), { sent: resend });
 }
-const emStuDone = sid => { ['date', 'time', 'next', 'final'].forEach(x => delete S.drafts['ems-' + x + '-' + sid]); S.emailStu = null; };
+const emStuDone = sid => { ['date', 'time', 'next', 'final', 'kind'].forEach(x => delete S.drafts['ems-' + x + '-' + sid]); S.emailStu = null; };
 
 /* ---------- Setup → Book Codes ---------- */
 function bookCodesModal() {
@@ -645,6 +651,8 @@ async function emailAct(a, el, e) {
       const p = emPersonBySid(d.sid), late = (S.studentsDoc[d.sid] || {}).late || {};
       S.drafts['ems-date-' + d.sid] = isIsoDate(late.date) ? late.date : '';
       S.drafts['ems-time-' + d.sid] = late.time || '';
+      // Enrolled late, or an original student on a make-up orientation (missed theirs: Absent on its roster).
+      S.drafts['ems-kind-' + d.sid] = isIsoDate(late.date) ? (late.makeup ? 'makeup' : 'late') : p && !p.needsLate ? 'makeup' : 'late';
       S.drafts['ems-next-' + d.sid] = p.next || '';
       S.drafts['ems-final-' + d.sid] = p.final || '';
       S.emailStu = { sid: d.sid, kind: a === 'emLateOpen' ? 'late' : 'ext' }; render(); return true;
@@ -653,14 +661,16 @@ async function emailAct(a, el, e) {
     case 'emLateSave2': {
       const date = S.drafts['ems-date-' + d.sid], time = String(S.drafts['ems-time-' + d.sid] || '').trim();
       if (!isIsoDate(date) || !time) { toast('Pick their orientation date and type the time.'); return true; }
-      await emSaveStudent(d.sid, { late: { date, time } });
-      emStuDone(d.sid); toast('Saved. Their emails and payment dates follow ' + monthDay(date) + '.'); render(); return true;
+      const makeup = S.drafts['ems-kind-' + d.sid] === 'makeup';
+      await emSaveStudent(d.sid, { late: { date, time, makeup } });
+      emStuDone(d.sid); toast(makeup ? 'Saved. Their orientation emails and roster follow ' + monthDay(date) + '; payments stay on the cohort’s dates.' : 'Saved. Their emails and payment dates follow ' + monthDay(date) + '.'); render(); return true;
     }
+    case 'emLateKind': S.drafts['ems-kind-' + d.sid] = d.v; render(); return true;
     case 'emLateClear':
       if (!confirm('Put them back on the cohort’s orientation and payment dates?')) return true;
       await emSaveStudent(d.sid, { late: null }); emStuDone(d.sid); toast('Back on the cohort’s dates.'); render(); return true;
     case 'emExtSave': {
-      const late = (S.studentsDoc[d.sid] || {}).late || {}, due = usualDue(late.date);
+      const late = (S.studentsDoc[d.sid] || {}).late || {}, due = usualDue(late.makeup ? '' : late.date);
       const next = S.drafts['ems-next-' + d.sid], fin = S.drafts['ems-final-' + d.sid];
       // The usual date isn't an extension, so it isn't saved as one.
       await emSaveStudent(d.sid, { payDates: { next: isIsoDate(next) && next !== due.next ? next : null, final: isIsoDate(fin) && fin !== due.final ? fin : null } });

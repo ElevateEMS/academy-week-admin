@@ -482,13 +482,14 @@ async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
-    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false });
+    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
+    studentsLoaded: false, rostersLoaded: false });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
   const base = 'cohorts/' + key;
   const w = (path, fn) => unwatchCohort.push(Store.watch(path, v => { fn(v); render(); }));
   w(base, d => { S.cohortDoc = d; if (S.sheet) shareHousekeeping(); });
-  w(base + '/students', list => { S.studentsDoc = Object.fromEntries(list.map(d => [d.id, d])); });
+  w(base + '/students', list => { S.studentsDoc = Object.fromEntries(list.map(d => [d.id, d])); S.studentsLoaded = true; });
   w(base + '/contacts', list => { S.contacts = list; });
   w(base + '/warnings', list => { S.warnings = list; });
   w(base + '/days', list => { S.days = Object.fromEntries(list.map(d => [d.id, d])); });
@@ -497,7 +498,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   w(base + '/packing', list => { S.packing = list; });
   w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/emailLog', list => { S.emailLog = list; });
-  w(base + '/rosters', list => { S.rosterDocs = Object.fromEntries(list.map(d => [d.id, d])); });
+  w(base + '/rosters', list => { S.rosterDocs = Object.fromEntries(list.map(d => [d.id, d])); S.rostersLoaded = true; });
   await loadSheet();
 }
 
@@ -559,7 +560,7 @@ function render() {
     }
     fitBoard();
     syncDue(); // template to-dos' due dates follow Course Details
-    syncRosters(); seedVaoems(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
+    syncRosters(); syncOrientTodos(); seedVaoems(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
@@ -1777,13 +1778,28 @@ function studentsView() {
       <thead><tr><th>#</th><th>Student</th><th class="c">Patient contacts</th><th class="c">Skills</th><th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
+        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
         <td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
         <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
       </tr>`).join('') || '<tr><td colspan="5" class="empty">No students match.</td></tr>'}</tbody>
     </table>
   </section>`;
+}
+
+// Under a name on the Students page (each one opens its pop-up): needs orientation date, late enrollee (the whole
+// course), make-up orientation (until it's happened), $ overdue (a deadline passed, box not ticked in the sheet),
+// $ extension (until the extended payments are ticked).
+function enrollTags(s) {
+  const p = emPerson(s), t = todayIso(), out = [];
+  const tag = (label, act, cls = '') => out.push(`<button class="enroll-tag ${cls}" data-act="${act}" data-sid="${s.sid}">${label}</button>`);
+  if (needsOrientDate(p)) tag('needs orientation date', 'emLateOpen', 'warn');
+  if (p.late && !p.makeup) tag('late enrollee', 'emLateOpen');
+  else if (p.late && p.makeup && p.orient >= t && !missedOrient(p)) tag('make-up orientation', 'emLateOpen');
+  const overdue = (!p.paidNext && p.next && p.next < t) || (!p.paidFinal && p.final && p.final < t);
+  if (overdue) tag('$ overdue', 'emExtOpen', 'warn');
+  else if ((p.ext.next && !p.paidNext) || (p.ext.final && !p.paidFinal)) tag('$ extension', 'emExtOpen');
+  return out.length ? `<div class="enroll-tags">${out.join('<span class="dot">·</span>')}</div>` : '';
 }
 
 function firstName(name) {

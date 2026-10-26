@@ -67,7 +67,8 @@ const rosterName = name => { const c = String(name).replace(/\s*\([^)]*\)/g, '')
 const rosterDoc = date => (S.rosterDocs || {})[date] || {};
 const onRoster = (r, doc = rosterDoc(r.date)) => r.people.filter(p => !(doc.out || {})[p.sid]);
 const sheetStudent = sid => (S.sheet && S.sheet.students || []).find(s => slug(s.name) === sid) || {};
-const courseNoFor = r => { const i = cohortInfo(); return String((r.late && i.lateCourseNo) || i.courseNo || '').replace(/#/g, '').trim(); }; // (plain: the form's column already says Course #)
+// (plain: the form's column already says Course #). A roster of only make-up orientations is the cohort's own course.
+const courseNoFor = r => { const i = cohortInfo(); return String((r.late && !r.people.every(p => p.makeup) && i.lateCourseNo) || i.courseNo || '').replace(/#/g, '').trim(); };
 // Signed: from the signatures in Drive once they've been read, otherwise the Orientation Roster box (column H).
 function signedMap(r) {
   const got = (S.rosterSigs || {})[r.date], out = {};
@@ -132,7 +133,35 @@ function saveListSoon(r) {
     .then(() => listSaving.delete(id))
     .catch(e => { console.warn('Roster list not saved yet:', e.message); setTimeout(() => listSaving.delete(id), 30000); }); // (tries again in a bit)
 }
-const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => t.roster && !t.done);
+// (an orientation to schedule counts too: the Course To-Do shows even before the Setup Checklist is done)
+const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => (t.roster || t.orientFor) && !t.done);
+
+/* ---------- Students who need an orientation date ---------- */
+// Enrolled after the cohort's orientation with no date of their own yet, or marked Absent on the roster for the
+// orientation they're down for (the cohort's or their own). Each gets a Course To-Do, "Schedule orientation · Name" /
+// "Reschedule orientation · Name", due the day it appears (so it's in the Morning Email); it checks itself off once
+// their new date is saved (Student Emails or their tag on the Students page).
+const missedOrient = p => !!(p && p.orient && (rosterDoc(p.orient).out || {})[p.sid]);
+const needsOrientDate = p => !!(p && (p.needsLate || missedOrient(p)));
+const orientTodoId = p => 'orient-' + p.sid + '-' + (p.needsLate ? 'new' : p.orient);
+const orientSyncing = new Set();
+function syncOrientTodos() {
+  if (!S.sheet || !S.cohortKey || !S.todosLoaded || !S.studentsLoaded || !S.rostersLoaded || /former/i.test(S.sheet.status || '')) return;
+  const removed = (S.cohortDoc && S.cohortDoc.removedRepeats) || {}, need = {};
+  emPeople().forEach(p => { if (needsOrientDate(p)) need[orientTodoId(p)] = p; });
+  const put = (id, data) => {
+    if (orientSyncing.has(id)) return;
+    orientSyncing.add(id);
+    Store.set(P('todos/' + id), data).catch(() => {}).finally(() => orientSyncing.delete(id));
+  };
+  Object.keys(need).forEach(id => {
+    const p = need[id];
+    if (removed[id] || S.todos.some(t => t.id === id)) return;
+    put(id, { text: (p.needsLate ? 'Schedule' : 'Reschedule') + ' orientation · ' + rosterName(p.name), done: false, day: SETUP, kind: 'ctodo',
+      order: -1500, created: Date.now(), repeat: true, orientFor: p.sid, due: todayIso(), dueAuto: false });
+  });
+  S.todos.filter(t => t.orientFor && !t.done && !need[t.id]).forEach(t => put(t.id, { done: true })); // their date is in
+}
 // The button on a roster to-do (only where students sign in the app).
 const SIG_ICON = '<svg viewBox="0 0 24 24"><path d="M3 17c2.5-6 4.5-9 6-9 2 0 0 8 2 8 1.5 0 2.5-4 4-4 1.2 0 1 2.5 2.5 2.5 1 0 2-1 3-2"/><path d="M3 21h18"/></svg>';
 function rosterBtn(t) {

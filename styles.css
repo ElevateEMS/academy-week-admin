@@ -1235,6 +1235,12 @@ button.status-pill:hover { filter: brightness(.96); }
 button.status-opt { cursor: pointer; } button.status-opt:hover { background: var(--line-soft); }
 .status-opt b { font-weight: 500; font-size: 14px; } .status-opt span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
 .status-opt.on b { color: var(--taupe-dark); }
+.enroll-tags { margin-top: 2px; line-height: 1.3; }
+.enroll-tags .dot { color: var(--muted); margin: 0 5px; font-size: 12px; }
+.enroll-tag { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--taupe-dark); cursor: pointer; text-decoration: underline; text-decoration-color: rgba(125, 101, 88, .35); text-underline-offset: 2px; }
+.enroll-tag:hover { text-decoration-color: currentColor; }
+.enroll-tag.warn { color: var(--rose); }
+.em-late-kind { margin: 4px 0 10px; }
 .status-opt.reset-opt { border-top: 1px dotted var(--line); border-radius: 0 0 8px 8px; margin-top: 4px; padding-top: 10px; }
 .status-opt.reset-opt b { color: #a3625a; }
 .reset-list { margin: 8px 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
