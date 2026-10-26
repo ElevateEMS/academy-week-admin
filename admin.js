@@ -146,7 +146,7 @@ function adminHeaderLinks() {
    (Admin header button, and quicklog.html.) Expense is picked to start. */
 // Date (today unless you change it), category (that tab's own dropdown, read from the sheet), amount, notes, and a
 // receipt photo if you have one (saved in Finances → "<year> receipts"; the row's Notes link to it).
-const CASH_ICON = '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>';
+const CASH_ICON = '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M12 8.4v7.2"/><path d="M14 10.1c-.3-.6-1-1-2-1-1.1 0-1.9.6-1.9 1.4 0 1.9 4 1 4 2.9 0 .8-.8 1.4-2.1 1.4-1 0-1.8-.4-2.1-1.1"/><path d="M5.5 9v0M18.5 15v0"/></svg>';
 const RECEIPT_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/></svg>';
 const qlKind = () => S.drafts['ql-kind'] === 'Income' ? 'Income' : 'Expenses';
 function qlStart() {

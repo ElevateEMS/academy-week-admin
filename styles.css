@@ -1365,6 +1365,9 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .field > span.ql-amount { position: relative; display: block; }
 .ql-amount i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); pointer-events: none; }
 .field .ql-amount input { padding-left: 24px; }
+/* Date and Amount side by side: the same height and text size */
+.ql-wrap .date-btn, .ql-wrap .ql-amount input, .modal .ql-amount input, .modal .inq-fields .date-btn { height: 42px; box-sizing: border-box; }
+.ql-wrap .date-btn { font-size: 16px; }
 .ql-pick { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; cursor: pointer; }
 .ql-pick svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .ql-photo { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
