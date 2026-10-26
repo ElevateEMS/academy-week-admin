@@ -142,34 +142,46 @@ function adminHeaderLinks() {
     + '<span class="head-div ql-div" aria-hidden="true"></span>';
 }
 
-/* ---------- Quick Log: an expense into "<year> Expenses" in $ Finances (Admin header button, and quicklog.html) ---------- */
+/* ---------- Quick Log: an expense or income into "<year> Expenses" / "<year> Income" in $ Finances ----------
+   (Admin header button, and quicklog.html.) Expense is picked to start. */
 // Date (today unless you change it), category (that tab's own dropdown, read from the sheet), amount, notes, and a
 // receipt photo if you have one (saved in Finances → "<year> receipts"; the row's Notes link to it).
 const RECEIPT_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/></svg>';
+const qlKind = () => S.drafts['ql-kind'] === 'Income' ? 'Income' : 'Expenses';
 function qlStart() {
-  S.ql = { cats: keepCopy('qlCats') || [], tab: '', loading: true, busy: false, err: '', photo: null, done: '' };
+  S.drafts['ql-kind'] = 'Expenses';
+  S.ql = { cats: keepCopy('qlCats-Expenses') || [], tab: '', loading: true, busy: false, err: '', photo: null, done: '' };
   S.drafts['ql-date'] = todayIso(); S.drafts['ql-cat'] = ''; S.drafts['ql-amount'] = ''; S.drafts['ql-notes'] = '';
   setTimeout(qlLoad, 0); // (qlShell calls this while drawing the page)
 }
 async function qlLoad() {
   const q = S.ql; if (!q) return;
   q.loading = true;
-  try { const r = await Sheets.financeInfo(S.drafts['ql-date'] || todayIso()); q.cats = r.categories || []; q.tab = r.tab; q.err = ''; keepCopy('qlCats', q.cats); }
+  const kind = qlKind();
+  try {
+    const r = await Sheets.financeInfo(S.drafts['ql-date'] || todayIso(), kind);
+    if (kind !== qlKind() || S.ql !== q) return; // (switched while it loaded)
+    q.cats = r.categories || []; q.tab = r.tab; q.err = ''; keepCopy('qlCats-' + kind, q.cats);
+  }
   catch (e) { q.err = e.message; }
   q.loading = false; render();
 }
 function qlForm() {
   const q = S.ql, v = k => esc(S.drafts['ql-' + k] ?? '');
   const cats = [...new Set([...q.cats, S.drafts['ql-cat']].filter(Boolean))];
-  return `${q.err ? `<p class="em-note">${esc(q.err)}</p>` : ''}
+  const kind = qlKind();
+  return `<div class="side-switch ql-kind" role="group" aria-label="Expense or income">
+      <button class="${kind === 'Expenses' ? 'on' : ''}" data-act="qlKind" data-k="Expenses">Expense</button>
+      <button class="${kind === 'Income' ? 'on' : ''}" data-act="qlKind" data-k="Income">Income</button></div>
+    ${q.err ? `<p class="em-note">${esc(q.err)}</p>` : ''}
     ${q.done ? `<p class="ql-done">✓ ${esc(q.done)}</p>` : ''}
     <div class="inq-fields two">
       <div class="field">Date<span class="ai-date">${datePicker('ql-date', { title: 'Date of the expense' })}</span></div>
       <label class="field">Amount<span class="ql-amount"><span>$</span><input id="ql-amount" data-draft="ql-amount" value="${v('amount')}" inputmode="decimal" placeholder="0.00" autocomplete="off"></span></label>
     </div>
     <label class="field">Category<select id="ql-cat" data-draft="ql-cat"><option value="">${q.loading && !cats.length ? 'Loading…' : 'Pick a category'}</option>${cats.map(c => `<option ${S.drafts['ql-cat'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
-    <label class="field">Notes<input id="ql-notes" data-draft="ql-notes" value="${v('notes')}" placeholder="What it was, e.g. Amazon folders x10" autocomplete="off"></label>
-    <div class="field">Receipt <span class="muted small">(optional)</span>
+    <label class="field">Notes<input id="ql-notes" data-draft="ql-notes" value="${v('notes')}" placeholder="${kind === 'Income' ? 'Who and what for, e.g. Beeson - deposit' : 'What it was, e.g. Amazon folders x10'}" autocomplete="off"></label>
+    <div class="field"><span>${kind === 'Income' ? 'Photo' : 'Receipt'} (optional)</span>
       ${q.photo ? `<div class="ql-photo">${q.photo.preview ? `<img src="${q.photo.preview}" alt="Receipt">` : `<span class="muted small">${esc(q.photo.name)}</span>`}
           <button class="link" data-act="qlPhotoClear">Remove</button></div>`
         : `<label class="btn ql-pick">${RECEIPT_ICON}<span>Add a photo</span><input id="ql-file" type="file" accept="image/*,application/pdf" hidden></label>`}</div>`;
@@ -180,7 +192,7 @@ function qlModal() {
     <div class="modal-head"><h2>Quick Log</h2><button class="x big" data-act="qlClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">${qlForm()}</div>
     <div class="modal-foot"><span class="muted small">${q.tab ? 'Adds a row to ' + esc(q.tab) : ''}</span>
-      <button class="btn primary" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : 'Add expense'}</button></div>
+      <button class="btn primary" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button></div>
   </div></div>`;
 }
 // quicklog.html (phone shortcut): just the Quick Log.
@@ -189,7 +201,7 @@ function qlShell() {
   const q = S.ql;
   return `<header class="calls-top"><img src="logo.png" alt=""><h1>Quick Log</h1></header>
   <main class="calls-wrap ql-wrap">${qlForm()}
-    <button class="btn primary wide ql-save" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : 'Add expense'}</button>
+    <button class="btn primary wide ql-save" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button>
     ${q.tab ? `<p class="muted small ql-tab">Adds a row to ${esc(q.tab)} in $ Finances.</p>` : ''}
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>`;
 }
@@ -627,10 +639,16 @@ async function adminAct(a, el = {}) {
   if (a === 'qlOpen') { qlStart(); render(); return true; }
   if (a === 'qlClose') { if (S.ql && !S.ql.busy) { S.ql = null; render(); } return true; }
   if (a === 'qlPhotoClear') { S.ql.photo = null; render(); return true; }
+  if (a === 'qlKind') { // Expense / Income: that tab's categories
+    if (!S.ql || qlKind() === el.dataset.k) return true;
+    S.drafts['ql-kind'] = el.dataset.k; S.drafts['ql-cat'] = '';
+    Object.assign(S.ql, { cats: keepCopy('qlCats-' + qlKind()) || [], tab: '', err: '', done: '' });
+    render(); qlLoad(); return true;
+  }
   if (a === 'qlSave') {
     const q = S.ql; if (!q || q.busy) return true;
     const g = k => String(S.drafts['ql-' + k] ?? '').trim();
-    const item = { date: g('date') || todayIso(), category: g('cat'), amount: g('amount'), notes: g('notes'),
+    const item = { kind: qlKind(), date: g('date') || todayIso(), category: g('cat'), amount: g('amount'), notes: g('notes'),
       photo: q.photo ? { data: q.photo.data, type: q.photo.type, name: q.photo.name } : null };
     if (!(Number(item.amount.replace(/[$,\s]/g, '')) > 0)) { toast('Type the amount.'); return true; }
     if (!item.category) { toast('Pick a category.'); return true; }

@@ -72,7 +72,7 @@ const Sheets = (() => {
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
-    financeInfo: date => call('financeInfo', { date }),
+    financeInfo: (date, kind) => call('financeInfo', { date, kind }),
     logExpense: item => call('logExpense', { item }),
     resetTestCohort: (key, typed) => call('resetTestCohort', { cohort: key, confirm: typed }), // { docs, trashed, sheetsCleared }
   };
@@ -193,7 +193,7 @@ function sampleSheets() {
     async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
     async rosterPdfFile() { throw new Error('Sample mode has no Drive file.'); },
     async resetTestCohort() { throw new Error('Sample mode has nothing to reset.'); },
-    async financeInfo() { return wait({ tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
+    async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
