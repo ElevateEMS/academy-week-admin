@@ -450,7 +450,8 @@ function adminInquiryBox({ calls = false } = {}) {
   if (!S.inq && !S.inqAt) S.inq = keepCopy('inq'); // the last list at once; the fresh one replaces it
   if (!S.inqAt && !S.inqErr && !S.inqBusy) setTimeout(() => loadInquiries(), 0);
   else if (S.inqAt && Date.now() - S.inqAt > 5 * 60e3 && !S.inqBusy) setTimeout(() => loadInquiries(), 0); // fresh every 5 minutes while open
-  const q = S.inq, open = S.inqOpen || {};
+  if (!S.inqOpen) { try { S.inqOpen = JSON.parse(pref('inqOpen') || '{}'); } catch { S.inqOpen = {}; } } // (this device's last choice)
+  const q = S.inq, open = S.inqOpen;
   const items = (q ? q.items : []).filter(x => !calls || !S.inqCallsOnly || x.source !== 'Website');
   const term = calls ? String(S.drafts['inq-search'] || '').trim().toLowerCase() : '', digits = term.replace(/\D/g, '');
   const found = term ? items.filter(x => [x.name, x.email, x.notes, x.message, x.cohort].some(v => String(v || '').toLowerCase().includes(term))
@@ -461,8 +462,8 @@ function adminInquiryBox({ calls = false } = {}) {
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
         <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
-  // Missed calls (only when there are some) and Needs follow-up are always open, Plans to enroll too when there are some;
-  // Responded and Enrolled open with a click; Close Out hides behind a link.
+  // Missed calls (only when there are some) and Needs follow-up are always open; Plans to enroll (when there are some),
+  // Responded and Enrolled open with a click (remembered on this device); Close Out hides behind a link.
   const section = (st, always) => {
     const list = of(st), isOpen = always || open[st];
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
@@ -473,7 +474,7 @@ function adminInquiryBox({ calls = false } = {}) {
   const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
     : (of('Missed call').length ? section('Missed call', true) : '') + section('Needs follow-up', true)
-      + (of('Plans to enroll').length ? section('Plans to enroll', true) : '') + section('Responded') + section('Enrolled')
+      + (of('Plans to enroll').length ? section('Plans to enroll') : '') + section('Responded') + section('Enrolled')
       + (open['Close Out'] ? section('Close Out') : '')
       + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Close Out">${open['Close Out'] ? 'Hide' : ni} closed out</button>` : '');
   const tools = calls && q ? `<div class="calls-tools">
@@ -519,10 +520,25 @@ function inqHistory(it, e) {
         <p class="muted small">Logged when you Save.${S.drafts['ie2-status'] === 'Missed call' ? ' This moves them from Missed calls to Responded.' : ' Change the status above too if it changed.'}</p></div>` : ''}
     <ul class="inq-hist-list">${list.map(c => `<li><b>${esc(inqDate(c.d))}</b> · ${esc(c.by || '')}${c.note ? ' · ' + esc(c.note) : ''}</li>`).join('') || '<li class="muted">Nothing logged yet.</li>'}</ul></div>`;
 }
+// "Interested in": the current cohorts, the next 2 seasons after the last one (Summer 2027, Fall 2027…), and any other
+// training you've typed before (Psychomotor exam, CPR…), so it's only typed once.
+const INQ_SEASONS = ['Spring', 'Summer', 'Fall'];
+function inqInterestOptions(it = {}) {
+  const have = [...new Set([...(S.inq ? S.inq.cohorts : []), it.cohort].filter(Boolean))];
+  const ranked = [...new Set([...have, ...S.cohorts.map(c => c.key)])].filter(k => cohortRank(k) != null).sort((a, b) => cohortRank(a) - cohortRank(b));
+  const next = [];
+  const last = ranked[ranked.length - 1];
+  if (last) {
+    let [season, year] = last.split(/\s+/); let i = INQ_SEASONS.findIndex(x => x.toLowerCase() === season.toLowerCase()); year = Number(year);
+    if (i < 0) i = 2;
+    for (let n = 0; n < 2; n++) { i++; if (i > 2) { i = 0; year++; } next.push(INQ_SEASONS[i] + ' ' + year); }
+  }
+  const typed = [...new Set(((S.inq && S.inq.items) || []).map(x => String(x.cohort || '').trim()).filter(c => c && cohortRank(c) == null))].sort();
+  return [...new Set([...have, ...next, ...typed])];
+}
 // One request: status, who, cohort, notes (and what they wrote or said). New = a call you're adding.
 function inqEdModal() {
   const e = S.inqEd, it = e.item || {}, v = k => esc(S.drafts['ie2-' + k] ?? '');
-  const cohorts = [...new Set([...(S.inq ? S.inq.cohorts : []), it.cohort].filter(Boolean))];
   return `<div class="overlay" data-act="inqEdClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['ie2-source'] === x ? 'on' : ''}" data-act="inqSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['ie2-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.name || it.phone || it.email || 'Info Request')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
@@ -536,7 +552,8 @@ function inqEdModal() {
         <label class="field">Name<input id="ie2-name" data-draft="ie2-name" value="${v('name')}" autocomplete="off"></label>
         <label class="field">Phone<input id="ie2-phone" data-draft="ie2-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
         <label class="field">Email<input id="ie2-email" data-draft="ie2-email" value="${v('email')}" autocomplete="off"></label>
-        <label class="field">Interested in<select id="ie2-cohort" data-draft="ie2-cohort"><option value="">Not sure yet</option>${cohorts.map(c => `<option ${S.drafts['ie2-cohort'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
+        <label class="field">Interested in<select id="ie2-cohort" data-draft="ie2-cohort"><option value="">Not sure yet</option>${inqInterestOptions(it).map(c => `<option ${S.drafts['ie2-cohort'] === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="__other" ${S.drafts['ie2-cohort'] === '__other' ? 'selected' : ''}>Type another…</option></select></label>
+        ${S.drafts['ie2-cohort'] === '__other' ? `<label class="field">Training<input id="ie2-cohort-other" data-draft="ie2-cohort-other" value="${v('cohort-other')}" placeholder="e.g. Psychomotor exam, CPR" autocomplete="off"></label>` : ''}
       </div>
       ${e.isNew ? `<div class="field">Date of the ${(S.drafts['ie2-source'] || 'Call').toLowerCase()}<span class="ai-date">${datePicker('ie2-received', { title: 'Date of the ' + (S.drafts['ie2-source'] || 'Call').toLowerCase() })}</span></div>` : ''}
       ${e.isNew && S.drafts['ie2-source'] === 'Email' ? `<label class="field">What they wrote<textarea id="ie2-message" data-draft="ie2-message" rows="4" placeholder="Paste their email (optional)">${v('message')}</textarea></label>` : ''}
@@ -739,12 +756,12 @@ async function adminAct(a, el = {}) {
       if (links.some(l => !l.name || !l.url)) { toast('Each link needs a name and a link (or remove it).'); return true; }
       await Store.set('meta/admin', { links }); S.linksDraft = null; S.lkPick = null; toast('Links saved.'); render(); return true;
     }
-    case 'inqSec': S.inqOpen = { ...(S.inqOpen || {}), [d.s]: !(S.inqOpen || {})[d.s] }; render(); return true;
+    case 'inqSec': S.inqOpen = { ...(S.inqOpen || {}), [d.s]: !(S.inqOpen || {})[d.s] }; pref('inqOpen', JSON.stringify(S.inqOpen)); render(); return true;
     case 'inqOpen': case 'inqNew': {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
       S.drafts['ie2-status'] = (it.status && inqStatus(it)) || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
-      S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = ''; S.drafts['ie2-source'] = 'Call'; S.drafts['ie2-message'] = '';
+      S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = ''; S.drafts['ie2-source'] = 'Call'; S.drafts['ie2-message'] = ''; S.drafts['ie2-cohort-other'] = '';
       S.inqEd = { item: it, isNew: a === 'inqNew', busy: false, log: false }; render(); return true;
     }
     case 'inqLogOpen': S.inqEd.log = true; render(); setTimeout(() => { const el = document.getElementById('ie2-cnote'); if (el) el.focus(); }, 0); return true;
@@ -756,7 +773,7 @@ async function adminAct(a, el = {}) {
     case 'inqEdClose': if (!S.inqEd.busy) { S.inqEd = null; render(); } return true;
     case 'inqSave': {
       const e = S.inqEd, g = k => String(S.drafts['ie2-' + k] ?? '').trim();
-      const item = { name: g('name'), phone: g('phone'), email: g('email'), notes: g('notes'), cohort: g('cohort'), status: g('status') };
+      const item = { name: g('name'), phone: g('phone'), email: g('email'), notes: g('notes'), cohort: g('cohort') === '__other' ? g('cohort-other') : g('cohort'), status: g('status') };
       if (e.isNew) {
         item.received = g('received') || todayIso(); item.source = g('source') || 'Call';
         if (item.source === 'Email') item.message = g('message');
