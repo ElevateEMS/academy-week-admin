@@ -797,7 +797,7 @@ async function adminAct(a, el = {}) {
     q.busy = true; q.done = ''; render();
     try {
       const r = await Sheets.logExpense(item);
-      const msg = `$${Number(item.amount.replace(/[$,\s]/g, '')).toFixed(2)} · ${item.category} added to ${r.tab}${r.receipt ? ' (with the receipt)' : ''}.`;
+      const msg = `$${Number(item.amount.replace(/[$,\s]/g, '')).toFixed(2)} · ${item.category} added to ${r.tab}${r.receipt ? ' (with the receipt)' : ''}.${r.made ? ` New year: made the ${r.made} tabs + $ Overview row.` : ''}`;
       if (window.QUICKLOG_ONLY) { // the phone page stays open for the next one
         Object.assign(q, { busy: false, photo: null, done: msg, err: '' }); S.drafts['ql-amount'] = ''; S.drafts['ql-notes'] = ''; S.drafts['ql-cat'] = '';
       } else { S.ql = null; toast(msg); }
