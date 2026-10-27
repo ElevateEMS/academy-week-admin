@@ -466,7 +466,7 @@ const fuText = iso => isIsoDate(iso) ? 'follow up ' + (iso <= todayIso() ? 'now'
 
 /* ---------- Info Requests → Partners (agencies, schools, employers…) ---------- */
 const PT_STATUSES = ['New', 'Quote sent', 'Waiting on them', 'Active partner', 'Closed'];
-const PT_TYPES = ['Agency', 'School', 'Employer', 'Other'];
+const PT_TYPES = ['Department', 'School', 'Agency']; // then any you've typed, then Other (which asks what)
 const PT_ICON = '<svg viewBox="0 0 24 24"><path d="M4 20.5V6.5l8-3 8 3v14"/><path d="M2.5 20.5h19"/><path d="M8 9.5h2M14 9.5h2M8 13.5h2M14 13.5h2M10.5 20.5v-3.5h3v3.5"/></svg>';
 const ptDue = x => isIsoDate(x.followUp) && x.followUp <= todayIso() && x.status !== 'Closed';
 function partnerLists(term) {
@@ -494,8 +494,8 @@ function partnerLists(term) {
 }
 function ptEdModal() {
   const e = S.ptEd, it = e.item || {}, v = k => esc(S.drafts['pt-' + k] ?? '');
-  const typed = [...new Set(((S.inq && S.inq.partners) || []).map(x => x.type).filter(t => t && !PT_TYPES.includes(t)))];
-  const types = [...PT_TYPES.slice(0, -1), ...typed, 'Other'];
+  const typed = [...new Set(((S.inq && S.inq.partners) || []).map(x => x.type).filter(t => t && !PT_TYPES.includes(t) && t !== 'Other'))].sort();
+  const types = [...PT_TYPES, ...typed, 'Other'];
   return `<div class="overlay" data-act="ptEdClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['pt-source'] === x ? 'on' : ''}" data-act="ptSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['pt-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.org || it.contact || 'Partner')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
@@ -508,8 +508,8 @@ function ptEdModal() {
         <label class="field">Contact person<input id="pt-contact" data-draft="pt-contact" value="${v('contact')}" autocomplete="off"></label>
         <label class="field">Phone<input id="pt-phone" data-draft="pt-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
         <label class="field">Email<input id="pt-email" data-draft="pt-email" value="${v('email')}" autocomplete="off"></label>
-        <label class="field">Type<select id="pt-type" data-draft="pt-type"><option value="">—</option>${types.map(t => `<option ${S.drafts['pt-type'] === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}<option value="__other" ${S.drafts['pt-type'] === '__other' ? 'selected' : ''}>Type another…</option></select></label>
-        ${S.drafts['pt-type'] === '__other' ? `<label class="field">New type<input id="pt-type-other" data-draft="pt-type-other" value="${v('type-other')}" placeholder="e.g. Hospital, Fire department" autocomplete="off"></label>` : ''}
+        <label class="field">Type<select id="pt-type" data-draft="pt-type"><option value="">—</option>${types.map(t => `<option ${S.drafts['pt-type'] === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+        ${S.drafts['pt-type'] === 'Other' ? `<label class="field">What kind<input id="pt-type-other" data-draft="pt-type-other" value="${v('type-other')}" placeholder="e.g. Hospital, Training platform" autocomplete="off"></label>` : ''}
         <label class="field">For<input id="pt-about" data-draft="pt-about" value="${v('about')}" autocomplete="off"></label>
       </div>
       ${e.isNew ? `<div class="field">Date of the ${(S.drafts['pt-source'] || 'Call').toLowerCase()}<span class="ai-date">${datePicker('pt-added', { title: 'Date of the ' + (S.drafts['pt-source'] || 'Call').toLowerCase() })}</span></div>` : ''}
@@ -733,6 +733,13 @@ function adminModals() {
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.linksDraft ? linksEdModal() : '');
 }
 function adminInput(t) {
+  // Dropdowns that change the window: Other / Type another… opens its box; the status changes the follow-up hint.
+  if (['pt-type', 'ie2-cohort', 'ie2-status'].includes(t.id)) {
+    S.drafts[t.id] = t.value; render();
+    const box = { 'pt-type': 'pt-type-other', 'ie2-cohort': 'ie2-cohort-other' }[t.id];
+    if (box && (t.value === 'Other' || t.value === '__other')) setTimeout(() => { const el = document.getElementById(box); if (el) el.focus(); }, 0);
+    return true;
+  }
   if (t.id === 'ql-file' && t.files && t.files[0]) { // Quick Log receipt (input or change, whichever comes first)
     if (t.dataset.read) return true;
     t.dataset.read = '1';
@@ -921,7 +928,7 @@ async function adminAct(a, el = {}) {
     case 'ptSave': {
       const e = S.ptEd, g = k => String(S.drafts['pt-' + k] ?? '').trim();
       const item = { org: g('org'), contact: g('contact'), phone: g('phone'), email: g('email'), about: g('about'), notes: g('notes'),
-        type: g('type') === '__other' ? g('type-other') : g('type'), status: g('status'), followUp: g('follow') };
+        type: g('type') === 'Other' ? (g('type-other') || 'Other') : g('type'), status: g('status'), followUp: g('follow') };
       if (!item.org && !item.contact) { toast('Add the organization or a contact name.'); return true; }
       if (!e.isNew) item.id = e.item.id;
       else { item.source = g('source') || 'Call'; item.added = g('added') || todayIso(); }
