@@ -454,7 +454,7 @@ function followUpField(key, empty = 'No date') {
 }
 // An inquiry with no date picked: what the hourly check will do on its own (14 days after the last contact).
 function inqAutoFollow(it, status) {
-  if (['Needs follow-up', 'Missed call'].includes(status)) return 'Already in follow-up';
+  if (['Needs follow-up', 'Missed call'].includes(status)) return 'Now: ' + inqDate(it.statusChanged || it.received || todayIso()); // (since it went there)
   if (['Enrolled', 'Close Out'].includes(status)) return 'None';
   const last = [it.received || todayIso(), it.statusChanged, ...inqContacts(it).map(c => c.d)].filter(isIsoDate).sort().pop() || todayIso();
   return 'Auto: ' + inqDate(addDays(last, 14));
@@ -504,13 +504,13 @@ function ptEdModal() {
       ${e.isNew ? '' : `<p class="muted small">Added ${esc(inqDate(it.added))}</p>`}
       <label class="field inq-status-pick">Status<select id="pt-status" data-draft="pt-status">${PT_STATUSES.map(st => `<option ${S.drafts['pt-status'] === st ? 'selected' : ''}>${st}</option>`).join('')}</select></label>
       <div class="inq-fields two">
-        <label class="field">Organization<input id="pt-org" data-draft="pt-org" value="${v('org')}" placeholder="e.g. Surry County Public Schools" autocomplete="off"></label>
+        <label class="field">Organization<input id="pt-org" data-draft="pt-org" value="${v('org')}" autocomplete="off"></label>
         <label class="field">Contact person<input id="pt-contact" data-draft="pt-contact" value="${v('contact')}" autocomplete="off"></label>
         <label class="field">Phone<input id="pt-phone" data-draft="pt-phone" value="${v('phone')}" autocomplete="off" inputmode="tel"></label>
         <label class="field">Email<input id="pt-email" data-draft="pt-email" value="${v('email')}" autocomplete="off"></label>
         <label class="field">Type<select id="pt-type" data-draft="pt-type"><option value="">—</option>${types.map(t => `<option ${S.drafts['pt-type'] === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}<option value="__other" ${S.drafts['pt-type'] === '__other' ? 'selected' : ''}>Type another…</option></select></label>
         ${S.drafts['pt-type'] === '__other' ? `<label class="field">New type<input id="pt-type-other" data-draft="pt-type-other" value="${v('type-other')}" placeholder="e.g. Hospital, Fire department" autocomplete="off"></label>` : ''}
-        <label class="field">For<input id="pt-about" data-draft="pt-about" value="${v('about')}" placeholder="Post our flyer, custom cohort quote…" autocomplete="off"></label>
+        <label class="field">For<input id="pt-about" data-draft="pt-about" value="${v('about')}" autocomplete="off"></label>
       </div>
       <label class="field">Notes<textarea id="pt-notes" data-draft="pt-notes" rows="4" placeholder="What they want, what you quoted…">${v('notes')}</textarea></label>
       ${followUpField('pt-follow')}
@@ -581,8 +581,9 @@ function adminInquiryBox({ calls = false } = {}) {
         title="${S.inqCallsOnly ? 'Showing calls and voicemails · tap for all' : 'Showing all · tap for calls and voicemails only'}" aria-label="${S.inqCallsOnly ? 'Show all' : 'Show calls only'}">${S.inqCallsOnly ? LINK_ICONS.phone : INQ_ALL_ICON}</button>`
       : q && !calls && !pt ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
-      + (q ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>'
-        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : '')).replace('<h2>', (q ? `<span class="status-wrap">${calls ? seg : tabs}</span>` : '') + '<h2>')}
+      + (q && !calls ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>'
+        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : '')) // (the phone page has its big + Inquiry)
+      .replace('<h2>', (q ? (calls ? seg : `<span class="status-wrap">${tabs}</span>`) : '') + '<h2>')}
     ${otherBar}
     ${S.inqErr ? `<p class="em-note">${esc(S.inqErr)}</p>` : ''}
     ${q && !q.timerOn && !pt ? '<p class="em-note">The hourly check is off. In the Admin Apps Script, run <b>setupInquiryCheck</b> once.</p>' : ''}

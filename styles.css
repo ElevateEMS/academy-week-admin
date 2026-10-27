@@ -1385,5 +1385,9 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .fu-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .fu-row .ai-date { flex: 0 0 auto; min-width: 150px; margin-top: 0; }
 .fu-row .chip.small { margin: 0; }
+/* phone page: Students | Partners on the left of the header row, in line with the icons on the right */
+.calls-box .box-head:has(.inq-seg) { justify-content: space-between; }
+.calls-box .box-head:has(.inq-seg) h2:empty { display: none; }
 .inq-seg { box-shadow: none; margin: 0; }
 .inq-seg button { padding: 5px 13px; }
+.calls-box .box-head:has(.inq-seg) .head-actions { position: static; }
