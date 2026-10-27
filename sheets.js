@@ -64,6 +64,8 @@ const Sheets = (() => {
     saveInquirySettings: settings => call('saveInquirySettings', { settings }).then(o => o.settings),
     saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
     deleteInquiry: id => call('deleteInquiry', { id }),
+    savePartner: item => call('savePartner', { item }).then(o => o.item), // Info Requests → Partners: a new one, or changes
+    deletePartner: id => call('deletePartner', { id }),
     cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
     shirtSheet: key => call('shirtSheet', { cohort: key }), // { name, url, rows: [{ row, printed, full, email, size, street, unit, city, state, zip, shipped, note }] }
     signLinks: (key, roster, names) => call('signLinks', { cohort: key, roster, names }).then(o => o.links), // { name: code }
@@ -196,6 +198,8 @@ function sampleSheets() {
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
+    async savePartner(item) { const p = { id: item.id || 'p-' + Date.now(), added: todayIso(), status: 'New', contacts: [], followUp: '', ...item }; delete p.contact; return wait(p); },
+    async deletePartner() { return wait({ deleted: true }); },
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
