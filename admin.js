@@ -445,13 +445,23 @@ const inqSlug = st => String(st || '').toLowerCase().replace(/[^a-z]+/g, '-');
 const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 // Follow up on: a date you pick ("call me back in a month"). On that day the hourly check moves an inquiry to Needs
 // follow-up (a partner shows under Follow up), and it's in the Morning Email. Logging a contact clears it.
-function followUpField(key) {
+function followUpField(key, empty = 'No date') {
   const quick = [['1 week', 7], ['2 weeks', 14], ['1 month', 'm']];
   return `<div class="field fu-field"><span>Follow up on</span>
-    <div class="fu-row"><span class="ai-date">${datePicker(key, { optional: true, empty: 'No date', title: 'Follow up on' })}</span>
+    <div class="fu-row"><span class="ai-date">${datePicker(key, { optional: true, empty, title: 'Follow up on' })}</span>
       ${quick.map(([l, n]) => `<button class="chip small" data-act="fuQuick" data-k="${key}" data-n="${n}">${l}</button>`).join('')}
       ${S.drafts[key] ? `<button class="link" data-act="fuQuick" data-k="${key}" data-n="">Clear</button>` : ''}</div></div>`;
 }
+// An inquiry with no date picked: what the hourly check will do on its own (14 days after the last contact).
+function inqAutoFollow(it, status) {
+  if (['Needs follow-up', 'Missed call'].includes(status)) return 'Already in follow-up';
+  if (['Enrolled', 'Close Out'].includes(status)) return 'None';
+  const last = [it.received || todayIso(), it.statusChanged, ...inqContacts(it).map(c => c.d)].filter(isIsoDate).sort().pop() || todayIso();
+  return 'Auto: ' + inqDate(addDays(last, 14));
+}
+const monthAhead = () => { const x = parseIso(todayIso()), day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + 1); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return isoOf(x); };
+// The list's grey line: the latest "What happened" you logged, otherwise Notes (or what they wrote).
+const lastNote = x => [...inqContacts(x)].reverse().find(c => c.note && c.by !== 'Automatic' && !/^(Call|Email|Text|Website|Voicemail)$/.test(c.note));
 const fuText = iso => isIsoDate(iso) ? 'follow up ' + (iso <= todayIso() ? 'now' : inqDate(iso)) : '';
 
 /* ---------- Info Requests → Partners (agencies, schools, employers…) ---------- */
@@ -465,7 +475,7 @@ function partnerLists(term) {
   const row = x => `<li class="inq-row" data-act="ptOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.type || 'Partner')}">${PT_ICON}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.org || x.contact || 'No name')}</span>
-        <span class="inq-sub">${[term || ptDue(x) ? x.status : '', x.org ? x.contact : '', x.about, fuText(x.followUp), x.notes].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+        <span class="inq-sub">${[term || ptDue(x) ? x.status : '', x.org ? x.contact : '', x.about, fuText(x.followUp), (lastNote(x) || {}).note || x.notes].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   if (found) return `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`;
   const due = all.filter(ptDue), of = st => all.filter(x => x.status === st && !ptDue(x));
@@ -528,7 +538,7 @@ function adminInquiryBox({ calls = false } = {}) {
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
-        <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), fuText(x.followUp), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
+        <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), fuText(x.followUp), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', (lastNote(x) || {}).note || x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   // Missed calls (only when there are some) and Needs follow-up are always open; Plans to enroll (when there are some),
   // Responded and Enrolled open with a click (remembered on this device); Close Out hides behind a link.
   const section = (st, always) => {
@@ -593,16 +603,28 @@ function gvUrl(phone) {
   const d = String(phone || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
   return d.length === 10 ? `https://voice.google.com/calls?a=nc,%2B1${d}&authuser=${encodeURIComponent(GV_ACCOUNT)}` : '';
 }
-// Contact history in a request's window: every time you talked (newest first), and + Log a contact.
+// Contact history in a request's window: every time you talked (newest first); + opens Log a Contact on top.
 function inqHistory(it, e, p = 'ie2') {
   const list = [...inqContacts(it)].reverse();
   return `<div class="inq-hist"><p class="mini-head with-plus">Contact history
-      ${e.log ? '' : `<button class="add-plus small-plus" data-act="inqLogOpen" data-p="${p}" title="Log a contact" aria-label="Log a contact">+</button>`}</p>
-    ${e.log ? `<div class="inq-log">
-        <div class="field">When<span class="ai-date">${datePicker(p + '-cdate', { title: 'Date you talked' })}</span></div>
-        <label class="field">What happened<input id="${p}-cnote" data-draft="${p}-cnote" value="${esc(S.drafts[p + '-cnote'] || '')}" placeholder="${p === 'pt' ? 'e.g. Sent the quote, they’ll ask their board' : 'e.g. Called back, wants Spring 2027 dates'}" autocomplete="off"></label>
-        <p class="muted small">Logged when you Save. Change the status above too if it changed${S.drafts[p + '-follow'] ? '; the follow-up date clears unless you pick a new one' : ''}.${S.drafts['ie2-status'] === 'Missed call' && p === 'ie2' ? ' This moves them from Missed calls to Responded.' : ''}</p></div>` : ''}
+      <button class="add-plus small-plus" data-act="logOpen" data-p="${p}" title="Log a contact" aria-label="Log a contact">+</button></p>
     <ul class="inq-hist-list">${list.map(c => `<li><b>${esc(inqDate(c.d))}</b> · ${esc(c.by || '')}${c.note ? ' · ' + esc(c.note) : ''}</li>`).join('') || '<li class="muted">Nothing logged yet.</li>'}</ul></div>`;
+}
+// Log a Contact (over an inquiry's or partner's window): when, what happened, the status now. Saves right away.
+function logContactModal() {
+  const L = S.logEd, p = L.p, sts = p === 'pt' ? PT_STATUSES : INQ_STATUSES;
+  return `<div class="overlay log-overlay" data-act="logClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Log a Contact</h2><button class="x big" data-act="logClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      <div class="inq-fields two">
+        <div class="field">When<span class="ai-date">${datePicker('lg-date', { title: 'Date you talked' })}</span></div>
+        <label class="field">Status<select id="lg-status" data-draft="lg-status">${sts.map(st => `<option ${S.drafts['lg-status'] === st ? 'selected' : ''}>${st}</option>`).join('')}</select></label>
+      </div>
+      <label class="field">What happened<input id="lg-note" data-draft="lg-note" value="${esc(S.drafts['lg-note'] || '')}" placeholder="${p === 'pt' ? 'e.g. Sent the quote, they’ll ask their board' : 'e.g. Called back, wants Spring 2027 dates'}" autocomplete="off"></label>
+      ${(S.drafts[p + '-follow'] || '') ? '<p class="muted small">Their follow-up date clears (pick a new one in their window if you want one).</p>' : ''}
+    </div>
+    <div class="modal-foot"><button class="btn primary" data-act="logSave" ${L.busy ? 'disabled' : ''}>${L.busy ? 'Saving…' : 'Log it'}</button></div>
+  </div></div>`;
 }
 // "Interested in": the current cohorts, the next 2 seasons after the last one (Summer 2027, Fall 2027…), and any other
 // training you've typed before (Psychomotor exam, CPR…), so it's only typed once.
@@ -642,7 +664,7 @@ function inqEdModal() {
       ${e.isNew ? `<div class="field">Date of the ${(S.drafts['ie2-source'] || 'Call').toLowerCase()}<span class="ai-date">${datePicker('ie2-received', { title: 'Date of the ' + (S.drafts['ie2-source'] || 'Call').toLowerCase() })}</span></div>` : ''}
       ${e.isNew && S.drafts['ie2-source'] === 'Email' ? `<label class="field">What they wrote<textarea id="ie2-message" data-draft="ie2-message" rows="4" placeholder="Paste their email (optional)">${v('message')}</textarea></label>` : ''}
       <label class="field">Notes<textarea id="ie2-notes" data-draft="ie2-notes" rows="4" placeholder="What they asked, when to call back…">${v('notes')}</textarea></label>
-      ${followUpField('ie2-follow')}
+      ${followUpField('ie2-follow', inqAutoFollow(it, S.drafts['ie2-status']))}
       ${e.isNew ? '' : inqHistory(it, e)}
     </div>
     <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="inqDelete">Delete</button>'}
@@ -702,7 +724,7 @@ function saveStickySoon(nid, id) {
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
   return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.adminPanel ? adminPanel() : '') + (S.inqSet ? inqSetModal() : '')
-    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.linksDraft ? linksEdModal() : '');
+    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.linksDraft ? linksEdModal() : '');
 }
 function adminInput(t) {
   if (t.id === 'ql-file' && t.files && t.files[0]) { // Quick Log receipt (input or change, whichever comes first)
@@ -721,7 +743,8 @@ function adminInput(t) {
   return true;
 }
 function adminEscape() {
-  if (S.inqEd) { if (S.inqEd.busy) return true; S.inqEd = null; }
+  if (S.logEd) { if (S.logEd.busy) return true; S.logEd = null; }
+  else if (S.inqEd) { if (S.inqEd.busy) return true; S.inqEd = null; }
   else if (S.ptEd) { if (S.ptEd.busy) return true; S.ptEd = null; }
   else if (S.linksDraft) { S.linksDraft = null; S.lkPick = null; }
   else if (S.inqSet) { if (S.inqSaving) return true; S.inqSet = false; }
@@ -849,12 +872,32 @@ async function adminAct(a, el = {}) {
       S.drafts['ie2-status'] = (it.status && inqStatus(it)) || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
       S.drafts['ie2-follow'] = it.followUp || '';
       S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = ''; S.drafts['ie2-source'] = 'Call'; S.drafts['ie2-message'] = ''; S.drafts['ie2-cohort-other'] = '';
-      S.inqEd = { item: it, isNew: a === 'inqNew', busy: false, log: false }; render(); return true;
+      S.inqEd = { item: it, isNew: a === 'inqNew', busy: false }; render(); return true;
     }
-    case 'inqLogOpen': { const p = d.p || 'ie2'; (p === 'pt' ? S.ptEd : S.inqEd).log = true; render(); setTimeout(() => { const el = document.getElementById(p + '-cnote'); if (el) el.focus(); }, 0); return true; }
+    case 'logOpen': {
+      const p = d.p || 'ie2', cur = S.drafts[p + '-status'];
+      S.drafts['lg-date'] = todayIso(); S.drafts['lg-note'] = '';
+      S.drafts['lg-status'] = p === 'ie2' && cur === 'Missed call' ? 'Responded' : cur; // (called back)
+      S.logEd = { p, busy: false }; render(); setTimeout(() => { const el = document.getElementById('lg-note'); if (el) el.focus(); }, 0); return true;
+    }
+    case 'logClose': if (S.logEd && !S.logEd.busy) { S.logEd = null; render(); } return true;
+    case 'logSave': {
+      const L = S.logEd, p = L.p, ed = p === 'pt' ? S.ptEd : S.inqEd; if (!ed || L.busy) return true;
+      const item = { id: ed.item.id, status: S.drafts['lg-status'], contact: { d: S.drafts['lg-date'] || todayIso(), note: String(S.drafts['lg-note'] || '').trim() } };
+      L.busy = true; render();
+      try {
+        const saved = await (p === 'pt' ? Sheets.savePartner(item) : Sheets.saveInquiry(item));
+        const list = p === 'pt' ? (S.inq.partners = S.inq.partners || []) : S.inq.items, i = list.findIndex(x => x.id === saved.id);
+        if (i >= 0) list[i] = saved;
+        keepCopy('inq', S.inq);
+        ed.item = saved; S.drafts[p + '-status'] = p === 'ie2' ? inqStatus(saved) : saved.status; S.drafts[p + '-follow'] = saved.followUp || '';
+        S.logEd = null; toast('Logged.');
+      } catch (err) { L.busy = false; alert('Couldn’t log it: ' + err.message); }
+      render(); return true;
+    }
     case 'fuQuick': { // follow-up quick picks: 1 week, 2 weeks, 1 month (same day next month), or clear
       let to = '';
-      if (d.n === 'm') { const x = parseIso(todayIso()), day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + 1); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); to = isoOf(x); }
+      if (d.n === 'm') to = monthAhead();
       else if (d.n) to = addDays(todayIso(), Number(d.n));
       S.drafts[d.k] = to; render(); return true;
     }
@@ -862,17 +905,17 @@ async function adminAct(a, el = {}) {
     case 'ptOpen': case 'ptNew': {
       const it = a === 'ptNew' ? {} : (((S.inq && S.inq.partners) || []).find(x => x.id === d.id) || {});
       ['org', 'contact', 'phone', 'email', 'about', 'notes', 'type'].forEach(k => { S.drafts['pt-' + k] = it[k] || ''; });
-      S.drafts['pt-status'] = it.status || 'New'; S.drafts['pt-follow'] = it.followUp || ''; S.drafts['pt-type-other'] = '';
+      S.drafts['pt-status'] = it.status || 'New'; S.drafts['pt-follow'] = a === 'ptNew' ? monthAhead() : it.followUp || ''; // (a new one: a month out) S.drafts['pt-type-other'] = '';
       S.drafts['pt-cdate'] = todayIso(); S.drafts['pt-cnote'] = '';
-      S.ptEd = { item: it, isNew: a === 'ptNew', busy: false, log: false }; render(); return true;
+      S.ptEd = { item: it, isNew: a === 'ptNew', busy: false }; render(); return true;
     }
-    case 'ptEdClose': if (!S.ptEd.busy) { S.ptEd = null; render(); } return true;
+    case 'ptEdClose': if (!S.ptEd.busy) { S.ptEd = null; S.logEd = null; render(); } return true;
     case 'ptSave': {
       const e = S.ptEd, g = k => String(S.drafts['pt-' + k] ?? '').trim();
       const item = { org: g('org'), contact: g('contact'), phone: g('phone'), email: g('email'), about: g('about'), notes: g('notes'),
         type: g('type') === '__other' ? g('type-other') : g('type'), status: g('status'), followUp: g('follow') };
       if (!item.org && !item.contact) { toast('Add the organization or a contact name.'); return true; }
-      if (!e.isNew) { item.id = e.item.id; if (e.log) item.contact = { d: g('cdate') || todayIso(), note: g('cnote') }; }
+      if (!e.isNew) item.id = e.item.id;
       e.busy = true; render();
       try {
         const saved = await Sheets.savePartner(item);
@@ -897,7 +940,7 @@ async function adminAct(a, el = {}) {
       S.drafts['ie2-source'] = d.s;
       if (d.s !== 'Call' && S.drafts['ie2-status'] === 'Missed call') S.drafts['ie2-status'] = 'Needs follow-up';
       render(); return true;
-    case 'inqEdClose': if (!S.inqEd.busy) { S.inqEd = null; render(); } return true;
+    case 'inqEdClose': if (!S.inqEd.busy) { S.inqEd = null; S.logEd = null; render(); } return true;
     case 'inqSave': {
       const e = S.inqEd, g = k => String(S.drafts['ie2-' + k] ?? '').trim();
       const item = { name: g('name'), phone: g('phone'), email: g('email'), notes: g('notes'), cohort: g('cohort') === '__other' ? g('cohort-other') : g('cohort'), status: g('status'), followUp: g('follow') };
@@ -906,10 +949,7 @@ async function adminAct(a, el = {}) {
         if (item.source === 'Email') item.message = g('message');
         if (!item.name && !item.phone && !item.email) { toast('Add a name, phone number or email.'); return true; }
       }
-      else {
-        item.id = e.item.id;
-        if (e.log) item.contact = { d: g('cdate') || todayIso(), note: g('cnote') };
-      }
+      else item.id = e.item.id;
       e.busy = true; render();
       try {
         const saved = await Sheets.saveInquiry(item);
