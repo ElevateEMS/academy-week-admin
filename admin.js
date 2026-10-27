@@ -699,6 +699,7 @@ function inqEdModal() {
       ${e.isNew ? '' : inqHistory(it, e)}
     </div>
     <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="inqDelete">Delete</button>'}
+      ${!e.isNew && /@/.test(it.email || '') ? `<button class="btn inq-draft" data-act="inqDraft" ${e.drafting || e.busy ? 'disabled' : ''} title="The info-request reply, in your Gmail Drafts">${e.drafting ? 'Drafting…' : /^Drafted/.test(it.reply || '') ? 'Draft again' : 'Make reply draft'}</button>` : ''}
       <button class="btn primary" data-act="inqSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add ' + (S.drafts['ie2-source'] || 'Call').toLowerCase() : 'Save'}</button></div>
   </div></div>`;
 }
@@ -1047,6 +1048,19 @@ async function adminAct(a, el = {}) {
         S.inqEd = null; toast(e.isNew ? (item.source || 'Call') + ' added.' : 'Saved.');
       } catch (err) { e.busy = false; alert('Couldn’t save: ' + err.message); }
       render(); return true;
+    }
+    case 'inqDraft': { // the info-request reply in Gmail Drafts (saved email; asks to Save first if it was just changed)
+      const e = S.inqEd; if (!e || e.drafting) return true;
+      if (String(S.drafts['ie2-email'] ?? '').trim() !== String(e.item.email || '').trim()) { toast('Save their new email first.'); return true; }
+      if (/^Drafted (\d{4}-\d{2}-\d{2})/.test(e.item.reply || '') && !confirm(`A reply draft was already made ${inqDate(e.item.reply.slice(8))}. Make another one?`)) return true;
+      e.drafting = true; render();
+      try {
+        const r = await Sheets.draftInquiryReply(e.item.id), list = S.inq.items, i = list.findIndex(x => x.id === r.item.id);
+        if (i >= 0) list[i] = r.item;
+        keepCopy('inq', S.inq); e.item = r.item;
+        toast(r.waiting ? 'No draft yet: ' + r.waiting + ' It drafts itself once there are dates.' : 'Reply draft is in your Gmail Drafts.');
+      } catch (err) { alert('Couldn’t make the draft: ' + err.message); }
+      e.drafting = false; render(); return true;
     }
     case 'inqDelete': {
       const it = S.inqEd.item;

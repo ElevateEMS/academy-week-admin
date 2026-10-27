@@ -64,6 +64,7 @@ const Sheets = (() => {
     saveInquirySettings: settings => call('saveInquirySettings', { settings }).then(o => o.settings),
     saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
     deleteInquiry: id => call('deleteInquiry', { id }),
+    draftInquiryReply: id => call('draftInquiryReply', { id }), // "Make reply draft": { item, waiting } (the reply in gbrown@'s Drafts)
     savePartner: item => call('savePartner', { item }).then(o => o.item), // Info Requests → Partners: a new one, or changes
     deletePartner: id => call('deletePartner', { id }),
     cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
@@ -162,6 +163,7 @@ function sampleSheets() {
     async docPdf() { return wait(null); }, // (the packet shows a stand-in page for each Google Doc)
     async listInquiries() { return wait(sampleInquiries); },
     async checkInquiries() { return wait(Object.assign({ drafted: 0, waiting: 0 }, sampleInquiries)); },
+    async draftInquiryReply(id) { const o = sampleInquiries.items.find(x => x.id === id); if (o) o.reply = 'Drafted ' + new Date().toISOString().slice(0, 10); return wait({ item: o, waiting: '' }); },
     async saveInquirySettings(st) { sampleInquiries.settings = st; return wait(st); },
     async saveInquiry(item) {
       const list = sampleInquiries.items, o = item.id ? list.find(x => x.id === item.id) : null;
