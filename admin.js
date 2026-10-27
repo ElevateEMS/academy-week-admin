@@ -446,11 +446,11 @@ const inqDate = iso => isIsoDate(iso) ? parseIso(iso).toLocaleDateString('en-US'
 // Follow up on: a date you pick ("call me back in a month"). On that day the hourly check moves an inquiry to Needs
 // follow-up (a partner shows under Follow up), and it's in the Morning Email. Logging a contact clears it.
 function followUpField(key, empty = 'No date') {
-  const quick = [['1 week', 7], ['2 weeks', 14], ['1 month', 'm']];
+  const quick = [['1 week', 7, '1 wk'], ['2 weeks', 14, '2 wks'], ['1 month', 'm', '1 mo']]; // (the short words on a phone)
   return `<div class="field fu-field"><span>Follow up on</span>
     <div class="fu-row"><span class="ai-date">${datePicker(key, { optional: true, empty, title: 'Follow up on' })}</span>
-      ${quick.map(([l, n]) => `<button class="chip small" data-act="fuQuick" data-k="${key}" data-n="${n}">${l}</button>`).join('')}
-      ${S.drafts[key] ? `<button class="link" data-act="fuQuick" data-k="${key}" data-n="">Clear</button>` : ''}</div></div>`;
+      ${quick.map(([l, n, sh]) => `<button class="chip small" data-act="fuQuick" data-k="${key}" data-n="${n}" title="${l}"><span class="fu-l">${l}</span><span class="fu-s">${sh}</span></button>`).join('')}
+      ${S.drafts[key] ? `<button class="x fu-clear" data-act="fuQuick" data-k="${key}" data-n="" title="Clear the date" aria-label="Clear the date">×</button>` : ''}</div></div>`;
 }
 // An inquiry with no date picked: what the hourly check will do on its own (14 days after the last contact).
 function inqAutoFollow(it, status) {
