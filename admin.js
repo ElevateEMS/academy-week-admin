@@ -529,7 +529,8 @@ function adminInquiryBox({ calls = false } = {}) {
   else if (S.inqAt && Date.now() - S.inqAt > 5 * 60e3 && !S.inqBusy) setTimeout(() => loadInquiries(), 0); // fresh every 5 minutes while open
   if (!S.inqOpen) { try { S.inqOpen = JSON.parse(pref('inqOpen') || '{}'); } catch { S.inqOpen = {}; } } // (this device's last choice)
   const q = S.inq, open = S.inqOpen;
-  const items = (q ? q.items : []).filter(x => !calls || !S.inqCallsOnly || x.source !== 'Website');
+  // Phone filter (Inquiries page): calls, voicemails, missed calls and texts only (no website forms or emails).
+  const items = (q ? q.items : []).filter(x => !calls || !S.inqCallsOnly || !['Website', 'Email'].includes(x.source));
   const term = calls ? String(S.drafts['inq-search'] || '').trim().toLowerCase() : '', digits = term.replace(/\D/g, '');
   const found = term ? items.filter(x => [x.name, x.email, x.notes, x.message, x.cohort].some(v => String(v || '').toLowerCase().includes(term))
     || (digits.length >= 3 && String(x.phone || '').replace(/\D/g, '').includes(digits))) : null;
@@ -578,7 +579,7 @@ function adminInquiryBox({ calls = false } = {}) {
     </div>` : '';
   return `<section class="box admin-inq ${calls ? 'calls-box' : ''}">
     ${adminHead(calls ? '' : 'Inquiries', (q && calls && !pt ? `<button class="eye inq-filter ${S.inqCallsOnly ? 'on' : ''}" data-act="inqCallsOnly" data-v="${S.inqCallsOnly ? 0 : 1}"
-        title="${S.inqCallsOnly ? 'Showing calls and voicemails · tap for all' : 'Showing all · tap for calls and voicemails only'}" aria-label="${S.inqCallsOnly ? 'Show all' : 'Show calls only'}">${S.inqCallsOnly ? LINK_ICONS.phone : INQ_ALL_ICON}</button>`
+        title="${S.inqCallsOnly ? 'Showing calls, voicemails and texts · tap for all' : 'Showing all · tap for calls, voicemails and texts only'}" aria-label="${S.inqCallsOnly ? 'Show all' : 'Show calls only'}">${S.inqCallsOnly ? LINK_ICONS.phone : INQ_ALL_ICON}</button>`
       : q && !calls && !pt ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
       + (q && !calls ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>'
