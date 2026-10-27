@@ -1002,7 +1002,7 @@ const nextCohort = (key = S.cohortKey) => {
 };
 // Course Details: the status pill on the left of the header; clicking it opens a menu to change it.
 const STATUS_HELP = { Upcoming: 'Not started. Students can’t log in yet.', Active: 'Students can log in to the Student Hub.',
-  Former: 'Only the Resources tab in the Student Hub; its folder moves to Former Cohorts.' };
+  Former: 'Only the Resources tab in the Student Hub; its folder moves to Former/Test Cohorts.' };
 function statusMenu() {
   const st = S.sheet.status || '';
   return `<span class="status-wrap"><button class="status-pill ${slug(st)}" data-act="statusMenu" title="Change the status" aria-haspopup="true" aria-expanded="${!!S.statusMenu}">${esc(st || 'Unknown')}</button>
@@ -2507,7 +2507,7 @@ async function act(a, el = {}, e) {
         const key = d.k, status = d.s;
         S.statusMenu = false;
         const why = status === 'Active' ? 'Students on its roster will be able to log in to the Student Hub.'
-          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub, and its folder moves to Former Cohorts.' : '';
+          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub, and its folder moves to Former/Test Cohorts.' : '';
         if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
         const res = await Sheets.setStatus(key, status);
         S.kdAt = 0; // Key Dates picks up the change
