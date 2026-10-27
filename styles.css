@@ -1294,6 +1294,9 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .inq-hist-list li { padding: 5px 0; border-bottom: 1px dotted var(--line); }
 .inq-hist-list li:last-child { border-bottom: 0; }
 .inq-hist-list b { font-weight: 500; color: var(--taupe-dark); }
+.inq-hist-list .hist-line { cursor: pointer; border-radius: 4px; }
+.inq-hist-list .hist-line:hover { background: var(--blush-soft); }
+.hist-by { display: block; padding: 9px 0; color: var(--taupe-dark); }
 .eye.inq-filter.on { opacity: 1; background: var(--blush-soft); border-radius: 8px; }
 
 /* ---------- Orientation roster (roster.js) ---------- */
