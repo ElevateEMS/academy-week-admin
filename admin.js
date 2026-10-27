@@ -489,18 +489,18 @@ function partnerLists(term) {
   if (found) return `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`;
   const due = all.filter(ptDue), of = st => all.filter(x => ptStatus(x) === st && !ptDue(x));
+  // Only the statuses someone's in; Closed is its own line at the bottom, closed until you tap it.
   const section = (st, always) => {
     const list = of(st), k = 'p:' + st, isOpen = always || open[k];
+    if (!list.length) return '';
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(k)}"`}>
         <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
       ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || '<li class="empty">None.</li>'}</ul>` : ''}`;
   };
-  const closed = of('Closed').length;
   return (due.length ? `<p class="mini-head inq-sec"><span>Follow up</span><span class="count">${due.length}</span></p>
       <ul class="checks inq-list">${due.map(row).join('')}</ul>` : '')
-    + section('New', true) + section('Quote sent') + section('Waiting on them') + section('Active partner/advertiser')
-    + (open['p:Closed'] ? section('Closed') : '')
-    + (closed ? `<button class="link inq-ni" data-act="inqSec" data-s="p:Closed">${open['p:Closed'] ? 'Hide' : closed} closed</button>` : '');
+    + section('Active partner/advertiser') + section('New', true) + section('Quote sent') + section('Waiting on them') + section('Closed')
+    || '<p class="empty">No partners yet. Tap + Inquiry to add one.</p>';
 }
 function ptEdModal() {
   const e = S.ptEd, it = e.item || {}, v = k => esc(S.drafts['pt-' + k] ?? '');
@@ -551,21 +551,19 @@ function adminInquiryBox({ calls = false } = {}) {
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
       <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
         <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), fuText(x.followUp), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', (lastNote(x) || {}).note || x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
-  // Missed calls (only when there are some) and Needs follow-up are always open; Plans to enroll (when there are some),
-  // Responded and Enrolled open with a click (remembered on this device); Close Out hides behind a link.
+  // Missed calls (only when there are some) and Needs follow-up are always open; Plans to enroll, Responded, Enrolled
+  // and Close Out (last) open with a click (remembered on this device), and only show when someone's in them.
   const section = (st, always) => {
     const list = of(st), isOpen = always || open[st];
+    if (!list.length && st !== 'Needs follow-up') return '';
     return `<p class="mini-head inq-sec ${always ? '' : 'toggle'}" ${always ? '' : `data-act="inqSec" data-s="${esc(st)}"`}>
         <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${INQ_SECTION[st] || st}</span><span class="count">${list.length}</span></p>
       ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || `<li class="empty">${st === 'Needs follow-up' ? 'All inquiries answered.' : 'None.'}</li>`}</ul>` : ''}`;
   };
-  const ni = of('Close Out').length;
   const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
     : (of('Missed call').length ? section('Missed call', true) : '') + section('Needs follow-up', true)
-      + (of('Plans to enroll').length ? section('Plans to enroll') : '') + section('Responded') + section('Enrolled')
-      + (open['Close Out'] ? section('Close Out') : '')
-      + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Close Out">${open['Close Out'] ? 'Hide' : ni} closed out</button>` : '');
+      + section('Plans to enroll') + section('Responded') + section('Enrolled') + section('Close Out');
   if (!S.inqTab) S.inqTab = pref('inqTab') === 'partners' ? 'partners' : 'students';
   const pt = S.inqTab === 'partners';
   // Top left: Students / Partners (tap to switch; this device remembers). Under the title, a note when the other side
