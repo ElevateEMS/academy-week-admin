@@ -497,7 +497,7 @@ function ptEdModal() {
   const typed = [...new Set(((S.inq && S.inq.partners) || []).map(x => x.type).filter(t => t && !PT_TYPES.includes(t)))];
   const types = [...PT_TYPES.slice(0, -1), ...typed, 'Other'];
   return `<div class="overlay" data-act="ptEdClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>${e.isNew ? 'Add an Inquiry' : esc(it.org || it.contact || 'Partner')}${!e.isNew && gvUrl(it.phone)
+    <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['pt-source'] === x ? 'on' : ''}" data-act="ptSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['pt-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.org || it.contact || 'Partner')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
       <button class="x big" data-act="ptEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
@@ -512,12 +512,13 @@ function ptEdModal() {
         ${S.drafts['pt-type'] === '__other' ? `<label class="field">New type<input id="pt-type-other" data-draft="pt-type-other" value="${v('type-other')}" placeholder="e.g. Hospital, Fire department" autocomplete="off"></label>` : ''}
         <label class="field">For<input id="pt-about" data-draft="pt-about" value="${v('about')}" autocomplete="off"></label>
       </div>
+      ${e.isNew ? `<div class="field">Date of the ${(S.drafts['pt-source'] || 'Call').toLowerCase()}<span class="ai-date">${datePicker('pt-added', { title: 'Date of the ' + (S.drafts['pt-source'] || 'Call').toLowerCase() })}</span></div>` : ''}
       <label class="field">Notes<textarea id="pt-notes" data-draft="pt-notes" rows="4" placeholder="What they want, what you quoted…">${v('notes')}</textarea></label>
       ${followUpField('pt-follow')}
       ${e.isNew ? '' : inqHistory(it, e, 'pt')}
     </div>
     <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="ptDelete">Delete</button>'}
-      <button class="btn primary" data-act="ptSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add inquiry' : 'Save'}</button></div>
+      <button class="btn primary" data-act="ptSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add ' + (S.drafts['pt-source'] || 'Call').toLowerCase() : 'Save'}</button></div>
   </div></div>`;
 }
 const RELOAD = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
@@ -912,9 +913,10 @@ async function adminAct(a, el = {}) {
       const it = a === 'ptNew' ? {} : (((S.inq && S.inq.partners) || []).find(x => x.id === d.id) || {});
       ['org', 'contact', 'phone', 'email', 'about', 'notes', 'type'].forEach(k => { S.drafts['pt-' + k] = it[k] || ''; });
       S.drafts['pt-status'] = it.status || 'New'; S.drafts['pt-follow'] = a === 'ptNew' ? monthAhead() : it.followUp || ''; // (a new one: a month out) S.drafts['pt-type-other'] = '';
-      S.drafts['pt-cdate'] = todayIso(); S.drafts['pt-cnote'] = '';
+      S.drafts['pt-source'] = 'Call'; S.drafts['pt-added'] = todayIso();
       S.ptEd = { item: it, isNew: a === 'ptNew', busy: false }; render(); return true;
     }
+    case 'ptSource': S.drafts['pt-source'] = d.s; render(); return true;
     case 'ptEdClose': if (!S.ptEd.busy) { S.ptEd = null; S.logEd = null; render(); } return true;
     case 'ptSave': {
       const e = S.ptEd, g = k => String(S.drafts['pt-' + k] ?? '').trim();
@@ -922,6 +924,7 @@ async function adminAct(a, el = {}) {
         type: g('type') === '__other' ? g('type-other') : g('type'), status: g('status'), followUp: g('follow') };
       if (!item.org && !item.contact) { toast('Add the organization or a contact name.'); return true; }
       if (!e.isNew) item.id = e.item.id;
+      else { item.source = g('source') || 'Call'; item.added = g('added') || todayIso(); }
       e.busy = true; render();
       try {
         const saved = await Sheets.savePartner(item);
