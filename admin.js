@@ -546,8 +546,11 @@ function adminInquiryBox({ calls = false } = {}) {
       + (ni ? `<button class="link inq-ni" data-act="inqSec" data-s="Close Out">${open['Close Out'] ? 'Hide' : ni} closed out</button>` : '');
   if (!S.inqTab) S.inqTab = pref('inqTab') === 'partners' ? 'partners' : 'students';
   const pt = S.inqTab === 'partners';
-  const tabs = `<div class="side-switch inq-tabs" role="group" aria-label="Students or partners">
-      <button class="${pt ? '' : 'on'}" data-act="inqTab" data-t="students">Students</button><button class="${pt ? 'on' : ''}" data-act="inqTab" data-t="partners">Partners</button></div>`;
+  // Top left: Students / Partners (tap to switch; this device remembers). The other side's count shows when it needs you:
+  // on Partners, students in Missed calls / Needs follow-up; on Students, partners whose follow-up date has come.
+  const otherN = pt ? (q ? q.items.filter(x => ['Missed call', 'Needs follow-up'].includes(inqStatus(x))).length : 0)
+    : (((q && q.partners) || []).filter(ptDue).length);
+  const tabs = `<button class="status-pill inq-tab ${pt ? 'pt' : ''}" data-act="inqTab" data-t="${pt ? 'students' : 'partners'}" title="Switch to ${pt ? 'Students' : 'Partners'}${otherN ? ' (' + otherN + ' waiting)' : ''}">${pt ? 'Partners' : 'Students'}${otherN ? ` <span class="inq-tab-n">· ${otherN}</span>` : ''}</button>`;
   const tools = calls && q ? `<div class="calls-tools">
       <button class="btn primary calls-add" data-act="${pt ? 'ptNew' : 'inqNew'}">${pt ? '+ Add a partner' : '+ Add a call'}</button>
       <input id="inq-search" class="calls-search" type="search" data-draft="inq-search" value="${esc(S.drafts['inq-search'] || '')}" placeholder="${pt ? 'Search partners' : 'Search name or phone'}" autocomplete="off" aria-label="Search">
@@ -558,8 +561,7 @@ function adminInquiryBox({ calls = false } = {}) {
       : q && !calls && !pt ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
       + (q ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add a partner" aria-label="Add a partner">+</button>'
-        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : ''))}
-    ${q ? tabs : ''}
+        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : '')).replace('<h2>', (q ? `<span class="status-wrap">${tabs}</span>` : '') + '<h2>')}
     ${S.inqErr ? `<p class="em-note">${esc(S.inqErr)}</p>` : ''}
     ${q && !q.timerOn && !pt ? '<p class="em-note">The hourly check is off. In the Admin Apps Script, run <b>setupInquiryCheck</b> once.</p>' : ''}
     ${waiting && q.waitingReason && !pt ? `<p class="em-note">${waiting} reply draft${waiting === 1 ? '' : 's'} waiting: ${esc(q.waitingReason)}</p>` : ''}
