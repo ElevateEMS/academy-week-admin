@@ -634,7 +634,7 @@ function logContactModal() {
 // training you've typed before (Psychomotor exam, CPR…), so it's only typed once.
 const INQ_SEASONS = ['Spring', 'Summer', 'Fall'];
 function inqInterestOptions(it = {}) {
-  const have = [...new Set([...(S.inq ? S.inq.cohorts : []), it.cohort].filter(Boolean))];
+  const have = [...new Set([...(S.inq ? S.inq.cohorts : []), S.inq && S.inq.defaultCohort, it.cohort].filter(Boolean))];
   const ranked = [...new Set([...have, ...S.cohorts.map(c => c.key)])].filter(k => cohortRank(k) != null).sort((a, b) => cohortRank(a) - cohortRank(b));
   const next = [];
   const last = ranked[ranked.length - 1];
@@ -873,6 +873,7 @@ async function adminAct(a, el = {}) {
     case 'inqOpen': case 'inqNew': {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
+      if (a === 'inqNew') S.drafts['ie2-cohort'] = (S.inq && S.inq.defaultCohort) || ''; // the cohort the reply would be about
       S.drafts['ie2-status'] = (it.status && inqStatus(it)) || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
       S.drafts['ie2-follow'] = it.followUp || '';
       S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = ''; S.drafts['ie2-source'] = 'Call'; S.drafts['ie2-message'] = ''; S.drafts['ie2-cohort-other'] = '';
