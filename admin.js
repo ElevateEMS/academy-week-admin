@@ -527,7 +527,7 @@ function ptEdModal() {
       ${followUpField('pt-follow')}
       ${e.isNew ? '' : inqHistory(it, e, 'pt')}
     </div>
-    <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="ptDelete">Delete</button>'}
+    <div class="modal-foot">${e.isNew ? '' : `<button class="trash-btn foot-trash" data-act="ptDelete" title="Delete" aria-label="Delete">${ICONS.trash}</button>`}
       <button class="btn primary" data-act="ptSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add ' + (S.drafts['pt-source'] || 'Call').toLowerCase() : 'Save'}</button></div>
   </div></div>`;
 }
@@ -698,8 +698,8 @@ function inqEdModal() {
       ${followUpField('ie2-follow', inqAutoFollow(it, S.drafts['ie2-status']))}
       ${e.isNew ? '' : inqHistory(it, e)}
     </div>
-    <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="inqDelete">Delete</button>'}
-      ${!e.isNew && /@/.test(it.email || '') ? `<button class="btn inq-draft" data-act="inqDraft" ${e.drafting || e.busy ? 'disabled' : ''} title="The info-request reply, in your Gmail Drafts">${e.drafting ? 'Drafting…' : /^Drafted/.test(it.reply || '') ? 'Draft again' : 'Make reply draft'}</button>` : ''}
+    <div class="modal-foot">${e.isNew ? '' : `<button class="trash-btn foot-trash" data-act="inqDelete" title="Delete" aria-label="Delete">${ICONS.trash}</button>`}
+      ${!e.isNew && /@/.test(it.email || '') ? `<button class="btn inq-draft" data-act="inqDraft" ${e.drafting || e.busy ? 'disabled' : ''} title="The info-request reply, in your Gmail Drafts">${e.drafting ? 'Drafting…' : /^Drafted/.test(it.reply || '') ? 'Draft again' : 'Draft info request reply'}</button>` : ''}
       <button class="btn primary" data-act="inqSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add ' + (S.drafts['ie2-source'] || 'Call').toLowerCase() : 'Save'}</button></div>
   </div></div>`;
 }

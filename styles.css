@@ -250,6 +250,9 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .seg.wide button { flex: 1; padding: 8px; font-size: 14px; }
 .modal-foot { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-top: 1px solid var(--line-soft); }
 .modal-foot .btn.primary { margin-left: auto; }
+.modal-foot .foot-trash { margin-left: -6px; }
+.modal-foot .inq-draft { margin-left: auto; } /* (next to Save, on the right) */
+.modal-foot .inq-draft + .btn.primary { margin-left: 0; }
 
 /* ---------- Students ---------- */
 .students-top { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
