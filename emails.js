@@ -474,12 +474,14 @@ async function emSaveStudent(sid, upd) {
 const emStuDone = sid => { ['date', 'time', 'next', 'final', 'kind'].forEach(x => delete S.drafts['ems-' + x + '-' + sid]); S.emailStu = null; };
 
 /* ---------- Setup → Book Codes ---------- */
+const JBL_PHONE = '1-800-832-0034'; // JB Learning Customer Service (more book codes); a plain phone link, so an iPhone calls from its own Phone app
 function bookCodesModal() {
   const all = S.bookCodes || [], free = freeCodes(), used = all.filter(c => c.sid).sort((a, b) => (b.at || 0) - (a.at || 0));
   return `<div class="overlay" data-act="bookCodesClose"><div class="modal small-modal em-codes" data-stop>
     <div class="modal-head"><h2>Book Codes</h2><button class="x big" data-act="bookCodesClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top" data-keep-scroll="bookCodes">
-      <p class="em-count"><b>${free.length}</b> unused · ${used.length} issued</p>
+      <p class="em-count"><span><b>${free.length}</b> unused · ${used.length} issued</span>
+        <a class="jbl-call" href="tel:${JBL_PHONE.replace(/\D/g, '')}" title="Call JB Learning Customer Service for more codes">${LINK_ICONS.phone}<span>JB Learning: ${JBL_PHONE}</span></a></p>
       <label class="field">Paste new codes (one per line, or separated by commas or spaces)
         <textarea id="bcPaste" data-draft="bcPaste" rows="4">${esc(S.drafts.bcPaste || '')}</textarea></label>
       <button class="btn primary small" data-act="bookCodesAdd">Add codes</button>

@@ -1397,3 +1397,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .inq-seg button { padding: 5px 13px; }
 .calls-box .box-head:has(.inq-seg) .head-actions { position: static; }
 .inq-seg button.on { background: var(--blush-soft); color: var(--taupe-dark); } /* mauve, so it doesn't blend into the brown + Inquiry button */
+.em-codes .em-count { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.jbl-call { display: inline-flex; align-items: center; gap: 6px; color: var(--taupe-dark); text-decoration: none; font-size: 14px; }
+.jbl-call:hover span { text-decoration: underline; }
+.jbl-call svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
