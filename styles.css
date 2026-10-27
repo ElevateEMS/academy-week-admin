@@ -1040,7 +1040,7 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .key-dates li.past { opacity: .55; }
 .stickies { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: start; padding: 2px 2px 6px; }
 .stickies > .empty { grid-column: 1 / -1; margin: 4px 0; }
-.sticky { border-radius: 4px 4px 4px 14px; padding: 10px 10px 4px; box-shadow: 0 1px 2px rgba(80, 55, 40, .08), 0 4px 10px rgba(80, 55, 40, .07); border: 1px solid rgba(125, 101, 88, .12); }
+.sticky { border-radius: 4px 4px 4px 14px; padding: 8px 8px 3px; box-shadow: 0 1px 2px rgba(80, 55, 40, .08), 0 4px 10px rgba(80, 55, 40, .07); border: 1px solid rgba(125, 101, 88, .12); }
 .sticky textarea { width: 100%; border: 0; background: transparent; resize: none; outline: none; padding: 0; min-height: 66px; line-height: 1.4; font-size: 14px; overflow: hidden; }
 .sticky textarea::placeholder { color: var(--taupe-dark); font-style: italic; opacity: .7; }
 .sticky-foot { display: flex; justify-content: space-between; align-items: center; }
@@ -1253,11 +1253,11 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 
 /* Sticky Notes: the grip (beside the color dot) shows on hover, like the dot and × */
 .sticky-tools { display: inline-flex; align-items: center; gap: 4px; }
-.sticky .sticky-grip { margin: 0 0 0 -4px; width: 18px; height: 18px; opacity: 0; transition: opacity .15s; }
+.sticky .sticky-grip { margin: 0 0 0 -4px; width: 16px; height: 16px; opacity: 0; transition: opacity .15s; }
 .sticky .sticky-grip svg { width: 16px; height: 16px; }
 .sticky:hover .sticky-grip { opacity: .7; } .sticky .sticky-grip:hover { opacity: 1; }
 /* Remind me: the bell shows on hover; a set date shows bottom right; a due one gets a rose edge */
-.sticky .sticky-bell { border: 0; background: none; padding: 0; width: 18px; height: 18px; cursor: pointer; color: var(--taupe-dark); opacity: 0; transition: opacity .15s; display: inline-flex; }
+.sticky .sticky-bell { border: 0; background: none; padding: 0; width: 16px; height: 16px; cursor: pointer; color: var(--taupe-dark); opacity: 0; transition: opacity .15s; display: inline-flex; }
 .sticky:hover .sticky-bell, .sticky .sticky-bell:focus { opacity: .75; } .sticky .sticky-bell:hover { opacity: 1; }
 .sticky-bell svg, .sticky-remind svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .sticky-foot .sticky-remind { margin-left: auto; margin-right: -2px; border: 0; background: rgba(255, 255, 255, .55); border-radius: 999px; padding: 1px 8px 1px 6px; font-size: 12px; color: var(--taupe-dark); cursor: pointer; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
@@ -1268,8 +1268,8 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 /* Delete: top right corner of the note (on hover); the text keeps clear of it */
 .sticky { position: relative; }
 .sticky .sticky-x { position: absolute; top: 1px; right: 1px; font-size: 16px; padding: 2px 5px; }
-.sticky textarea { padding-right: 14px; }
-.sticky-foot { min-height: 22px; }
+.sticky textarea { padding-right: 4px; }
+.sticky-foot { min-height: 16px; }
 .sticky.moving { box-shadow: 0 6px 20px rgba(80, 55, 40, .22); transform: scale(1.02); position: relative; z-index: 2; }
 @media (hover: none) { .sticky .sticky-grip { opacity: .45; } }
 
