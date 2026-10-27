@@ -733,12 +733,12 @@ function adminNotesBox() {
     <div class="stickies">${notes.map(n => {
       const id = 'an-' + n.id, due = isIsoDate(n.remind) && n.remind <= todayIso();
       return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}${due ? ' remind-due' : ''}" data-nid="${n.id}">
+        <button class="x sticky-x" data-act="adminNoteDel" data-id="${n.id}" aria-label="Delete note">×</button>
         <textarea id="${id}" data-draft="${id}" data-anote="${n.id}" data-grow rows="3" placeholder="Type a note">${esc(S.drafts[id] ?? n.text ?? '')}</textarea>
         <div class="sticky-foot"><span class="sticky-tools"><span class="ai-grip sticky-grip" data-ngrip title="Drag to move" aria-label="Drag to move">${ICONS.grip}</span>
           <button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button>
           ${isIsoDate(n.remind) ? '' : `<button class="sticky-bell" data-act="nrOpen" data-id="${n.id}" title="Remind me" aria-label="Remind me">${BELL}</button>`}</span>
-          ${isIsoDate(n.remind) ? `<button class="sticky-remind" data-act="nrOpen" data-id="${n.id}" title="${due ? 'Reminder is due: tap to move or clear it' : 'Reminder: tap to change'}">${BELL}${inqDate(n.remind)}</button>` : ''}
-          <button class="x" data-act="adminNoteDel" data-id="${n.id}" aria-label="Delete note">×</button></div>
+          ${isIsoDate(n.remind) ? `<button class="sticky-remind" data-act="nrOpen" data-id="${n.id}" title="${due ? 'Reminder is due: tap to move or clear it' : 'Reminder: tap to change'}">${BELL}${inqDate(n.remind)}</button>` : ''}</div>
       </div>`;
     }).join('') || '<p class="empty">No sticky notes. Tap + to add one.</p>'}</div>
   </section>`;
