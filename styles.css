@@ -1382,7 +1382,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 /* Info Requests: Students / Partners pill (top left), and the follow-up date */
 .status-pill.inq-tab { background: var(--blush-soft); }
 .status-pill.inq-tab.pt { background: var(--honey-soft); color: #7a5d30; }
-.inq-tab-n { color: var(--rose); font-weight: 600; }
+.em-note.inq-other b { font-weight: 600; }
 .fu-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .fu-row .ai-date { flex: 0 0 auto; min-width: 150px; margin-top: 0; }
 .fu-row .chip.small { margin: 0; }
