@@ -1396,3 +1396,4 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .inq-seg { box-shadow: none; margin: 0; }
 .inq-seg button { padding: 5px 13px; }
 .calls-box .box-head:has(.inq-seg) .head-actions { position: static; }
+.inq-seg button.on { background: var(--blush-soft); color: var(--taupe-dark); } /* mauve, so it doesn't blend into the brown + Inquiry button */
