@@ -3,7 +3,7 @@
      meta/admin        { info: { started, insurance, phone, portal, website }, links: [{ id, name, url }] }
      adminTodos/{id}   { text, done, created, doneAt }
      adminDates/{id}   { date (YYYY-MM-DD), text, created }
-     adminNotes/{id}   { text, color, created }   (sticky notes)
+     adminNotes/{id}   { text, color, created, order, remind (YYYY-MM-DD or '') }   (sticky notes; remind → Morning Email)
    Info Requests (website inquiries → reply drafts) live in the Admin Apps Script, not Firebase:
    listInquiries / checkInquiries / saveInquirySettings (sheets.js).
    Quick Links and the portal/website open in a big panel inside the app (nearly the whole window),
@@ -707,15 +707,36 @@ function adminNotesBox() {
   return `<section class="box shaded admin-notes">
     ${adminHead('Sticky Notes', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
     <div class="stickies">${notes.map(n => {
-      const id = 'an-' + n.id;
-      return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}" data-nid="${n.id}">
+      const id = 'an-' + n.id, due = isIsoDate(n.remind) && n.remind <= todayIso();
+      return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}${due ? ' remind-due' : ''}" data-nid="${n.id}">
         <textarea id="${id}" data-draft="${id}" data-anote="${n.id}" data-grow rows="3" placeholder="Type a note">${esc(S.drafts[id] ?? n.text ?? '')}</textarea>
         <div class="sticky-foot"><span class="sticky-tools"><span class="ai-grip sticky-grip" data-ngrip title="Drag to move" aria-label="Drag to move">${ICONS.grip}</span>
-          <button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button></span>
+          <button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button>
+          ${isIsoDate(n.remind) ? '' : `<button class="sticky-bell" data-act="nrOpen" data-id="${n.id}" title="Remind me" aria-label="Remind me">${BELL}</button>`}</span>
+          ${isIsoDate(n.remind) ? `<button class="sticky-remind" data-act="nrOpen" data-id="${n.id}" title="${due ? 'Reminder is due: tap to move or clear it' : 'Reminder: tap to change'}">${BELL}${inqDate(n.remind)}</button>` : ''}
           <button class="x" data-act="adminNoteDel" data-id="${n.id}" aria-label="Delete note">×</button></div>
       </div>`;
     }).join('') || '<p class="empty">No sticky notes. Tap + to add one.</p>'}</div>
   </section>`;
+}
+// Remind me: a date on a sticky. From that day it's in the Morning Email (Reminders) every morning and has a rose
+// edge here, until you move the date, clear it, or delete the note.
+const BELL = '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
+function noteRemindModal() {
+  const n = S.adminNotes.find(x => x.id === S.noteRemind) || {}, quick = [['1 week', 7], ['2 weeks', 14], ['1 month', 'm']];
+  const first = String(n.text || '').trim().split('\n')[0];
+  return `<div class="overlay" data-act="nrClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Remind me</h2><button class="x big" data-act="nrClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      ${first ? `<p class="muted small nr-note">${esc(first.length > 90 ? first.slice(0, 90) + '…' : first)}</p>` : ''}
+      <div class="field fu-field"><span>Remind me on</span>
+        <div class="fu-row"><span class="ai-date">${datePicker('nr-date', { optional: true, empty: 'Pick a date', title: 'Remind me on' })}</span>
+          ${quick.map(([l, k]) => `<button class="chip small" data-act="fuQuick" data-k="nr-date" data-n="${k}">${l}</button>`).join('')}</div></div>
+      <p class="muted small">It shows up in the Morning Email every morning from that day until you clear it or pick a new date.</p>
+    </div>
+    <div class="modal-foot">${isIsoDate(n.remind) ? '<button class="btn" data-act="nrClear">Clear reminder</button>' : ''}
+      <button class="btn primary" data-act="nrSave">Save</button></div>
+  </div></div>`;
 }
 const noteSaveTimers = {};
 function saveStickySoon(nid, id) {
@@ -732,7 +753,7 @@ function saveStickySoon(nid, id) {
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
   return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.adminPanel ? adminPanel() : '') + (S.inqSet ? inqSetModal() : '')
-    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.linksDraft ? linksEdModal() : '');
+    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '');
 }
 function adminInput(t) {
   // Dropdowns that change the window: Other / Type another… opens its box; the status changes the follow-up hint.
@@ -758,7 +779,8 @@ function adminInput(t) {
   return true;
 }
 function adminEscape() {
-  if (S.logEd) { if (S.logEd.busy) return true; S.logEd = null; }
+  if (S.noteRemind) { S.noteRemind = null; S.datePick = null; }
+  else if (S.logEd) { if (S.logEd.busy) return true; S.logEd = null; }
   else if (S.inqEd) { if (S.inqEd.busy) return true; S.inqEd = null; }
   else if (S.ptEd) { if (S.ptEd.busy) return true; S.ptEd = null; }
   else if (S.linksDraft) { S.linksDraft = null; S.lkPick = null; }
@@ -1019,6 +1041,18 @@ async function adminAct(a, el = {}) {
       const n = S.adminNotes.find(x => x.id === d.id); if (!n) return true;
       const i = NOTE_COLORS.indexOf(n.color);
       await Store.set('adminNotes/' + n.id, { color: NOTE_COLORS[(i + 1) % NOTE_COLORS.length] }); return true;
+    }
+    case 'nrOpen': {
+      const n = S.adminNotes.find(x => x.id === d.id); if (!n) return true;
+      S.noteRemind = n.id; S.drafts['nr-date'] = isIsoDate(n.remind) ? n.remind : ''; render(); return true;
+    }
+    case 'nrClose': S.noteRemind = null; S.datePick = null; render(); return true;
+    case 'nrSave': case 'nrClear': {
+      const id = S.noteRemind, to = a === 'nrSave' ? S.drafts['nr-date'] || '' : '';
+      if (a === 'nrSave' && !isIsoDate(to)) { toast('Pick a date.'); return true; }
+      S.noteRemind = null; S.datePick = null; delete S.drafts['nr-date'];
+      await Store.set('adminNotes/' + id, { remind: to }); render();
+      toast(to ? 'Reminder set for ' + inqDate(to) + '.' : 'Reminder cleared.'); return true;
     }
     case 'adminNoteDel': {
       const n = S.adminNotes.find(x => x.id === d.id);
