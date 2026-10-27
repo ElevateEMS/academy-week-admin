@@ -497,7 +497,7 @@ function partnerLists(term) {
         <span>${always ? '' : `<span class="inq-caret">${isOpen ? '▾' : '▸'}</span>`}${st}</span><span class="count">${list.length}</span></p>
       ${isOpen ? `<ul class="checks inq-list">${list.map(row).join('') || '<li class="empty">None.</li>'}</ul>` : ''}`;
   };
-  return (due.length ? `<p class="mini-head inq-sec"><span>Follow up</span><span class="count">${due.length}</span></p>
+  return (due.length ? `<p class="mini-head inq-sec"><span>Needs follow-up</span><span class="count">${due.length}</span></p>
       <ul class="checks inq-list">${due.map(row).join('')}</ul>` : '')
     + section('Active partner/advertiser') + section('New', true) + section('Quote sent') + section('Waiting on them') + section('Closed')
     || '<p class="empty">No partners yet. Tap + Inquiry to add one.</p>';
@@ -567,7 +567,7 @@ function adminInquiryBox({ calls = false } = {}) {
   if (!S.inqTab) S.inqTab = pref('inqTab') === 'partners' ? 'partners' : 'students';
   const pt = S.inqTab === 'partners';
   // Top left: Students / Partners (tap to switch; this device remembers). Under the title, a note when the other side
-  // needs you: "Students: 2 missed calls, 1 needs follow up. View →" / "Partners: 1 to follow up. View →".
+  // needs you: "Students: 2 missed calls, 1 needs follow-up. View →" / "Partners: 1 needs follow-up. View →".
   const tabs = `<button class="status-pill inq-tab ${pt ? 'pt' : ''}" data-act="inqTab" data-t="${pt ? 'students' : 'partners'}" title="Switch to ${pt ? 'Students' : 'Partners'}">${pt ? 'Partners' : 'Students'}</button>`;
   // The Inquiries phone page: Students | Partners side by side, the one you're on highlighted.
   const seg = `<div class="side-switch inq-seg" role="group" aria-label="Students or partners">
@@ -575,11 +575,11 @@ function adminInquiryBox({ calls = false } = {}) {
   let otherNote = '';
   if (q && pt) {
     const mc = q.items.filter(x => inqStatus(x) === 'Missed call').length, nf = q.items.filter(x => inqStatus(x) === 'Needs follow-up').length;
-    const bits = [mc ? mc + ' missed call' + (mc === 1 ? '' : 's') : '', nf ? nf + ' needs follow up' : ''].filter(Boolean);
+    const bits = [mc ? mc + ' missed call' + (mc === 1 ? '' : 's') : '', nf ? nf + ' needs follow-up' : ''].filter(Boolean);
     if (bits.length) otherNote = '<b>Students:</b> ' + bits.join(', ') + '.';
   } else if (q) {
     const due = (q.partners || []).filter(ptDue).length;
-    if (due) otherNote = '<b>Partners:</b> ' + due + ' to follow up.';
+    if (due) otherNote = '<b>Partners:</b> ' + due + ' needs follow-up.';
   }
   const otherBar = otherNote ? `<p class="em-note inq-other">${otherNote} <button class="link" data-act="inqTab" data-t="${pt ? 'students' : 'partners'}">View →</button></p>` : '';
   const tools = calls && q ? `<div class="calls-tools">
