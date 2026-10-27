@@ -26,10 +26,12 @@ const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.
 
 // The right column is Sticky Notes or To Do (Setup → Preferences → Admin Page); the other is only hidden.
 const adminSide = () => (S.settings && S.settings.adminSide) === 'todo' ? 'todo' : 'notes';
+// Left: Business Info over Changes for Future Classes; middle: Inquiries; right: Sticky Notes / To Do.
+// (Key Dates came off the page Oct 26, 2026: adminDatesBox is kept but not shown; dates you added stay saved.)
 function adminView() {
   return `<div class="board admin-board">
-    <div class="board-col">${adminInfoBox()}${adminDatesBox()}</div>
-    <div class="board-col">${adminChangesBox()}${adminInquiryBox()}</div>
+    <div class="board-col">${adminInfoBox()}${adminChangesBox()}</div>
+    <div class="board-col">${adminInquiryBox()}</div>
     <div class="board-col">${adminSide() === 'todo' ? adminTodoBox() : adminNotesBox()}</div>
   </div>`;
 }
