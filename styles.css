@@ -1385,3 +1385,5 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .fu-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .fu-row .ai-date { flex: 0 0 auto; min-width: 150px; margin-top: 0; }
 .fu-row .chip.small { margin: 0; }
+.inq-seg { box-shadow: none; margin: 0; }
+.inq-seg button { padding: 5px 13px; }

@@ -497,7 +497,7 @@ function ptEdModal() {
   const typed = [...new Set(((S.inq && S.inq.partners) || []).map(x => x.type).filter(t => t && !PT_TYPES.includes(t)))];
   const types = [...PT_TYPES.slice(0, -1), ...typed, 'Other'];
   return `<div class="overlay" data-act="ptEdClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>${e.isNew ? 'Add a Partner' : esc(it.org || it.contact || 'Partner')}${!e.isNew && gvUrl(it.phone)
+    <div class="modal-head"><h2>${e.isNew ? 'Add an Inquiry' : esc(it.org || it.contact || 'Partner')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
       <button class="x big" data-act="ptEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
@@ -517,7 +517,7 @@ function ptEdModal() {
       ${e.isNew ? '' : inqHistory(it, e, 'pt')}
     </div>
     <div class="modal-foot">${e.isNew ? '' : '<button class="link" data-act="ptDelete">Delete</button>'}
-      <button class="btn primary" data-act="ptSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add partner' : 'Save'}</button></div>
+      <button class="btn primary" data-act="ptSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : e.isNew ? 'Add inquiry' : 'Save'}</button></div>
   </div></div>`;
 }
 const RELOAD = '<svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>';
@@ -559,6 +559,9 @@ function adminInquiryBox({ calls = false } = {}) {
   // Top left: Students / Partners (tap to switch; this device remembers). Under the title, a note when the other side
   // needs you: "Students: 2 missed calls, 1 needs follow up. View →" / "Partners: 1 to follow up. View →".
   const tabs = `<button class="status-pill inq-tab ${pt ? 'pt' : ''}" data-act="inqTab" data-t="${pt ? 'students' : 'partners'}" title="Switch to ${pt ? 'Students' : 'Partners'}">${pt ? 'Partners' : 'Students'}</button>`;
+  // The Inquiries phone page: Students | Partners side by side, the one you're on highlighted.
+  const seg = `<div class="side-switch inq-seg" role="group" aria-label="Students or partners">
+      <button class="${pt ? '' : 'on'}" data-act="inqTab" data-t="students">Students</button><button class="${pt ? 'on' : ''}" data-act="inqTab" data-t="partners">Partners</button></div>`;
   let otherNote = '';
   if (q && pt) {
     const mc = q.items.filter(x => inqStatus(x) === 'Missed call').length, nf = q.items.filter(x => inqStatus(x) === 'Needs follow-up').length;
@@ -570,16 +573,16 @@ function adminInquiryBox({ calls = false } = {}) {
   }
   const otherBar = otherNote ? `<p class="em-note inq-other">${otherNote} <button class="link" data-act="inqTab" data-t="${pt ? 'students' : 'partners'}">View →</button></p>` : '';
   const tools = calls && q ? `<div class="calls-tools">
-      <button class="btn primary calls-add" data-act="${pt ? 'ptNew' : 'inqNew'}">${pt ? '+ Add a partner' : '+ Add a call'}</button>
+      <button class="btn primary calls-add" data-act="${pt ? 'ptNew' : 'inqNew'}">+ Inquiry</button>
       <input id="inq-search" class="calls-search" type="search" data-draft="inq-search" value="${esc(S.drafts['inq-search'] || '')}" placeholder="${pt ? 'Search partners' : 'Search name or phone'}" autocomplete="off" aria-label="Search">
     </div>` : '';
   return `<section class="box admin-inq ${calls ? 'calls-box' : ''}">
-    ${adminHead('Info Requests', (q && calls && !pt ? `<button class="eye inq-filter ${S.inqCallsOnly ? 'on' : ''}" data-act="inqCallsOnly" data-v="${S.inqCallsOnly ? 0 : 1}"
+    ${adminHead(calls ? '' : 'Inquiries', (q && calls && !pt ? `<button class="eye inq-filter ${S.inqCallsOnly ? 'on' : ''}" data-act="inqCallsOnly" data-v="${S.inqCallsOnly ? 0 : 1}"
         title="${S.inqCallsOnly ? 'Showing calls and voicemails · tap for all' : 'Showing all · tap for calls and voicemails only'}" aria-label="${S.inqCallsOnly ? 'Show all' : 'Show calls only'}">${S.inqCallsOnly ? LINK_ICONS.phone : INQ_ALL_ICON}</button>`
       : q && !calls && !pt ? `<button class="eye" data-act="inqSetOpen" title="Reply settings: tuition, textbook, months" aria-label="Reply settings">${ICONS.pencil}</button>` : '')
       + `<button class="eye inq-reload ${S.inqBusy ? 'spin' : ''}" data-act="inqCheck" title="Check for new requests now" aria-label="Check for new requests now" ${S.inqBusy ? 'disabled' : ''}>${RELOAD}</button>`
-      + (q ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add a partner" aria-label="Add a partner">+</button>'
-        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : '')).replace('<h2>', (q ? `<span class="status-wrap">${tabs}</span>` : '') + '<h2>')}
+      + (q ? (pt ? '<button class="add-plus small-plus" data-act="ptNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>'
+        : '<button class="add-plus small-plus" data-act="inqNew" title="Add an inquiry" aria-label="Add an inquiry">+</button>') : '')).replace('<h2>', (q ? `<span class="status-wrap">${calls ? seg : tabs}</span>` : '') + '<h2>')}
     ${otherBar}
     ${S.inqErr ? `<p class="em-note">${esc(S.inqErr)}</p>` : ''}
     ${q && !q.timerOn && !pt ? '<p class="em-note">The hourly check is off. In the Admin Apps Script, run <b>setupInquiryCheck</b> once.</p>' : ''}
@@ -646,7 +649,7 @@ function inqInterestOptions(it = {}) {
 function inqEdModal() {
   const e = S.inqEd, it = e.item || {}, v = k => esc(S.drafts['ie2-' + k] ?? '');
   return `<div class="overlay" data-act="inqEdClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['ie2-source'] === x ? 'on' : ''}" data-act="inqSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['ie2-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.name || it.phone || it.email || 'Info Request')}${!e.isNew && gvUrl(it.phone)
+    <div class="modal-head"><h2>${e.isNew ? `Add an Inquiry <span class="inq-src">${NEW_INQ_SOURCES.map(x => `<button class="eye ${S.drafts['ie2-source'] === x ? 'on' : ''}" data-act="inqSource" data-s="${x}" title="${x}" aria-label="${x}" aria-pressed="${S.drafts['ie2-source'] === x}">${SOURCE_ICONS[x]()}</button>`).join('')}</span>` : esc(it.name || it.phone || it.email || 'Inquiry')}${!e.isNew && gvUrl(it.phone)
       ? ` <a class="eye inq-gv" href="${gvUrl(it.phone)}" target="_blank" rel="noopener" data-chrome title="Call ${esc(it.phone)} with Google Voice" aria-label="Call ${esc(it.phone)} with Google Voice">${LINK_ICONS.phone}</a>` : ''}</h2>
       <button class="x big" data-act="inqEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
@@ -675,7 +678,7 @@ function inqSetModal() {
   const v = k => esc(S.drafts['iq-' + k] ?? '');
   const sel = (k, cur) => `<select id="iq-${k}" data-draft="iq-${k}">${MONTH_NAMES.map(m => `<option ${m === cur ? 'selected' : ''}>${m}</option>`).join('')}</select>`;
   return `<div class="overlay" data-act="inqSetClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>Info Request Replies</h2><button class="x big" data-act="inqSetClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Inquiry Replies</h2><button class="x big" data-act="inqSetClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       <p class="muted small">What the reply drafts say. Dates come from the cohorts’ Course Details.</p>
       <div class="inq-fields">
@@ -923,7 +926,7 @@ async function adminAct(a, el = {}) {
         const list = S.inq.partners, i = list.findIndex(x => x.id === saved.id);
         if (i >= 0) list[i] = saved; else list.unshift(saved);
         keepCopy('inq', S.inq);
-        S.ptEd = null; toast(e.isNew ? 'Partner added.' : 'Saved.');
+        S.ptEd = null; toast(e.isNew ? 'Inquiry added.' : 'Saved.');
       } catch (err) { e.busy = false; alert('Couldn’t save: ' + err.message); }
       render(); return true;
     }
@@ -962,7 +965,7 @@ async function adminAct(a, el = {}) {
     }
     case 'inqDelete': {
       const it = S.inqEd.item;
-      if (!confirm(`Delete ${it.name || it.phone || it.email || 'this request'} from Info Requests?`)) return true;
+      if (!confirm(`Delete ${it.name || it.phone || it.email || 'this inquiry'} from Inquiries?`)) return true;
       S.inqEd.busy = true; render();
       try { await Sheets.deleteInquiry(it.id); S.inq.items = S.inq.items.filter(x => x.id !== it.id); keepCopy('inq', S.inq); S.inqEd = null; }
       catch (err) { S.inqEd.busy = false; alert('Couldn’t delete: ' + err.message); }
