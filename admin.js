@@ -151,9 +151,15 @@ function adminHeaderLinks() {
 const CASH_ICON = '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M12 8.4v7.2"/><path d="M14 10.1c-.3-.6-1-1-2-1-1.1 0-1.9.6-1.9 1.4 0 1.9 4 1 4 2.9 0 .8-.8 1.4-2.1 1.4-1 0-1.8-.4-2.1-1.1"/><path d="M5.5 9v0M18.5 15v0"/></svg>';
 const RECEIPT_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/></svg>';
 const qlKind = () => S.drafts['ql-kind'] === 'Income' ? 'Income' : 'Expenses';
+// The tab name + link from last time on this device (so "Open 2026 Expenses" is there right away, not popping in
+// once the sheet answers); only while it's the same year as the date picked.
+function qlSavedTab(kind) {
+  const t = keepCopy('qlTab-' + kind) || {}, year = String(S.drafts['ql-date'] || todayIso()).slice(0, 4);
+  return t.tab && String(t.tab).slice(0, 4) === year ? { tab: t.tab, url: t.url || '' } : { tab: '', url: '' };
+}
 function qlStart() {
-  S.drafts['ql-kind'] = 'Expenses';
-  S.ql = { cats: keepCopy('qlCats-Expenses') || [], tab: '', loading: true, busy: false, err: '', photo: null, done: '' };
+  S.drafts['ql-kind'] = 'Expenses'; S.drafts['ql-date'] = todayIso();
+  S.ql = { cats: keepCopy('qlCats-Expenses') || [], ...qlSavedTab('Expenses'), loading: true, busy: false, err: '', photo: null, done: '' };
   S.drafts['ql-date'] = todayIso(); S.drafts['ql-cat'] = ''; S.drafts['ql-amount'] = ''; S.drafts['ql-notes'] = '';
   setTimeout(qlLoad, 0); // (qlShell calls this while drawing the page)
 }
@@ -165,6 +171,7 @@ async function qlLoad() {
     const r = await Sheets.financeInfo(S.drafts['ql-date'] || todayIso(), kind);
     if (kind !== qlKind() || S.ql !== q) return; // (switched while it loaded)
     q.cats = r.categories || []; q.tab = r.tab; q.url = r.url || ''; q.err = ''; keepCopy('qlCats-' + kind, q.cats);
+    keepCopy('qlTab-' + kind, { tab: q.tab, url: q.url });
   }
   catch (e) { q.err = e.message; }
   q.loading = false; render();
@@ -806,7 +813,7 @@ async function adminAct(a, el = {}) {
   if (a === 'qlKind') { // Expense / Income: that tab's categories
     if (!S.ql || qlKind() === el.dataset.k) return true;
     S.drafts['ql-kind'] = el.dataset.k; S.drafts['ql-cat'] = '';
-    Object.assign(S.ql, { cats: keepCopy('qlCats-' + qlKind()) || [], tab: '', url: '', err: '', done: '' });
+    Object.assign(S.ql, { cats: keepCopy('qlCats-' + qlKind()) || [], ...qlSavedTab(qlKind()), err: '', done: '' });
     render(); qlLoad(); return true;
   }
   if (a === 'qlSave') {
