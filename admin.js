@@ -15,7 +15,7 @@ const ARROW = '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="
 function adminWatch() {
   return [
     Store.watch('meta/admin', d => { S.admin = d || {}; render(); }),
-    Store.watch('adminTodos', list => { S.adminTodos = list; render(); tdLinkDone(); }),
+    Store.watch('adminTodos', list => { S.adminTodos = list; render(); tdLinkDone(); tdCleanup(); }),
     Store.watch('adminDates', list => { S.adminDates = list; render(); }),
     Store.watch('adminNotes', list => { S.adminNotes = list; render(); }),
   ];
@@ -343,14 +343,19 @@ function adminTodoCard() {
   const dated = now.filter(t => tdWhen(t)).sort(byWhen), plain = now.filter(t => !tdWhen(t)).sort((a, b) => (a.created || 0) - (b.created || 0));
   const later = open.filter(t => tdWhen(t) > soon).sort(byWhen);
   const done = S.adminTodos.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  // The arrow by "To Do" shows everything: scheduled items (faded, under what's due) and the Completed section.
+  // Closed, only what's due within TD_SOON days (and undated ones) shows. Remembered on this device.
+  if (S.tdAll === undefined) S.tdAll = pref('tdAll') === '1';
+  const all = S.tdAll, hidden = later.length + done.length;
+  const empty = all || !hidden ? 'Nothing to do. Tap + to add one.' : 'Nothing due right now.';
   return `<div class="td-card">
-    <div class="td-head"><h3>To Do</h3><span class="head-actions">${done.length ? '<button class="link" data-act="adminTodoClear">Clear checked</button>' : ''}
+    <div class="td-head"><h3>To Do${hidden ? `<button class="td-all" data-act="tdAllToggle" aria-expanded="${all}" title="${all ? 'Show only what’s due' : 'Show scheduled and completed'}" aria-label="${all ? 'Show only what’s due' : 'Show scheduled and completed'}">${all ? '▾' : '▸'}</button>` : ''}</h3><span class="head-actions">
       <button class="add-plus small-plus" data-act="tdNew" title="Add a to-do" aria-label="Add a to-do">+</button></span></div>
     <div class="td-scroll">
-      <ul class="checks td-list">${[...dated, ...plain].map(tdLine).join('') || (later.length ? '' : '<li class="empty">Nothing to do. Tap + to add one.</li>')}</ul>
-      ${later.length ? `<button class="td-up-toggle" data-act="tdUpToggle" aria-expanded="${!!S.tdUpOpen}">${S.tdUpOpen ? '▾' : '▸'} ${later.length} upcoming</button>
-        ${S.tdUpOpen ? `<ul class="checks td-list td-upcoming">${later.map(tdLine).join('')}</ul>` : ''}` : ''}
-      ${done.length ? `<ul class="checks td-list">${done.map(tdLine).join('')}</ul>` : ''}
+      ${dated.length + plain.length || !(all && later.length) ? `<ul class="checks td-list">${[...dated, ...plain].map(tdLine).join('') || `<li class="empty">${empty}</li>`}</ul>` : ''}
+      ${all && later.length ? `<ul class="checks td-list td-scheduled">${later.map(tdLine).join('')}</ul>` : ''}
+      ${all && done.length ? `<button class="td-up-toggle" data-act="tdDoneToggle" aria-expanded="${!!S.tdDoneOpen}">${S.tdDoneOpen ? '▾' : '▸'} Completed (${done.length})</button>
+        ${S.tdDoneOpen ? `<ul class="checks td-list td-done">${done.map(tdLine).join('')}</ul>` : ''}` : ''}
     </div>
   </div>`;
 }
@@ -376,11 +381,11 @@ function tdModal() {
       </div>
       ${rep === 'custom' ? `<div class="td-custom">Every <input id="td-rn" data-draft="td-rn" type="number" min="1" max="99" inputmode="numeric" value="${esc(S.drafts['td-rn'] || '1')}" aria-label="How many">
         <select id="td-ru" data-draft="td-ru" aria-label="Days, weeks or months">${['day', 'week', 'month'].map(u => `<option value="${u}" ${(S.drafts['td-ru'] || 'week') === u ? 'selected' : ''}>${u}s</option>`).join('')}</select></div>` : ''}
+      <button type="button" class="link td-addlink" data-act="tdLinkAdd">+ Add a link</button>
       ${e.links.length ? `<div class="td-links">${e.links.map((l, i) => `<div class="td-lrow">
           <input id="tdl-${i}-name" data-tdl="${i}:name" value="${esc(l.name)}" placeholder="Name" autocomplete="off">
           <input id="tdl-${i}-url" data-tdl="${i}:url" value="${esc(l.url)}" placeholder="Link" autocomplete="off">
           <button class="x" data-act="tdLinkDel" data-i="${i}" aria-label="Remove link">×</button></div>`).join('')}</div>` : ''}
-      <button type="button" class="link td-addlink" data-act="tdLinkAdd">+ Add a link</button>
       ${t && !t.done && (sn || (isIsoDate(t.due) && t.due <= addDays(todayIso(), TD_SOON))) ? `<div class="field td-snooze">Snooze <span class="td-hint inline">${t.repeat ? 'just this time; the schedule stays the same' : 'moves it to a new day'}</span>
         <div class="fu-row"><span class="ai-date">${datePicker('td-snooze', { optional: true, empty: 'Pick a date', title: 'Snooze until' })}</span>
           ${chip('tdSnooze', addDays(todayIso(), 1), sn, 'Tomorrow')}${chip('tdSnooze', addDays(todayIso(), 7), sn, 'Next week')}</div></div>` : ''}
@@ -419,6 +424,16 @@ async function tdTick(t) {
     return;
   }
   await Store.set('adminTodos/' + t.id, { done: true, doneAt: Date.now(), snooze: '' });
+}
+// Checked-off items delete themselves a week after they were checked (whenever the app is open, on any device).
+const TD_KEEP_DONE_DAYS = 7;
+const tdCleaning = new Set();
+function tdCleanup() {
+  const cutoff = Date.now() - TD_KEEP_DONE_DAYS * 864e5;
+  S.adminTodos.filter(t => t.done && t.doneAt && t.doneAt < cutoff && !tdCleaning.has(t.id)).forEach(t => {
+    tdCleaning.add(t.id);
+    Store.del('adminTodos/' + t.id).catch(() => {}).finally(() => tdCleaning.delete(t.id));
+  });
 }
 // The Morning Email's Done link (?todoDone=<id>&on=<the date it was listed for>): ticks it once the to-dos load.
 // The date check stops a second click (or an old email) from moving a repeating one on again.
@@ -1233,7 +1248,8 @@ async function adminAct(a, el = {}) {
     case 'tdNew': tdOpen(null); return true;
     case 'tdOpen': { const t = S.adminTodos.find(x => x.id === d.id); if (t) tdOpen(t); return true; }
     case 'tdClose': S.tdEd = null; S.datePick = null; render(); return true;
-    case 'tdUpToggle': S.tdUpOpen = !S.tdUpOpen; render(); return true;
+    case 'tdAllToggle': S.tdAll = !S.tdAll; S.tdDoneOpen = false; pref('tdAll', S.tdAll ? '1' : '0'); render(); return true; // (Completed starts closed)
+    case 'tdDoneToggle': S.tdDoneOpen = !S.tdDoneOpen; render(); return true;
     case 'tdWho': S.drafts['td-who'] = d.v; render(); return true;
     case 'tdSnooze': S.drafts['td-snooze'] = S.drafts['td-snooze'] === d.v ? '' : d.v; render(); return true;
     case 'tdLinkAdd': S.tdEd.links.push({ name: '', url: '' }); render();

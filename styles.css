@@ -1448,8 +1448,8 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .td-list li:hover .x { opacity: .7; }
 .td-up-toggle { border: 0; background: none; padding: 6px 0 4px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
 .td-up-toggle:hover { color: var(--taupe-dark); }
-.td-upcoming li { opacity: .6; }
-.td-upcoming li:hover { opacity: .9; }
+.td-scheduled li { opacity: .6; }
+.td-scheduled li:hover { opacity: .9; }
 .td-list .empty { color: var(--muted); font-size: 13px; font-style: italic; }
 /* the to-do window */
 .td-chips { display: flex; flex-wrap: wrap; }
@@ -1483,3 +1483,12 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .td-lrow .x { opacity: .6; }
 .td-custom select { border: 1px solid var(--line); border-radius: 10px; padding: 5px 28px 5px 10px; background-color: var(--paper); font: inherit; font-size: 14px; color: var(--ink); }
 .td-custom input { font: inherit; font-size: 14px; color: var(--ink); }
+/* v229: Completed section (× always showing), + Add a link above its rows */
+.td-list.td-done li .x { opacity: .55; }
+.td-list.td-done li .x:hover { opacity: 1; }
+.td-modal .td-addlink + .td-links { margin-top: -4px; margin-bottom: 10px; }
+/* v231: the arrow by "To Do" (show scheduled + completed) */
+.td-head h3 { display: inline-flex; align-items: center; gap: 4px; }
+.td-all { border: 0; background: none; padding: 2px 6px; font-size: 13px; color: var(--muted); cursor: pointer; border-radius: 6px; line-height: 1; font-family: Jost, sans-serif; }
+.td-all:hover { color: var(--taupe-dark); background: var(--blush-soft); }
+.td-list.td-scheduled { border-top: 1px dotted rgba(125, 101, 88, .25); }
