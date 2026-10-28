@@ -355,32 +355,33 @@ function adminTodoCard() {
   </div>`;
 }
 // The to-do window (+ or click an item's words).
+const TD_REPEATS = [['', 'Doesn’t repeat'], ['w1', 'Every week'], ['w2', 'Every 2 weeks'], ['m1', 'Every month'], ['custom', 'Custom']];
 function tdModal() {
   const e = S.tdEd, t = e.id ? S.adminTodos.find(x => x.id === e.id) : null;
   if (e.id && !t) return '';
-  const rep = S.drafts['td-rep'] || '', who = S.drafts['td-who'] || 'both', due = S.drafts['td-due'] || '';
-  const chip = (act, v, cur, label) => `<button type="button" class="chip small ${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${label}</button>`;
-  const r = tdRepeatDraft();
+  const rep = S.drafts['td-rep'] || '', who = S.drafts['td-who'] || 'both';
   const sn = S.drafts['td-snooze'] || '';
+  const chip = (act, v, cur, label) => `<button type="button" class="chip small ${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${label}</button>`;
   return `<div class="overlay" data-act="tdClose"><div class="modal small-modal td-modal" data-stop>
-    <div class="modal-head"><h2>${e.id ? 'To-Do' : 'New To-Do'}</h2><button class="x big" data-act="tdClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>${t ? 'To-Do' : 'New To-Do'}</h2>
+      <span class="td-head-r"><div class="side-switch inq-seg td-who-seg" role="group" aria-label="Who it’s for">${[['bella', 'Bella'], ['nick', 'Nick'], ['both', 'Both']].map(([v, l]) =>
+        `<button type="button" class="${who === v ? 'on' : ''}" data-act="tdWho" data-v="${v}" aria-pressed="${who === v}">${l}</button>`).join('')}</div>
+      <button class="x big" data-act="tdClose" aria-label="Close">×</button></span></div>
     <div class="modal-body pad-top">
-      <label class="field">What<input id="td-text" data-draft="td-text" data-add="tdSave" value="${esc(S.drafts['td-text'] ?? '')}" placeholder="e.g. Check on ads" autocomplete="off"></label>
-      <label class="field">Note (optional)<input id="td-note" data-draft="td-note" value="${esc(S.drafts['td-note'] ?? '')}" placeholder="A detail to remember" autocomplete="off"></label>
-      <div class="field">Repeat<div class="td-chips">${chip('tdRep', '', rep, 'Doesn’t repeat')}${chip('tdRep', 'w1', rep, 'Every week')}${chip('tdRep', 'w2', rep, 'Every 2 weeks')}${chip('tdRep', 'm1', rep, 'Every month')}${chip('tdRep', 'custom', rep, 'Custom')}</div>
-        ${rep === 'custom' ? `<div class="td-custom">Every <input id="td-rn" data-draft="td-rn" type="number" min="1" max="99" inputmode="numeric" value="${esc(S.drafts['td-rn'] || '1')}">
-          ${['day', 'week', 'month'].map(u => chip('tdRu', u, S.drafts['td-ru'] || 'week', u + 's')).join('')}</div>` : ''}</div>
-      <div class="field">${rep ? (t && t.repeat ? 'Next one' : 'Starts on') : 'Due'}<span class="ai-date">${datePicker('td-due', { optional: !rep, empty: 'No due date', title: rep ? 'First date' : 'Due date' })}</span>
-        ${r ? `<span class="td-hint">Repeats ${esc(repLabel(r, due || todayIso()))}. Checking it off moves it to the next date on that schedule, even if you do it late.</span>` : ''}</div>
-      <div class="field">For<div class="td-chips">${chip('tdWho', 'bella', who, 'Bella')}${chip('tdWho', 'nick', who, 'Nick')}${chip('tdWho', 'both', who, 'Both')}</div>
-        <span class="td-hint">Shows up in ${who === 'both' ? 'both of your' : who === 'bella' ? 'Bella’s' : 'Nick’s'} Morning Email${who === 'both' ? 's' : ''} when it’s due.</span></div>
-      <div class="field">Links<div class="td-links">${e.links.map((l, i) => `<div class="td-lrow">
-          <input id="tdl-${i}-name" data-tdl="${i}:name" value="${esc(l.name)}" placeholder="Name (e.g. Google Ads)" autocomplete="off">
+      <label class="field">Title<input id="td-text" data-draft="td-text" data-add="tdSave" value="${esc(S.drafts['td-text'] ?? '')}" autocomplete="off"></label>
+      <label class="field">Note (optional)<input id="td-note" data-draft="td-note" value="${esc(S.drafts['td-note'] ?? '')}" autocomplete="off"></label>
+      <div class="td-row">
+        <div class="field">Due<span class="ai-date">${datePicker('td-due', { optional: !rep, empty: 'No due date', title: 'Due date' })}</span></div>
+        <label class="field">Repeat<select id="td-rep" data-draft="td-rep">${TD_REPEATS.map(([v, l]) => `<option value="${v}" ${rep === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      </div>
+      ${rep === 'custom' ? `<div class="td-custom">Every <input id="td-rn" data-draft="td-rn" type="number" min="1" max="99" inputmode="numeric" value="${esc(S.drafts['td-rn'] || '1')}" aria-label="How many">
+        <select id="td-ru" data-draft="td-ru" aria-label="Days, weeks or months">${['day', 'week', 'month'].map(u => `<option value="${u}" ${(S.drafts['td-ru'] || 'week') === u ? 'selected' : ''}>${u}s</option>`).join('')}</select></div>` : ''}
+      ${e.links.length ? `<div class="td-links">${e.links.map((l, i) => `<div class="td-lrow">
+          <input id="tdl-${i}-name" data-tdl="${i}:name" value="${esc(l.name)}" placeholder="Name" autocomplete="off">
           <input id="tdl-${i}-url" data-tdl="${i}:url" value="${esc(l.url)}" placeholder="Link" autocomplete="off">
-          <button class="x" data-act="tdLinkDel" data-i="${i}" aria-label="Remove link">×</button></div>`).join('')}</div>
-        <button type="button" class="btn small td-addlink" data-act="tdLinkAdd">+ Add a link</button>
-        ${e.links.some(l => /ads\.google\.com/i.test(l.url || '')) ? `<span class="td-hint">Google Ads opens in ${GOOGLE_ADS_ACCOUNT}.</span>` : ''}</div>
-      ${t && !t.done && (sn || (isIsoDate(t.due) && t.due <= addDays(todayIso(), TD_SOON))) ? `<div class="field">Snooze <span class="td-hint inline">${t.repeat ? 'just this time; the schedule stays the same' : 'moves it to a new day'}</span>
+          <button class="x" data-act="tdLinkDel" data-i="${i}" aria-label="Remove link">×</button></div>`).join('')}</div>` : ''}
+      <button type="button" class="link td-addlink" data-act="tdLinkAdd">+ Add a link</button>
+      ${t && !t.done && (sn || (isIsoDate(t.due) && t.due <= addDays(todayIso(), TD_SOON))) ? `<div class="field td-snooze">Snooze <span class="td-hint inline">${t.repeat ? 'just this time; the schedule stays the same' : 'moves it to a new day'}</span>
         <div class="fu-row"><span class="ai-date">${datePicker('td-snooze', { optional: true, empty: 'Pick a date', title: 'Snooze until' })}</span>
           ${chip('tdSnooze', addDays(todayIso(), 1), sn, 'Tomorrow')}${chip('tdSnooze', addDays(todayIso(), 7), sn, 'Next week')}</div></div>` : ''}
     </div>
@@ -936,7 +937,13 @@ function adminInput(t) {
   }
   if (t.id === 'inq-search') { S.drafts['inq-search'] = t.value; render(); return true; } // Inquiries page: filter as you type
   if (t.dataset.tdl && S.tdEd) { const [i, k] = t.dataset.tdl.split(':'); S.tdEd.links[Number(i)][k] = t.value; return true; }
-  if (t.id === 'td-rn') { S.drafts['td-rn'] = t.value; const h = document.querySelector('.td-modal .td-hint'); if (h && tdRepeatDraft()) h.textContent = `Repeats ${repLabel(tdRepeatDraft(), S.drafts['td-due'] || todayIso())}. Checking it off moves it to the next date on that schedule, even if you do it late.`; return true; }
+  if (t.id === 'td-rep' || t.id === 'td-ru') {
+    if (S.drafts[t.id] === t.value && t.id === 'td-rep') return true; // (input + change both arrive)
+    S.drafts[t.id] = t.value;
+    if (t.id === 'td-rep' && t.value && !S.drafts['td-due']) S.drafts['td-due'] = todayIso();
+    render(); return true;
+  }
+  if (t.id === 'td-rn') { S.drafts['td-rn'] = t.value; return true; }
   if (t.dataset.lk && S.linksDraft) { const [i, k] = t.dataset.lk.split(':'); S.linksDraft[Number(i)][k] = t.value; return true; }
   if (!t.dataset.anote) return false;
   S.drafts[t.id] = t.value; grow(t);
@@ -1227,8 +1234,6 @@ async function adminAct(a, el = {}) {
     case 'tdOpen': { const t = S.adminTodos.find(x => x.id === d.id); if (t) tdOpen(t); return true; }
     case 'tdClose': S.tdEd = null; S.datePick = null; render(); return true;
     case 'tdUpToggle': S.tdUpOpen = !S.tdUpOpen; render(); return true;
-    case 'tdRep': S.drafts['td-rep'] = d.v; if (d.v && !S.drafts['td-due']) S.drafts['td-due'] = todayIso(); render(); return true;
-    case 'tdRu': S.drafts['td-ru'] = d.v; render(); return true;
     case 'tdWho': S.drafts['td-who'] = d.v; render(); return true;
     case 'tdSnooze': S.drafts['td-snooze'] = S.drafts['td-snooze'] === d.v ? '' : d.v; render(); return true;
     case 'tdLinkAdd': S.tdEd.links.push({ name: '', url: '' }); render();
