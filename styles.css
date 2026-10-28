@@ -1512,3 +1512,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .dp-grid .dp-fill { height: 30px; }
 .dp-center .dp-grid .dp-fill { height: 34px; }
 .dp-multi .dp-grid .dp-fill { height: 36px; }
+/* v236: Course page one screen tall (columns stop at the window's bottom, boxes scroll inside); Location on one line */
+@media (min-width: 1101px) {
+  .course-board.fit { grid-template-rows: minmax(0, 1fr); }
+  .course-board.fit > .board-col { min-height: 0; }
+  .course-board.fit .box:not(.box-info):not(.box-ctodo) { min-height: 0; }
+}
+.info-row b.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cf-time::placeholder { font-size: 12px; }

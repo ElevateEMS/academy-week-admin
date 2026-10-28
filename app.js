@@ -1136,7 +1136,7 @@ function infoBox() {
     ${row('Orientation', date(i.firstDay) + (isIsoDate(i.firstDay) ? ' · ' + esc(x.orientTime) : ''))}
     ${row('Full CPR course', date(i.cpr) + (isIsoDate(i.cpr) && x.cprTime ? ' · ' + esc(x.cprTime) : ''))}
     ${row('Academy Week', aw)}
-    ${row('Location', x.awLocation ? esc(x.awLocation) : tbd)}
+    <div class="info-row"><span>Location</span><b class="one-line" title="${esc(x.awLocation)}">${x.awLocation ? esc(x.awLocation) : tbd}</b></div>
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
     ${row('Google Meet', meet)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
@@ -2420,7 +2420,11 @@ function grow(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2
 function fitBoard() {
   const board = document.querySelector('.board');
   if (!board) return;
-  board.style.minHeight = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
+  const fill = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
+  board.style.minHeight = fill;
+  // The Course page stays one screen tall: each column stops at the bottom of the window and its boxes scroll inside.
+  const fit = !!fill && innerWidth > 1100 && board.classList.contains('course-board');
+  board.classList.toggle('fit', fit); board.style.height = fit ? fill : '';
   // Prep: the scenarios box is only as tall as the plan, and Notes matches it (unless either was drag-sized).
   const scen = board.querySelector('.box-scenarios'), notes = board.querySelector('.box-notes'), h = cfg().heights;
   if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
