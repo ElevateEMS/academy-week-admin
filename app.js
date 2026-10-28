@@ -146,7 +146,7 @@ function bagCarries(item, bagNo) {
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
 const isBagItem = text => /bag check/i.test(text);
 const isBinderItem = text => /binder cover/i.test(text);
-const isBinderList = text => /prepare binders/i.test(text); // gets the list icon: what goes in each binder
+const isBinderList = text => /prepare (student )?binders/i.test(text); // gets the list icon (what goes in each binder) and the binder packet's Print
 const isShirtItem = text => /ship.*shirt/i.test(text); // Course To-Do: gets the Print packet button (packet.js)
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
@@ -261,6 +261,48 @@ async function seedVaoems() {
     await Store.set(P('todos/' + id), { text: VAOEMS_ITEM, heading: false, done: pastOrientation(), day: SETUP, kind: 'setup',
       order: ref ? orderOf(ref) + 1 : 99000, created: Date.now(), repeat: true }, false);
   } catch (e) { console.warn('VAOEMS item not added:', e.message); }
+}
+
+// Oct 27, 2026: "Print binder covers", "Print skills sheets" and "Put together binders" became one Prep to-do,
+// "Prepare student binders" (its Print makes every student's packet, covers included). Done once to the Prep template
+// (and the binder paperwork list: 2 backboarding, 7 splinting, 2 traction splints), and once to each cohort that
+// already has its to-dos (checked if all three were).
+const BINDER_OLD = /^(print binder covers|print skills sheets|put together binders|prepare binders)$/i, BINDER_ITEM = 'Prepare student binders';
+let binderTplTried = false, binderTried = null;
+async function seedBinderPrep() {
+  const st = S.settings;
+  if (st && !st.binderPrep2 && !binderTplTried) {
+    binderTplTried = true;
+    try {
+      if (await Store.claim('meta/settings', 'binderPrep2')) {
+        const patch = {};
+        if (st.checklist) {
+          const prep = [...((st.checklist.days || {})[PREP] || [])], at = prep.findIndex(l => BINDER_OLD.test(tplText(l)));
+          if (at >= 0) {
+            const list = prep.filter(l => !BINDER_OLD.test(tplText(l)));
+            if (!list.some(l => /prepare student binders/i.test(l))) list.splice(at, 0, BINDER_ITEM);
+            patch.checklist = { ...st.checklist, days: { ...(st.checklist.days || {}), [PREP]: list } };
+          }
+        }
+        if (st.binderList) patch.binderList = st.binderList.flatMap(l => /^3 backboarding$/i.test(l) ? ['2 Backboarding']
+          : /^8 splinting$/i.test(l) ? ['7 Splinting', ...(st.binderList.some(x => /traction/i.test(x)) ? [] : ['2 Traction Splints'])] : [l]);
+        if (Object.keys(patch).length) await Store.set('meta/settings', patch);
+      }
+    } catch (e) { console.warn('Binder template not updated:', e.message); }
+  }
+  const key = S.cohortKey, doc = S.cohortDoc;
+  if (!doc || !S.todosLoaded || !doc.repeatsAdded || doc.binderPrep2 || binderTried === key) return; // (a cohort without its to-dos yet gets the new template)
+  binderTried = key;
+  try {
+    if (!(await Store.claim('cohorts/' + key, 'binderPrep2')) || key !== S.cohortKey) return;
+    const old = S.todos.filter(t => (t.day ?? 1) === PREP && (t.kind || 'todo') === 'todo' && BINDER_OLD.test(String(t.text || '').trim()));
+    if (!old.length) return;
+    const id = repeatId(PREP, BINDER_ITEM);
+    if (!S.todos.some(t => t.id === id)) await Store.set(P('todos/' + id), { text: BINDER_ITEM, done: old.every(t => t.done), day: PREP, kind: 'todo',
+      order: Math.min(...old.map(orderOf)), created: Date.now(), repeat: true }, false);
+    await Promise.all(old.map(t => Store.del(P('todos/' + t.id))));
+    await Store.set('cohorts/' + key, { removedRepeats: Object.fromEntries(old.map(t => [t.id, true])) });
+  } catch (e) { console.warn('Binder to-dos not combined:', e.message); }
 }
 
 /* ---------- Cohorts in order (for "the previous cohort") ---------- */
@@ -560,7 +602,7 @@ function render() {
     }
     fitBoard();
     syncDue(); // template to-dos' due dates follow Course Details
-    syncRosters(); syncOrientTodos(); seedVaoems(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
+    syncRosters(); syncOrientTodos(); seedVaoems(); seedBinderPrep(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
@@ -657,6 +699,7 @@ function shell() {
   ${S.dueEd ? dueModal() : ''}
   ${adminModals()}
   ${S.packet ? packetModal() : ''}
+  ${S.bp ? bpModal() : ''}
   ${S.roster ? rosterModal() : ''}
   ${S.resetAsk ? resetModal() : ''}`;
 }
@@ -902,7 +945,8 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
-      if (kind === 'todo' && isBinderList(t.text)) open = `<button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`;
+      if (kind === 'todo' && isBinderList(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`
+        + `<button class="btn tiny" data-act="bpOpen" data-id="${t.id}" title="Print every student’s binder packet, cover pages included">Print · ${attending().length}</button></span>`;
       // Ship student shirts: Print Packet and Shipping File as icons (names on hover), so it all fits on one row.
       if (kind === 'ctodo' && isShirtItem(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="packetOpen" title="Print Packet" aria-label="Print Packet">${PRINTER}</button>`
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
@@ -2417,7 +2461,7 @@ document.addEventListener('keydown', e => {
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }
     else if (S.roster) { if (S.roster.busy) return; if (S.roster.redo || S.roster.redoInst || S.roster.saveAsk) { S.roster.redo = null; S.roster.redoInst = null; S.roster.saveAsk = false; } else { if (S.roster.url) URL.revokeObjectURL(S.roster.url); S.roster = null; } }
     else if (S.ship) S.ship = null;
-    else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false;
+    else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false; else if (S.bp) { if (S.bp.busy) return; bpClose(); return; }
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
     else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
@@ -2928,7 +2972,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });

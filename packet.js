@@ -107,3 +107,92 @@ async function packetAct(a, el = {}) {
   }
   return false;
 }
+
+/* ---------- Student binder packet (Prep → "Prepare student binders" → Print) ----------
+   Every attending student's packet back to back, alphabetical: their cover page (name + logo, like the binder covers),
+   then DEFAULTS.binderPacket. Any sheet with an odd number of pages gets a blank page after it, so the whole PDF prints
+   double-sided: two-page sheets front/back, one-page sheets with a blank back, and each student starts on a new sheet. */
+const lastFirst = s => { const n = coverName(s.name); return (n.last + ' ' + n.first).toLowerCase(); };
+function bpModal() {
+  const p = S.bp, list = DEFAULTS.binderPacket, people = students().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
+  const count = people.filter(s => !s.out).length;
+  if (p.url) {
+    return `<div class="overlay" data-act="bpClose"><div class="modal pdf packet-view" data-stop>
+      <div class="modal-head"><h2>Binder Packets <span class="muted small">${p.count} student${p.count === 1 ? '' : 's'} · ${p.sheets} sheets of paper</span></h2>
+        <span class="panel-actions"><a class="btn small" href="${p.url}" target="_blank" rel="noopener" data-chrome>Open in new tab ↗</a>
+        <button class="btn small primary" data-act="bpPrint">${PRINTER_SMALL} Print</button>
+        <button class="x big" data-act="bpClose" aria-label="Close">×</button></span></div>
+      <p class="bp-note">Print <b>double-sided</b> (flip on long edge). Each student’s packet starts with their cover page.</p>
+      <iframe id="bpFrame" src="${p.url}" title="Binder packets"></iframe>
+    </div></div>`;
+  }
+  return `<div class="overlay" data-act="bpClose"><div class="modal binder bp-modal" data-stop>
+    <div class="modal-head"><h2>Student Binders</h2>${p.busy ? '' : '<button class="x big" data-act="bpClose" aria-label="Close">×</button>'}</div>
+    <div class="modal-body">
+      <p class="muted small">Uncheck anyone who isn’t coming to academy week (they’re left off the packets, squads and counts; the sheet isn’t changed).</p>
+      <div class="binder-list">${people.map(s => `<label class="${s.out ? 'off' : ''}">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)}<span>${esc(s.name)}</span></label>`).join('')}</div>
+      <p class="mini-head">Each student’s packet</p>
+      <ol class="packet-list">${list.map(x => `<li>${x.copies > 1 ? `<b>${x.copies}×</b> ` : ''}${esc(x.name)}</li>`).join('')}</ol>
+      ${p.err ? `<div class="alert">${esc(p.err)}</div>` : ''}
+    </div>
+    <div class="modal-foot">${p.busy ? '<span class="muted small">Putting it together…</span>' : `<span class="muted small">${count} student${count === 1 ? '' : 's'}</span>`}
+      <button class="btn primary" data-act="bpMake" ${p.busy || !count ? 'disabled' : ''}>${p.busy ? 'Working…' : 'Make the PDF'}</button></div>
+  </div></div>`;
+}
+function bpClose() {
+  if (S.bp && S.bp.url) URL.revokeObjectURL(S.bp.url);
+  S.bp = null; render();
+}
+// A cover page like the printed binder covers: first name, last name bigger under it, the logo. Times stands in for Georgia.
+async function bpCover(PDFLib, out, font, logo, s) {
+  const page = out.addPage([612, 792]), { first, last } = coverName(s.name);
+  const fit = (text, base) => { let size = base; while (size > 12 && font.widthOfTextAtSize(text, size) > 540) size -= 1; return size; };
+  const f1 = fit(first, 36), f2 = fit(last, 66);
+  const center = (text, size, y) => page.drawText(text, { x: (612 - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color: PDFLib.rgb(0, 0, 0) });
+  let top = 792 - 2.83 * 72; // (same spacing as the printed covers, in points from the top)
+  center(first, f1, top - f1 * 0.95); top -= f1 * 1.2 + 0.44 * 72;
+  center(last, f2, top - f2 * 0.92); top -= f2 * 1.15 + 1.64 * 72;
+  if (logo) { const w = 2.75 * 72, h = w * logo.height / logo.width; page.drawImage(logo, { x: (612 - w) / 2, y: top - h, width: w, height: h }); }
+}
+async function bpMake() {
+  const p = S.bp; p.busy = true; p.err = ''; render();
+  try {
+    const PDFLib = await loadPdfLib();
+    const list = DEFAULTS.binderPacket, people = attending().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
+    const sources = await Promise.all(list.map(item => item.cover ? null : packetSource(PDFLib, item)));
+    const out = await PDFLib.PDFDocument.create();
+    const font = await out.embedFont(PDFLib.StandardFonts.TimesRoman);
+    let logo = null;
+    try { logo = await out.embedPng(await (await fetch('logo-full.png')).arrayBuffer()); } catch { /* covers without the logo */ }
+    const blank = () => out.addPage([612, 792]);
+    for (const s of people) {
+      for (let i = 0; i < list.length; i++) {
+        for (let c = 0; c < (list[i].copies || 1); c++) {
+          if (list[i].cover) { await bpCover(PDFLib, out, font, logo, s); blank(); continue; }
+          const pages = await out.copyPages(sources[i], sources[i].getPageIndices());
+          pages.forEach(pg => out.addPage(pg));
+          if (pages.length % 2) blank(); // (so the next sheet starts on a fresh piece of paper)
+        }
+      }
+    }
+    const bytes = await out.save();
+    p.url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    p.count = people.length; p.sheets = out.getPageCount() / 2;
+  } catch (e) { p.err = e.message; }
+  p.busy = false; render();
+}
+async function bpAct(a, el = {}) {
+  const d = el.dataset || {};
+  switch (a) {
+    case 'bpOpen': S.bp = { todo: d.id, busy: false, err: '' }; render(); return true;
+    case 'bpClose': if (S.bp && S.bp.busy) return true; bpClose(); return true;
+    case 'bpMake': await bpMake(); return true;
+    case 'bpPrint': { // and check off "Prepare student binders"
+      const f = document.getElementById('bpFrame'), id = S.bp.todo;
+      try { f.contentWindow.focus(); f.contentWindow.print(); } catch { window.open(S.bp.url, '_blank'); }
+      if (id && S.todos.some(t => t.id === id && !t.done)) await Store.set(P('todos/' + id), { done: true });
+      return true;
+    }
+  }
+  return false;
+}

@@ -59,7 +59,7 @@ const DEFAULTS = {
 
   // What goes in each binder (the list icon on a "Prepare binders" to-do).
   binderList: ['Student cover page', 'Student Skills Tracker', 'Vital Sign practice assignment', '1 Scenario Eval',
-    '10 Medical/Trauma Assessments', '3 Airway', '3 Bleeding', '3 Backboarding', '8 Splinting'],
+    '10 Medical/Trauma Assessments', '3 Airway', '3 Bleeding', '2 Backboarding', '7 Splinting', '2 Traction Splints'],
 
   // Staffing names that never get paperwork/pay reminders (the two of you).
   skipStaff: ['Bella', 'Nick'],
@@ -404,6 +404,20 @@ DEFAULTS.courseTodoList = ['Ship student shirts'];
 
 /* The print packet that ships with the shirts, in order, for each student.
    doc = a Google Doc (pulled fresh as a PDF each time); pdf = a file kept with the app. */
+// Student binder packet (Prep → "Prepare student binders" → Print): for each attending student, in this order.
+// cover: their name page (drawn by the app). A 1-page sheet gets a blank back so the whole thing prints double-sided.
+DEFAULTS.binderPacket = [
+  { name: 'Cover page', cover: true, copies: 1 },
+  { name: 'Skills Tracking', pdf: 'skills-tracking.pdf', copies: 1 },
+  { name: 'Vital Signs Practice Assignment', pdf: 'vitals-academy-week.pdf', copies: 1 },
+  { name: 'Scenario Evaluation', pdf: 'skills-scenario-eval.pdf', copies: 1 },
+  { name: 'Assessment Skill Sheet', pdf: 'skills-assessment.pdf', copies: 10 },
+  { name: 'Airway', pdf: 'skills-airway.pdf', copies: 3 },
+  { name: 'Bleeding', pdf: 'skills-bleeding.pdf', copies: 3 },
+  { name: 'Spinal Immobilization', pdf: 'skills-spinal.pdf', copies: 2 },
+  { name: 'Splinting (Long Bone / Joint)', pdf: 'skills-splinting.pdf', copies: 7 },
+  { name: 'Traction Splint', pdf: 'skills-traction.pdf', copies: 2 },
+];
 DEFAULTS.printPacket = [
   { name: 'Ride Along & Academy Week Readiness Guide', doc: '1mOaVm0DU1w76LU_Uu3NRmkW6FiWPpwzVfIbztawgz2s', copies: 1 },
   { name: 'Patient Contact Instructions', doc: '1KaQtsY9coYLENbxguCd-pXEYs9s91qBRCnPDAR-rfJI', copies: 1 },
