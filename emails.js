@@ -177,8 +177,8 @@ function rowWho(r) {
   if (r.tpl.who === 'cpr-tbd') return n + ' got their Welcome before it';
   return n + ' student' + s;
 }
-// Only the "you're behind" reminders can be skipped for a cohort (the × on their row).
-const EM_SKIPPABLE = ['next-early', 'next-day', 'final-early', 'final-day', 'coursework-behind'];
+// The "you're behind" reminders, and the CPR update (if you told them yourself), can be skipped for a cohort (the × on their row).
+const EM_SKIPPABLE = ['next-early', 'next-day', 'final-early', 'final-day', 'coursework-behind', 'cpr-update'];
 const freeCodes = () => (S.bookCodes || []).filter(c => !c.sid).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.code).localeCompare(String(b.code)));
 
 const MAIL = '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="M4 7l8 6 8-6"/></svg>';
