@@ -28,15 +28,15 @@ const tplById = id => emailTemplates({ all: true }).find(t => t.id === id);
 
 // check (Cohort Graduates): everyone attending Academy Week, all checked; you uncheck anyone when you draft it.
 const WHO = { all: 'Whole cohort', check: 'Cohort Graduates', textbook: 'Textbook ✓ students', 'unpaid-next': 'Haven’t paid Next', 'unpaid-final': 'Haven’t paid Final',
-  firstclass: 'Missing a first class assignment', pick: 'Students you pick' };
+  firstclass: 'Missing a first class assignment', pick: 'Students you pick', 'cpr-tbd': 'Welcome went out before the CPR date & time' };
 // The first class assignments (cohort sheet columns G, L, H), in the order the reminder lists them.
 const FIRST_CLASS = [['fcp', 'first class paperwork/syllabus signatures'], ['rideAgreement', 'ride along agreement'], ['orientRoster', 'orientation roster']];
 const andList = a => a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ', and ' + a[a.length - 1];
 // A template's time of day (when.hour, 0-23; when.lateHour for late enrollees, who can also be when.lateDays later).
 const hourText = h => h === 12 ? 'noon' : h === 0 ? 'midnight' : (h > 12 ? h - 12 : h) + (h >= 12 ? ' PM' : ' AM');
-const FROM = { enroll: 'As each student enrolls', orientation: 'Orientation', next: 'Next installment due', final: 'Final installment due', academy: 'Academy Week start', manual: 'Only when you pick it' };
+const FROM = { enroll: 'As each student enrolls', orientation: 'Orientation', next: 'Next installment due', final: 'Final installment due', academy: 'Academy Week start', cpr: 'Once the CPR date & time are in', manual: 'Only when you pick it' };
 function whenText(w) {
-  if (w.from === 'enroll' || w.from === 'manual') return FROM[w.from];
+  if (w.from === 'enroll' || w.from === 'manual' || w.from === 'cpr') return FROM[w.from];
   const name = { orientation: 'orientation', next: 'Next is due', final: 'Final is due', academy: 'Academy Week' }[w.from];
   const n = Number(w.days) || 0, a = Math.abs(n);
   if (!n) return (w.from === 'next' || w.from === 'final') ? 'Morning ' + name : 'Day of ' + name;
@@ -84,7 +84,7 @@ function emPerson(s) {
     next: isIsoDate(pd.next) ? pd.next : payFrom ? addDays(payFrom, payLate ? 14 : -1) : '',
     final: isIsoDate(pd.final) ? pd.final : payFrom ? addDays(payFrom, payLate ? 28 : 29) : '',
     ext: { next: isIsoDate(pd.next), final: isIsoDate(pd.final) },
-    sent, bookCode: doc.bookCode || '',
+    sent, bookCode: doc.bookCode || '', cprTold: !!doc.cprTold,
     // Enrolled after the cohort's orientation and their own date isn't in yet.
     needsLate: !late && !sent.welcome && pastOrientation(),
     // First class assignments not ticked in the sheet yet (null until the Admin Apps Script sends those columns).
@@ -106,6 +106,8 @@ function whoFits(t, p) {
   if (t.who === 'unpaid-final') return !p.paidFinal;
   if (t.who === 'firstclass') return !!(p.missing && p.missing.length);
   if (t.who === 'pick') return false;
+  // Their Welcome went out before the cohort's CPR date and time were both in (cprTold = it had both).
+  if (t.who === 'cpr-tbd') return !!p.sent.welcome && !p.cprTold;
   return true;
 }
 // The date this email is due for this student, and whether it's their own (late enrollee / extension).
@@ -126,6 +128,14 @@ function emailRows() {
   emailTemplates().forEach(t => {
     const from = t.when.from;
     if (from === 'manual') return;
+    // CPR follow-up: only once the CPR date (still ahead) and time are both in Course Details; due right away.
+    if (from === 'cpr') {
+      const cpr = cohortInfo().cpr;
+      if (!isIsoDate(cpr) || cpr < todayIso() || !courseExtra().cprTime) return;
+      const sids = people.filter(p => !p.sent[t.id] && whoFits(t, p)).map(p => p.sid);
+      if (sids.length) rows[t.id + '|cohort|'] = { key: t.id + '|cohort|', tpl: t, date: '', custom: false, sids };
+      return;
+    }
     if (t.who === 'pick' || t.who === 'check') { // a reminder row; you choose who when you draft it (check = everyone starts checked)
       const a = emAnchor(from, emCohortPerson()), date = a.date ? addDays(a.date, Number(t.when.days) || 0) : '';
       if (from !== 'enroll' && !date) { undated.add(from); return; }
@@ -164,6 +174,7 @@ function rowWho(r) {
   if (/^unpaid/.test(r.tpl.who)) return n + ' unpaid';
   if (r.tpl.who === 'firstclass') return n + ' missing something';
   if (r.tpl.who === 'textbook') return n + ' with Textbook';
+  if (r.tpl.who === 'cpr-tbd') return n + ' got their Welcome before it';
   return n + ' student' + s;
 }
 // Only the "you're behind" reminders can be skipped for a cohort (the × on their row).
@@ -590,7 +601,9 @@ async function emCreate() {
     let warn = '';
     for (let i = 0; i < out.length; i += 20) { const res = await Sheets.createDrafts(out.slice(i, i + 20)); if (res && res.warning) warn = res.warning; }
     const day = todayIso(), sids = drafts.flatMap(dr => dr.people.filter(p => validEmail(p.email)).map(p => p.sid));
-    await Promise.all(sids.map(sid => Store.set(P('students/' + sid), { sent: { [t.id]: day } })));
+    // A Welcome (or this CPR update) that had the CPR date and time in it: no CPR follow-up needed for them.
+    const cprFull = isIsoDate(cohortInfo().cpr) && !!courseExtra().cprTime && (t.id === 'welcome' || t.id === 'cpr-update');
+    await Promise.all(sids.map(sid => Store.set(P('students/' + sid), { sent: { [t.id]: day }, ...(cprFull ? { cprTold: true } : {}) })));
     const names = drafts.flatMap(dr => dr.people.filter(p => validEmail(p.email)).map(p => p.name));
     await Store.add(P('emailLog'), { tpl: t.id, name: t.name, date: ed.date || day, at: Date.now(), names, count: names.length, by: (S.user && S.user.email) || '' });
     S.emailDraft = null;

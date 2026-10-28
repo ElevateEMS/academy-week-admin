@@ -380,6 +380,11 @@ I am notifying you that you have not completed the {cohort} Hybrid EMT course du
 
 Unfortunately, due to your failure to abide by the deadlines and expectations set forth in the syllabus and reviewed at orientation and via email, your attempt for this EMT class is being submitted to the state as a failed attempt.` },
 
+  // Shows up once the cohort's CPR date and time are both in Course Details, for anyone whose Welcome went out before that.
+  { id: 'cpr-update', name: 'CPR class date & time', subject: 'Update: Full CPR Class Date & Time',
+    when: { from: 'cpr', days: 0 }, who: 'cpr-tbd', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}
+
+Quick update on CPR: if you'll be using the full CPR class we're hosting during the course, it will be held at the ODEMSA office on **{CPR date}, from {CPR time}**. Once the course starts, you'll be able to sign up for one of the CPR classes if you need it.` },
   { id: 'cohort-congrats', name: 'Congratulations to the cohort', subject: 'Congratulations to the {cohort} Cohort',
     when: { from: 'academy', days: 5 }, who: 'check', send: 'bcc', body: `Students,
 
