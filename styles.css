@@ -1522,3 +1522,8 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .cf-time::placeholder { font-size: 12px; }
 /* v237: Academy Week instructions box starts 2 lines tall (drag the corner to make it taller) */
 .cf-row textarea.cf-info { min-height: 0; height: calc(2 * 1.4em + 18px); }
+/* v238: in the one-screen Course page, a box you drag-sized (Notes, Emails…) can still shrink to fit the window */
+@media (min-width: 1101px) {
+  .course-board.fit .box[style*="height"] { flex-shrink: 1 !important; min-height: 0; }
+  .course-board.fit .box-notes .notes-wrap { min-height: 0; }
+}
