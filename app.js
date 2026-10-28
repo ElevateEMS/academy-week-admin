@@ -1924,9 +1924,6 @@ function settingsView() {
       tile('Bag Contents', 'What goes in each jump bag pocket, for the daily bag check.', open('bagEdOpen', 'Edit')),
     ])}
     ${group('Preferences', [
-      tile('Admin Page', 'What fills the right side of the Admin page. The other one is kept, just hidden.',
-        `<div class="seg">${[['notes', 'Sticky Notes'], ['todo', 'To Do']].map(([v, l]) =>
-          `<button class="${adminSide() === v ? 'on' : ''}" data-act="adminSide" data-v="${v}">${l}</button>`).join('')}</div>`),
       tile('Checked Items', 'Whether lists start out showing what’s checked off.',
         `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
           `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),

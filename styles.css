@@ -1421,3 +1421,45 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .jbl-call { display: inline-flex; align-items: center; gap: 6px; color: var(--taupe-dark); text-decoration: none; font-size: 14px; }
 .jbl-call:hover span { text-decoration: underline; }
 .jbl-call svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Bulletin: the To Do card above the sticky notes ---------- */
+.td-card { flex-shrink: 0; background: #fff; border: 1px solid rgba(125, 101, 88, .12); border-radius: 4px 4px 4px 14px; padding: 8px 12px 6px; margin: 2px 2px 14px;
+  box-shadow: 0 1px 2px rgba(80, 55, 40, .08), 0 4px 10px rgba(80, 55, 40, .07); display: flex; flex-direction: column; max-height: 45vh; }
+.td-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+.td-head h3 { margin: 0; font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--taupe-dark); }
+.td-head .head-actions { position: static; display: inline-flex; align-items: center; gap: 10px; }
+.td-head .link { font-size: 12px; }
+.td-scroll { overflow: auto; min-height: 0; margin: 2px -4px 0; padding: 0 4px; }
+.td-list li { align-items: flex-start; flex-wrap: nowrap; gap: 10px; padding: 7px 0; border-bottom-color: rgba(125, 101, 88, .18); }
+.td-list li .circle { margin-top: 1px; flex: none; }
+.td-main { flex: 1; min-width: 0; }
+.td-txt { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.td-txt:hover .txt { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.td-note { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.td-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+.td-link { font-size: 12px; line-height: 1.6; padding: 0 9px; border-radius: 999px; background: var(--blush-soft); color: var(--taupe-dark); text-decoration: none; white-space: nowrap; }
+.td-link:hover { background: var(--blush); }
+.td-rep { font-size: 12px; color: var(--taupe-dark); white-space: nowrap; }
+.td-who { font-size: 10.5px; font-weight: 600; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--sage-soft); color: #5d7259; }
+.td-list li.td-today { background: var(--honey-soft); margin: 0 -6px; padding-left: 6px; padding-right: 6px; border-radius: 6px; }
+.td-list li.td-late { box-shadow: inset 3px 0 0 var(--rose); margin: 0 -6px; padding-left: 9px; padding-right: 6px; background: var(--rose-soft); border-radius: 0 6px 6px 0; }
+.td-list li.done .td-txt { color: var(--muted); }
+.td-list li .x { opacity: 0; margin-top: -2px; }
+.td-list li:hover .x { opacity: .7; }
+.td-up-toggle { border: 0; background: none; padding: 6px 0 4px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.td-up-toggle:hover { color: var(--taupe-dark); }
+.td-upcoming li { opacity: .6; }
+.td-upcoming li:hover { opacity: .9; }
+.td-list .empty { color: var(--muted); font-size: 13px; font-style: italic; }
+/* the to-do window */
+.td-chips { display: flex; flex-wrap: wrap; }
+.td-custom { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--ink); flex-wrap: wrap; }
+.td-custom input { width: 58px !important; padding: 4px 8px !important; }
+.td-custom .chip.small { margin: 0; }
+.td-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.td-hint.inline { margin-left: 4px; }
+.td-lrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.td-lrow input:first-child { flex: 0 0 38%; }
+.td-lrow input { min-width: 0; }
+.td-addlink { justify-self: start; }
+@media (hover: none) { .td-list li .x { opacity: .5; } }

@@ -15,7 +15,7 @@ const ARROW = '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="
 function adminWatch() {
   return [
     Store.watch('meta/admin', d => { S.admin = d || {}; render(); }),
-    Store.watch('adminTodos', list => { S.adminTodos = list; render(); }),
+    Store.watch('adminTodos', list => { S.adminTodos = list; render(); tdLinkDone(); }),
     Store.watch('adminDates', list => { S.adminDates = list; render(); }),
     Store.watch('adminNotes', list => { S.adminNotes = list; render(); }),
   ];
@@ -24,15 +24,13 @@ const adminInfo = () => ({ ...DEFAULTS.adminInfo, ...((S.admin && S.admin.info) 
 const adminLinks = () => (S.admin && S.admin.links) || DEFAULTS.adminLinks;
 const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.test(u) ? u : 'https://' + u; };
 
-// The right column is Sticky Notes or To Do (Setup → Preferences → Admin Page); the other is only hidden.
-const adminSide = () => (S.settings && S.settings.adminSide) === 'todo' ? 'todo' : 'notes';
-// Left: Business Info over Changes for Future Classes; middle: Inquiries; right: Sticky Notes / To Do.
+// Left: Business Info over Changes for Future Classes; middle: Inquiries; right: the Bulletin (To Do card + sticky notes).
 // (Key Dates came off the page Oct 26, 2026: adminDatesBox is kept but not shown; dates you added stay saved.)
 function adminView() {
   return `<div class="board admin-board">
     <div class="board-col">${adminInfoBox()}${adminChangesBox()}</div>
     <div class="board-col">${adminInquiryBox()}</div>
-    <div class="board-col">${adminSide() === 'todo' ? adminTodoBox() : adminNotesBox()}</div>
+    <div class="board-col">${adminNotesBox()}</div>
   </div>`;
 }
 const adminHead = (title, extra = '') => `<div class="box-head admin-head"><h2>${title}</h2>${extra ? `<span class="head-actions">${extra}</span>` : ''}</div>`;
@@ -282,17 +280,157 @@ function adminPanel() {
   </div></div>`;
 }
 
-/* ---------- To Do ---------- */
-function adminTodoBox() {
-  const open = S.adminTodos.filter(t => !t.done).sort((a, b) => (a.created || 0) - (b.created || 0));
+/* ---------- To Do (the card at the top of the Bulletin) ----------
+   adminTodos/{id} also has: due (yyyy-MM-dd), note, links [{ name, url }], who ('bella' | 'nick' | 'both'; none = both),
+   repeat { n, unit: 'day' | 'week' | 'month', day (month: day of the month) } or null, snooze (yyyy-MM-dd or '').
+   A repeating item keeps its schedule: ticking it moves `due` to the next date on that schedule after today (it never
+   goes to the done list). Snooze moves it just this once: it shows on the snooze date instead of `due`.
+   The Morning Email lists them (by who) with their links and a Done link: ?todoDone=<id>&on=<date> ticks it here. */
+const TD_SOON = 2; // days ahead an item counts as coming up now (same as the Morning Email's heads-up)
+const GOOGLE_ADS_ACCOUNT = 'elevateemsacademy@gmail.com'; // Google Ads opens in this Google account
+const tdWhen = t => isIsoDate(t.snooze) ? t.snooze : isIsoDate(t.due) ? t.due : '';
+const tdWho = t => t.who === 'bella' || t.who === 'nick' ? t.who : 'both';
+// A to-do's link: Google Ads gets ?authuser= so it opens in the business account even with other Google accounts signed in.
+function tdUrl(u) {
+  u = fullUrl(u);
+  if (!/^https?:\/\/ads\.google\.com(\/|$|\?)/i.test(u) || /[?&]authuser=/i.test(u)) return u;
+  return u + (u.includes('?') ? '&' : '?') + 'authuser=' + encodeURIComponent(GOOGLE_ADS_ACCOUNT);
+}
+const addMonthsKeep = (iso, n, day) => { // n months on, on `day` (or the month's last day if it's shorter)
+  const d = parseIso(iso); d.setDate(1); d.setMonth(d.getMonth() + n);
+  d.setDate(Math.min(day || parseIso(iso).getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return isoOf(d);
+};
+const tdStep = (iso, r) => r.unit === 'month' ? addMonthsKeep(iso, r.n, r.day) : addDays(iso, r.n * (r.unit === 'week' ? 7 : 1));
+function tdNext(t) { // the next date on its schedule that's after today
+  let d = tdStep(t.due, t.repeat);
+  for (let i = 0; d <= todayIso() && i < 1000; i++) d = tdStep(d, t.repeat);
+  return d;
+}
+// "every 2 weeks on Sunday", "every month on the 1st", "every 3 days"
+function repLabel(r, due) {
+  if (!r) return '';
+  const every = r.n === 1 ? 'every ' + r.unit : `every ${r.n} ${r.unit}s`;
+  if (!isIsoDate(due)) return every;
+  if (r.unit === 'week') return every + ' on ' + parseIso(due).toLocaleDateString('en-US', { weekday: 'long' });
+  if (r.unit === 'month') return every + ' on the ' + ordinal(r.day || parseIso(due).getDate());
+  return every;
+}
+const repShort = r => !r ? '' : r.n === 1 ? { day: 'daily', week: 'weekly', month: 'monthly' }[r.unit] : `${r.n} ${{ day: 'days', week: 'wks', month: 'mos' }[r.unit]}`;
+function tdChip(t) {
+  const w = tdWhen(t); if (!w) return '';
+  const days = Math.round((parseIso(w) - parseIso(todayIso())) / 864e5);
+  const label = days === 0 ? 'today' : days === 1 ? 'tomorrow' : days < 0 ? 'was ' + dueDay(w) : dueDay(w);
+  return `<button class="due-chip ${days <= TD_SOON && days >= 0 ? 'soon' : ''} ${days < 0 ? 'late' : ''}" data-act="tdOpen" data-id="${t.id}" title="${isIsoDate(t.snooze) ? 'Snoozed to ' + dueDay(t.snooze) : 'Due date'}">${isIsoDate(t.snooze) ? '💤 ' : ''}${label}</button>`;
+}
+function tdLine(t) {
+  const w = tdWhen(t), who = tdWho(t);
+  const cls = t.done ? 'done' : w && w < todayIso() ? 'td-late' : w === todayIso() ? 'td-today' : '';
+  const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
+  return `<li class="td-line ${cls}">
+    ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
+    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open"><span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
+      ${links || t.repeat || who !== 'both' || (!t.done && w) ? `<div class="td-meta">${links}
+        ${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}
+        ${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}
+        ${t.done ? '' : tdChip(t)}</div>` : ''}</div>
+    ${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</li>`;
+}
+function adminTodoCard() {
+  const soon = addDays(todayIso(), TD_SOON), open = S.adminTodos.filter(t => !t.done);
+  const byWhen = (a, b) => tdWhen(a).localeCompare(tdWhen(b)) || (a.created || 0) - (b.created || 0);
+  const now = open.filter(t => !tdWhen(t) || tdWhen(t) <= soon);
+  const dated = now.filter(t => tdWhen(t)).sort(byWhen), plain = now.filter(t => !tdWhen(t)).sort((a, b) => (a.created || 0) - (b.created || 0));
+  const later = open.filter(t => tdWhen(t) > soon).sort(byWhen);
   const done = S.adminTodos.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  return `<section class="box admin-todo">
-    ${adminHead('To Do', (done.length ? '<button class="link" data-act="adminTodoClear">Clear checked</button>' : '') + '<button class="add-plus small-plus" data-act="adminTodoOpen" title="Add a to-do" aria-label="Add a to-do">+</button>')}
-    ${S.adminTodoAdd ? `<div class="add-row"><input id="ad-todo" data-draft="ad-todo" data-add="adminTodo" data-aclose="todo" placeholder="Type a to-do, then Enter" value="${esc(S.drafts['ad-todo'] || '')}" autocomplete="off"></div>` : ''}
-    <ul class="checks">${[...open, ...done].map(t => `<li class="${t.done ? 'done' : ''}">
-      <label>${circle(t.done, `data-act="adminTodo" data-id="${t.id}"`)}<span><span class="txt">${esc(t.text)}</span></span></label>
-      ${dueBits('admin', t, t.done)}<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
-  </section>`;
+  return `<div class="td-card">
+    <div class="td-head"><h3>To Do</h3><span class="head-actions">${done.length ? '<button class="link" data-act="adminTodoClear">Clear checked</button>' : ''}
+      <button class="add-plus small-plus" data-act="tdNew" title="Add a to-do" aria-label="Add a to-do">+</button></span></div>
+    <div class="td-scroll">
+      <ul class="checks td-list">${[...dated, ...plain].map(tdLine).join('') || (later.length ? '' : '<li class="empty">Nothing to do. Tap + to add one.</li>')}</ul>
+      ${later.length ? `<button class="td-up-toggle" data-act="tdUpToggle" aria-expanded="${!!S.tdUpOpen}">${S.tdUpOpen ? '▾' : '▸'} ${later.length} upcoming</button>
+        ${S.tdUpOpen ? `<ul class="checks td-list td-upcoming">${later.map(tdLine).join('')}</ul>` : ''}` : ''}
+      ${done.length ? `<ul class="checks td-list">${done.map(tdLine).join('')}</ul>` : ''}
+    </div>
+  </div>`;
+}
+// The to-do window (+ or click an item's words).
+function tdModal() {
+  const e = S.tdEd, t = e.id ? S.adminTodos.find(x => x.id === e.id) : null;
+  if (e.id && !t) return '';
+  const rep = S.drafts['td-rep'] || '', who = S.drafts['td-who'] || 'both', due = S.drafts['td-due'] || '';
+  const chip = (act, v, cur, label) => `<button type="button" class="chip small ${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${label}</button>`;
+  const r = tdRepeatDraft();
+  const sn = S.drafts['td-snooze'] || '';
+  return `<div class="overlay" data-act="tdClose"><div class="modal small-modal td-modal" data-stop>
+    <div class="modal-head"><h2>${e.id ? 'To-Do' : 'New To-Do'}</h2><button class="x big" data-act="tdClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      <label class="field">What<input id="td-text" data-draft="td-text" data-add="tdSave" value="${esc(S.drafts['td-text'] ?? '')}" placeholder="e.g. Check on ads" autocomplete="off"></label>
+      <label class="field">Note (optional)<input id="td-note" data-draft="td-note" value="${esc(S.drafts['td-note'] ?? '')}" placeholder="A detail to remember" autocomplete="off"></label>
+      <div class="field">Repeat<div class="td-chips">${chip('tdRep', '', rep, 'Doesn’t repeat')}${chip('tdRep', 'w1', rep, 'Every week')}${chip('tdRep', 'w2', rep, 'Every 2 weeks')}${chip('tdRep', 'm1', rep, 'Every month')}${chip('tdRep', 'custom', rep, 'Custom')}</div>
+        ${rep === 'custom' ? `<div class="td-custom">Every <input id="td-rn" data-draft="td-rn" type="number" min="1" max="99" inputmode="numeric" value="${esc(S.drafts['td-rn'] || '1')}">
+          ${['day', 'week', 'month'].map(u => chip('tdRu', u, S.drafts['td-ru'] || 'week', u + 's')).join('')}</div>` : ''}</div>
+      <div class="field">${rep ? (t && t.repeat ? 'Next one' : 'Starts on') : 'Due'}<span class="ai-date">${datePicker('td-due', { optional: !rep, empty: 'No due date', title: rep ? 'First date' : 'Due date' })}</span>
+        ${r ? `<span class="td-hint">Repeats ${esc(repLabel(r, due || todayIso()))}. Checking it off moves it to the next date on that schedule, even if you do it late.</span>` : ''}</div>
+      <div class="field">For<div class="td-chips">${chip('tdWho', 'bella', who, 'Bella')}${chip('tdWho', 'nick', who, 'Nick')}${chip('tdWho', 'both', who, 'Both')}</div>
+        <span class="td-hint">Shows up in ${who === 'both' ? 'both of your' : who === 'bella' ? 'Bella’s' : 'Nick’s'} Morning Email${who === 'both' ? 's' : ''} when it’s due.</span></div>
+      <div class="field">Links<div class="td-links">${e.links.map((l, i) => `<div class="td-lrow">
+          <input id="tdl-${i}-name" data-tdl="${i}:name" value="${esc(l.name)}" placeholder="Name (e.g. Google Ads)" autocomplete="off">
+          <input id="tdl-${i}-url" data-tdl="${i}:url" value="${esc(l.url)}" placeholder="Link" autocomplete="off">
+          <button class="x" data-act="tdLinkDel" data-i="${i}" aria-label="Remove link">×</button></div>`).join('')}</div>
+        <button type="button" class="btn small td-addlink" data-act="tdLinkAdd">+ Add a link</button>
+        ${e.links.some(l => /ads\.google\.com/i.test(l.url || '')) ? `<span class="td-hint">Google Ads opens in ${GOOGLE_ADS_ACCOUNT}.</span>` : ''}</div>
+      ${t && !t.done && (sn || (isIsoDate(t.due) && t.due <= addDays(todayIso(), TD_SOON))) ? `<div class="field">Snooze <span class="td-hint inline">${t.repeat ? 'just this time; the schedule stays the same' : 'moves it to a new day'}</span>
+        <div class="fu-row"><span class="ai-date">${datePicker('td-snooze', { optional: true, empty: 'Pick a date', title: 'Snooze until' })}</span>
+          ${chip('tdSnooze', addDays(todayIso(), 1), sn, 'Tomorrow')}${chip('tdSnooze', addDays(todayIso(), 7), sn, 'Next week')}</div></div>` : ''}
+    </div>
+    <div class="modal-foot">${t ? `<button class="trash-btn foot-trash" data-act="tdDelete" title="Delete" aria-label="Delete">${ICONS.trash}</button>` : '<span></span>'}
+      <button class="btn primary" data-act="tdSave">${t ? 'Save' : 'Add'}</button></div>
+  </div></div>`;
+}
+// The repeat picked in the window ({ n, unit, day } or null).
+function tdRepeatDraft() {
+  const rep = S.drafts['td-rep'] || '';
+  if (!rep) return null;
+  const r = rep === 'custom' ? { n: Math.max(1, Math.min(99, Math.round(Number(S.drafts['td-rn']) || 1))), unit: S.drafts['td-ru'] || 'week' }
+    : { n: Number(rep.slice(1)), unit: rep[0] === 'm' ? 'month' : 'week' };
+  if (r.unit === 'month') r.day = parseIso(S.drafts['td-due'] || todayIso()).getDate();
+  return r;
+}
+function tdOpen(t) {
+  const r = t && t.repeat;
+  S.drafts['td-text'] = t ? t.text || '' : ''; S.drafts['td-note'] = t ? t.note || '' : '';
+  S.drafts['td-due'] = t && isIsoDate(t.due) ? t.due : '';
+  S.drafts['td-rep'] = !r ? '' : r.n === 1 && r.unit === 'week' ? 'w1' : r.n === 2 && r.unit === 'week' ? 'w2' : r.n === 1 && r.unit === 'month' ? 'm1' : 'custom';
+  S.drafts['td-rn'] = r ? String(r.n) : '1'; S.drafts['td-ru'] = r ? r.unit : 'week';
+  S.drafts['td-who'] = t ? tdWho(t) : /^nbrown@/i.test((S.user && S.user.email) || '') ? 'nick' : 'bella';
+  S.drafts['td-snooze'] = t && isIsoDate(t.snooze) ? t.snooze : '';
+  S.tdEd = { id: t ? t.id : null, links: ((t && t.links) || []).map(l => ({ name: l.name || '', url: l.url || '' })) };
+  render();
+  if (!t) setTimeout(() => { const i = document.getElementById('td-text'); if (i) i.focus(); }, 0);
+}
+async function tdTick(t) {
+  if (t.done) { await Store.set('adminTodos/' + t.id, { done: false, doneAt: null }); return; }
+  if (t.repeat && isIsoDate(t.due)) {
+    const next = tdNext(t);
+    await Store.set('adminTodos/' + t.id, { due: next, snooze: '', lastDone: Date.now() });
+    toast(`Done. Next one: ${parseIso(next).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`);
+    return;
+  }
+  await Store.set('adminTodos/' + t.id, { done: true, doneAt: Date.now(), snooze: '' });
+}
+// The Morning Email's Done link (?todoDone=<id>&on=<the date it was listed for>): ticks it once the to-dos load.
+// The date check stops a second click (or an old email) from moving a repeating one on again.
+let tdFromLink = (() => { const q = new URLSearchParams(location.search); return q.get('todoDone') ? { id: q.get('todoDone'), on: q.get('on') || '' } : null; })();
+async function tdLinkDone() {
+  const p = tdFromLink; if (!p) return;
+  tdFromLink = null;
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch {}
+  const t = S.adminTodos.find(x => x.id === p.id);
+  if (!t) { toast('That to-do isn’t there anymore.'); return; }
+  if (t.done || (p.on && tdWhen(t) !== p.on)) { toast(`Already checked off: ${t.text}`); return; }
+  await tdTick(t);
+  if (!t.repeat) toast(`Checked off: ${t.text}`);
 }
 
 /* ---------- Changes for Future Classes ----------
@@ -729,7 +867,8 @@ const noteKey = n => n.order != null ? n.order : -(n.created || 0);
 function adminNotesBox() {
   const notes = [...S.adminNotes].sort((a, b) => noteKey(a) - noteKey(b));
   return `<section class="box shaded admin-notes">
-    ${adminHead('Sticky Notes', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
+    ${adminHead('Bulletin', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
+    ${adminTodoCard()}
     <div class="stickies">${notes.map(n => {
       const id = 'an-' + n.id, due = isIsoDate(n.remind) && n.remind <= todayIso();
       return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}${due ? ' remind-due' : ''}" data-nid="${n.id}">
@@ -777,7 +916,7 @@ function saveStickySoon(nid, id) {
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
   return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.adminPanel ? adminPanel() : '') + (S.inqSet ? inqSetModal() : '')
-    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '');
+    + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
   // Dropdowns that change the window: Other / Type another… opens its box; the status changes the follow-up hint.
@@ -796,6 +935,8 @@ function adminInput(t) {
     return true;
   }
   if (t.id === 'inq-search') { S.drafts['inq-search'] = t.value; render(); return true; } // Inquiries page: filter as you type
+  if (t.dataset.tdl && S.tdEd) { const [i, k] = t.dataset.tdl.split(':'); S.tdEd.links[Number(i)][k] = t.value; return true; }
+  if (t.id === 'td-rn') { S.drafts['td-rn'] = t.value; const h = document.querySelector('.td-modal .td-hint'); if (h && tdRepeatDraft()) h.textContent = `Repeats ${repLabel(tdRepeatDraft(), S.drafts['td-due'] || todayIso())}. Checking it off moves it to the next date on that schedule, even if you do it late.`; return true; }
   if (t.dataset.lk && S.linksDraft) { const [i, k] = t.dataset.lk.split(':'); S.linksDraft[Number(i)][k] = t.value; return true; }
   if (!t.dataset.anote) return false;
   S.drafts[t.id] = t.value; grow(t);
@@ -805,6 +946,7 @@ function adminInput(t) {
 function adminEscape() {
   if (S.histEd) { if (S.histEd.busy) return true; S.histEd = null; S.datePick = null; }
   else if (S.noteRemind) { S.noteRemind = null; S.datePick = null; }
+  else if (S.tdEd) { if (S.datePick) S.datePick = null; else S.tdEd = null; }
   else if (S.logEd) { if (S.logEd.busy) return true; S.logEd = null; }
   else if (S.inqEd) { if (S.inqEd.busy) return true; S.inqEd = null; }
   else if (S.ptEd) { if (S.ptEd.busy) return true; S.ptEd = null; }
@@ -819,7 +961,7 @@ function adminEscape() {
 }
 // Enter in one of the Admin page's add lines.
 function adminEnter(t) {
-  const a = { adminTodo: 'adminTodoAdd', adminDate: 'adminDateAdd', adminNext: 'adminNextAdd' }[t.dataset.add];
+  const a = { adminTodo: 'adminTodoAdd', adminDate: 'adminDateAdd', adminNext: 'adminNextAdd', tdSave: 'tdSave' }[t.dataset.add];
   if (!a) return false;
   adminAct(a, t);
   return true;
@@ -856,7 +998,6 @@ async function adminAct(a, el = {}) {
     case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) openPanel(l.name, fullUrl(l.url)); return true; }
     case 'adminOpenUrl': openPanel(d.name, d.url); return true;
     case 'inqCallsOnly': S.inqCallsOnly = d.v === '1'; pref('inqCallsOnly', d.v === '1' ? '1' : '0'); render(); return true; // remembered on this device
-    case 'adminSide': await Store.set('meta/settings', { adminSide: d.v === 'todo' ? 'todo' : 'notes' }); return true;
     case 'adminNextAdd': {
       const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;
       if (!text || !src) return true;
@@ -1080,7 +1221,37 @@ async function adminAct(a, el = {}) {
     }
     case 'adminTodo': {
       const t = S.adminTodos.find(x => x.id === d.id); if (!t) return true;
-      await Store.set('adminTodos/' + t.id, { done: !t.done, doneAt: t.done ? null : Date.now() }); return true;
+      await tdTick(t); return true;
+    }
+    case 'tdNew': tdOpen(null); return true;
+    case 'tdOpen': { const t = S.adminTodos.find(x => x.id === d.id); if (t) tdOpen(t); return true; }
+    case 'tdClose': S.tdEd = null; S.datePick = null; render(); return true;
+    case 'tdUpToggle': S.tdUpOpen = !S.tdUpOpen; render(); return true;
+    case 'tdRep': S.drafts['td-rep'] = d.v; if (d.v && !S.drafts['td-due']) S.drafts['td-due'] = todayIso(); render(); return true;
+    case 'tdRu': S.drafts['td-ru'] = d.v; render(); return true;
+    case 'tdWho': S.drafts['td-who'] = d.v; render(); return true;
+    case 'tdSnooze': S.drafts['td-snooze'] = S.drafts['td-snooze'] === d.v ? '' : d.v; render(); return true;
+    case 'tdLinkAdd': S.tdEd.links.push({ name: '', url: '' }); render();
+      setTimeout(() => { const i = document.getElementById('tdl-' + (S.tdEd.links.length - 1) + '-name'); if (i) i.focus(); }, 0); return true;
+    case 'tdLinkDel': S.tdEd.links.splice(Number(d.i), 1); render(); return true;
+    case 'tdDelete': {
+      const e = S.tdEd; if (!e || !e.id || !confirm('Delete this to-do?')) return true;
+      S.tdEd = null; S.datePick = null; render();
+      await Store.del('adminTodos/' + e.id); return true;
+    }
+    case 'tdSave': {
+      const e = S.tdEd; if (!e) return true;
+      const g = k => String(S.drafts['td-' + k] ?? '').trim();
+      const text = g('text');
+      if (!text) { toast('Type the to-do.'); return true; }
+      const links = e.links.map(l => ({ name: String(l.name || '').trim(), url: fullUrl(l.url) })).filter(l => l.url);
+      const repeat = tdRepeatDraft(), due = g('due') || (repeat ? todayIso() : '');
+      let snooze = g('snooze'); if (snooze && snooze <= due) snooze = ''; // (snooze only ever moves it later)
+      const item = { text, note: g('note'), due, repeat, who: g('who') || 'both', links, snooze };
+      S.tdEd = null; S.datePick = null; render();
+      if (e.id) await Store.set('adminTodos/' + e.id, item);
+      else await Store.add('adminTodos', { ...item, done: false, created: Date.now() });
+      toast(e.id ? 'Saved.' : 'To-do added.'); return true;
     }
     case 'adminTodoDel': await Store.del('adminTodos/' + d.id); return true;
     case 'adminTodoClear':
