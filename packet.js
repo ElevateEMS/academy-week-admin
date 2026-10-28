@@ -114,7 +114,7 @@ async function packetAct(a, el = {}) {
    double-sided: two-page sheets front/back, one-page sheets with a blank back, and each student starts on a new sheet. */
 const lastFirst = s => { const n = coverName(s.name); return (n.last + ' ' + n.first).toLowerCase(); };
 function bpModal() {
-  const p = S.bp, list = DEFAULTS.binderPacket, people = students().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
+  const p = S.bp, list = cfg().packet, people = students().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
   const count = people.filter(s => !s.out).length;
   if (p.url) {
     return `<div class="overlay" data-act="bpClose"><div class="modal pdf packet-view" data-stop>
@@ -131,8 +131,8 @@ function bpModal() {
     <div class="modal-body">
       <p class="muted small">Uncheck anyone who isn’t coming to academy week (they’re left off the packets, squads and counts; the sheet isn’t changed).</p>
       <div class="binder-list">${people.map(s => `<label class="${s.out ? 'off' : ''}">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)}<span>${esc(s.name)}</span></label>`).join('')}</div>
-      <p class="mini-head">Each student’s packet</p>
-      <ol class="packet-list">${list.map(x => `<li>${x.copies > 1 ? `<b>${x.copies}×</b> ` : ''}${esc(x.name)}</li>`).join('')}</ol>
+      <p class="mini-head">Each student’s packet <span class="count">changes here are for this print only</span></p>
+      ${packetCounter(list, p.counts, 'bpCount', p.busy ? 'disabled' : '')}
       ${p.err ? `<div class="alert">${esc(p.err)}</div>` : ''}
     </div>
     <div class="modal-foot">${p.busy ? '<span class="muted small">Putting it together…</span>' : `<span class="muted small">${count} student${count === 1 ? '' : 's'}</span>`}
@@ -158,7 +158,7 @@ async function bpMake() {
   const p = S.bp; p.busy = true; p.err = ''; render();
   try {
     const PDFLib = await loadPdfLib();
-    const list = DEFAULTS.binderPacket, people = attending().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
+    const list = cfg().packet.map(x => ({ ...x, copies: x.cover ? 1 : p.counts[packetKey(x)] ?? x.copies })).filter(x => x.copies), people = attending().slice().sort((a, b) => lastFirst(a).localeCompare(lastFirst(b)));
     const sources = await Promise.all(list.map(item => item.cover ? null : packetSource(PDFLib, item)));
     const out = await PDFLib.PDFDocument.create();
     const font = await out.embedFont(PDFLib.StandardFonts.TimesRoman);
@@ -184,7 +184,11 @@ async function bpMake() {
 async function bpAct(a, el = {}) {
   const d = el.dataset || {};
   switch (a) {
-    case 'bpOpen': S.bp = { todo: d.id, busy: false, err: '' }; render(); return true;
+    case 'bpOpen': S.bp = { todo: d.id, busy: false, err: '', counts: {} }; render(); return true;
+    case 'bpCount': { // this print only (Setup → Templates → Prep sets the usual counts)
+      const cur = cfg().packet.find(x => packetKey(x) === d.k); if (!cur || S.bp.busy) return true;
+      S.bp.counts[d.k] = Math.max(0, Math.min(50, (S.bp.counts[d.k] ?? cur.copies) + Number(d.by))); render(); return true;
+    }
     case 'bpClose': if (S.bp && S.bp.busy) return true; bpClose(); return true;
     case 'bpMake': await bpMake(); return true;
     case 'bpPrint': { // and check off "Prepare student binders"

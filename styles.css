@@ -1496,3 +1496,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .bp-note { margin: 0 22px 8px; font-size: 13px; color: var(--taupe-dark); }
 .bp-modal .mini-head { margin-top: 14px; }
 .bp-modal .packet-list { margin: 4px 0 4px; }
+/* v233: binder packet copy counts (Templates → Prep, and the Print window) */
+.pk-rows { display: grid; gap: 2px; margin-top: 4px; color: var(--ink); font-size: 14px; }
+.pk-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dotted var(--line); }
+.pk-row:last-child { border-bottom: 0; }
+.pk-row.off .pk-name { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.pk-ctl { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.pk-ctl b { min-width: 18px; text-align: center; font-weight: 600; }
+.pk-fixed { flex: none; }

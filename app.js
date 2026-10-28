@@ -107,6 +107,7 @@ function cfg() {
     setup: s.setupList || DEFAULTS.setupList,
     courseTodo: withDefaultDue('ctodo-', s.courseTodoList || DEFAULTS.courseTodoList),
     binder: s.binderList || DEFAULTS.binderList,
+    packet: binderPacket(s.binderCopies),
     docs: { ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) },
     weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
@@ -145,6 +146,17 @@ function bagCarries(item, bagNo) {
 }
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
 const isBagItem = text => /bag check/i.test(text);
+// The binder packet's sheets with this program's copy counts (Setup → Templates → Prep; 0 = left out). The cover is always 1.
+const packetKey = x => x.cover ? 'cover' : x.pdf;
+const binderPacket = (copies = {}) => DEFAULTS.binderPacket.map(x => ({ ...x, copies: x.cover ? 1 : copies[packetKey(x)] ?? x.copies }));
+const packetLine = x => `${x.copies > 1 ? x.copies + '× ' : ''}${x.name}`;
+// −/+ rows for a packet's copy counts (counts: { key: n }); act gets data-k and data-by.
+function packetCounter(list, counts, act, dis = '') {
+  return `<div class="pk-rows">${list.map(x => { const k = packetKey(x), n = x.cover ? 1 : counts[k] ?? x.copies;
+    return `<div class="pk-row ${n ? '' : 'off'}"><span class="pk-name">${esc(x.name)}${n ? '' : ' <span class="muted small">(left out)</span>'}</span>
+      ${x.cover ? '<span class="pk-fixed muted small">1 per student</span>' : `<span class="pk-ctl"><button type="button" class="btn tiny" data-act="${act}" data-k="${esc(k)}" data-by="-1" ${n <= 0 || dis ? 'disabled' : ''} aria-label="One fewer ${esc(x.name)}">−</button>
+        <b>${n}</b><button type="button" class="btn tiny" data-act="${act}" data-k="${esc(k)}" data-by="1" ${n >= 50 || dis ? 'disabled' : ''} aria-label="One more ${esc(x.name)}">+</button></span>`}</div>`; }).join('')}</div>`;
+}
 const isBinderItem = text => /binder cover/i.test(text);
 const isBinderList = text => /prepare (student )?binders/i.test(text); // gets the list icon (what goes in each binder) and the binder packet's Print
 const isShirtItem = text => /ship.*shirt/i.test(text); // Course To-Do: gets the Print packet button (packet.js)
@@ -946,7 +958,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
       if (kind === 'todo' && isBinderList(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`
-        + `<button class="btn tiny" data-act="bpOpen" data-id="${t.id}" title="Print every student’s binder packet, cover pages included">Print · ${attending().length}</button></span>`;
+        + `<button class="eye" data-act="bpOpen" data-id="${t.id}" title="Print binder packets (${attending().length} student${attending().length === 1 ? '' : 's'})" aria-label="Print binder packets">${PRINTER}</button></span>`;
       // Ship student shirts: Print Packet and Shipping File as icons (names on hover), so it all fits on one row.
       if (kind === 'ctodo' && isShirtItem(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="packetOpen" title="Print Packet" aria-label="Print Packet">${PRINTER}</button>`
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
@@ -1653,8 +1665,8 @@ function binderModal() {
 function binderListModal() {
   return `<div class="overlay" data-act="binderListClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Binder Paperwork</h2><button class="x big" data-act="binderListClose" aria-label="Close">×</button></div>
-    <div class="modal-body"><ul class="plain-list">${cfg().binder.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
-    <div class="modal-foot"><span class="muted small">Change this list in Setup → Templates → Prep.</span></div>
+    <div class="modal-body"><ul class="plain-list">${cfg().packet.filter(x => x.copies).map(x => `<li>${esc(packetLine(x))}</li>`).join('')}</ul></div>
+    <div class="modal-foot"><span class="muted small">Change the counts in Setup → Templates → Prep.</span></div>
   </div></div>`;
 }
 
@@ -2045,8 +2057,8 @@ function templatesModal() {
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>`}
        ${tab === '0' ? `<label class="field">Packing list <span class="small">(one per line)</span>
          <textarea id="tpl-pack" data-draft="tpl-pack" rows="8">${dv('tpl-pack', c.packing.join('\n'))}</textarea></label>
-       <label class="field">Binder paperwork <span class="small">(one per line; the list icon on a “Prepare binders” to-do shows it)</span>
-         <textarea id="tpl-binder" data-draft="tpl-binder" rows="8">${dv('tpl-binder', c.binder.join('\n'))}</textarea></label>` : ''}
+       <div class="field">Binder packet <span class="small">(copies of each sheet per student, for “Prepare student binders”; 0 leaves it out)</span>
+         ${packetCounter(c.packet, S.tplBinder || {}, 'tplBinderCount')}</div>` : ''}
        ${tab === '6' ? `<p class="tpl-group">Documentation Checklist <span class="muted small">(one per line)</span></p>
          <div class="day-fields">${[['class', 'Records for the Class'], ['student', 'Records for each Student'], ['skills', 'Skills sheets (physical copies only)'], ['final', 'Final Steps']].map(([k2, label]) =>
            `<label class="field">${label}<textarea id="tpl-doc-${k2}" data-draft="tpl-doc-${k2}" rows="7">${dv('tpl-doc-' + k2, (c.docs[k2] || []).join('\n'))}</textarea></label>`).join('')}</div>` : ''}
@@ -2816,9 +2828,14 @@ async function act(a, el = {}, e) {
 
       case 'tplOpen': S.tplOpen = true; S.tplTab = d.t || 'setup'; render(); break;
       case 'tplTab': S.tplTab = d.t; render(); break;
+      case 'tplBinderCount': { // (saved with the rest of Templates)
+        const cur = cfg().packet.find(x => packetKey(x) === d.k); if (!cur) break;
+        S.tplBinder = S.tplBinder || {};
+        S.tplBinder[d.k] = Math.max(0, Math.min(50, (S.tplBinder[d.k] ?? cur.copies) + Number(d.by))); render(); break;
+      }
       case 'tplClose':
-        if (TPL_KEYS.some(k => S.drafts[k] !== undefined) && !confirm('Close without saving your changes?')) return;
-        TPL_KEYS.forEach(k => delete S.drafts[k]);
+        if ((TPL_KEYS.some(k => S.drafts[k] !== undefined) || S.tplBinder) && !confirm('Close without saving your changes?')) return;
+        TPL_KEYS.forEach(k => delete S.drafts[k]); S.tplBinder = null;
         S.tplOpen = false; render(); break;
       case 'tplSave': {
         const c = cfg();
@@ -2833,8 +2850,9 @@ async function act(a, el = {}, e) {
           days[x] = lines(S.drafts['tpl-todo-' + x] ?? ((c.checklist.days || {})[x] || []).join('\n'));
           dayNotes[x] = String(S.drafts['tpl-notes-' + x] ?? (c.dayNotes[x] || '')).replace(/\s+$/, '');
         });
-        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList, docChecklist, setupList, binderList, courseTodoList });
-        TPL_KEYS.forEach(k => delete S.drafts[k]);
+        const binderCopies = Object.fromEntries(c.packet.filter(x => !x.cover).map(x => [packetKey(x), (S.tplBinder || {})[packetKey(x)] ?? x.copies]));
+        await Store.set('meta/settings', { checklist: { everyDay, days }, dayNotes, packingList, docChecklist, setupList, binderList, courseTodoList, binderCopies });
+        TPL_KEYS.forEach(k => delete S.drafts[k]); S.tplBinder = null;
         S.tplOpen = false; render();
         // The open cohort already has its lists; offer to add any new items to it.
         const doc = S.cohortDoc || {};
