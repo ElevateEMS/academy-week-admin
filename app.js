@@ -1134,7 +1134,8 @@ function infoBox() {
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   return `<div class="info-rows">
     ${row('Orientation', date(i.firstDay) + (isIsoDate(i.firstDay) ? ' · ' + esc(x.orientTime) : ''))}
-    ${row('Full CPR course', date(i.cpr) + (isIsoDate(i.cpr) && x.cprTime ? ' · ' + esc(x.cprTime) : ''))}
+    ${row('Full CPR course', (isIsoDate(i.cpr) && isIsoDate(i.firstDay) && i.cpr.slice(0, 4) === i.firstDay.slice(0, 4) // (same year as orientation: no year, so it fits on one line)
+      ? esc(parseIso(i.cpr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })) : date(i.cpr)) + (isIsoDate(i.cpr) && x.cprTime ? ' · ' + esc(x.cprTime) : ''))}
     ${row('Academy Week', aw)}
     <div class="info-row"><span>Location</span><b class="one-line" title="${esc(x.awLocation)}">${x.awLocation ? esc(x.awLocation) : tbd}</b></div>
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
