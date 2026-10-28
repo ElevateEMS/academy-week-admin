@@ -1520,3 +1520,5 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 }
 .info-row b.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cf-time::placeholder { font-size: 12px; }
+/* v237: Academy Week instructions box starts 2 lines tall (drag the corner to make it taller) */
+.cf-row textarea.cf-info { min-height: 0; height: calc(2 * 1.4em + 18px); }

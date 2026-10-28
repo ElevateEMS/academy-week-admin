@@ -988,7 +988,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
-      if (kind === 'todo' && isBinderList(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="binderList" title="What goes in each binder" aria-label="What goes in each binder">${ICONS.list}</button>`
+      if (kind === 'todo' && isBinderList(t.text)) open = `<span class="ship-btns">`
         + `<button class="eye" data-act="bpOpen" data-id="${t.id}" title="Print binder packets (${attending().length} student${attending().length === 1 ? '' : 's'})" aria-label="Print binder packets">${PRINTER}</button></span>`;
       // Ship student shirts: Print Packet and Shipping File as icons (names on hover), so it all fits on one row.
       if (kind === 'ctodo' && isShirtItem(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="packetOpen" title="Print Packet" aria-label="Print Packet">${PRINTER}</button>`
@@ -1739,14 +1739,17 @@ function courseFields(prefix, form) {
       : type === 'date'
       ? datePicker(prefix + k, { optional: true, title: label })
       : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 242999 (late one: 242999 / 8375636)' : ''}" autocomplete="off" ${dis}>`}</div>`;
+  // Same order as the Course Details box: dates (with times), the Academy Week location (+ instructions, edit-only), then the rest.
+  const one = k => field(COURSE_FIELDS.find(([x]) => x === k));
   return `<div class="course-fields">
-    ${COURSE_FIELDS.filter(([k]) => k !== 'courseNos').map(field).join('')}
+    ${['firstDay', 'cpr', 'academyStart'].map(one).join('')}
+    <div class="cf-row"><span>Academy Week location</span><input id="${prefix}awLocation" data-draft="${prefix}awLocation" value="${esc(S.drafts[prefix + 'awLocation'] || '')}" placeholder="Name and address" autocomplete="off" ${dis}></div>
+    <div class="cf-row cf-top"><span>Academy Week instructions</span><textarea id="${prefix}awInfo" class="cf-info" data-draft="${prefix}awInfo" rows="2" placeholder="How to get in on the first morning" ${dis}>${esc(S.drafts[prefix + 'awInfo'] || '')}</textarea></div>
+    ${['jbl', 'meet'].map(one).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
       ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
       ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
-    ${COURSE_FIELDS.filter(([k]) => k === 'courseNos').map(field).join('')}
-    <div class="cf-row"><span>Academy Week location</span><input id="${prefix}awLocation" data-draft="${prefix}awLocation" value="${esc(S.drafts[prefix + 'awLocation'] || '')}" placeholder="Name and address" autocomplete="off" ${dis}></div>
-    <div class="cf-row cf-top"><span>Academy Week instructions</span><textarea id="${prefix}awInfo" data-draft="${prefix}awInfo" rows="3" placeholder="How to get in on the first morning" ${dis}>${esc(S.drafts[prefix + 'awInfo'] || '')}</textarea></div>
+    ${one('courseNos')}
   </div>`;
 }
 const courseForm = prefix => prefix === 'ie-' ? S.infoEdit : S.newCohort;
