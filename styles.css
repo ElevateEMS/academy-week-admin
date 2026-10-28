@@ -1504,3 +1504,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pk-ctl { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .pk-ctl b { min-width: 18px; text-align: center; font-weight: 600; }
 .pk-fixed { flex: none; }
+/* v235: Course Details: time next to the date, Academy Week location + instructions */
+.cf-date-time { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 8px; align-items: center; }
+.cf-date-time .dp, .cf-date-time .date-btn { width: 100%; }
+.cf-row textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper); outline: none; color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
+.cf-row textarea:focus { border-color: var(--taupe); }
+.dp-grid .dp-fill { height: 30px; }
+.dp-center .dp-grid .dp-fill { height: 34px; }
+.dp-multi .dp-grid .dp-fill { height: 36px; }

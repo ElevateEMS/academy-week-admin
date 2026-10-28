@@ -208,7 +208,7 @@ During orientation, we will:
 **CPR**
 
 As mentioned on our website, CPR is a required component to obtain your EMT certification and we offer two CPR classes during the course for students who need it. Any student is welcome to attend either CPR course. You will have the opportunity to sign up for one once the course begins.
-- **Full in-person CPR Course:** Held on {CPR date} in Richmond, VA. Because this is a full CPR class, no prior online training needs to be completed or purchased (this is fully covered with your tuition). If your ride-alongs will be scheduled with the assistance of ElevateEMS, you will need to utilize this option (or obtain your CPR elsewhere) before you begin scheduling ride alongs.
+- **Full in-person CPR Course:** Held on {CPR date}{if cpr time} from {CPR time}{end} in the Richmond, VA area. Because this is a full CPR class, no prior online training needs to be completed or purchased (this is fully covered with your tuition). If your ride-alongs will be scheduled with the assistance of ElevateEMS, you will need to utilize this option (or obtain your CPR elsewhere) before you begin scheduling ride alongs.
 - **Skills Check-Off:** CPR check off during Academy Week. This is a condensed CPR class where you'll have to complete online training modules with the AHA beforehand ($37 paid directly to the AHA).
 
 Lastly, we've created a personal referral code just for you: **{referral code}**. If anyone you refer enrolls using your code, you'll receive 10% of their tuition back as a thank-you (paid out after the drop-period has passed for their course)!
@@ -326,15 +326,15 @@ Please read this email in its entirety, as it contains important information reg
 - **All skills videos must be reviewed prior to Academy Week.** Do not expect to pass the psychomotor exam without thoroughly studying your Patient Assessment sheet (both are found in the Student Portal)
 - Your BLS CPR card must be uploaded (unless signed up for a skills session with us at Academy Week)
 - The shirt mailed to you is your required student uniform and must be worn during Academy Week. Refer to the syllabus for full uniform requirements (long pants, closed-toe shoes, watch, etc.).
-- There will be a shared fridge with the ODEMSA staff for packed lunches, and we also have slotted a 1 hour lunch period each day to allow time to run out.
+- There will be a shared fridge on site for packed lunches, and we also have slotted a 1 hour lunch period each day to allow time to run out.
 - Bring a laptop or tablet on the last day of Academy Week for NREMT registration following the psychomotor exam.
 - 100% attendance is required. **You must arrive on time each day.**
 
 **Academy Week Address & Schedule**
 
-**Old Dominion Emergency Medical Services Alliance (ODEMSA) address:** 7818 E Parham Rd Suite 911, Henrico, VA 23294
+**Address:** {academy week location}
 
-Walk into the building through the main entrance, check in with security, take the elevators down to the basement, and follow the signs for ODEMSA (suite 911).
+{academy week instructions}
 - **{day 1}** (0800-1700) - Final Exam and Skills
 - **{day 2}** (0800-1700) - Scenarios
 - **{day 3}** (0800-1700) - Review/Sign off skills
@@ -418,6 +418,14 @@ DEFAULTS.binderPacket = [
   { name: 'Splinting (Long Bone / Joint)', pdf: 'skills-splinting.pdf', copies: 7 },
   { name: 'Traction Splint', pdf: 'skills-traction.pdf', copies: 2 },
 ];
+// Course Details kept with the app (not the sheet): orientation and CPR times, the Academy Week location and arrival
+// instructions. Saved per cohort as cohorts/{key}.details; anything never set uses these.
+DEFAULTS.courseExtra = {
+  orientTime: '11:00 AM',
+  cprTime: '',
+  awLocation: 'ODEMSA, 7818 E Parham Rd Suite 911, Henrico, VA 23294',
+  awInfo: 'Walk into the building through the main entrance, check in with security, take the elevators down to the basement, and follow the signs for ODEMSA (suite 911).',
+};
 DEFAULTS.printPacket = [
   { name: 'Ride Along & Academy Week Readiness Guide', doc: '1mOaVm0DU1w76LU_Uu3NRmkW6FiWPpwzVfIbztawgz2s', copies: 1 },
   { name: 'Patient Contact Instructions', doc: '1KaQtsY9coYLENbxguCd-pXEYs9s91qBRCnPDAR-rfJI', copies: 1 },

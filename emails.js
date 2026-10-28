@@ -80,7 +80,7 @@ function emPerson(s) {
   return {
     sid: s.sid, name: s.name, email: String(s.email || '').trim(),
     textbook: !!s.textbook, paidNext: !!s.paidNext, paidFinal: !!s.paidFinal,
-    late: !!late, makeup, orient, time: late ? String(late.time || '') : DEFAULTS.email.orientationTime,
+    late: !!late, makeup, orient, time: late ? String(late.time || '') : courseExtra().orientTime,
     next: isIsoDate(pd.next) ? pd.next : payFrom ? addDays(payFrom, payLate ? 14 : -1) : '',
     final: isIsoDate(pd.final) ? pd.final : payFrom ? addDays(payFrom, payLate ? 28 : 29) : '',
     ext: { next: isIsoDate(pd.next), final: isIsoDate(pd.final) },
@@ -97,7 +97,7 @@ const emPersonBySid = sid => { const s = students().find(x => x.sid === sid); re
 // The cohort's own dates, for an email to the whole group.
 function emCohortPerson() {
   const f = cohortInfo().firstDay, orient = isIsoDate(f) ? f : '';
-  return { orient, time: DEFAULTS.email.orientationTime, next: orient ? addDays(orient, -1) : '', final: orient ? addDays(orient, 29) : '', late: false, ext: {} };
+  return { orient, time: courseExtra().orientTime, next: orient ? addDays(orient, -1) : '', final: orient ? addDays(orient, 29) : '', late: false, ext: {} };
 }
 
 function whoFits(t, p) {
@@ -205,6 +205,7 @@ const EM_IFS = {
   'has book': p => !!(p && p.textbook), 'needs book': p => !!(p && !p.textbook), extension: p => !!(p && (p.ext.next || p.ext.final)),
   'one missing': p => !!(p && p.missing && p.missing.length === 1),
   signing: p => !!(p && p.signLink), // their orientation roster signing link is in (Test cohorts until December)
+  'cpr time': () => !!courseExtra().cprTime, // a CPR class time is in Course Details
 };
 function emTest(expr, p, group) {
   return expr.split(/\s+and\s+/i).every(term => {
@@ -237,7 +238,8 @@ function emValues(p) {
     'first name': p ? firstName(p.name) : '', 'full name': p ? fullName(p.name) : '', cohort: S.cohortKey || '',
     'orientation date': emDate(c.orient), 'orientation time': c.time,
     'next due': emDate(c.next), 'final due': emDate(c.final),
-    'cpr date': emDate(i.cpr), 'academy week start': emDate(aw),
+    'cpr date': emDate(i.cpr), 'cpr time': courseExtra().cprTime, 'academy week start': emDate(aw),
+    'academy week location': courseExtra().awLocation, 'academy week instructions': courseExtra().awInfo,
     'academy week dates': days.length ? emDate(days[0].iso) + ' – ' + emDate(days[days.length - 1].iso) : '',
     'coursework deadline': isIsoDate(aw) ? emDate(addDays(aw, -1)) + ' at 8:00 AM' : '',
     'fingerprinting deadline': isIsoDate(aw) ? emDate(monthBefore(aw)) : '',
@@ -494,8 +496,8 @@ function bookCodesModal() {
 
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
-  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {academy week start} {academy week dates} {day 1} … {day 5} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {sign link} (their orientation roster signing link)</p>
-  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in). Join with “and”; put “not” in front to flip one.</p>
+  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {sign link} (their orientation roster signing link)</p>
+  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 function emailTplModal() {
   const ed = S.emailTplEd, list = emailTemplates({ all: true });

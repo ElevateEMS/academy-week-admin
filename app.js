@@ -42,6 +42,14 @@ const parseIso = s => { const [y, m, d] = s.split('-').map(Number); return new D
 const isIsoDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 // The cohort sheet's settings box (JBL code, dates, Meet link, review dates). Blank = not set yet.
 const cohortInfo = () => (S.sheet && S.sheet.info) || {};
+// Orientation/CPR times and the Academy Week location + instructions (kept with the app: cohorts/{key}.details).
+// A blank orientation time is the usual 11:00 AM.
+function courseExtra(doc = S.cohortDoc) {
+  const x = { ...DEFAULTS.courseExtra, ...((doc && doc.details) || {}) };
+  if (!String(x.orientTime || '').trim()) x.orientTime = DEFAULTS.courseExtra.orientTime;
+  return x;
+}
+const EXTRA_KEYS = ['orientTime', 'cprTime', 'awLocation', 'awInfo'];
 const longDate = s => parseIso(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 // "Oct 20" (for logs, where 10/20 could be misread as a count)
 const monthDay = s => s ? parseIso(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -317,6 +325,29 @@ async function seedBinderPrep() {
   } catch (e) { console.warn('Binder to-dos not combined:', e.message); }
 }
 
+// Oct 28, 2026: a saved Welcome / Academy Week instructions template (one you've edited) gets the same new fill-ins as
+// the built-in ones: the CPR time, "the Richmond, VA area", and the Academy Week location + instructions. Once.
+const EXTRA_SWAPS = [
+  ['Held on {CPR date} in Richmond, VA.', 'Held on {CPR date}{if cpr time} from {CPR time}{end} in the Richmond, VA area.'],
+  ['shared fridge with the ODEMSA staff', 'shared fridge on site'],
+  ['**Old Dominion Emergency Medical Services Alliance (ODEMSA) address:** 7818 E Parham Rd Suite 911, Henrico, VA 23294', '**Address:** {academy week location}'],
+  ['Walk into the building through the main entrance, check in with security, take the elevators down to the basement, and follow the signs for ODEMSA (suite 911).', '{academy week instructions}'],
+];
+let extrasTried = false;
+async function seedEmailExtras() {
+  const st = S.settings;
+  if (!st || st.emailExtras1 || extrasTried || !S.emailTplsLoaded) return; // (after the saved templates have loaded)
+  extrasTried = true;
+  try {
+    if (!(await Store.claim('meta/settings', 'emailExtras1'))) return;
+    for (const id of ['welcome', 'aw-instructions']) {
+      const t = S.emailTpls[id]; if (!t || typeof t.body !== 'string') continue;
+      const body = EXTRA_SWAPS.reduce((b, [a, z]) => b.split(a).join(z), t.body);
+      if (body !== t.body) await Store.set('emailTemplates/' + id, { body });
+    }
+  } catch (e) { console.warn('Email templates not updated:', e.message); }
+}
+
 /* ---------- Cohorts in order (for "the previous cohort") ---------- */
 // "Spring 2027" → 2027.0, "Summer 2027" → 2027.33, "Fall 2027" → 2027.67. Test/QA/Custom ones aren't real classes.
 const SEASONS = { winter: 0, spring: 0.1, summer: 0.4, fall: 0.7, autumn: 0.7 };
@@ -466,7 +497,7 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
   unwatchGlobal.push(Store.watch('updates', list => { S.updates = list; render(); }));
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
-  unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); render(); }));
+  unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); S.emailTplsLoaded = true; render(); }));
   unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
   unwatchGlobal.push(...adminWatch());
   render();
@@ -614,7 +645,7 @@ function render() {
     }
     fitBoard();
     syncDue(); // template to-dos' due dates follow Course Details
-    syncRosters(); syncOrientTodos(); seedVaoems(); seedBinderPrep(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
+    syncRosters(); syncOrientTodos(); seedVaoems(); seedBinderPrep(); seedEmailExtras(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
@@ -1089,7 +1120,7 @@ const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus
 
 // Course Details box: what's in the sheet's settings box, TBD where it's blank.
 function infoBox() {
-  const i = cohortInfo(), st = S.sheet.status || '';
+  const i = cohortInfo(), st = S.sheet.status || '', x = courseExtra();
   const tbd = '<span class="tbd">TBD</span>';
   const date = v => isIsoDate(v) ? esc(longDate(v)) : v ? esc(v) : tbd;
   const days = weekDays().filter(d => d.iso);
@@ -1102,9 +1133,10 @@ function infoBox() {
   const dropped = students().filter(x => x.out).length + S.sheet.students.filter(x => /^blocked$/i.test(x.status)).length;
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   return `<div class="info-rows">
-    ${row('Orientation', date(i.firstDay))}
-    ${row('Full CPR course', date(i.cpr))}
+    ${row('Orientation', date(i.firstDay) + (isIsoDate(i.firstDay) ? ' · ' + esc(x.orientTime) : ''))}
+    ${row('Full CPR course', date(i.cpr) + (isIsoDate(i.cpr) && x.cprTime ? ' · ' + esc(x.cprTime) : ''))}
     ${row('Academy Week', aw)}
+    ${row('Location', x.awLocation ? esc(x.awLocation) : tbd)}
     ${row('JBL course code', i.jbl ? esc(i.jbl) : tbd)}
     ${row('Google Meet', meet)}
     ${row('Review sessions', rev.length ? `<details><summary>${rev.length} date${rev.length === 1 ? '' : 's'}${upcoming.length ? ' · next ' + shortDate(upcoming[0]) : ''}</summary><span class="muted small">${esc(rev.join(', '))}</span></details>` : tbd)}
@@ -1574,6 +1606,7 @@ function datePicker(key, { optional = false, empty = 'Not set', title = '' } = {
       const on = multi ? multi.reviews.includes(iso) : iso === value;
       cells.push(`<button type="button" class="${on ? 'on' : ''} ${iso === todayIso() ? 'today' : ''}" data-act="${multi ? 'dpToggle' : 'dpPick'}" data-k="${key}" data-iso="${iso}">${i}</button>`);
     }
+    while (cells.length < 42) cells.push('<span class="dp-fill"></span>'); // always 6 weeks tall, so the month and arrows never move
     if (multi) {
       const n = multi.reviews.length;
       cal = `<div class="dp-pop dp-multi">
@@ -1699,7 +1732,11 @@ const COURSE_FIELDS = [['firstDay', 'Orientation', 'date'], ['cpr', 'Full CPR co
 function courseFields(prefix, form) {
   const dis = form.busy ? 'disabled' : '';
   // (the course # box comes after Review sessions, the same order as the Course Details box)
-  const field = ([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date'
+  const timeFor = { firstDay: ['orientTime', '11:00 AM'], cpr: ['cprTime', 'e.g. 10:00 AM – 2:00 PM'] };
+  const tIn = k => { const [tk, ph] = timeFor[k]; return `<input id="${prefix + tk}" class="cf-time" data-draft="${prefix + tk}" value="${esc(S.drafts[prefix + tk] || '')}" placeholder="${ph}" aria-label="${k === 'cpr' ? 'CPR class time' : 'Orientation time'}" autocomplete="off" ${dis}>`; };
+  const field = ([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date' && timeFor[k]
+      ? `<div class="cf-date-time">${datePicker(prefix + k, { optional: true, title: label })}${tIn(k)}</div>`
+      : type === 'date'
       ? datePicker(prefix + k, { optional: true, title: label })
       : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 242999 (late one: 242999 / 8375636)' : ''}" autocomplete="off" ${dis}>`}</div>`;
   return `<div class="course-fields">
@@ -1708,6 +1745,8 @@ function courseFields(prefix, form) {
       ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
       ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
     ${COURSE_FIELDS.filter(([k]) => k === 'courseNos').map(field).join('')}
+    <div class="cf-row"><span>Academy Week location</span><input id="${prefix}awLocation" data-draft="${prefix}awLocation" value="${esc(S.drafts[prefix + 'awLocation'] || '')}" placeholder="Name and address" autocomplete="off" ${dis}></div>
+    <div class="cf-row cf-top"><span>Academy Week instructions</span><textarea id="${prefix}awInfo" data-draft="${prefix}awInfo" rows="3" placeholder="How to get in on the first morning" ${dis}>${esc(S.drafts[prefix + 'awInfo'] || '')}</textarea></div>
   </div>`;
 }
 const courseForm = prefix => prefix === 'ie-' ? S.infoEdit : S.newCohort;
@@ -1719,7 +1758,10 @@ function courseValues(prefix) {
   out.reviews = [...courseForm(prefix).reviews];
   return out;
 }
-const clearCourseDrafts = prefix => COURSE_FIELDS.forEach(([k]) => delete S.drafts[prefix + k]);
+const clearCourseDrafts = prefix => { COURSE_FIELDS.forEach(([k]) => delete S.drafts[prefix + k]); EXTRA_KEYS.forEach(k => delete S.drafts[prefix + k]); };
+const fillExtraDrafts = (prefix, doc) => { const x = courseExtra(doc); EXTRA_KEYS.forEach(k => { S.drafts[prefix + k] = x[k] || ''; }); };
+// What's typed in the four app-kept boxes (a cleared orientation time goes back to 11:00 AM).
+const extraValues = prefix => Object.fromEntries(EXTRA_KEYS.map(k => [k, String(S.drafts[prefix + k] ?? '').trim()]));
 
 function infoEditModal() {
   const f = S.infoEdit;
@@ -2590,7 +2632,7 @@ async function act(a, el = {}, e) {
       case 'binderList': S.binderList = true; render(); break;
       case 'binderListClose': S.binderList = false; render(); break;
       case 'newCohortOpen':
-        S.menuOpen = false; S.newCohort = { busy: false, err: '', reviews: [] }; clearCourseDrafts('nc-'); render();
+        S.menuOpen = false; S.newCohort = { busy: false, err: '', reviews: [] }; clearCourseDrafts('nc-'); fillExtraDrafts('nc-', null); render();
         setTimeout(() => { const el = document.getElementById('newCohortIn'); if (el) el.focus(); }, 0); break;
       case 'newCohortClose': if (S.newCohort && S.newCohort.busy) return; S.newCohort = null; render(); break;
       case 'newCohortCreate': {
@@ -2598,7 +2640,7 @@ async function act(a, el = {}, e) {
         if (!key || !S.newCohort || S.newCohort.busy) { if (!key) toast('Type the cohort’s name first.'); return; }
         if (S.cohorts.some(c => c.key.toLowerCase() === key.toLowerCase())) { S.newCohort.err = key + ' is already in the config sheet.'; render(); return; }
         // Only the course details you filled in are sent (the rest stay blank = TBD).
-        const vals = courseValues('nc-'), info = {};
+        const vals = courseValues('nc-'), info = {}, extras = extraValues('nc-');
         COURSE_FIELDS.forEach(([k]) => { if (vals[k]) info[k] = vals[k]; });
         if (vals.reviews.length) info.reviews = vals.reviews;
         S.newCohort.busy = true; S.newCohort.err = ''; render();
@@ -2612,6 +2654,7 @@ async function act(a, el = {}, e) {
           try { await Sheets.saveSettings(key, info); } catch (err) { infoErr = (res && res.settingsError) || err.message; }
           S.kdAt = 0;
         }
+        try { await Store.set('cohorts/' + key, { details: extras }); } catch (err) { infoErr = infoErr || err.message; }
         delete S.drafts.newCohort; clearCourseDrafts('nc-'); S.newCohort = null;
         try { S.cohorts = await Sheets.listCohorts(); } catch {}
         S.view = 'course'; pref('view', 'course');
@@ -2772,6 +2815,7 @@ async function act(a, el = {}, e) {
         const i = cohortInfo(), orig = {};
         COURSE_FIELDS.forEach(([k, , type]) => { const v = String(i[k] || ''); orig[k] = type === 'date' ? (isIsoDate(v) ? v : '') : v; S.drafts['ie-' + k] = orig[k]; });
         orig.reviews = (i.reviews || []).filter(isIsoDate);
+        fillExtraDrafts('ie-'); orig.extras = extraValues('ie-');
         S.infoEdit = { busy: false, err: '', reviews: [...orig.reviews], orig };
         render(); break;
       }
@@ -2784,14 +2828,15 @@ async function act(a, el = {}, e) {
         const now = courseValues('ie-'), changed = {};
         COURSE_FIELDS.forEach(([k]) => { if (now[k] !== f.orig[k]) changed[k] = now[k]; });
         if (JSON.stringify(now.reviews) !== JSON.stringify(f.orig.reviews)) changed.reviews = now.reviews;
-        if (!Object.keys(changed).length) { S.infoEdit = null; clearCourseDrafts('ie-'); render(); return; }
+        const extras = extraValues('ie-'), extrasChanged = JSON.stringify(extras) !== JSON.stringify(f.orig.extras);
+        if (!Object.keys(changed).length && !extrasChanged) { S.infoEdit = null; clearCourseDrafts('ie-'); render(); return; }
         f.busy = true; f.err = ''; render();
         try {
-          applyInfo(await Sheets.saveSettings(S.cohortKey, changed));
-          S.kdAt = 0; // Key Dates picks up the change
+          if (extrasChanged) await Store.set('cohorts/' + S.cohortKey, { details: extras }); // (times + location: kept with the app)
+          if (Object.keys(changed).length) { applyInfo(await Sheets.saveSettings(S.cohortKey, changed)); S.kdAt = 0; } // Key Dates picks up the change
         } catch (err) { f.busy = false; f.err = err.message; render(); return; }
         S.infoEdit = null; clearCourseDrafts('ie-');
-        toast('Saved to ' + S.cohortKey + '’s sheet.'); render(); break;
+        toast(Object.keys(changed).length ? 'Saved to ' + S.cohortKey + '’s sheet.' : 'Saved.'); render(); break;
       }
       case 'callToggle': { const k = 'call-' + d.sid; S.drafts[k] = !S.drafts[k]; render(); break; }
       case 'logContact': {

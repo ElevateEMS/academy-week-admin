@@ -27,6 +27,9 @@ function syllabusFills() {
     'orientation date': sylDate(c.orient), 'orientation day': sylDay(c.orient),
     'academy week dates': sylRange(days[0], days[4]),
     'cpr date': sylLong(i.cpr),
+    'cpr time': courseExtra().cprTime || 'time TBD', // "(10:00 AM – 2:00 PM)" / "(time TBD)"
+    'orientation times': (t => t ? t + '-' + milPlus(t, 2) : '1100-1300')(milTime(courseExtra().orientTime)), // the schedule table: "1100-1300"
+    'academy week location': courseExtra().awLocation,
     'coursework deadline': isIsoDate(aw) ? sylDate(addDays(aw, -1)) + ' at 8:00 AM' : '',
     'next due': sylDate(c.next, { year: false }), 'final due': sylDate(c.final, { year: false }),
   };
