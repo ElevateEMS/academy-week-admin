@@ -501,6 +501,7 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
   unwatchGlobal.push(...adminWatch());
   render();
+  if (Sheets.flushOutbox) setTimeout(() => Sheets.flushOutbox(), 1500); // anything saved while offline last time
   // The last cohort used opens straight away (while the cohort list loads alongside it).
   const last = S.cohortKey;
   if (!S.cohorts.length) S.cohorts = keepCopy('cohorts') || []; // last list, until the fresh one arrives
@@ -508,7 +509,7 @@ Store.onUser(async user => {
   try {
     S.cohorts = await Sheets.listCohorts();
     keepCopy('cohorts', S.cohorts);
-  } catch (e) { S.sheetErr = e.message; render(); return; }
+  } catch (e) { S.sheetErr = e.offline ? null : e.message; render(); return; } // (offline: the last list)
   S.cohortsLoaded = true;
   watchPrev();
   loadScenarios(); // which scenario Docs are in the Drive folders (no need to wait)
@@ -605,12 +606,31 @@ async function loadSheet() {
     emailInit();
     shareHousekeeping();
   } catch (e) {
-    S.sheetErr = e.message;
+    S.sheetErr = e.offline ? null : e.message; // (offline: the copy from last time stays up)
   }
   S.loading = false; render();
 }
 
 const P = path => 'cohorts/' + S.cohortKey + '/' + path;
+
+/* ---------- Offline ----------
+   The app itself loads without internet (sw.js keeps a copy of its files), and the app's own data (to-dos, notes…)
+   works offline as always. Changes that go to the Google Sheets wait in the outbox (sheets.js) and go out when it's
+   back online; this bar says so. */
+function offlineBar() {
+  const box = Sheets.outbox ? Sheets.outbox() : { count: 0 }, off = navigator.onLine === false;
+  if (!off && !box.count) return '';
+  const n = box.count, waiting = n ? `${n} change${n === 1 ? '' : 's'} waiting to sync` : '';
+  if (off) return `<div class="offline-bar">⚡︎ Offline. Changes are saved on this device${n ? ` · ${waiting}` : ''}. Google Sheet info is from last time.</div>`;
+  if (box.err) return `<div class="offline-bar err">A change couldn’t sync: ${esc(box.err)} <button class="btn tiny" data-act="outboxRetry">Try again</button> <button class="link" data-act="outboxDrop">Discard it</button></div>`;
+  return `<div class="offline-bar">${box.flushing ? 'Syncing' : 'Waiting to sync'}: ${waiting.replace(' waiting to sync', '')}…</div>`;
+}
+addEventListener('online', () => { render(); if (Sheets.flushOutbox) Sheets.flushOutbox(); });
+addEventListener('offline', () => render());
+setInterval(() => { if (Sheets.flushOutbox && navigator.onLine !== false) Sheets.flushOutbox(); }, 60000); // (in case "online" never fired)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline copy not set up:', e.message)));
+}
 
 /* ---------- Render ---------- */
 let raf = 0;
@@ -724,6 +744,7 @@ function shell() {
     </nav>
   </header>
   <main class="wrap">
+    ${offlineBar()}
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
     ${{ admin: adminView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
@@ -2683,6 +2704,8 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'makeDocs': await makeCohortDocs(); break;
+      case 'outboxRetry': await Sheets.flushOutbox(); break;
+      case 'outboxDrop': if (confirm('Discard the change that couldn’t sync? It won’t be sent to the Google Sheet.')) { Sheets.dropFirstOutbox(); Sheets.flushOutbox(); } break;
       case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
@@ -2854,7 +2877,7 @@ async function act(a, el = {}, e) {
           if (Object.keys(changed).length) { applyInfo(await Sheets.saveSettings(S.cohortKey, changed)); S.kdAt = 0; } // Key Dates picks up the change
         } catch (err) { f.busy = false; f.err = err.message; render(); return; }
         S.infoEdit = null; clearCourseDrafts('ie-');
-        toast(Object.keys(changed).length ? 'Saved to ' + S.cohortKey + '’s sheet.' : 'Saved.'); render(); break;
+        toast(Object.keys(changed).length ? (cohortInfo().pending ? 'Saved on this device. It goes to ' + S.cohortKey + '’s sheet when you’re back online.' : 'Saved to ' + S.cohortKey + '’s sheet.') : 'Saved.'); render(); break;
       }
       case 'callToggle': { const k = 'call-' + d.sid; S.drafts[k] = !S.drafts[k]; render(); break; }
       case 'logContact': {

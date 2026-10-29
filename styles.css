@@ -1537,3 +1537,8 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .sticky-ed .sn-li.sn-l2 { padding-left: calc(.8em + 32px); }
 .sticky-ed .sn-li.sn-l3 { padding-left: calc(.8em + 48px); }
 .sticky-ed .sn-li.sn-l4 { padding-left: calc(.8em + 64px); }
+/* v244: offline */
+.offline-bar { margin: 0 0 14px; padding: 8px 14px; border-radius: 12px; background: var(--honey-soft); color: var(--taupe-dark); font-size: 13.5px; border: 1px solid rgba(193, 154, 98, .35); }
+.offline-bar.err { background: var(--rose-soft); color: var(--rose); border-color: rgba(185, 122, 114, .4); }
+.offline-bar .btn.tiny { margin-left: 6px; }
+.pending-tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--honey); white-space: nowrap; }

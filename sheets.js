@@ -37,14 +37,111 @@
 const Sheets = (() => {
   if (!Store.configured) return sampleSheets();
 
+  // No internet: an error with .offline set (the outbox below keeps changes; reads fall back to the last copy).
+  const offlineErr = () => Object.assign(new Error('You’re offline.'), { offline: true });
   async function call(action, params = {}) {
-    const token = await Store.idToken();
-    // Sent as plain text on purpose: Apps Script can't answer the extra "preflight"
-    // check browsers make for JSON requests.
-    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, token, ...params }) });
+    if (navigator.onLine === false) throw offlineErr();
+    let token, res;
+    try {
+      token = await Store.idToken();
+      // Sent as plain text on purpose: Apps Script can't answer the extra "preflight"
+      // check browsers make for JSON requests.
+      res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, token, ...params }) });
+    } catch (e) {
+      if (e instanceof TypeError || /network/i.test(e.code || e.message || '')) throw offlineErr();
+      throw e;
+    }
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'The Google Sheet didn’t answer.');
     return out;
+  }
+
+  /* ---------- Outbox: changes made while offline ----------
+     Saving an inquiry or partner, deleting one, a Quick Log entry and Course Details: with no internet they're kept on
+     this device (localStorage 'aw-outbox', in order) and shown right away (marked pending), then sent in the same order
+     once it's back online. A new inquiry/partner gets a "tmp-" id until it's sent; later changes to it follow it. */
+  const OUTBOX = 'aw-outbox';
+  const readBox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX)) || []; } catch { return []; } };
+  const writeBox = list => { localStorage.setItem(OUTBOX, JSON.stringify(list)); }; // (throws when there's no room: the caller says so)
+  const who = () => /^nbrown@/i.test((S.user && S.user.email) || '') ? 'Nick' : 'Bella';
+  let flushing = false;
+  function enqueue(action, params, extra = {}) {
+    const list = readBox();
+    list.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), action, params, at: Date.now(), ...extra });
+    try { writeBox(list); } catch { throw new Error('Couldn’t save this on the device to send later (a photo may be too big). Try again once you’re online.'); }
+    render();
+  }
+  async function viaOutbox(action, params, optimistic, extra) {
+    if (!readBox().length) { // (with something already waiting, this goes after it, in order)
+      try { return { live: await call(action, params) }; } catch (e) { if (!e.offline) throw e; }
+    }
+    enqueue(action, params, extra);
+    setTimeout(() => Sheets.flushOutbox(), 0);
+    return { queued: optimistic() };
+  }
+  // What a saved inquiry/partner looks like before the sheet has it.
+  function pendingRow(listName, item, tmp) {
+    const list = (S.inq && S.inq[listName]) || [];
+    const cur = item.id ? list.find(x => x.id === item.id) : null;
+    const { contact, editContact, ...rest } = item;
+    const row = { ...(cur || { id: tmp, received: item.received || item.added || todayIso(), added: item.added || todayIso(), source: item.source || 'Call', message: item.message || '', reply: '', contacts: [] }), ...rest, pending: true };
+    let contacts = [...((cur && cur.contacts) || [])];
+    if (editContact) { const i = editContact.i; if (editContact.del) contacts.splice(i, 1); else if (contacts[i]) contacts[i] = { ...contacts[i], d: editContact.d, note: editContact.note }; }
+    if (contact) contacts.push({ ...contact, by: who() });
+    row.contacts = contacts;
+    return row;
+  }
+  function putRow(listName, row, oldId) { // into S.inq (and the copy kept on this device)
+    if (!S.inq) return;
+    const list = S.inq[listName] = S.inq[listName] || [];
+    const i = list.findIndex(x => x.id === (oldId || row.id));
+    if (i >= 0) list[i] = row; else list.unshift(row);
+    keepCopy('inq', S.inq);
+  }
+  const saveRow = (action, listName) => async item => {
+    const tmp = item.id ? null : 'tmp-' + Date.now();
+    const r = await viaOutbox(action, { item }, () => pendingRow(listName, item, tmp), tmp ? { tmp } : {});
+    return r.live ? r.live.item : r.queued;
+  };
+  const deleteRow = (action, listName) => async id => {
+    if (String(id).startsWith('tmp-')) { // never sent: just drop it and its waiting changes
+      writeBox(readBox().filter(op => op.tmp !== id && !(op.params.item && op.params.item.id === id)));
+      return {};
+    }
+    const r = await viaOutbox(action, { id }, () => ({ queued: true }));
+    return r.live || r.queued;
+  };
+  // Sends what's waiting, oldest first. Stops at the first one that can't go (offline, or the sheet said no: shown in the bar).
+  async function flushOutbox() {
+    if (flushing || navigator.onLine === false || !S.user) return;
+    let list = readBox(); if (!list.length) return;
+    flushing = true; render();
+    const ids = {}; let sent = 0, inq = false, settings = false;
+    try {
+      while ((list = readBox()).length) {
+        const op = list[0], params = JSON.parse(JSON.stringify(op.params));
+        if (params.item && ids[params.item.id]) params.item.id = ids[params.item.id];
+        if (params.id && ids[params.id]) params.id = ids[params.id];
+        let out;
+        try { out = await call(op.action, params); }
+        catch (e) {
+          if (e.offline) break;
+          op.err = e.message; writeBox([op, ...list.slice(1)]); break;
+        }
+        if (op.tmp && out.item) { ids[op.tmp] = out.item.id; writeBox(readBox().map(o => { // later changes to it now use its real id
+          if (o.params.item && o.params.item.id === op.tmp) o.params.item.id = out.item.id; if (o.params.id === op.tmp) o.params.id = out.item.id; return o; })); }
+        if (out.item) putRow(op.action === 'savePartner' ? 'partners' : 'items', out.item, op.tmp || out.item.id);
+        if (/Inquiry|Partner/.test(op.action)) inq = true;
+        if (op.action === 'saveSettings') settings = true;
+        writeBox(readBox().slice(1)); sent++;
+      }
+    } finally { flushing = false; }
+    if (sent) {
+      toast(sent === 1 ? '1 change synced.' : sent + ' changes synced.');
+      if (inq && typeof loadInquiries === 'function') loadInquiries();
+      if (settings && S.cohortKey && typeof loadSheet === 'function') loadSheet();
+    }
+    render();
   }
 
   return {
@@ -55,18 +152,25 @@ const Sheets = (() => {
     listScenarios: () => call('listScenarios').then(o => o.scenarios),
     createCohort: (key, info) => call('createCohort', { cohort: key, info }),
     setStatus: (key, status) => call('setStatus', { cohort: key, status }),
-    saveSettings: (key, info) => call('saveSettings', { cohort: key, info }).then(o => o.info),
+    saveSettings: async (key, info) => {
+      const r = await viaOutbox('saveSettings', { cohort: key, info }, () => {
+        const base = key === S.cohortKey && S.sheet ? { ...(S.sheet.info || {}) } : {}, next = { ...base, ...info, pending: true };
+        if ('courseNos' in info) { const [a = '', b = ''] = String(info.courseNos || '').split('/').map(x => x.trim()); Object.assign(next, { courseNo: a, lateCourseNo: b }); }
+        return next;
+      });
+      return r.live ? r.live.info : r.queued;
+    },
     createDrafts: drafts => call('createDrafts', { drafts }), // { count, warning } (warning: made without your signature)
     docPdf: id => call('docPdf', { id }).then(o => o.pdf), // a Google Doc as a PDF (base64), for the print packet
     makeCohortDocs: (key, fills) => call('makeCohortDocs', { cohort: key, fills }), // { made, found, docs: { syllabus, schedule, adminFolder, dropped } }
     listInquiries: () => call('listInquiries'),     // website info requests: { items, settings, waitingReason, lastCheck, timerOn }
     checkInquiries: () => call('checkInquiries'),   // check now (makes any drafts), then the same as listInquiries
     saveInquirySettings: settings => call('saveInquirySettings', { settings }).then(o => o.settings),
-    saveInquiry: item => call('saveInquiry', { item }).then(o => o.item),   // a call you add, or changes to a row
-    deleteInquiry: id => call('deleteInquiry', { id }),
+    saveInquiry: saveRow('saveInquiry', 'items'),     // a call you add, or changes to a row (outbox when offline)
+    deleteInquiry: deleteRow('deleteInquiry', 'items'),
     draftInquiryReply: id => call('draftInquiryReply', { id }), // "Make reply draft": { item, waiting } (the reply in gbrown@'s Drafts)
-    savePartner: item => call('savePartner', { item }).then(o => o.item), // Info Requests → Partners: a new one, or changes
-    deletePartner: id => call('deletePartner', { id }),
+    savePartner: saveRow('savePartner', 'partners'), // Info Requests → Partners: a new one, or changes (outbox when offline)
+    deletePartner: deleteRow('deletePartner', 'partners'),
     cohortDates: () => call('cohortDates').then(o => o.cohorts), // [{ key, status, firstDay, cpr, academyStart }]
     shirtSheet: key => call('shirtSheet', { cohort: key }), // { name, url, rows: [{ row, printed, full, email, size, street, unit, city, state, zip, shipped, note }] }
     signLinks: (key, roster, names) => call('signLinks', { cohort: key, roster, names }).then(o => o.links), // { name: code }
@@ -76,7 +180,11 @@ const Sheets = (() => {
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
     financeInfo: (date, kind) => call('financeInfo', { date, kind }),
-    logExpense: item => call('logExpense', { item }),
+    logExpense: async item => { const r = await viaOutbox('logExpense', { item }, () => ({ queued: true, tab: (item.date || '').slice(0, 4) + ' ' + item.kind })); return r.live || r.queued; },
+    // The outbox: how many are waiting, the first one's error (if the sheet turned it down), send now, drop the stuck one.
+    outbox: () => { const l = readBox(); return { count: l.length, err: l[0] && l[0].err || '', flushing }; },
+    flushOutbox,
+    dropFirstOutbox: () => { writeBox(readBox().slice(1)); render(); },
     resetTestCohort: (key, typed) => call('resetTestCohort', { cohort: key, confirm: typed }), // { docs, trashed, sheetsCleared }
   };
 })();

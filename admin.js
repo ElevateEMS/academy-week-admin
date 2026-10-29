@@ -10,6 +10,7 @@
    with "Open in Chrome ↗". */
 
 const NOTE_COLORS = ['yellow', 'blush', 'sage', 'blue', 'paper'];
+const PENDING_TAG = ' <span class="pending-tag" title="Saved on this device; it goes to the Google Sheet when you’re back online">⏳ waiting to sync</span>';
 const ARROW = '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4.5c0 .8-.7 1.5-1.5 1.5h-11c-.8 0-1.5-.7-1.5-1.5v-11C4 6.7 4.7 6 5.5 6H10"/></svg>';
 
 function adminWatch() {
@@ -171,7 +172,7 @@ async function qlLoad() {
     q.cats = r.categories || []; q.tab = r.tab; q.url = r.url || ''; q.err = ''; keepCopy('qlCats-' + kind, q.cats);
     keepCopy('qlTab-' + kind, { tab: q.tab, url: q.url });
   }
-  catch (e) { q.err = e.message; }
+  catch (e) { if (!e.offline) q.err = e.message; } // (offline: the categories from last time)
   q.loading = false; render();
 }
 function qlForm() {
@@ -207,7 +208,7 @@ function qlShell() {
   if (!S.ql) qlStart();
   const q = S.ql;
   // (the title down to the Open button sit in the middle of the screen; the two small links stay at the bottom)
-  return `<main class="calls-wrap ql-wrap"><div class="ql-body"><header class="calls-top"><img src="logo.png" alt=""><h1>Quick Log</h1></header>${qlForm()}
+  return `<main class="calls-wrap ql-wrap">${offlineBar()}<div class="ql-body"><header class="calls-top"><img src="logo.png" alt=""><h1>Quick Log</h1></header>${qlForm()}
     <button class="btn primary wide ql-save" data-act="qlSave" ${q.busy ? 'disabled' : ''}>${q.busy ? 'Saving…' : qlKind() === 'Income' ? 'Add income' : 'Add expense'}</button>
     ${q.tab ? `<p class="muted small ql-tab">Adds a row to ${esc(q.tab)} in $ Finances.</p>` : ''}
     ${q.url ? `<a class="btn ql-open" href="${esc(q.url)}" target="_blank" rel="noopener" data-chrome>Open ${esc(q.tab)} ↗</a>` : ''}</div>
@@ -588,7 +589,7 @@ async function loadInquiries(check = false) {
     S.inq = res; S.inqErr = ''; keepCopy('inq', res);
     if (check) toast([res.added ? `${res.added} new` : '', res.drafted ? `${res.drafted} reply draft${res.drafted === 1 ? '' : 's'} in your Gmail Drafts` : ''].filter(Boolean).join(' · ') || 'Nothing new.');
   } catch (e) {
-    S.inqErr = /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message;
+    S.inqErr = e.offline ? '' : /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message; // (offline: the last copy)
   }
   S.inqBusy = null; S.inqAt = Date.now(); render();
 }
@@ -638,7 +639,7 @@ function partnerLists(term) {
   const found = term ? all.filter(x => [x.org, x.contact, x.email, x.notes, x.about, x.type, x.phone].some(v => String(v || '').toLowerCase().includes(term))) : null;
   const row = x => `<li class="inq-row" data-act="ptOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.type || 'Partner')}">${PT_ICON}</span>
-      <span class="inq-main"><span class="inq-name">${esc(x.org || x.contact || 'No name')}</span>
+      <span class="inq-main"><span class="inq-name">${esc(x.org || x.contact || 'No name')}${x.pending ? PENDING_TAG : ''}</span>
         <span class="inq-sub">${[term || ptDue(x) ? ptStatus(x) : '', x.org ? x.contact : '', x.about, fuText(x.followUp), (lastNote(x) || {}).note || x.notes].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   if (found) return `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`;
@@ -703,7 +704,7 @@ function adminInquiryBox({ calls = false } = {}) {
   const waiting = items.filter(x => x.reply === 'Waiting').length;
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
-      <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}</span>
+      <span class="inq-main"><span class="inq-name">${esc(x.name || x.phone || x.email || 'No name')}${x.pending ? PENDING_TAG : ''}</span>
         <span class="inq-sub">${[term ? inqStatus(x) : '', inqLastTalk(x) ? 'last talked ' + inqDate(inqLastTalk(x)) : inqDate(x.received), fuText(x.followUp), x.cohort, x.reply === 'Waiting' ? 'reply waiting' : /^Drafted/.test(x.reply) && x.status === 'Needs follow-up' ? 'reply drafted' : '', (lastNote(x) || {}).note || x.notes || x.message].filter(Boolean).map(esc).join(' · ')}</span></span></li>`;
   // Missed calls (only when there are some) and Needs follow-up are always open; Plans to enroll, Responded, Enrolled
   // and Close Out (last) open with a click (remembered on this device), and only show when someone's in them.
@@ -760,7 +761,7 @@ function adminInquiryBox({ calls = false } = {}) {
 function callsShell() {
   if (S.inqCallsOnly === undefined) S.inqCallsOnly = pref('inqCallsOnly') === '1'; // this device's last choice (All until switched)
   return `<header class="calls-top"><img src="logo.png" alt=""><h1>Inquiries</h1></header>
-  <main class="calls-wrap">${adminInquiryBox({ calls: true })}
+  <main class="calls-wrap">${offlineBar()}${adminInquiryBox({ calls: true })}
     <p class="calls-foot"><a href="./" class="link">Open the full app</a> · <button class="link" data-act="signout">Sign out</button></p></main>
   ${adminModals()}${S.dueEd ? dueModal() : ''}`;
 }
@@ -1125,7 +1126,9 @@ async function adminAct(a, el = {}) {
     q.busy = true; q.done = ''; render();
     try {
       const r = await Sheets.logExpense(item);
-      const msg = `$${Number(item.amount.replace(/[$,\s]/g, '')).toFixed(2)} · ${item.category} added to ${r.tab}${r.receipt ? ' (with the receipt)' : ''}.${r.made ? ` New year: made the ${r.made} tabs + $ Overview row.` : ''}`;
+      const amt = `$${Number(item.amount.replace(/[$,\s]/g, '')).toFixed(2)} · ${item.category}`;
+      const msg = r.queued ? `${amt} saved on this device. It goes into ${r.tab} when you’re back online.`
+        : `${amt} added to ${r.tab}${r.receipt ? ' (with the receipt)' : ''}.${r.made ? ` New year: made the ${r.made} tabs + $ Overview row.` : ''}`;
       if (window.QUICKLOG_ONLY) { // the phone page stays open for the next one
         Object.assign(q, { busy: false, photo: null, done: msg, err: '' }); S.drafts['ql-amount'] = ''; S.drafts['ql-notes'] = ''; S.drafts['ql-cat'] = '';
       } else { S.ql = null; toast(msg); }
