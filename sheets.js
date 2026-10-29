@@ -181,6 +181,8 @@ const Sheets = (() => {
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
     financeInfo: (date, kind) => call('financeInfo', { date, kind }),
     logExpense: async item => { const r = await viaOutbox('logExpense', { item }, () => ({ queued: true, tab: (item.date || '').slice(0, 4) + ' ' + item.kind })); return r.live || r.queued; },
+    // A "Schedule ride alongs" to-do checked off (or not): ticks Confirmed on their Clinical Tracking row (outbox when offline).
+    confirmRideAlong: async (key, raKey, row, done) => { const r = await viaOutbox('confirmRideAlong', { cohort: key, raKey, row, done }, () => ({ queued: true })); return r.live || r.queued; },
     // The outbox: how many are waiting, the first one's error (if the sheet turned it down), send now, drop the stuck one.
     outbox: () => { const l = readBox(); return { count: l.length, err: l[0] && l[0].err || '', flushing }; },
     flushOutbox,
@@ -304,6 +306,7 @@ function sampleSheets() {
     async rosterSigs(key, date) { return wait(Object.entries(sampleSigs).filter(([, v]) => v.date === date).map(([name, v]) => ({ name, signedAt: v.at, late: false, png: v.png }))); },
     async clearRosterSig(key, date, name) { delete sampleSigs[name]; return wait({ cleared: true }); },
     async rosterPdfFile() { throw new Error('Sample mode has no Drive file.'); },
+    async confirmRideAlong(key, raKey, row, done) { console.log('Sample mode: Confirmed would be', done, 'for', raKey || 'row ' + row); return wait({ row }); },
     async resetTestCohort() { throw new Error('Sample mode has nothing to reset.'); },
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },

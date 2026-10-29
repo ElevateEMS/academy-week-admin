@@ -2730,7 +2730,14 @@ async function act(a, el = {}, e) {
         S.drafts[k] = ''; render();
         await Store.add(P('todos'), { text, done: false, day, kind, order: Date.now(), created: Date.now() }); break;
       }
-      case 'todo': { const t = S.todos.find(x => x.id === d.id); await Store.set(P('todos/' + d.id), { done: !t.done }); break; }
+      case 'todo': {
+        const t = S.todos.find(x => x.id === d.id);
+        await Store.set(P('todos/' + d.id), { done: !t.done });
+        // A Ride Along Request's to-do: its Confirmed box in Clinical Tracking follows along.
+        if (/^ra-/.test(t.id)) Sheets.confirmRideAlong(S.cohortKey, t.raKey || '', t.raRow || Number((t.id.match(/^ra-(\d+)-/) || [])[1]) || 0, !t.done)
+          .catch(err => toast('Checked off here, but Confirmed in the Clinical Tracking sheet didn’t change: ' + err.message));
+        break;
+      }
       case 'delTodo': {
         const t = S.todos.find(x => x.id === d.id);
         // A deleted repeat to-do stays gone for this cohort, even after the template is saved again.
