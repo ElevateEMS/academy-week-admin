@@ -879,6 +879,8 @@ function hlShow(rect, label, pending) {
       e.stopPropagation();
       const p = hlPending; hlHide(); window.getSelection().removeAllRanges();
       try {
+        if (p.stickyAdd) { stickyHighlight(p.stickyAdd); return; } // sticky notes (admin.js)
+        if (p.stickyRemove) { stickyUnhighlight(p.stickyRemove); return; }
         if (p.addNote) {
           const hl = notesHl(p.addNote.n);
           if (!hl.includes(p.addNote.phrase)) await Store.set(P('days/' + p.addNote.n), { hl: [...hl, p.addNote.phrase] });
@@ -946,8 +948,10 @@ document.addEventListener('mouseup', e => {
   hlNoClick = !!hlDown && Math.hypot(e.clientX - hlDown.x, e.clientY - hlDown.y) > 3 && !!(e.target.closest && e.target.closest('.checks'));
   hlDown = null;
   const notes = e.target.closest && e.target.closest('textarea[data-notes]');
+  const sticky = e.target.closest && e.target.closest('.sticky-ed[data-anote]');
   setTimeout(() => {
     if (notes) return notesPop(notes, e);
+    if (sticky) return stickyPop(sticky, e);
     const pieces = hlSelection();
     if (!pieces.length) return;
     hlShow(window.getSelection().getRangeAt(0).getBoundingClientRect(), 'Highlight', { add: pieces });

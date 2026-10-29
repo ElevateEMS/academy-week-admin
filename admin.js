@@ -476,7 +476,9 @@ function adminChangesBox() {
   const plus = (k, label) => `<button class="add-plus small-plus" data-act="chAdd" data-k="${k}" title="${label}" aria-label="${label}">+</button>`;
   const byOrder = (a, c) => (a.order || a.created || 0) - (c.order || c.created || 0), byNew = (a, c) => (a.created || 0) - (c.created || 0);
   const nxt = [...(S.adminNext || [])].sort(byOrder);
-  const upd = [...S.updates.filter(x => !x.done).sort(byNew), ...S.updates.filter(x => x.done).sort(byNew)];
+  const updKey = x => x.order != null ? x.order : (x.created || 0); // (dragged ones keep `order`; the rest go by when they were added)
+  const upd = [...S.updates.filter(x => !x.done), ...S.updates.filter(x => x.done)].sort((a, c) => (a.done ? 1 : 0) - (c.done ? 1 : 0) || updKey(a) - updKey(c));
+  const grip = `<span class="ai-grip ch-grip" data-chgrip title="Drag to reorder" aria-label="Drag to reorder">${ICONS.grip}</span>`;
   const k = 'add-anext-' + SETUP;
   const where = home.target ? esc(home.target) + '’s' : 'the next cohort’s';
   return `<section class="box admin-changes ${hidden('next') ? 'hide-done' : ''}">
@@ -484,13 +486,13 @@ function adminChangesBox() {
     <p class="mini-head with-plus">Do before next cohort ${home.src ? plus('anext', 'Add a change') : ''}</p>
     <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
     ${S.changesAdd === 'anext' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="adminNext" data-chadd="anext" placeholder="Type a change, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : ''}
-    <ul class="checks">${nxt.map(x => `<li class="${x.done ? 'done' : ''}">
+    <ul class="checks ch-list" data-chlist="anext">${nxt.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
       <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}</span></label>${dueBits('anext', x, x.done)}
       <button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
     <hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
     ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
-    <ul class="checks">${upd.map(x => `<li class="${x.done ? 'done' : ''}">
-      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>
+    <ul class="checks ch-list" data-chlist="upd">${upd.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
+      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>${dueBits('upd', x, x.done)}
       <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
@@ -594,7 +596,9 @@ async function loadInquiries(check = false) {
   S.inqBusy = null; S.inqAt = Date.now(); render();
 }
 const INQ_STATUSES = ['Missed call', 'Needs follow-up', 'Plans to enroll', 'Responded', 'Enrolled', 'Close Out'];
-const NEW_CALL_STATUSES = ['Needs follow-up', 'Plans to enroll', 'Missed call']; // what an inquiry you're adding can be (Missed call: calls only)
+const NEW_CALL_STATUSES = ['Responded', 'Plans to enroll', 'Needs follow-up', 'Missed call']; // what an inquiry you're adding can be (Missed call: calls only)
+// Adding one you've talked to: Responded, follow up in 2 weeks. A missed call: due today (no date). Needs follow-up: today too.
+const newInqFollow = st => st === 'Missed call' || st === 'Needs follow-up' ? '' : addDays(todayIso(), 14);
 const NEW_INQ_SOURCES = ['Call', 'Email', 'Text']; // how they reached out (Website forms and voicemails come in by themselves)
 const TEXT_ICON = '<svg viewBox="0 0 24 24"><path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h-1A1.5 1.5 0 0 1 3 15.5V7a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M8 10h8M8 13h5"/></svg>';
 const SOURCE_ICONS = { Call: () => LINK_ICONS.phone, Email: () => LINK_ICONS.mail, Text: () => TEXT_ICON };
@@ -944,7 +948,9 @@ function cleanInline(node) {
       const tag = c.tagName, st = c.style || {};
       const bold = tag === 'B' || tag === 'STRONG' || Number(st.fontWeight) >= 600 || st.fontWeight === 'bold';
       const ital = tag === 'I' || tag === 'EM' || st.fontStyle === 'italic';
+      const mark = tag === 'MARK' || (st.backgroundColor && !/transparent|rgba\(0, 0, 0, 0\)/.test(st.backgroundColor)); // a highlight
       let inner = cleanInline(c);
+      if (mark) inner = '<mark class="hl">' + inner + '</mark>';
       if (/^(DIV|P|LI)$/.test(tag)) inner = (out && !/<br>$/.test(out) ? '<br>' : '') + inner; // (a block inside a line: its own line)
       if (ital) inner = '<i>' + inner + '</i>';
       if (bold) inner = '<b>' + inner + '</b>';
@@ -1036,6 +1042,31 @@ document.addEventListener('paste', e => {
   e.preventDefault();
   document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
 });
+
+/* Highlighting in a sticky note: select words → Highlight (the same honey as the to-do lists); click a highlight →
+   Remove highlight. Saved in the note's html as <mark class="hl">. */
+function stickyPop(el, e) {
+  const sel = getSelection();
+  if (sel.rangeCount && !sel.isCollapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    const range = sel.getRangeAt(0).cloneRange();
+    hlShow(range.getBoundingClientRect(), 'Highlight', { stickyAdd: { el, range } });
+    return;
+  }
+  const mark = e.target.closest && e.target.closest('mark.hl, span[style*="background"]');
+  if (mark && el.contains(mark)) hlShow({ left: e.clientX, top: e.clientY - 6, width: 0 }, 'Remove highlight', { stickyRemove: { el, mark } });
+}
+function stickyHighlight({ el, range }) {
+  el.focus({ preventScroll: true });
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  const mark = document.createElement('mark'); mark.className = 'hl';
+  try { mark.appendChild(range.extractContents()); range.insertNode(mark); } catch { return; }
+  sel.removeAllRanges(); snNormalize(el); saveStickySoon(el, true);
+}
+function stickyUnhighlight({ el, mark }) {
+  const p = mark.parentNode; if (!p) return;
+  while (mark.firstChild) p.insertBefore(mark.firstChild, mark);
+  p.removeChild(mark); p.normalize(); saveStickySoon(el, true);
+}
 
 /* Bulletin layout: like Pinterest. Each sticky spans as many 2px rows as it's tall, so short notes stack up beside a tall one.
    Re-measured whenever a note changes size (typing) or the window does. */
@@ -1215,8 +1246,8 @@ async function adminAct(a, el = {}) {
       const it = a === 'inqNew' ? {} : (S.inq.items.find(x => x.id === d.id) || {});
       ['name', 'phone', 'email', 'notes', 'cohort'].forEach(k => { S.drafts['ie2-' + k] = it[k] || ''; });
       if (a === 'inqNew') S.drafts['ie2-cohort'] = (S.inq && S.inq.defaultCohort) || ''; // the cohort the reply would be about
-      S.drafts['ie2-status'] = (it.status && inqStatus(it)) || 'Needs follow-up'; S.drafts['ie2-received'] = todayIso();
-      S.drafts['ie2-follow'] = it.followUp || '';
+      S.drafts['ie2-status'] = (it.status && inqStatus(it)) || (a === 'inqNew' ? 'Responded' : 'Needs follow-up'); S.drafts['ie2-received'] = todayIso();
+      S.drafts['ie2-follow'] = a === 'inqNew' ? newInqFollow('Responded') : it.followUp || '';
       S.drafts['ie2-cdate'] = todayIso(); S.drafts['ie2-cnote'] = ''; S.drafts['ie2-source'] = 'Call'; S.drafts['ie2-message'] = ''; S.drafts['ie2-cohort-other'] = '';
       S.inqEd = { item: it, isNew: a === 'inqNew', busy: false }; render(); return true;
     }
@@ -1307,10 +1338,15 @@ async function adminAct(a, el = {}) {
       catch (err) { S.ptEd.busy = false; alert('Couldn’t delete: ' + err.message); }
       render(); return true;
     }
-    case 'inqStatus': S.drafts['ie2-status'] = d.s; render(); return true;
+    case 'inqStatus': { // (a new one: the follow-up date goes with the status, unless you picked your own)
+      const was = S.drafts['ie2-status'];
+      S.drafts['ie2-status'] = d.s;
+      if (S.inqEd && S.inqEd.isNew && (S.drafts['ie2-follow'] || '') === newInqFollow(was)) S.drafts['ie2-follow'] = newInqFollow(d.s);
+      render(); return true;
+    }
     case 'inqSource': // (Missed call only fits a call)
       S.drafts['ie2-source'] = d.s;
-      if (d.s !== 'Call' && S.drafts['ie2-status'] === 'Missed call') S.drafts['ie2-status'] = 'Needs follow-up';
+      if (d.s !== 'Call' && S.drafts['ie2-status'] === 'Missed call') { S.drafts['ie2-status'] = 'Responded'; S.drafts['ie2-follow'] = newInqFollow('Responded'); }
       render(); return true;
     case 'inqEdClose': if (!S.inqEd.busy) { S.inqEd = null; S.logEd = null; render(); } return true;
     case 'inqSave': {
@@ -1494,6 +1530,35 @@ document.addEventListener('pointerdown', e => {
       render();
       await Promise.all(ids.map((nid, i) => Store.set('adminNotes/' + nid, { order: i * 1000 })));
     } else render();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+});
+
+// Changes for Future Classes: drag an item by its grip to move it up or down its list; the order is saved.
+document.addEventListener('pointerdown', e => {
+  const grip = e.target.closest && e.target.closest('[data-chgrip]');
+  if (!grip) return;
+  e.preventDefault();
+  const row = grip.closest('li'), list = row.parentElement, which = list.dataset.chlist;
+  S.dragging = { type: 'changes' }; // (no redraws mid-drag)
+  row.classList.add('moving');
+  const move = ev => {
+    const after = [...list.children].find(c => c !== row && ev.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
+    if (after) { if (after !== row.nextSibling) list.insertBefore(row, after); } else if (list.lastElementChild !== row) list.appendChild(row);
+  };
+  const up = async () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    row.classList.remove('moving');
+    const ids = [...list.querySelectorAll('[data-chid]')].map(c => c.dataset.chid);
+    S.dragging = null;
+    const path = id => which === 'upd' ? 'updates/' + id : 'cohorts/' + nextFor + '/todos/' + id;
+    if (which === 'upd') S.updates = S.updates.map(x => ids.includes(x.id) ? { ...x, order: ids.indexOf(x.id) * 1000 } : x);
+    else S.adminNext = (S.adminNext || []).map(x => ids.includes(x.id) ? { ...x, order: ids.indexOf(x.id) * 1000 } : x);
+    render();
+    if (which !== 'upd' && !nextFor) return;
+    await Promise.all(ids.map((id, i) => Store.set(path(id), { order: i * 1000 })));
   };
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);

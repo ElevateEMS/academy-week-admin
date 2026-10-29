@@ -1542,3 +1542,16 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .offline-bar.err { background: var(--rose-soft); color: var(--rose); border-color: rgba(185, 122, 114, .4); }
 .offline-bar .btn.tiny { margin-left: 6px; }
 .pending-tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--honey); white-space: nowrap; }
+/* v245: sticky note dash lines are indented from the left (wrapped lines line up under the words); highlights; Future updates grips */
+.sticky-ed .sn-li { padding-left: calc(.8em + 12px); text-indent: -.8em; }
+.sticky-ed .sn-li.sn-l1 { padding-left: calc(.8em + 28px); }
+.sticky-ed .sn-li.sn-l2 { padding-left: calc(.8em + 44px); }
+.sticky-ed .sn-li.sn-l3 { padding-left: calc(.8em + 60px); }
+.sticky-ed .sn-li.sn-l4 { padding-left: calc(.8em + 76px); }
+.sticky-ed mark.hl { cursor: pointer; }
+.ch-list li { flex-wrap: nowrap; }
+.ch-list .ch-grip { flex: none; width: 14px; height: 18px; margin: 0 -4px 0 -6px; opacity: 0; cursor: grab; transition: opacity .15s; touch-action: none; }
+.ch-list .ch-grip svg { width: 14px; height: 14px; }
+.ch-list li:hover .ch-grip { opacity: .55; } .ch-list .ch-grip:hover { opacity: 1; }
+.ch-list li.moving { opacity: .55; background: var(--blush-soft); border-radius: 6px; }
+@media (hover: none) { .ch-list .ch-grip { opacity: .4; } }
