@@ -889,7 +889,7 @@ function adminNotesBox() {
       const id = 'an-' + n.id, due = isIsoDate(n.remind) && n.remind <= todayIso();
       return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}${due ? ' remind-due' : ''}" data-nid="${n.id}">
         <button class="x sticky-x" data-act="adminNoteDel" data-id="${n.id}" aria-label="Delete note">×</button>
-        <textarea id="${id}" data-draft="${id}" data-anote="${n.id}" data-grow rows="3" placeholder="Type a note">${esc(S.drafts[id] ?? n.text ?? '')}</textarea>
+        <div id="${id}" class="sticky-ed${noteBlank(n) ? ' is-empty' : ''}" contenteditable="true" data-anote="${n.id}" data-ph="Type a note" role="textbox" aria-multiline="true" aria-label="Sticky note">${noteHtml(n)}</div>
         <div class="sticky-foot"><span class="sticky-tools"><span class="ai-grip sticky-grip" data-ngrip title="Drag to move" aria-label="Drag to move">${ICONS.grip}</span>
           <button class="dot" data-act="adminNoteColor" data-id="${n.id}" title="Change color" aria-label="Change color"></button>
           ${isIsoDate(n.remind) ? '' : `<button class="sticky-bell" data-act="nrOpen" data-id="${n.id}" title="Remind me" aria-label="Remind me">${BELL}</button>`}</span>
@@ -917,16 +917,135 @@ function noteRemindModal() {
       <button class="btn primary" data-act="nrSave">Save</button></div>
   </div></div>`;
 }
+/* Sticky note text: a formatted box (⌘B bold, ⌘I italics). Saved as adminNotes/{id}.html (one <div> per line; a "- " line
+   is a list line, class sn-li + sn-l0…4 for how far it's indented) plus .text, the same thing as plain text ("  - " for
+   an indented line), which the Morning Email's Reminders read. Notes from before Oct 29, 2026 only have .text. */
+const SN_MAX_LEVEL = 4;
+const snLevel = el => { const m = (el.className || '').match(/sn-l(\d)/); return m ? Number(m[1]) : 0; };
+const noteBlank = n => !String(n.text || '').trim();
+function noteHtml(n) {
+  if (n.html) return cleanNoteHtml(n.html);
+  const lines = String(n.text || '').split('\n');
+  return lines.map(line => {
+    const m = line.match(/^(\s*)(- .*)$/);
+    if (m) return `<div class="sn-li sn-l${Math.min(SN_MAX_LEVEL, Math.floor(m[1].length / 2))}">${esc(m[2])}</div>`;
+    return `<div>${esc(line) || '<br>'}</div>`;
+  }).join('');
+}
+// Only lines, line breaks, bold and italics are kept (anything pasted or saved is boiled down to those).
+function cleanInline(node) {
+  let out = '';
+  node.childNodes.forEach(c => {
+    if (c.nodeType === 3) out += esc(c.nodeValue);
+    else if (c.nodeType !== 1) return;
+    else if (c.tagName === 'BR') out += '<br>';
+    else {
+      const tag = c.tagName, st = c.style || {};
+      const bold = tag === 'B' || tag === 'STRONG' || Number(st.fontWeight) >= 600 || st.fontWeight === 'bold';
+      const ital = tag === 'I' || tag === 'EM' || st.fontStyle === 'italic';
+      let inner = cleanInline(c);
+      if (/^(DIV|P|LI)$/.test(tag)) inner = (out && !/<br>$/.test(out) ? '<br>' : '') + inner; // (a block inside a line: its own line)
+      if (ital) inner = '<i>' + inner + '</i>';
+      if (bold) inner = '<b>' + inner + '</b>';
+      out += inner;
+    }
+  });
+  return out;
+}
+function cleanNoteHtml(html) {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  snNormalize(box);
+  return [...box.children].map(d => `<div${d.classList.contains('sn-li') ? ` class="sn-li sn-l${snLevel(d)}"` : ''}>${cleanInline(d) || '<br>'}</div>`).join('') || '<div><br></div>';
+}
+// Every line is its own <div> right inside the box; a line starting with "- " is a list line (and stops being one when it doesn't).
+function snNormalize(el) {
+  let line = null;
+  [...el.childNodes].forEach(c => {
+    if (c.nodeType === 1 && c.tagName === 'DIV') { line = null; return; }
+    if (c.nodeType === 3 && !c.nodeValue && !line) { c.remove(); return; }
+    if (!line) { line = document.createElement('div'); el.insertBefore(line, c); }
+    line.appendChild(c); // (the same text node, so the cursor stays where it was)
+  });
+  if (!el.children.length) el.innerHTML = '<div><br></div>';
+  [...el.children].forEach(d => {
+    const li = /^- /.test(d.textContent.replace(/ /g, ' ')) || (d.classList.contains('sn-li') && /^-\s*$/.test(d.textContent));
+    if (li) { const lv = snLevel(d); d.className = 'sn-li sn-l' + lv; } else d.removeAttribute('class');
+  });
+}
+function notePlain(el) {
+  return [...el.children].map(d => (d.classList.contains('sn-li') ? '  '.repeat(snLevel(d)) : '') + d.innerText.replace(/\n$/, '').replace(/ /g, ' ')).join('\n').replace(/\s+$/, '');
+}
 const noteSaveTimers = {};
-function saveStickySoon(nid, id) {
-  clearTimeout(noteSaveTimers[id]);
-  noteSaveTimers[id] = setTimeout(async () => {
-    const text = S.drafts[id];
-    if (text === undefined) return;
-    await Store.set('adminNotes/' + nid, { text });
-    if (document.activeElement && document.activeElement.id === id) return; // keep the draft while typing
-    if (S.drafts[id] === text) delete S.drafts[id];
-  }, 700);
+function saveStickySoon(el, now = false) {
+  const nid = el.dataset.anote;
+  clearTimeout(noteSaveTimers[nid]);
+  const go = () => { if (!el.isConnected && !now) return; Store.set('adminNotes/' + nid, { html: cleanNoteHtml(el.innerHTML), text: notePlain(el) }); };
+  if (now) go(); else noteSaveTimers[nid] = setTimeout(go, 600);
+}
+const noteLine = el => { const sel = getSelection(); let n = sel.rangeCount ? sel.getRangeAt(0).startContainer : null; while (n && n.parentNode !== el) n = n.parentNode; return n && n.nodeType === 1 ? n : null; };
+const caretAt = (node, offset) => { const r = document.createRange(); r.setStart(node, offset); r.collapse(true); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); };
+const caretAtStartOfText = (line, skip) => { // just after the first `skip` characters of a line
+  const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT); let t, left = skip;
+  while ((t = w.nextNode())) { if (t.nodeValue.length >= left) { caretAt(t, left); return; } left -= t.nodeValue.length; }
+  caretAt(line, line.childNodes.length);
+};
+// Enter on a list line starts the next one with "- " (Enter on an empty "- " ends the list); Tab / Shift+Tab move a list line in or out.
+document.addEventListener('keydown', e => {
+  const el = e.target.closest && e.target.closest('.sticky-ed[data-anote]');
+  if (!el || e.isComposing) return;
+  if ((e.metaKey || e.ctrlKey) && /^[bi]$/i.test(e.key)) { // (the browser does the bold/italics; this just keeps the shortcut here)
+    e.preventDefault(); document.execCommand(e.key.toLowerCase() === 'b' ? 'bold' : 'italic'); return;
+  }
+  const line = noteLine(el);
+  if (!line || !line.classList.contains('sn-li')) return;
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const lv = Math.max(0, Math.min(SN_MAX_LEVEL, snLevel(line) + (e.shiftKey ? -1 : 1)));
+    line.className = 'sn-li sn-l' + lv; saveStickySoon(el); return;
+  }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    if (/^-\s*$/.test(line.textContent.replace(/ /g, ' '))) { // an empty "- " line: end the list
+      e.preventDefault(); line.removeAttribute('class'); line.innerHTML = '<br>'; caretAt(line, 0); saveStickySoon(el); return;
+    }
+    el._afterEnter = { level: snLevel(line) };
+  }
+});
+document.addEventListener('input', e => {
+  const el = e.target.closest && e.target.closest('.sticky-ed[data-anote]');
+  if (!el) return;
+  const after = el._afterEnter; el._afterEnter = null;
+  if (after && e.inputType === 'insertParagraph') { // the new line after a list line: "- " in front, same indent
+    const line = noteLine(el);
+    if (line && !/^-[ \u00a0]/.test(line.textContent)) {
+      if (line.firstChild && line.firstChild.nodeName === 'BR' && line.childNodes.length === 1) line.innerHTML = '';
+      line.insertBefore(document.createTextNode('-\u00a0'), line.firstChild); // (a no-break space, so it isn't dropped while typing)
+      line.className = 'sn-li sn-l' + after.level; caretAtStartOfText(line, 2);
+    }
+  }
+  snNormalize(el);
+  el.classList.toggle('is-empty', !el.textContent.trim());
+  saveStickySoon(el);
+}, true);
+document.addEventListener('focusout', e => { const el = e.target.closest && e.target.closest('.sticky-ed[data-anote]'); if (el && !S.rendering) saveStickySoon(el, true); });
+// Pasting: the words only (no colors or fonts from where they came from).
+document.addEventListener('paste', e => {
+  const el = e.target.closest && e.target.closest('.sticky-ed[data-anote]');
+  if (!el) return;
+  e.preventDefault();
+  document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+});
+
+/* Bulletin layout: like Pinterest. Each sticky spans as many 2px rows as it's tall, so short notes stack up beside a tall one.
+   Re-measured whenever a note changes size (typing) or the window does. */
+const STICKY_GAP = 12;
+let stickyRO = null;
+function layoutSticky(el) { el.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((el.getBoundingClientRect().height + STICKY_GAP) / 2)); }
+function layoutStickies() {
+  const list = document.querySelectorAll('.stickies .sticky');
+  if (!list.length) return;
+  if (!stickyRO && window.ResizeObserver) stickyRO = new ResizeObserver(entries => entries.forEach(en => layoutSticky(en.target)));
+  list.forEach(el => { layoutSticky(el); if (stickyRO) stickyRO.observe(el); });
 }
 
 /* ---------- Hooks called from app.js ---------- */
@@ -960,10 +1079,8 @@ function adminInput(t) {
   }
   if (t.id === 'td-rn') { S.drafts['td-rn'] = t.value; return true; }
   if (t.dataset.lk && S.linksDraft) { const [i, k] = t.dataset.lk.split(':'); S.linksDraft[Number(i)][k] = t.value; return true; }
-  if (!t.dataset.anote) return false;
-  S.drafts[t.id] = t.value; grow(t);
-  saveStickySoon(t.dataset.anote, t.id);
-  return true;
+  if (t.dataset.anote) return true; // (sticky notes save themselves: see the sticky note input listener)
+  return false;
 }
 function adminEscape() {
   if (S.histEd) { if (S.histEd.busy) return true; S.histEd = null; S.datePick = null; }
@@ -1311,8 +1428,7 @@ async function adminAct(a, el = {}) {
     case 'adminNoteDel': {
       const n = S.adminNotes.find(x => x.id === d.id);
       if (n && String(n.text || '').trim() && !confirm('Delete this sticky note?')) return true;
-      delete S.drafts['an-' + d.id];
-      await Store.del('adminNotes/' + d.id); return true;
+        await Store.del('adminNotes/' + d.id); return true;
     }
   }
   return false;

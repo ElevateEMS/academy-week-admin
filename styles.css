@@ -1527,3 +1527,13 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
   .course-board.fit .box[style*="height"] { flex-shrink: 1 !important; min-height: 0; }
   .course-board.fit .box-notes .notes-wrap { min-height: 0; }
 }
+/* v242: sticky notes are formatted text (⌘B / ⌘I, dash lists with a hanging indent), laid out like Pinterest */
+.stickies { grid-auto-rows: 2px; row-gap: 0; column-gap: 12px; gap: 0 12px; }
+.sticky-ed { position: relative; min-height: 66px; outline: none; font-size: 14px; line-height: 1.4; padding-right: 4px; overflow-wrap: anywhere; cursor: text; color: var(--ink); }
+.sticky-ed.is-empty::before { content: attr(data-ph); position: absolute; top: 0; left: 0; color: var(--taupe-dark); font-style: italic; opacity: .7; pointer-events: none; }
+.sticky-ed b { font-weight: 600; }
+.sticky-ed .sn-li { padding-left: .8em; text-indent: -.8em; }
+.sticky-ed .sn-li.sn-l1 { padding-left: calc(.8em + 16px); }
+.sticky-ed .sn-li.sn-l2 { padding-left: calc(.8em + 32px); }
+.sticky-ed .sn-li.sn-l3 { padding-left: calc(.8em + 48px); }
+.sticky-ed .sn-li.sn-l4 { padding-left: calc(.8em + 64px); }

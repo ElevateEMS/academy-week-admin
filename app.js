@@ -627,6 +627,9 @@ function render() {
     const tScrolls = [...document.querySelectorAll('textarea[id]')].filter(el => el.scrollTop).map(el => [el.id, el.scrollTop]);
     const bScrolls = [...document.querySelectorAll('.box[data-box-id], section.box')].filter(el => el.scrollTop)
       .map(el => [el.dataset.boxId || el.className, el.scrollTop]);
+    // A sticky note you're typing in is kept as it is (not redrawn), so the cursor and formatting stay put.
+    const liveNote = a && a.matches && a.matches('.sticky-ed[data-anote]') ? a : null;
+    const liveRange = liveNote && getSelection().rangeCount ? getSelection().getRangeAt(0).cloneRange() : null;
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? (window.CALLS_ONLY ? callsShell() : window.QUICKLOG_ONLY ? qlShell() : shell()) : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
@@ -634,6 +637,10 @@ function render() {
     if (id) {
       const el = document.getElementById(id);
       if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
+    }
+    if (liveNote) {
+      const fresh = document.getElementById(liveNote.id);
+      if (fresh) { fresh.replaceWith(liveNote); liveNote.focus({ preventScroll: true }); if (liveRange) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(liveRange); } }
     }
     // (after the cursor is put back: focusing a text box scrolls it to the top)
     tScrolls.forEach(([id, top]) => { const el = document.getElementById(id); if (el) el.scrollTop = top; });
@@ -2422,6 +2429,7 @@ document.addEventListener('dblclick', async e => {
 function grow(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 
 function fitBoard() {
+  if (typeof layoutStickies === 'function') layoutStickies(); // (Bulletin: Pinterest-style)
   const board = document.querySelector('.board');
   if (!board) return;
   const fill = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
