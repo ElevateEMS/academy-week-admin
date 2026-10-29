@@ -903,8 +903,22 @@ function hlShow(rect, label, pending) {
   hlPending = pending; hlPop.textContent = label;
   hlPop.style.left = (rect.left + rect.width / 2) + 'px'; hlPop.style.top = Math.max(8, rect.top - 8) + 'px';
   hlPop.classList.add('show');
+  // On a list item's highlight: an Edit button beside it (so a fully highlighted item can still be edited).
+  if (pending.editKey) {
+    if (!hlEdit) {
+      hlEdit = document.createElement('button'); hlEdit.className = 'hl-pop hl-edit'; hlEdit.type = 'button'; hlEdit.textContent = 'Edit';
+      hlEdit.addEventListener('mousedown', e => e.preventDefault());
+      hlEdit.addEventListener('click', e => { e.stopPropagation(); const k = hlEdit.dataset.k; hlHide(); window.getSelection().removeAllRanges(); S.editItem = k; S.editFocus = true; render(); });
+      document.body.appendChild(hlEdit);
+    }
+    hlEdit.dataset.k = pending.editKey;
+    const w = hlPop.offsetWidth;
+    hlEdit.style.left = (rect.left + rect.width / 2 + w / 2 + 6) + 'px'; hlEdit.style.top = hlPop.style.top;
+    hlEdit.classList.add('show');
+  }
 }
-function hlHide() { if (hlPop) hlPop.classList.remove('show'); hlPending = null; }
+let hlEdit = null;
+function hlHide() { if (hlPop) hlPop.classList.remove('show'); if (hlEdit) hlEdit.classList.remove('show'); hlPending = null; }
 
 // The selected words in each list item the selection touches.
 function hlSelection() {
@@ -925,7 +939,7 @@ function hlSelection() {
 
 let bagDragOff = null, hlDragOff = null, hlDown = null, hlNoClick = false;
 document.addEventListener('mousedown', e => {
-  if (hlPop && e.target === hlPop) return;
+  if (hlPop && (e.target === hlPop || e.target === hlEdit)) return;
   hlHide();
   hlDown = { x: e.clientX, y: e.clientY }; hlNoClick = false;
   // A to-do can be dragged to move it; on its words, a drag selects them instead.
@@ -978,7 +992,8 @@ document.addEventListener('click', e => {
   if (mark) {
     e.preventDefault(); e.stopPropagation();
     const [kind, ...rest] = mark.closest('.txt').dataset.hl.split(':');
-    hlShow(mark.getBoundingClientRect(), 'Remove highlight', { remove: { kind, id: rest.join(':'), range: mark.dataset.r.split('-').map(Number) } });
+    hlShow(mark.getBoundingClientRect(), 'Remove highlight', { remove: { kind, id: rest.join(':'), range: mark.dataset.r.split('-').map(Number) },
+      editKey: EDITABLE.includes(kind) ? mark.closest('.txt').dataset.hl : null });
     return;
   }
   const txt = e.target.closest && e.target.closest('.txt[data-hl]');

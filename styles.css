@@ -1555,3 +1555,6 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .ch-list li:hover .ch-grip { opacity: .55; } .ch-list .ch-grip:hover { opacity: 1; }
 .ch-list li.moving { opacity: .55; background: var(--blush-soft); border-radius: 6px; }
 @media (hover: none) { .ch-list .ch-grip { opacity: .4; } }
+/* v247: Edit beside Remove highlight */
+.hl-pop.hl-edit { transform: translate(0, -100%); }
+.hl-pop.hl-edit::before { display: none; }
