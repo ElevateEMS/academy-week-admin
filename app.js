@@ -1002,6 +1002,8 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
         + `<a class="eye pirate-link" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome title="Pirate Ship ↗" aria-label="Pirate Ship (opens in Chrome)">${PIRATE}${ARROW_OUT}</a></span>`;
       if (kind === 'ctodo' && t.roster) open = rosterBtn(t);
+      // A to-do the admin script added from a Ride Along Request: Open ↗ goes to their row in Clinical Tracking.
+      if (t.link && /^https:\/\//.test(t.link)) open = `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-name="${esc(t.linkName || 'Clinical Tracking')}" title="Their request in the Clinical Tracking sheet">Open ↗</a>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
