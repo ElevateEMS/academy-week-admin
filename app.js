@@ -2488,7 +2488,7 @@ function fitBoard() {
   const fill = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
   board.style.minHeight = fill;
   // The Course page stays one screen tall: each column stops at the bottom of the window and its boxes scroll inside.
-  const fit = !!fill && innerWidth > 1100 && board.classList.contains('course-board');
+  const fit = !!fill && innerWidth > 1100 && (board.classList.contains('course-board') || board.classList.contains('staff-board')); // (Staff page too)
   board.classList.toggle('fit', fit); board.style.height = fit ? fill : '';
   // Prep: the scenarios box is only as tall as the plan, and Notes matches it (unless either was drag-sized).
   const scen = board.querySelector('.box-scenarios'), notes = board.querySelector('.box-notes'), h = cfg().heights;

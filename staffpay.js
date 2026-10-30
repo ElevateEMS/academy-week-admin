@@ -24,6 +24,9 @@ const StaffApi = {
 };
 const money = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const to12 = hm => { if (!hm) return ''; const [h, m] = hm.split(':').map(Number); return ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); };
+// Times are military: typed "0745" (or "745") = 07:45, shown as 0745.
+const hmT = t => { const d = String(t || '').replace(/\D/g, ''); if (d.length < 3 || d.length > 4) return ''; const h = +d.slice(0, -2), m = +d.slice(-2); return h <= 23 && m <= 59 ? String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') : ''; };
+const milT = t => String(t || '').replace(':', '');
 const qHours = (a, b) => { if (!a || !b) return 0; const m = t => { const [h, x] = t.split(':').map(Number); return h * 60 + x; }; const d = m(b) - m(a); return d > 0 ? Math.round(d / 15) / 4 : 0; };
 const shortDay = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -71,11 +74,10 @@ function staffView() {
         <p class="muted small">On a Staffing tab, but not on the Staff Directory tab (so they can’t sign in or be paid here yet).</p>
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
           <button class="btn tiny" data-act="staffEdOpen" data-new="${esc(u.name)}">Add</button></li>`).join('')}</ul></section>` : ''}
-      <section class="box"><div class="box-head admin-head"><h2>Staff Portal</h2></div>
-        <p class="muted small center">Staff sign in here for their timesheets.</p>
-        <div class="staff-qr" id="staffQr"></div>
+      <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staff Portal<small>schedule and timesheets</small></h2></div>
         <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
           <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
+        <div class="staff-qr" id="staffQr"></div>
       </section>
       <section class="box"><div class="box-head admin-head"><h2>Staffing by Cohort</h2></div>
         ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
@@ -151,20 +153,24 @@ function payModal() {
       : co ? `<p class="empty">${esc(P.name)} isn’t on ${esc(P.cohort)}’s Staffing tab and has nothing on the Payroll tab for it.</p>` : '<p class="loading">Loading…</p>'}</div></div></div>`;
   const rates = co.rates || {};
   const dayRow = d => {
-    const ed = P.ed[d.date] || {}, role = ed.role ?? d.role, start = ed.start ?? d.start, end = ed.end ?? d.end;
-    const hrs = qHours(start, end), rate = rates[role] ?? d.rate, dirty = P.ed[d.date] && (role !== d.role || start !== d.start || end !== d.end);
+    const ed = P.ed[d.date] || {}, role = ed.role ?? d.role, start = ed.start ?? milT(d.start), end = ed.end ?? milT(d.end);
+    const hrs = qHours(hmT(start), hmT(end)), rate = rates[role] ?? d.rate, dirty = P.ed[d.date] && (role !== d.role || start !== milT(d.start) || end !== milT(d.end));
     const lock = d.paid || !d.editable;
+    const sigTag = !d.row ? '<span class="tag-soft">no times yet</span>'
+      : d.needsSig ? `<span class="tag-soft warn" title="${d.fix ? 'Changed by ' + esc(d.fix.by) + (d.fix.from ? ' from ' + esc(d.fix.from) : '') : ''}">${d.fix ? 'correction · ' : ''}needs signature</span>`
+      : d.signed ? `<span class="tag-soft sage-soft">signed${d.signedHow === 'inperson' ? ' in person' : ''} ✓</span>` : '';
     return `<div class="pay-row ${d.paid ? 'paid' : ''} ${!d.row ? 'empty-day' : ''}">
-      <span class="pr-date">${shortDay(d.date)}${!d.row ? '<span class="tag-soft">no times yet</span>' : ''}${d.over && !d.paid ? `<span class="tag-soft warn" title="Their maximum eligible role is ${esc(p.maxRole)}">above ${esc(p.maxRole)}</span>` : ''}</span>
-      ${lock ? `<span>${esc(d.role)}</span><span>${d.start ? to12(d.start) + ' – ' + to12(d.end) : '—'}</span>`
+      <span class="pr-date">${shortDay(d.date)}${d.exam ? ' <span class="muted small">exam</span>' : ''}${sigTag}${d.over && !d.paid ? `<span class="tag-soft warn" title="Their maximum eligible role is ${esc(p.maxRole)}">above ${esc(p.maxRole)}</span>` : ''}</span>
+      ${lock ? `<span>${esc(d.role)}</span><span>${d.start ? milT(d.start) + '–' + milT(d.end) : '—'}</span>`
         : `<select data-payf="role" data-date="${d.date}" aria-label="Role">${PAY_ROLES.map(r => `<option ${r === role ? 'selected' : ''}>${r}</option>`).join('')}</select>
-           <span class="pr-times"><input type="time" step="300" id="pay-s-${d.date}" data-payf="start" data-date="${d.date}" value="${esc(start)}" aria-label="Start">
-           <input type="time" step="300" id="pay-e-${d.date}" data-payf="end" data-date="${d.date}" value="${esc(end)}" aria-label="End"></span>`}
+           <span class="pr-times"><input type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="${esc((d.sched || '0800–1700').split('–')[0])}" id="pay-s-${d.date}" data-payf="start" data-date="${d.date}" value="${esc(start)}" aria-label="Start">
+           <input type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="${esc((d.sched || '0800–1700').split('–')[1] || '')}" id="pay-e-${d.date}" data-payf="end" data-date="${d.date}" value="${esc(end)}" aria-label="End"></span>`}
       <span class="pr-num">${hrs || d.hours ? (lock ? d.hours : hrs) + ' hrs' : ''}</span>
       <span class="pr-num">${lock ? money(d.total) : hrs ? money(hrs * rate) : ''}<span class="muted small"> ${money(rate)}/hr</span></span>
-      <span class="pr-act">${d.paid ? `<span class="tag sage-tag">Paid${d.check ? ' #' + esc(d.check) : ''}</span>`
+      <span class="pr-act">${dirty ? `<button class="btn tiny" data-act="paySaveDay" data-date="${d.date}" ${P.busy ? 'disabled' : ''}>Save</button>`
+        : d.row && d.needsSig ? `<button class="btn tiny" data-act="paySign" data-date="${d.date}" ${P.busy ? 'disabled' : ''} title="They sign on this computer">Sign here</button>`
+        : d.paid ? `<span class="tag sage-tag">Paid${d.check ? ' #' + esc(d.check) : ''}</span>`
         : !d.editable ? '<span class="muted small">typed on the sheet</span>'
-        : dirty ? `<button class="btn tiny" data-act="paySaveDay" data-date="${d.date}" ${P.busy ? 'disabled' : ''}>Save</button>`
         : d.row ? `<button class="x" data-act="payClearDay" data-date="${d.date}" title="Clear this day's times" aria-label="Clear">×</button>` : ''}</span>
     </div>`;
   };
@@ -185,7 +191,9 @@ function payModal() {
       ${!p.matched ? `<div class="alert">${esc(p.name)} isn’t on the Staff Directory tab, so they can’t sign in to put in times. <button class="btn small" data-act="staffEdOpen" data-new="${esc(p.name)}">Add them</button></div>` : ''}
       <div class="pay-table">${p.days.map(dayRow).join('')}${p.flats.map(flatRow).join('')}</div>
       <div class="pay-under">${p.paid ? '' : flatForm}<span class="pay-total">Total <b>${money(p.total)}</b>${p.unpaid && p.unpaid !== p.total ? ` · <span class="muted">${money(p.unpaid)} not paid yet</span>` : ''}</span></div>
-      ${p.missing.length && !p.paid ? `<p class="muted small">No times yet for ${p.missing.map(shortDay).join(', ')}. You can type them in here, or they can do it in the Staff Portal.</p>` : ''}
+      ${p.missing.length && !p.paid ? `<p class="muted small">No times yet for ${p.missing.map(shortDay).join(', ')}. They can fill them in on the Staff Portal, or you can type them here (military time, like 0800), and then they sign.</p>` : ''}
+      ${(p.unsigned || []).length ? `<p class="pay-sign-note"><span>${p.unsigned.length} day${p.unsigned.length === 1 ? '' : 's'} need${p.unsigned.length === 1 ? 's' : ''} ${esc(p.name.split(' ')[0])}’s signature (${p.unsigned.map(shortDay).join(', ')}). They can sign on their phone, or here.</span>
+        ${p.unsigned.length > 1 ? `<button class="btn small" data-act="paySignAll" ${P.busy ? 'disabled' : ''}>Sign all ${p.unsigned.length} here</button>` : ''}</p>` : ''}
       ${P.err ? `<div class="alert">${esc(P.err)}</div>` : ''}
       ${P.pdfUrl ? `<p class="small">Timesheet saved to Payroll Docs → ${esc(p.name)}. <a href="${esc(P.pdfUrl)}" target="_blank" rel="noopener" data-chrome>Open it ↗</a></p>` : ''}
     </div>
@@ -206,8 +214,9 @@ function staffInput(t) {
   if (t.dataset.payf && S.pay) {
     const d = t.dataset.date, co = S.staffCo[S.pay.cohort], p = co && co.people.find(x => x.name === S.pay.name || x.staffName === S.pay.name);
     const day = p && p.days.find(x => x.date === d);
-    const ed = S.pay.ed[d] = S.pay.ed[d] || { role: day.role, start: day.start, end: day.end };
-    ed[t.dataset.payf] = t.value;
+    const ed = S.pay.ed[d] = S.pay.ed[d] || { role: day.role, start: milT(day.start), end: milT(day.end) };
+    if (t.dataset.payf === 'role') ed.role = t.value;
+    else { const digits = t.value.replace(/\D/g, '').slice(0, 4); if (t.value !== digits) t.value = digits; ed[t.dataset.payf] = digits; }
     render(); return true;
   }
   if (t.dataset.payflat && S.pay && S.pay.flat) { S.pay.flat[t.dataset.payflat] = t.value; return true; }
@@ -264,10 +273,21 @@ async function staffAct(a, el = {}) {
       await payDo(() => StaffApi.call('adminFlat', { cohort: P.cohort, name: payPerson().name, row: Number(d.row), del: true }));
       return true;
     }
+    case 'paySign': case 'paySignAll': {
+      const P = S.pay, p = payPerson(), dates = a === 'paySignAll' ? [...(p.unsigned || [])] : [d.date];
+      const days = p.days.filter(x => dates.includes(x.date));
+      const what = days.map(x => `${shortDay(x.date)} ${milT(x.start)}–${milT(x.end)}`).join(' · ');
+      const png = await sigPadOpen(`${p.name} signs ${dates.length > 1 ? dates.length + ' days' : shortDay(dates[0])}`, `${p.name.split(' ')[0]} signs with the trackpad or mouse. ${what}`);
+      if (!png) return true;
+      await payDo(async () => { const out = await StaffApi.call('adminSign', { cohort: P.cohort, name: p.name, dates, png }); toast('Signed.'); return out; });
+      return true;
+    }
     case 'payMark': {
       const P = S.pay, check = String(S.drafts['pay-check'] || '').trim();
       if (!check) { toast('Type the check #.'); return true; }
-      if (Object.keys(P.ed).some(k => P.ed[k])) { const dirty = payPerson().days.some(x => { const e = P.ed[x.date]; return e && (e.role !== x.role || e.start !== x.start || e.end !== x.end); }); if (dirty && !confirm('A day has changes that aren’t saved. Mark paid without them?')) return true; }
+      const un = payPerson().unsigned || [];
+      if (un.length && !confirm(`${un.length} day${un.length === 1 ? ' isn’t' : 's aren’t'} signed yet (${un.map(shortDay).join(', ')}). Pay anyway?`)) return true;
+      if (Object.keys(P.ed).some(k => P.ed[k])) { const dirty = payPerson().days.some(x => { const e = P.ed[x.date]; return e && (e.role !== x.role || e.start !== milT(x.start) || e.end !== milT(x.end)); }); if (dirty && !confirm('A day has changes that aren’t saved. Mark paid without them?')) return true; }
       await payDo(async () => { const out = await StaffApi.call('adminMarkPaid', { cohort: P.cohort, name: payPerson().name, check }); P.ed = {}; P.pdfUrl = out.pdfUrl || ''; if (out.pdfErr) P.err = 'Marked paid, but the timesheet PDF wasn’t saved: ' + out.pdfErr; toast(payPerson().name + ' marked paid · ' + money(out.paidTotal) + ' · Check #' + check); return out; });
       return true;
     }
