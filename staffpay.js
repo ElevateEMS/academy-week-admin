@@ -159,7 +159,7 @@ function payModal() {
     const ed = P.ed[d.date] || {}, role = ed.role ?? d.role, start = ed.start ?? milT(d.start), end = ed.end ?? milT(d.end);
     const hrs = qHours(hmT(start), hmT(end)), rate = rates[role] ?? d.rate, dirty = P.ed[d.date] && (role !== d.role || start !== milT(d.start) || end !== milT(d.end));
     const lock = d.paid || !d.editable;
-    const sigTag = !d.row ? '<span class="tag-soft">no times yet</span>'
+    const sigTag = !d.row ? '<span class="tag-soft notimes">no times yet</span>'
       : d.needsSig ? `<span class="tag-soft warn" title="${d.fix ? 'Changed by ' + esc(d.fix.by) + (d.fix.from ? ' from ' + esc(d.fix.from) : '') : ''}">${d.fix ? 'correction · ' : ''}needs signature</span>`
       : d.signed ? `<span class="tag-soft sage-soft">signed${d.signedHow === 'inperson' ? ' in person' : ''} ✓</span>` : '';
     return `<div class="pay-row ${d.paid ? 'paid' : ''} ${!d.row ? 'empty-day' : ''}">
@@ -185,8 +185,8 @@ function payModal() {
   const flatForm = fl ? `<div class="pay-flat-form">
       <select data-payflat="kind" aria-label="Kind"><option value="extra" ${fl.kind !== 'reimb' ? 'selected' : ''}>Extra pay</option><option value="reimb" ${fl.kind === 'reimb' ? 'selected' : ''}>Reimbursement</option></select>
       <select data-payflat="date" aria-label="Date">${days.map(d => `<option value="${d.date}" ${d.date === fl.date ? 'selected' : ''}>${shortDay(d.date)}</option>`).join('')}</select>
-      <input id="pay-fdesc" data-payflat="desc" value="${esc(fl.desc)}" placeholder="${fl.kind === 'reimb' ? 'What they bought (lunch for the class…)' : 'What for (gas money, paperwork help…)'}">
-      <input id="pay-famt" data-payflat="amount" value="${esc(fl.amount)}" placeholder="$50" inputmode="decimal">
+      <input id="pay-fdesc" data-payflat="desc" value="${esc(fl.desc)}" placeholder="${fl.kind === 'reimb' ? 'What they bought (ex. food)' : 'What for (ex. gas)'}">
+      <input id="pay-famt" data-payflat="amount" value="${esc(fl.amount)}" placeholder="$" inputmode="decimal">
       <button class="btn tiny" data-act="payFlatAdd" ${P.busy ? 'disabled' : ''}>Add</button><button class="link" data-act="payFlatCancel">Cancel</button></div>`
     : `<button class="link" data-act="payFlatOpen">+ Add extra</button>`;
   return `<div class="overlay" data-act="payClose"><div class="modal pay-modal" data-stop>${head}

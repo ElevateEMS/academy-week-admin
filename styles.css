@@ -1661,3 +1661,4 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .cf-line { flex: 1; border-bottom: 1px solid var(--taupe); padding: 0 4px 2px; font-weight: 500; min-width: 0; }
 .cf-words { font-size: 15px; }
 .cf-amt { border: 1px solid var(--taupe); border-radius: 6px; padding: 3px 10px; background: #fff; white-space: nowrap; }
+.pay-row .pr-date .tag-soft.notimes { background: #fff; color: #8a6a35; border: 1px solid #e3cfa6; font-weight: 500; }
