@@ -1724,3 +1724,18 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pick-row.yes { border-left: 4px solid var(--sage); }
 .pick-row.meh { border-left: 4px solid var(--honey); }
 .pick-row.bad { border-left: 4px solid var(--rose); }
+/* Staff page tabs + Availability & Staffing additions */
+.staff-tabs { display: flex; width: max-content; margin: 0 auto 14px; }
+.staff-tabs button { padding: 6px 18px; font-size: 14px; }
+.staff-tabs button.on { background: var(--taupe-dark); color: #fff; }
+.stf-weeks { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.stf-weeks .chip.on .muted { color: rgba(255, 255, 255, .8); }
+.stf-draft-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--honey-soft); border: 1px dashed var(--honey); border-radius: 12px; padding: 8px 14px; margin-bottom: 14px; font-size: 14px; }
+.stf-draft-bar > span { flex: 1; }
+.stf-draft-hint { text-align: center; margin: -4px 0 12px; }
+.stf-slot.draft { border-style: dashed; border-width: 1.5px; border-color: var(--taupe-dark); }
+.av-wrap { position: relative; display: grid; }
+.av-pen { position: absolute; top: 50%; left: 4px; transform: translateY(-50%); border: 0; background: none; color: var(--taupe-dark); font-size: 12px; cursor: pointer; opacity: 0; padding: 2px; }
+.av-wrap:hover .av-pen, .av-pen:focus { opacity: .8; }
+.av-h { display: grid; }
+.av-h .muted { font-size: 11px; }
