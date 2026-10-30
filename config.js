@@ -3,7 +3,7 @@
    firebaseConfig: Firebase Console -> Project settings -> General -> "Your apps" -> Web app.
    It's meant to be public; firestore.rules is what keeps the data to Bella and Nick.
 
-   APPS_SCRIPT_URL: the web app URL from the "Academy Week Admin Backend" Apps Script
+   APPS_SCRIPT_URL: the web app URL from the "Elevate EMS Admin" Apps Script (was "Academy Week Admin Backend")
    (Deploy -> Manage deployments -> Web app URL). That's what reads the cohort
    sheets and writes the patient contact counts back.
 
@@ -22,3 +22,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnyk9LG7P7xlzP
 
 // Who can sign in. Keep this list the same as the one in firestore.rules and Code.gs.
 const STAFF_EMAILS = ['gbrown@elevateemsacademy.com', 'nbrown@elevateemsacademy.com'];
+
+// The web app URL from the separate "Elevate EMS Staff" Apps Script (the Staff page, the Pay window, and
+// staff.elevateemsacademy.com all use it). While it says PASTE, the Staff page says it isn't connected.
+const STAFF_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiwYoNdMrb-JNEJ4ZiYq3jKndti1XsdNqrnBitwK0mjlSsusfhCTXOTrCLIQKsFNhfhw/exec';

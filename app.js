@@ -16,7 +16,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
-const VIEWS = ['admin', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
+const VIEWS = ['admin', 'staff', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
 const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
@@ -463,16 +463,21 @@ function staffTasks(n, { carry = true } = {}) {
       out.push({ html: 'Staff roster signed', done: !!checks['staff-roster'], late,
         attrs: `data-act="check" data-d="${d}" data-k="staff-roster"` });
     }
-    if (!(late && checks['timesheets'])) {
-      out.push({ html: 'Timesheets', who: working.map(p => p.name).join(', '), done: !!checks['timesheets'], late,
+    // With the Staff Portal: who still hasn't put in their times that day (checks itself once everyone has).
+    const co = staffCohortData(), iso = dayDate(d);
+    const missing = co && iso && iso <= todayIso() ? working.filter(p => { const sp = staffPayFor(p.name); return !sp || sp.missing.includes(iso); }).map(p => p.name) : null;
+    const tsDone = !!checks['timesheets'] || (missing && !missing.length);
+    if (!(late && tsDone)) {
+      out.push({ html: 'Timesheets', who: missing ? (missing.length ? 'still to fill in: ' + missing.join(', ') : 'everyone’s in') : working.map(p => p.name).join(', '), done: tsDone, late,
         attrs: `data-act="check" data-d="${d}" data-k="timesheets"` });
     }
   });
   people.forEach(p => {
-    if (p.lastDay === n || (carry && p.lastDay < n && !p.doc.paid)) {
-      out.push({ html: '💵 Pay ' + esc(p.name), sub: p.lastDay === n ? 'last day' : '',
-        done: !!p.doc.paid, late: p.lastDay < n ? p.lastDay : null,
-        attrs: `data-act="paid" data-key="${p.key}" data-name="${esc(p.name)}"` });
+    const sp = staffReady() ? staffPayFor(p.name) : null, paid = sp ? sp.paid : !!p.doc.paid;
+    if (p.lastDay === n || (carry && p.lastDay < n && !paid)) {
+      out.push({ html: '💵 Pay ' + esc(p.name) + (sp && sp.unpaid > 0 ? ' · ' + money(sp.unpaid) : sp && sp.paid ? ' · ' + money(sp.total) : ''),
+        sub: p.lastDay === n ? 'last day' : '', done: paid, late: p.lastDay < n ? p.lastDay : null,
+        attrs: staffReady() ? `data-act="payOpen" data-name="${esc(p.name)}"` : `data-act="paid" data-key="${p.key}" data-name="${esc(p.name)}"` });
     }
   });
   return out;
@@ -605,6 +610,7 @@ async function loadSheet() {
     seedRepeats();
     emailInit();
     shareHousekeeping();
+    loadStaffCohort(key); // pay amounts + who's put in their times (staffpay.js)
   } catch (e) {
     S.sheetErr = e.offline ? null : e.message; // (offline: the copy from last time stays up)
   }
@@ -672,10 +678,11 @@ function render() {
     }
     fitBoard();
     syncDue(); // template to-dos' due dates follow Course Details
-    syncRosters(); syncOrientTodos(); seedVaoems(); seedBinderPrep(); seedEmailExtras(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
+    syncRosters(); syncOrientTodos(); seedVaoems(); seedBinderPrep(); seedEmailExtras(); seedStaffingTodo(); // orientation roster to-dos (roster.js); the VAOEMS item on older cohorts' Setup Checklists
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
+    if (S.view === 'staff') showStaffQr();
   }, 0);
 }
 
@@ -730,12 +737,13 @@ function shell() {
   <header class="top">
     <div class="head-left">
       <button class="brand ${S.view === 'admin' ? 'on' : ''}" data-act="view" data-v="admin" title="Admin"><img src="logo.png" alt=""><b>Admin</b></button>
+      <button class="head-staff ${S.view === 'staff' ? 'on' : ''}" data-act="view" data-v="staff" title="Staff: pay, timesheets, the staff list">Staff</button>
       <span class="head-div" aria-hidden="true"></span>
       ${sideSwitch()}
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${S.view === 'admin' ? adminHeaderLinks() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
+      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? '' : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
         ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '') + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
@@ -746,7 +754,7 @@ function shell() {
   <main class="wrap">
     ${offlineBar()}
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ admin: adminView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -769,6 +777,7 @@ function shell() {
   ${S.ship ? shipModal() : ''}
   ${S.dueEd ? dueModal() : ''}
   ${adminModals()}
+  ${staffModals()}
   ${S.packet ? packetModal() : ''}
   ${S.bp ? bpModal() : ''}
   ${S.roster ? rosterModal() : ''}
@@ -777,6 +786,7 @@ function shell() {
 
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
+  if (S.view === 'staff') return '<h1>Staff</h1><p>Timesheets, pay and the staff list</p>';
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? attending().length : 0; // (enrolled: dropped / not attending aren't counted)
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
@@ -1042,6 +1052,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         + `<button class="eye" data-act="shipOpen" title="Shipping File" aria-label="Shipping File">${FILE_DOWN}</button>`
         + `<a class="eye pirate-link" href="${PIRATE_SHIP_URL}" target="_blank" rel="noopener" data-chrome title="Pirate Ship ↗" aria-label="Pirate Ship (opens in Chrome)">${PIRATE}${ARROW_OUT}</a></span>`;
       if (kind === 'ctodo' && t.roster) open = rosterBtn(t);
+      if (kind === 'ctodo' && isStaffingItem(t.text)) open = staffingLink();
       // A to-do the admin script added from a Ride Along Request: Open ↗ goes to their row in Clinical Tracking.
       if (t.link && /^https:\/\//.test(t.link)) open = `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-name="${esc(t.linkName || 'Clinical Tracking')}" title="Their request in the Clinical Tracking sheet">Open ↗</a>`;
       if (bag) {
@@ -2508,6 +2519,7 @@ document.addEventListener('input', e => {
   if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
   if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
   if (emailInput(t)) return; // the email draft pop-up and the template editor
+  if (staffInput(t)) return; // the Pay window (staffpay.js)
   if (adminInput(t)) return; // Admin page sticky notes
   if (!k) return;
   if (k === 'search') { S.search = t.value; render(); return; }
@@ -2569,6 +2581,7 @@ document.addEventListener('keydown', e => {
     else if (S.datePick) S.datePick = null;
     else if (S.dueEd) { S.dueEd = null; delete S.drafts['due-date']; }
     else if (emailEscape()) { /* closed an email pop-up */ }
+    else if (staffEscape()) { /* closed the Pay window or the staff person window */ }
     else if (adminEscape()) { /* closed an Admin page pop-up */ }
     else if (S.packet) { if (S.packet.busy) return; packetClose(); }
     else if (S.roster) { if (S.roster.busy) return; if (S.roster.redo || S.roster.redoInst || S.roster.saveAsk) { S.roster.redo = null; S.roster.redoInst = null; S.roster.saveAsk = false; } else { if (S.roster.url) URL.revokeObjectURL(S.roster.url); S.roster = null; } }
@@ -3102,7 +3115,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await staffAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });
