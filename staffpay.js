@@ -65,13 +65,11 @@ function staffView() {
   const a = S.staffAll || keepCopy('staffall');
   if (a && !S.staffAll) S.staffAll = a;
   if (!a) return S.staffAllErr ? `<div class="alert">Couldn’t load staff: ${esc(S.staffAllErr)} <button class="btn small" data-act="staffRefresh">Try again</button></div>` : '<p class="loading">Loading staff…</p>';
-  const tab = S.staffTab || pref('staffTab') || 'pay';
-  const tabs = `<div class="staff-tabs seg" role="tablist">${[['pay', 'Staff & Pay'], ['stf', 'Availability & Staffing']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="stfTab" data-t="${k}" role="tab" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
-  if (tab === 'stf') return tabs + staffingPage();
+  if (staffTab() === 'stf') return staffingPage();
   const owed = [];
   a.people.forEach(p => p.unpaid.forEach(u => owed.push({ name: p.name, ...u })));
   const weekOf = c => ((a.weeks || []).some(w => w.cohort === c));
-  return tabs + `<div class="board staff-board">
+  return `<div class="board staff-board">
     <div class="board-col staff-main">${staffListBox(a)}</div>
     <div class="board-col">
       <section class="box"><div class="box-head admin-head"><h2>To Pay</h2></div>
@@ -95,6 +93,12 @@ function staffView() {
       </section>
     </div>
   </div>`;
+}
+// Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
+const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
+function staffTabs() {
+  return `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
+    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
 }
 function staffListBox(a) {
   const bar = p => {

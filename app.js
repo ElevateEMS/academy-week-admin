@@ -750,7 +750,7 @@ function shell() {
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? '' : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
+      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
         ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '') + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
