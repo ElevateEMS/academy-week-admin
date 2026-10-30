@@ -31,19 +31,23 @@ const qHours = (a, b) => { if (!a || !b) return 0; const m = t => { const [h, x]
 const shortDay = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 /* ---------- Loading ---------- */
-const staffLoading = {};
+// Like Inquiries: the last copy (kept on this computer, keepCopy) shows right away, and the fresh one replaces it
+// when it comes in (staffFresh says which ones are fresh this visit).
+const staffLoading = {}, staffFresh = {};
 async function loadStaffCohort(cohort, fresh = false) {
   if (!staffReady() || !cohort || staffLoading['co:' + cohort]) return;
-  staffLoading['co:' + cohort] = true;
   S.staffCo = S.staffCo || {};
-  try { S.staffCo[cohort] = await StaffApi.call('adminCohort', { cohort, fresh }); S.staffCoErr = null; }
+  if (!S.staffCo[cohort]) { const copy = keepCopy('staffco-' + cohort); if (copy) { S.staffCo[cohort] = copy; render(); } }
+  staffLoading['co:' + cohort] = true; render();
+  try { S.staffCo[cohort] = await StaffApi.call('adminCohort', { cohort, fresh }); S.staffCoErr = null; staffFresh['co:' + cohort] = true; keepCopy('staffco-' + cohort, S.staffCo[cohort]); }
   catch (e) { S.staffCoErr = e.message; console.warn('Staff pay not loaded:', e.message); }
   staffLoading['co:' + cohort] = false; render();
 }
 async function loadStaffAll(fresh = false) {
   if (!staffReady() || staffLoading.all) return;
+  if (!S.staffAll) S.staffAll = keepCopy('staffall');
   staffLoading.all = true; S.staffAllErr = null; render();
-  try { S.staffAll = await StaffApi.call('adminStaff', { fresh }); }
+  try { S.staffAll = await StaffApi.call('adminStaff', { fresh }); staffFresh.all = true; keepCopy('staffall', S.staffAll); }
   catch (e) { S.staffAllErr = e.message; }
   staffLoading.all = false; render();
 }
@@ -57,8 +61,9 @@ const staffCohortData = () => (S.staffCo && S.staffCo[S.cohortKey]) || null;
 /* ---------- Staff page ---------- */
 function staffView() {
   if (!staffReady()) return `<section class="box"><p class="empty">The Staff page needs the Staff Apps Script connected (STAFF_SCRIPT_URL in config.js).</p></section>`;
-  if (!S.staffAll && !staffLoading.all && !S.staffAllErr) setTimeout(() => loadStaffAll(), 0);
-  const a = S.staffAll;
+  if (!staffFresh.all && !staffLoading.all && !S.staffAllErr) setTimeout(() => loadStaffAll(), 0);
+  const a = S.staffAll || keepCopy('staffall');
+  if (a && !S.staffAll) S.staffAll = a;
   if (!a) return S.staffAllErr ? `<div class="alert">Couldn’t load staff: ${esc(S.staffAllErr)} <button class="btn small" data-act="staffRefresh">Try again</button></div>` : '<p class="loading">Loading staff…</p>';
   const owed = [];
   a.people.forEach(p => p.unpaid.forEach(u => owed.push({ name: p.name, ...u })));
@@ -97,7 +102,7 @@ function staffListBox(a) {
       <span class="yr-num">${money(p.year)}${p.coming ? ` <span class="muted">+${money(p.coming)}</span>` : ''}</span></div>`;
   };
   return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
-      <button class="eye" data-act="staffRefresh" title="Read the sheets again" aria-label="Refresh">${RESET}</button>
+      <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <p class="muted small">From the Staff Directory tab in $ Finances. ${a.year} totals (limit ${money(a.limit)}) count paid and not-yet-paid rows on the Payroll tab; the faded part is days still on the schedule (about ${8} hrs each).</p>
     <div class="staff-table">
@@ -199,7 +204,7 @@ function payModal() {
     </div>
     <div class="modal-foot pay-foot">
       ${p.unpaid > 0 ? `<label class="pay-check">Check #<input id="pay-check" data-draft="pay-check" value="${esc(S.drafts['pay-check'] || '')}" inputmode="numeric" autocomplete="off"></label>
-        <button class="btn primary" data-act="payMark" ${P.busy ? 'disabled' : ''}>${P.busy ? 'Saving…' : 'Mark paid · ' + money(p.unpaid)}</button>`
+        <button class="btn primary" data-act="payMark" ${P.busy || staffLoading['co:' + P.cohort] ? 'disabled' : ''}>${P.busy ? 'Saving…' : staffLoading['co:' + P.cohort] ? 'Checking for the latest…' : 'Mark paid · ' + money(p.unpaid)}</button>`
       : p.paid ? `<span class="muted">Paid${p.checks.length ? ' · Check #' + p.checks.map(esc).join(', #') : ''}</span>
         <button class="btn small" data-act="payPdf" ${P.busy ? 'disabled' : ''}>Timesheet PDF</button>
         <button class="link" data-act="payUndo" ${P.busy ? 'disabled' : ''}>Undo paid</button>` : '<span class="muted">Nothing to pay yet.</span>'}
@@ -230,7 +235,7 @@ function staffEscape() {
 
 async function payDo(fn) {
   const P = S.pay; P.busy = true; P.err = ''; render();
-  try { const out = await fn(); if (out && out.people) S.staffCo[P.cohort] = out; S.staffAll = null; }
+  try { const out = await fn(); if (out && out.people) { S.staffCo[P.cohort] = out; keepCopy('staffco-' + P.cohort, out); } staffFresh.all = false; }
   catch (e) { P.err = e.message; }
   P.busy = false; render();
 }
@@ -238,14 +243,14 @@ async function payDo(fn) {
 async function staffAct(a, el = {}) {
   const d = el.dataset || {};
   switch (a) {
-    case 'staffRefresh': S.staffAll = null; S.staffAllErr = null; loadStaffAll(true); return true;
+    case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
     case 'payOpen': {
       if (!staffReady()) { toast('The Staff Apps Script isn’t connected yet.'); return true; }
       const cohort = d.cohort || S.cohortKey;
       S.pay = { cohort, name: d.name, ed: {}, flat: null, busy: false, err: '', pdfUrl: '' }; S.drafts['pay-check'] = '';
       render();
-      if (!S.staffCo || !S.staffCo[cohort]) await loadStaffCohort(cohort, true);
+      await loadStaffCohort(cohort, true); // (always the latest here: this is where money gets marked paid)
       return true;
     }
     case 'payClose': if (S.pay && !S.pay.busy) { S.pay = null; render(); } return true;
@@ -283,6 +288,7 @@ async function staffAct(a, el = {}) {
       return true;
     }
     case 'payMark': {
+      if (staffLoading['co:' + S.pay.cohort]) { toast('Checking for the latest first… one moment.'); return true; }
       const P = S.pay, check = String(S.drafts['pay-check'] || '').trim();
       if (!check) { toast('Type the check #.'); return true; }
       const un = payPerson().unsigned || [];
