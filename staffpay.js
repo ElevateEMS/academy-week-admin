@@ -104,12 +104,13 @@ function staffListBox(a) {
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table">
-      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span></div>
+      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>W-9</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span></div>
       ${a.people.map(p => `<div class="st-row">
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         <span>${p.account ? '<span class="tag sage-tag">Set up</span>' : '<span class="muted small">Not yet</span>'}</span>
+        <span>${p.w9 && p.w9.on ? `<span class="tag sage-tag" title="On file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>` : '<span class="muted small">Needed</span>'}</span>
         ${bar(p)}
       </div>`).join('')}
     </div></section>`;
@@ -281,6 +282,7 @@ async function staffAct(a, el = {}) {
   const d = el.dataset || {};
   switch (a) {
     case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
+    case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
     case 'payOpen': {
       if (!staffReady()) { toast('The Staff Apps Script isn’t connected yet.'); return true; }

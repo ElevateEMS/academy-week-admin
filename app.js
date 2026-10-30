@@ -472,6 +472,13 @@ function staffTasks(n, { carry = true } = {}) {
         attrs: `data-act="check" data-d="${d}" data-k="timesheets"` });
     }
   });
+  // W-9: on their first day, until it's in (it ticks itself once their W-9 is in Payroll Docs).
+  people.forEach(p => {
+    const sp = staffReady() ? staffPayFor(p.name) : null, first = Math.min(...p.days);
+    if (!sp || !sp.matched || !sp.w9) return;
+    if (first === n || (carry && first < n && !sp.w9.on)) out.push({ html: '📝 W-9 · ' + esc(p.name), sub: first === n ? 'first day' : '',
+      done: !!sp.w9.on, late: first < n ? first : null, attrs: `data-act="w9Info" data-name="${esc(p.name)}"` });
+  });
   people.forEach(p => {
     const sp = staffReady() ? staffPayFor(p.name) : null, paid = sp ? sp.paid : !!p.doc.paid;
     if (p.lastDay === n || (carry && p.lastDay < n && !paid)) {

@@ -1568,7 +1568,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 @media (max-width: 1000px) { .staff-board { grid-template-columns: 1fr; } }
 .staff-board .board-col { display: grid; gap: 18px; align-content: start; }
 .staff-table { display: grid; margin-top: 6px; }
-.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px minmax(190px, 1.3fr); gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
+.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px 56px minmax(190px, 1.3fr); gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
 .st-row > span { min-width: 0; overflow-wrap: anywhere; }
 .st-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); border-bottom: 1px solid var(--line); padding-top: 0; }
 .st-row a { color: var(--ink); text-underline-offset: 2px; }
