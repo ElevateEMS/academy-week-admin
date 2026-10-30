@@ -84,11 +84,10 @@ function staffView() {
           <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
         <div class="staff-qr" id="staffQr"></div>
       </section>
-      <section class="box"><div class="box-head admin-head"><h2>Staffing by Cohort</h2></div>
+      <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staffing by Cohort<small>paid and not paid yet</small></h2></div>
         ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
           <b>${money(c.total)}</b><span></span></li>`).join('')}</ul>`
           : '<p class="empty">Nothing on the Payroll tab for a cohort yet.</p>'}
-        <p class="muted small">Everything on the Payroll tab for each cohort’s Academy Week (paid and not paid yet), newest first.</p>
       </section>
     </div>
   </div>`;
@@ -103,10 +102,9 @@ function staffListBox(a) {
   };
   return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
-      <button class="add-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
-    <p class="muted small">From the Staff Directory tab in $ Finances. ${a.year} totals (limit ${money(a.limit)}) count paid and not-yet-paid rows on the Payroll tab; the faded part is days still on the schedule (about ${8} hrs each).</p>
+      <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table">
-      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>${a.year} total</span></div>
+      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span></div>
       ${a.people.map(p => `<div class="st-row">
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
@@ -203,8 +201,7 @@ function payModal() {
       ${P.pdfUrl ? `<p class="small">Timesheet saved to Payroll Docs → ${esc(p.name)}. <a href="${esc(P.pdfUrl)}" target="_blank" rel="noopener" data-chrome>Open it ↗</a></p>` : ''}
     </div>
     <div class="modal-foot pay-foot">
-      ${p.unpaid > 0 ? `<label class="pay-check">Check #<input id="pay-check" data-draft="pay-check" value="${esc(S.drafts['pay-check'] || '')}" inputmode="numeric" autocomplete="off"></label>
-        <button class="btn primary" data-act="payMark" ${P.busy || staffLoading['co:' + P.cohort] ? 'disabled' : ''}>${P.busy ? 'Saving…' : staffLoading['co:' + P.cohort] ? 'Checking for the latest…' : 'Mark paid · ' + money(p.unpaid)}</button>`
+      ${p.unpaid > 0 ? `<button class="btn primary" data-act="payCheckOpen" ${P.busy || staffLoading['co:' + P.cohort] ? 'disabled' : ''}>${P.busy ? 'Saving…' : staffLoading['co:' + P.cohort] ? 'Checking for the latest…' : 'Pay · ' + money(p.unpaid)}</button>`
       : p.paid ? `<span class="muted">Paid${p.checks.length ? ' · Check #' + p.checks.map(esc).join(', #') : ''}</span>
         <button class="btn small" data-act="payPdf" ${P.busy ? 'disabled' : ''}>Timesheet PDF</button>
         <button class="link" data-act="payUndo" ${P.busy ? 'disabled' : ''}>Undo paid</button>` : '<span class="muted">Nothing to pay yet.</span>'}
@@ -212,7 +209,45 @@ function payModal() {
   </div></div>`;
 }
 
-function staffModals() { return (S.pay ? payModal() : '') + (S.staffEd ? staffEdModal() : ''); }
+function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : ''); }
+
+/* ---------- Writing the check (Pay → this → Check given · Paid) ---------- */
+const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+function numWords(n) {
+  if (n === 0) return 'zero';
+  const under1000 = x => { const h = Math.floor(x / 100), r = x % 100;
+    const rest = r < 20 ? ONES[r] : TENS[Math.floor(r / 10)] + (r % 10 ? '-' + ONES[r % 10] : '');
+    return [h ? ONES[h] + ' hundred' : '', rest].filter(Boolean).join(' '); };
+  const parts = [[1e6, 'million'], [1e3, 'thousand'], [1, '']].map(([v, name]) => { const x = Math.floor(n / v) % 1000; return x ? under1000(x) + (name ? ' ' + name : '') : ''; });
+  return parts.filter(Boolean).join(' ');
+}
+// "$345.00" → "Three hundred forty-five and 00/100"
+function checkWords(amount) {
+  const cents = Math.round(amount * 100), d = Math.floor(cents / 100), c = cents % 100;
+  const w = numWords(d);
+  return w.charAt(0).toUpperCase() + w.slice(1) + ' and ' + String(c).padStart(2, '0') + '/100';
+}
+function nextCheckNo() { const last = String(keepCopy('lastCheck') || ''); return /^\d+$/.test(last) ? String(Number(last) + 1) : ''; }
+function checkModal() {
+  const P = S.pay, p = payPerson(), un = p.unsigned || [];
+  const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  return `<div class="overlay check-overlay" data-act="payCheckClose"><div class="modal small-modal check-modal" data-stop>
+    <div class="modal-head"><h2>Write the check</h2><button class="x big" data-act="payCheckClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      <div class="check-face">
+        <div class="cf-top"><span>Date <b>${today}</b></span><label>No. <input id="pay-check" data-draft="pay-check" value="${esc(S.drafts['pay-check'] ?? '')}" inputmode="numeric" autocomplete="off" placeholder="1001"></label></div>
+        <div class="cf-row"><span class="cf-label">Pay to the order of</span><b class="cf-line">${esc(p.name)}</b><b class="cf-amt">${money(p.unpaid)}</b></div>
+        <div class="cf-row"><b class="cf-line cf-words">${esc(checkWords(p.unpaid))}</b><span class="cf-label">dollars</span></div>
+        <div class="cf-row"><span class="cf-label">Memo</span><span class="cf-line">${esc(P.cohort)} Academy Week</span></div>
+      </div>
+      ${un.length ? `<p class="pay-sign-note"><span>${un.length} day${un.length === 1 ? ' isn’t' : 's aren’t'} signed yet (${un.map(shortDay).join(', ')}). You can still pay; the timesheet will show ${un.length === 1 ? 'it' : 'them'} as not signed.</span></p>` : ''}
+      ${P.err ? `<div class="alert">${esc(P.err)}</div>` : ''}
+    </div>
+    <div class="modal-foot pay-foot"><button class="link" data-act="payCheckClose">Cancel</button>
+      <button class="btn primary" data-act="payMark" ${P.busy ? 'disabled' : ''}>${P.busy ? 'Saving…' : 'Check given · Paid'}</button></div>
+  </div></div>`;
+}
 
 // Typing in the Pay window (times, role, the flat-rate line).
 function staffInput(t) {
@@ -229,6 +264,7 @@ function staffInput(t) {
 }
 function staffEscape() {
   if (S.staffEd) { if (S.staffEd.busy) return true; S.staffEd = null; return true; }
+  if (S.pay && S.pay.check) { if (S.pay.busy) return true; S.pay.check = false; return true; }
   if (S.pay) { if (S.pay.busy) return true; S.pay = null; return true; }
   return false;
 }
@@ -248,7 +284,7 @@ async function staffAct(a, el = {}) {
     case 'payOpen': {
       if (!staffReady()) { toast('The Staff Apps Script isn’t connected yet.'); return true; }
       const cohort = d.cohort || S.cohortKey;
-      S.pay = { cohort, name: d.name, ed: {}, flat: null, busy: false, err: '', pdfUrl: '' }; S.drafts['pay-check'] = '';
+      S.pay = { cohort, name: d.name, ed: {}, flat: null, busy: false, err: '', pdfUrl: '', check: false }; S.drafts['pay-check'] = '';
       render();
       await loadStaffCohort(cohort, true); // (always the latest here: this is where money gets marked paid)
       return true;
@@ -287,14 +323,27 @@ async function staffAct(a, el = {}) {
       await payDo(async () => { const out = await StaffApi.call('adminSign', { cohort: P.cohort, name: p.name, dates, png }); toast('Signed.'); return out; });
       return true;
     }
-    case 'payMark': {
+    case 'payCheckOpen': {
       if (staffLoading['co:' + S.pay.cohort]) { toast('Checking for the latest first… one moment.'); return true; }
-      const P = S.pay, check = String(S.drafts['pay-check'] || '').trim();
-      if (!check) { toast('Type the check #.'); return true; }
-      const un = payPerson().unsigned || [];
-      if (un.length && !confirm(`${un.length} day${un.length === 1 ? ' isn’t' : 's aren’t'} signed yet (${un.map(shortDay).join(', ')}). Pay anyway?`)) return true;
-      if (Object.keys(P.ed).some(k => P.ed[k])) { const dirty = payPerson().days.some(x => { const e = P.ed[x.date]; return e && (e.role !== x.role || e.start !== milT(x.start) || e.end !== milT(x.end)); }); if (dirty && !confirm('A day has changes that aren’t saved. Mark paid without them?')) return true; }
-      await payDo(async () => { const out = await StaffApi.call('adminMarkPaid', { cohort: P.cohort, name: payPerson().name, check }); P.ed = {}; P.pdfUrl = out.pdfUrl || ''; if (out.pdfErr) P.err = 'Marked paid, but the timesheet PDF wasn’t saved: ' + out.pdfErr; toast(payPerson().name + ' marked paid · ' + money(out.paidTotal) + ' · Check #' + check); return out; });
+      const P = S.pay;
+      const dirty = payPerson().days.some(x => { const e = P.ed[x.date]; return e && (e.role !== x.role || e.start !== milT(x.start) || e.end !== milT(x.end)); });
+      if (dirty && !confirm('A day has changes that aren’t saved. Pay without them?')) return true;
+      if (!S.drafts['pay-check']) S.drafts['pay-check'] = nextCheckNo();
+      P.check = true; P.err = ''; render();
+      setTimeout(() => { const x = document.getElementById('pay-check'); if (x) { x.focus(); x.select(); } }, 0);
+      return true;
+    }
+    case 'payCheckClose': if (S.pay && !S.pay.busy) { S.pay.check = false; render(); } return true;
+    case 'payMark': {
+      const P = S.pay, check = String(S.drafts['pay-check'] || '').trim().replace(/^#/, '');
+      if (!check) { toast('Type the check number.'); return true; }
+      await payDo(async () => {
+        const out = await StaffApi.call('adminMarkPaid', { cohort: P.cohort, name: payPerson().name, check });
+        P.ed = {}; P.check = false; P.pdfUrl = out.pdfUrl || ''; keepCopy('lastCheck', check);
+        if (out.pdfErr) P.err = 'Paid, but the timesheet PDF wasn’t saved: ' + out.pdfErr;
+        toast('Paid · ' + money(out.paidTotal) + ' · Check #' + check);
+        return out;
+      });
       return true;
     }
     case 'payUndo': {
