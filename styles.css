@@ -1662,3 +1662,65 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .cf-words { font-size: 15px; }
 .cf-amt { border: 1px solid var(--taupe); border-radius: 6px; padding: 3px 10px; background: #fff; white-space: nowrap; }
 .pay-row .pr-date .tag-soft.notimes { background: #fff; color: #8a6a35; border: 1px solid #e3cfa6; font-weight: 500; }
+
+/* Staffing page (Academy Week → Staffing) */
+.box.stf-bar { flex-direction: row; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 18px; overflow: visible; }
+.stf-bar .head-actions { position: static; margin-left: auto; }
+.stf-open { color: #8a6a35; background: var(--honey-soft); border-radius: 999px; padding: 2px 12px; font-weight: 600; }
+.stf-done { color: #4f6b4b; background: var(--sage-soft); border-radius: 999px; padding: 2px 12px; font-weight: 600; }
+.stf-week { display: grid; grid-template-columns: repeat(var(--n), minmax(170px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+.box.stf-day { padding: 12px 12px 14px; display: grid; gap: 8px; border-top: 3px solid var(--honey); overflow: visible; }
+.stf-day.covered { border-top-color: var(--sage); }
+.stf-day-head { display: grid; text-align: center; }
+.stf-day-head b { font-size: 16px; }
+.stf-stations { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.stf-stations .x { opacity: 1; font-size: 20px; border: 1px solid var(--line); width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--taupe-dark); }
+.stf-stations .x:disabled { opacity: .35; cursor: default; }
+.stf-math { margin: -4px 0 0; text-align: center; line-height: 1.3; }
+.stf-owners { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.stf-owners .chip { font-size: 13px; padding: 3px 11px; }
+.stf-sec { display: grid; gap: 4px; }
+.stf-sec-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 2px; margin-top: 4px; }
+.stf-ok { color: #4f6b4b; font-size: 12px; }
+.stf-short { color: #8a6a35; font-size: 12px; font-weight: 600; }
+.stf-slot { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 5px 8px; cursor: pointer; font-size: 14px; }
+.stf-slot:hover { border-color: var(--taupe); }
+.stf-slot.has { background: var(--sage-soft); border-color: #c7d5c2; }
+.stf-slot.open { background: var(--honey-soft); border-color: #e3cfa9; }
+.stf-slot.off { opacity: .6; }
+.stf-slot.bad { background: var(--rose-soft); border-color: #e4bdb6; }
+.stf-slot.meh { border-color: var(--honey); }
+.stf-slot em { grid-column: 2; justify-self: start; margin-top: 2px; }
+.stf-open-tag { color: #8a6a35; font-size: 12px; letter-spacing: .04em; }
+.tag-soft.bad { background: var(--rose-soft); color: #8d4f48; }
+.tag-soft.meh { background: var(--honey-soft); color: #8a6a35; }
+.stf-add { justify-self: start; font-size: 12px; }
+.box.stf-avail { margin-bottom: 14px; flex: 0 0 auto; overflow: visible; }
+.stf-avail h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); line-height: 1.2; }
+.av-grid { display: grid; grid-template-columns: minmax(170px, auto) repeat(var(--n), minmax(64px, 1fr)); gap: 4px 6px; align-items: center; overflow-x: auto; }
+.av-h { text-align: center; font-size: 12px; color: var(--muted); }
+.av-name { display: grid; line-height: 1.2; padding: 3px 0; }
+.av-cell { position: relative; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); cursor: pointer; font-size: 15px; color: var(--muted); }
+.av-cell:hover { border-color: var(--taupe); }
+.av-cell.is-yes { background: var(--sage-soft); border-color: #c7d5c2; color: #4f6b4b; font-weight: 600; }
+.av-cell.is-maybe { background: var(--honey-soft); border-color: #e3cfa9; color: #8a6a35; font-weight: 600; }
+.av-cell.is-no { background: var(--rose-soft); border-color: #e4bdb6; color: #8d4f48; font-weight: 600; }
+.av-dot, .av-by-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--taupe-dark); vertical-align: middle; }
+.av-cell .av-dot { position: absolute; top: 4px; right: 4px; }
+.av-by-dot { background: transparent; border: 1.5px solid var(--taupe-dark); width: 7px; height: 7px; }
+.av-cell .av-by-dot { position: absolute; bottom: 4px; right: 4px; }
+.av-key { margin: 10px 0 0; }
+.av-seg { display: flex; margin-bottom: 12px; }
+.av-seg button { flex: 1; padding: 8px 10px; font-size: 14px; }
+.av-seg button.on.yes { background: var(--sage); color: #fff; }
+.av-seg button.on.maybe { background: var(--honey); color: #fff; }
+.av-seg button.on.no { background: var(--rose); color: #fff; }
+.stf-pick .modal-body { display: grid; gap: 4px; }
+.pick-h { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.pick-row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.pick-row:hover:not(:disabled) { border-color: var(--taupe); }
+.pick-row:disabled { opacity: .5; cursor: default; }
+.pick-row.on { opacity: 1; border-color: var(--taupe-dark); }
+.pick-row.yes { border-left: 4px solid var(--sage); }
+.pick-row.meh { border-left: 4px solid var(--honey); }
+.pick-row.bad { border-left: 4px solid var(--rose); }

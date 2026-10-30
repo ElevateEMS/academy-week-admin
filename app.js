@@ -16,8 +16,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
-const VIEWS = ['admin', 'staff', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
-const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
+const VIEWS = ['admin', 'staff', 'course', 'day', 'week', 'schedule', 'staffing', 'students', 'settings'];
+const AW_VIEWS = ['day', 'week', 'schedule', 'staffing', 'students']; // the Academy Week side
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
   settings: null, shopping: [], updates: [], prevTodos: [],
@@ -570,7 +570,7 @@ let sidePickedFor = null;
 function pickSide(key) {
   if (sidePickedFor === key) return;
   sidePickedFor = key;
-  if (!['course', 'day', 'week', 'schedule'].includes(S.view)) return;
+  if (!['course', 'day', 'week', 'schedule', 'staffing'].includes(S.view)) return;
   const side = sideByDate();
   if (side === 'course') S.view = 'course';
   else if (S.view === 'course') S.view = 'day';
@@ -699,6 +699,7 @@ const ICONS = {
   students: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.8 14.2c2.2.2 4 1.7 4.6 4.8"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   schedule: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 9h6M9 13h6M9 17h4"/></svg>',
+  get staffing() { return STAFFING_ICON; },
   list: '<svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="1.1"/><circle cx="4.8" cy="12" r="1.1"/><circle cx="4.8" cy="17.5" r="1.1"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14.5 7.5l3 3"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8c0-.4.4-.8.8-.8h4.4c.4 0 .8.4.8.8V7M6.5 7l.9 12.2c.1.9.8 1.8 1.8 1.8h5.6c1 0 1.7-.9 1.8-1.8L17.5 7M10 11v6M14 11v6"/></svg>',
@@ -730,7 +731,7 @@ function bootShell() {
 
 // Course / Academy Week switch. Students and Setup belong to neither, so nothing is lit there.
 function sideSwitch() {
-  const side = S.view === 'course' ? 'course' : ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : null;
+  const side = S.view === 'course' ? 'course' : ['day', 'week', 'schedule', 'staffing'].includes(S.view) ? 'aw' : null;
   return `<div class="side-switch" role="group" aria-label="Course or Academy Week">
     <button class="${side === 'course' ? 'on' : ''}" data-act="side" data-s="course">Course</button>
     <button class="${side === 'aw' ? 'on' : ''}" data-act="side" data-s="aw">Academy Week</button></div>`;
@@ -738,7 +739,7 @@ function sideSwitch() {
 
 function shell() {
   const icon = (v, label) => `<button class="icon-btn ${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}" title="${label}" aria-label="${label}">${ICONS[v]}</button>`;
-  const aw = ['day', 'week', 'schedule'].includes(S.view);
+  const aw = ['day', 'week', 'schedule', 'staffing'].includes(S.view);
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
   <header class="top">
@@ -750,7 +751,7 @@ function shell() {
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? '' : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
+      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? '' : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + icon('staffing', 'Staffing') + (S.sheet && S.sheet.sheetUrl
         ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '') + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
@@ -761,7 +762,7 @@ function shell() {
   <main class="wrap">
     ${offlineBar()}
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, staffing: staffingView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -794,6 +795,7 @@ function shell() {
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
   if (S.view === 'staff') return '<h1>Staff</h1>';
+  if (S.view === 'staffing') return staffingTitle();
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? attending().length : 0; // (enrolled: dropped / not attending aren't counted)
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
@@ -2639,16 +2641,16 @@ async function act(a, el = {}, e) {
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
       case 'view': {
         // The Students icon again: back to the page you came from (Course, or the Academy Week page you were on).
-        const back = ['course', 'day', 'week', 'schedule'];
+        const back = ['course', 'day', 'week', 'schedule', 'staffing'];
         let v = d.v;
         if (v === 'students' && S.view === 'students') v = back.includes(pref('studentsFrom')) ? pref('studentsFrom') : 'course';
         else if (v === 'students' && back.includes(S.view)) pref('studentsFrom', S.view);
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
-        if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
+        if (['day', 'week', 'schedule', 'staffing'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
       }
       case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
-        const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
+        const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule', 'staffing'].includes(pref('awView')) ? pref('awView') : 'day');
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
       }
       case 'day':
