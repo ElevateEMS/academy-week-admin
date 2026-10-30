@@ -8,7 +8,7 @@
      S.staffEd          the add/edit person window */
 
 const STAFF_PORTAL_URL = 'https://staff.elevateemsacademy.com';
-const PAY_ROLES = ['EC', 'Instructor', 'Assistant', 'Patient'];
+const PAY_ROLES = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient']; // the pay scale's names (rates: Payroll tab)
 const staffReady = () => typeof STAFF_SCRIPT_URL === 'string' && !/PASTE/.test(STAFF_SCRIPT_URL) && Store.configured;
 
 const StaffApi = {
@@ -96,7 +96,7 @@ function staffListBox(a) {
     <div class="staff-table">
       <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Emergency contact</span><span>Portal</span><span>${a.year} (limit ${money(a.limit)})</span></div>
       ${a.people.map(p => `<div class="st-row">
-        <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role ? `<span class="muted small st-role">${esc(p.role)}</span>` : ''}</span>
+        <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         <span>${em(p.emergency) ? esc(em(p.emergency)) : '<span class="tbd">None</span>'}</span>
@@ -120,8 +120,11 @@ function staffEdModal() {
     <div class="modal-head"><h2>${e.orig ? esc(e.orig) : 'Add someone'}</h2><button class="x big" data-act="staffEdClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${f('name', 'Name (as they should be paid)')}
-      ${f('role', 'Maximum eligible role', 'text', 'Instructor, Assistant, Patient, EC…')}
-      ${f('phone', 'Phone (they need this to set up their account)', 'tel')}
+      <label class="field">Maximum eligible role<select id="se-role" data-draft="se-role">
+        <option value="">Pick one</option>${[...PAY_ROLES, ...(S.drafts['se-role'] && !PAY_ROLES.includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
+          .map(r => `<option ${r === S.drafts['se-role'] ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
+      <p class="muted small se-hint">What they're paid on an Instructor day. Change it when someone gets certified; their unpaid Instructor days move to the new rate.</p>
+      ${f('phone', 'Phone', 'tel')}
       ${f('email', 'Email', 'email')}
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
@@ -148,7 +151,7 @@ function payModal() {
     const hrs = qHours(start, end), rate = rates[role] ?? d.rate, dirty = P.ed[d.date] && (role !== d.role || start !== d.start || end !== d.end);
     const lock = d.paid || !d.editable;
     return `<div class="pay-row ${d.paid ? 'paid' : ''} ${!d.row ? 'empty-day' : ''}">
-      <span class="pr-date">${shortDay(d.date)}${!d.row ? '<span class="tag-soft">no times yet</span>' : ''}</span>
+      <span class="pr-date">${shortDay(d.date)}${!d.row ? '<span class="tag-soft">no times yet</span>' : ''}${d.over && !d.paid ? `<span class="tag-soft warn" title="Their maximum eligible role is ${esc(p.maxRole)}">above ${esc(p.maxRole)}</span>` : ''}</span>
       ${lock ? `<span>${esc(d.role)}</span><span>${d.start ? to12(d.start) + ' – ' + to12(d.end) : '—'}</span>`
         : `<select data-payf="role" data-date="${d.date}" aria-label="Role">${PAY_ROLES.map(r => `<option ${r === role ? 'selected' : ''}>${r}</option>`).join('')}</select>
            <span class="pr-times"><input type="time" step="300" id="pay-s-${d.date}" data-payf="start" data-date="${d.date}" value="${esc(start)}" aria-label="Start">
@@ -174,7 +177,7 @@ function payModal() {
     : `<button class="link" data-act="payFlatOpen">+ Flat-rate job</button>`;
   return `<div class="overlay" data-act="payClose"><div class="modal pay-modal" data-stop>${head}
     <div class="modal-body pad-top">
-      <p class="muted small">${esc(P.cohort)} Academy Week${p.phone ? ' · ' + esc(p.phone) : ''}${p.email ? ' · ' + esc(p.email) : ''}${p.matched ? (p.account ? '' : ' · hasn’t set up the Staff Portal yet') : ''}</p>
+      <p class="muted small">${esc(P.cohort)} Academy Week${p.maxRole ? ' · ' + esc(p.maxRole) : p.matched ? ' · no maximum eligible role picked yet' : ''}${p.phone ? ' · ' + esc(p.phone) : ''}${p.email ? ' · ' + esc(p.email) : ''}${p.matched ? (p.account ? '' : ' · hasn’t set up the Staff Portal yet') : ''}</p>
       ${!p.matched ? `<div class="alert">${esc(p.name)} isn’t on the Staff Directory tab, so they can’t sign in to put in times. <button class="btn small" data-act="staffEdOpen" data-new="${esc(p.name)}">Add them</button></div>` : ''}
       <div class="pay-table">${p.days.map(dayRow).join('')}${p.flats.map(flatRow).join('')}</div>
       <div class="pay-under">${p.paid ? '' : flatForm}<span class="pay-total">Total <b>${money(p.total)}</b>${p.unpaid && p.unpaid !== p.total ? ` · <span class="muted">${money(p.unpaid)} not paid yet</span>` : ''}</span></div>
@@ -281,7 +284,7 @@ async function staffAct(a, el = {}) {
     case 'staffEdOpen': {
       const p = d.name && S.staffAll ? S.staffAll.people.find(x => x.name === d.name) : null;
       const base = p || { name: d.new || '', role: '', phone: '', email: '', notes: '', emergency: {} };
-      Object.entries({ name: base.name, role: base.role, phone: base.phone, email: base.email, notes: base.notes,
+      Object.entries({ name: base.name, role: base.role || base.roleText, phone: base.phone, email: base.email, notes: base.notes,
         emName: (base.emergency || {}).name, emPhone: (base.emergency || {}).phone, emRel: (base.emergency || {}).relation })
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
       S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, busy: false, err: '' };
