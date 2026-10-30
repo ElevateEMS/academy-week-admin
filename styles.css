@@ -1568,7 +1568,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 @media (max-width: 1000px) { .staff-board { grid-template-columns: 1fr; } }
 .staff-board .board-col { display: grid; gap: 18px; align-content: start; }
 .staff-table { display: grid; margin-top: 6px; }
-.st-row { display: grid; grid-template-columns: minmax(150px, 1.3fr) 120px minmax(150px, 1.2fr) minmax(150px, 1.4fr) 70px minmax(170px, 1.2fr); gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
+.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px minmax(190px, 1.3fr); gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
 .st-row > span { min-width: 0; overflow-wrap: anywhere; }
 .st-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); border-bottom: 1px solid var(--line); padding-top: 0; }
 .st-row a { color: var(--ink); text-underline-offset: 2px; }
@@ -1626,3 +1626,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pay-row .pr-date .tag-soft.warn { background: var(--honey-soft); color: #8a6a35; }
 .se-hint { margin: -4px 0 10px; }
 .small-modal select#se-role { width: 100%; }
+/* The Staff box stops at the bottom of the window and scrolls inside (big screens). */
+@media (min-width: 1001px) {
+  .staff-list-box { max-height: calc(100vh - 150px); overflow-y: auto; }
+  .staff-list-box .st-head { position: sticky; top: -14px; background: var(--paper); z-index: 1; }
+}
+.st-cohorts li { grid-template-columns: 1fr auto; }
+.st-cohorts li > span:last-child { display: none; }
+.staff-link { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 0; }

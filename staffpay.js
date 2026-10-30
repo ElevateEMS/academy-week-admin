@@ -72,10 +72,16 @@ function staffView() {
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
           <button class="btn tiny" data-act="staffEdOpen" data-new="${esc(u.name)}">Add</button></li>`).join('')}</ul></section>` : ''}
       <section class="box"><div class="box-head admin-head"><h2>Staff Portal</h2></div>
-        <p class="muted small">Staff sign in here to fill in their times. Text them the link, or let them scan this.</p>
+        <p class="muted small center">Staff sign in here for their timesheets.</p>
         <div class="staff-qr" id="staffQr"></div>
-        <p class="center"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a></p>
-        <p class="center"><button class="btn small" data-act="staffCopyLink">Copy link</button></p>
+        <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
+          <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
+      </section>
+      <section class="box"><div class="box-head admin-head"><h2>Staffing by Cohort</h2></div>
+        ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
+          <b>${money(c.total)}</b><span></span></li>`).join('')}</ul>`
+          : '<p class="empty">Nothing on the Payroll tab for a cohort yet.</p>'}
+        <p class="muted small">Everything on the Payroll tab for each cohort’s Academy Week (paid and not paid yet), newest first.</p>
       </section>
     </div>
   </div>`;
@@ -88,18 +94,16 @@ function staffListBox(a) {
       <div class="yr-bar"><span class="yr-soon" style="width:${soon}%"></span><span class="yr-now" style="width:${pct}%"></span></div>
       <span class="yr-num">${money(p.year)}${p.coming ? ` <span class="muted">+${money(p.coming)}</span>` : ''}</span></div>`;
   };
-  const em = e => [e.name, e.phone, e.relation].filter(Boolean).join(' · ');
-  return `<section class="box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
+  return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
       <button class="eye" data-act="staffRefresh" title="Read the sheets again" aria-label="Refresh">${RESET}</button>
       <button class="add-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
-    <p class="muted small">From the Staff Directory tab in $ Finances. ${a.year} totals count paid and not-yet-paid rows on the Payroll tab; the faded part is days still on the schedule (about ${8} hrs each).</p>
+    <p class="muted small">From the Staff Directory tab in $ Finances. ${a.year} totals (limit ${money(a.limit)}) count paid and not-yet-paid rows on the Payroll tab; the faded part is days still on the schedule (about ${8} hrs each).</p>
     <div class="staff-table">
-      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Emergency contact</span><span>Portal</span><span>${a.year} (limit ${money(a.limit)})</span></div>
+      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>${a.year} total</span></div>
       ${a.people.map(p => `<div class="st-row">
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
-        <span>${em(p.emergency) ? esc(em(p.emergency)) : '<span class="tbd">None</span>'}</span>
         <span>${p.account ? '<span class="tag sage-tag">Set up</span>' : '<span class="muted small">Not yet</span>'}</span>
         ${bar(p)}
       </div>`).join('')}
