@@ -177,17 +177,18 @@ function payModal() {
         : d.row ? `<button class="x" data-act="payClearDay" data-date="${d.date}" title="Clear this day's times" aria-label="Clear">×</button>` : ''}</span>
     </div>`;
   };
-  const flatRow = f => `<div class="pay-row flat ${f.paid ? 'paid' : ''}"><span class="pr-date">${shortDay(f.date)}</span><span class="pr-desc">Flat rate: ${esc(f.desc)}</span><span></span>
+  const flatRow = f => `<div class="pay-row flat ${f.paid ? 'paid' : ''}"><span class="pr-date">${shortDay(f.date)}</span><span class="pr-desc">${f.reimb ? 'Reimbursement' : 'Extra pay'}: ${esc(f.desc)}${f.reimb ? ' <span class="muted small" title="Paying them back for something they bought: not income, so it doesn’t count toward their yearly limit">(not income)</span>' : ''}</span><span></span>
     <span class="pr-num">${money(f.total)}</span><span class="pr-act">${f.paid ? `<span class="tag sage-tag">Paid${f.check ? ' #' + esc(f.check) : ''}</span>`
       : `<button class="x" data-act="payFlatDel" data-row="${f.row}" title="Delete" aria-label="Delete">×</button>`}</span></div>`;
   const days = co.days.filter(d => d.date);
   const fl = P.flat;
   const flatForm = fl ? `<div class="pay-flat-form">
+      <select data-payflat="kind" aria-label="Kind"><option value="extra" ${fl.kind !== 'reimb' ? 'selected' : ''}>Extra pay</option><option value="reimb" ${fl.kind === 'reimb' ? 'selected' : ''}>Reimbursement</option></select>
       <select data-payflat="date" aria-label="Date">${days.map(d => `<option value="${d.date}" ${d.date === fl.date ? 'selected' : ''}>${shortDay(d.date)}</option>`).join('')}</select>
-      <input id="pay-fdesc" data-payflat="desc" value="${esc(fl.desc)}" placeholder="What it was (paperwork help…)">
+      <input id="pay-fdesc" data-payflat="desc" value="${esc(fl.desc)}" placeholder="${fl.kind === 'reimb' ? 'What they bought (lunch for the class…)' : 'What for (gas money, paperwork help…)'}">
       <input id="pay-famt" data-payflat="amount" value="${esc(fl.amount)}" placeholder="$50" inputmode="decimal">
       <button class="btn tiny" data-act="payFlatAdd" ${P.busy ? 'disabled' : ''}>Add</button><button class="link" data-act="payFlatCancel">Cancel</button></div>`
-    : `<button class="link" data-act="payFlatOpen">+ Flat-rate job</button>`;
+    : `<button class="link" data-act="payFlatOpen">+ Add extra</button>`;
   return `<div class="overlay" data-act="payClose"><div class="modal pay-modal" data-stop>${head}
     <div class="modal-body pad-top">
       <p class="muted small">${esc(P.cohort)} Academy Week${p.maxRole ? ' · ' + esc(p.maxRole) : p.matched ? ' · no maximum eligible role picked yet' : ''}${p.phone ? ' · ' + esc(p.phone) : ''}${p.email ? ' · ' + esc(p.email) : ''}${p.matched ? (p.account ? '' : ' · hasn’t set up the Staff Portal yet') : ''}</p>
@@ -259,7 +260,7 @@ function staffInput(t) {
     else { const digits = t.value.replace(/\D/g, '').slice(0, 4); if (t.value !== digits) t.value = digits; ed[t.dataset.payf] = digits; }
     render(); return true;
   }
-  if (t.dataset.payflat && S.pay && S.pay.flat) { S.pay.flat[t.dataset.payflat] = t.value; return true; }
+  if (t.dataset.payflat && S.pay && S.pay.flat) { S.pay.flat[t.dataset.payflat] = t.value; if (t.dataset.payflat === 'kind') render(); return true; }
   return false;
 }
 function staffEscape() {
@@ -301,15 +302,15 @@ async function staffAct(a, el = {}) {
       await payDo(async () => { const out = await StaffApi.call('adminSaveDay', { cohort: P.cohort, name, date: d.date, clear: true }); delete P.ed[d.date]; return out; });
       return true;
     }
-    case 'payFlatOpen': { const co = S.staffCo[S.pay.cohort], p = payPerson(); S.pay.flat = { date: (p.days[p.days.length - 1] || co.days[0] || {}).date || '', desc: '', amount: '' }; render(); setTimeout(() => { const x = document.getElementById('pay-fdesc'); if (x) x.focus(); }, 0); return true; }
+    case 'payFlatOpen': { const co = S.staffCo[S.pay.cohort], p = payPerson(); S.pay.flat = { kind: 'extra', date: (p.days[p.days.length - 1] || co.days[0] || {}).date || '', desc: '', amount: '' }; render(); setTimeout(() => { const x = document.getElementById('pay-fdesc'); if (x) x.focus(); }, 0); return true; }
     case 'payFlatCancel': S.pay.flat = null; render(); return true;
     case 'payFlatAdd': {
       const P = S.pay, f = P.flat;
-      await payDo(async () => { const out = await StaffApi.call('adminFlat', { cohort: P.cohort, name: payPerson().name, date: f.date, desc: f.desc, amount: f.amount }); P.flat = null; return out; });
+      await payDo(async () => { const out = await StaffApi.call('adminFlat', { cohort: P.cohort, name: payPerson().name, date: f.date, desc: f.desc, amount: f.amount, kind: f.kind }); P.flat = null; return out; });
       return true;
     }
     case 'payFlatDel': {
-      if (!confirm('Delete this flat-rate job?')) return true;
+      if (!confirm('Delete this line?')) return true;
       const P = S.pay;
       await payDo(() => StaffApi.call('adminFlat', { cohort: P.cohort, name: payPerson().name, row: Number(d.row), del: true }));
       return true;
