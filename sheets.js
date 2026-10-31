@@ -3,6 +3,8 @@
      loadCohort(key)             -> that cohort's Student Roster tab (names, column P, Academy Week Start)
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
+     setPortalStatus(key, s, status, todo) -> Active / Paused in their AD (Portal Status); from an overdue payment to-do,
+                                    the to-do remembers the pause so paying unpauses them
      dropStudent(key, s, drop)   -> Drop / Withdraw ({ kind, date, note }): off the main roster (the rows under them move
                                     up), onto the dropped list under it as Blocked, a row in the Dropped Students Record,
                                     and two Course To-Dos (JBL report then access, VAOEMS disposition)
@@ -152,6 +154,7 @@ const Sheets = (() => {
     loadCohort: key => call('loadCohort', { cohort: key }),
     changeContacts: (key, student, by) =>
       call('changeContacts', { cohort: key, row: student.row, name: student.name, by }).then(o => o.count),
+    setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
     dropStudent: (key, student, drop) => call('dropStudent', { cohort: key, name: student.name, email: student.email, ...drop }), // { line, docUrl, warnings }
     listScenarios: () => call('listScenarios').then(o => o.scenarios),
     createCohort: (key, info) => call('createCohort', { cohort: key, info }),
@@ -312,6 +315,7 @@ function sampleSheets() {
     async rosterPdfFile() { throw new Error('Sample mode has no Drive file.'); },
     async confirmRideAlong(key, raKey, row, done) { console.log('Sample mode: Confirmed would be', done, 'for', raKey || 'row ' + row); return wait({ row }); },
     async resetTestCohort() { throw new Error('Sample mode has nothing to reset.'); },
+    async setPortalStatus(key, student, status) { return wait({ status }); },
     async dropStudent(key, student, drop) { console.log('Sample mode:', student.name, 'would be', drop); return wait({ line: 37, docUrl: 'https://drive.google.com/', warnings: [] }); },
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },

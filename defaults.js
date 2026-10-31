@@ -380,6 +380,16 @@ I am notifying you that you have not completed the {cohort} Hybrid EMT course du
 
 Unfortunately, due to your failure to abide by the deadlines and expectations set forth in the syllabus and reviewed at orientation and via email, your attempt for this EMT class is being submitted to the state as a failed attempt.` },
 
+  // From an overdue payment to-do's Email button (or pick it yourself). {overdue payment} / {overdue date}: the oldest one they owe.
+  { id: 'pay-overdue', name: 'Payment overdue', subject: 'Overdue EMT Tuition Payment',
+    when: { from: 'manual', days: 0 }, who: 'pick', send: 'each', body: `Hi {first name},
+
+Our records show that your {overdue payment} was due on **{overdue date}** and we haven't received it yet. Please make your payment as soon as possible to keep your access to the Student Hub.
+
+Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)
+
+If you've already paid or have any questions, just reply to this email.` },
+
   // Shows up once the cohort's CPR date and time are both in Course Details, for anyone whose Welcome went out before that.
   { id: 'cpr-update', name: 'CPR class date & time', subject: 'Update: Full CPR Class Date & Time',
     when: { from: 'cpr', days: 0 }, who: 'cpr-tbd', send: 'bcc', body: `{if group}Hi everyone!{else}Hi {first name}!{end}

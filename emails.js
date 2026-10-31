@@ -93,6 +93,13 @@ function emPerson(s) {
   };
 }
 const emPeople = () => students().filter(s => !s.out).map(emPerson);
+// Their oldest unpaid payment whose due date has passed (null if none).
+function overdueOf(p) {
+  const t = todayIso();
+  if (!p.paidNext && p.next && p.next < t) return { kind: 'next', label: 'next tuition installment', date: p.next };
+  if (!p.paidFinal && p.final && p.final < t) return { kind: 'final', label: 'final tuition payment', date: p.final };
+  return null;
+}
 const emPersonBySid = sid => { const s = students().find(x => x.sid === sid); return s ? emPerson(s) : null; };
 // The cohort's own dates, for an email to the whole group.
 function emCohortPerson() {
@@ -249,6 +256,8 @@ function emValues(p) {
     'first name': p ? firstName(p.name) : '', 'full name': p ? fullName(p.name) : '', cohort: S.cohortKey || '',
     'orientation date': emDate(c.orient), 'orientation time': c.time,
     'next due': emDate(c.next), 'final due': emDate(c.final),
+    // The oldest payment they owe that's past due (the Payment overdue email).
+    'overdue payment': p ? (overdueOf(p) || {}).label || '' : '', 'overdue date': p ? emDate((overdueOf(p) || {}).date || '') : '',
     'cpr date': emDate(i.cpr), 'cpr time': courseExtra().cprTime, 'academy week start': emDate(aw),
     'academy week location': courseExtra().awLocation, 'academy week instructions': courseExtra().awInfo,
     'academy week dates': days.length ? emDate(days[0].iso) + ' – ' + emDate(days[days.length - 1].iso) : '',
@@ -507,7 +516,7 @@ function bookCodesModal() {
 
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
-  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {sign link} (their orientation roster signing link)</p>
+  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {overdue payment} {overdue date} (the payment they’re late on: “next tuition installment” / “final tuition payment”, and when it was due) {sign link} (their orientation roster signing link)</p>
   <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 function emailTplModal() {

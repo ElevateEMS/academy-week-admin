@@ -1039,6 +1039,13 @@ addEventListener('scroll', hlHide, true);
 addEventListener('scroll', e => { const t = e.target; if (t && t.dataset && t.dataset.notes) { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; } }, true);
 
 /* ---------- Shared pieces ---------- */
+function payBtns(t) {
+  const s = students().find(x => x.name === t.payFor);
+  if (!s) return '';
+  const paused = /^paused$/i.test(s.status);
+  return `<span class="ship-btns"><button class="btn tiny" data-act="payEmail" data-sid="${s.sid}" title="A Payment overdue email in your Gmail Drafts">Email</button>`
+    + `<button class="btn tiny" data-act="portalStatus" data-sid="${s.sid}" data-id="${t.id}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${paused ? 'Unpause' : 'Pause portal'}</button></span>`;
+}
 function circle(checked, attrs, extra = '') {
   return `<input type="checkbox" class="circle" ${attrs} ${checked ? 'checked' : ''} ${extra}>`;
 }
@@ -1066,6 +1073,8 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       if (t.link && /^https:\/\//.test(t.link)) open = /\.google\.com\//.test(t.link)
         ? `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-name="${esc(t.linkName || 'Clinical Tracking')}" title="Their request in the Clinical Tracking sheet">Open ↗</a>`
         : `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-chrome title="${esc(t.linkName || 'Open')} (opens in Chrome)">${esc(t.linkName || 'Open')} ↗</a>`;
+      // An overdue payment (the admin script adds these): Email them, Pause / Unpause their portal. Gone once it's paid.
+      if (kind === 'ctodo' && t.payFor && !done) open = payBtns(t);
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -2074,6 +2083,7 @@ function drawer() {
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
+        <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? 'Unpause portal' : 'Pause portal'}</button>
         <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
       </section>`}
     </div>
@@ -2697,6 +2707,29 @@ async function act(a, el = {}, e) {
       case 'resetCancel': if (S.resetBusy) return; S.resetAsk = false; delete S.drafts.resetName; render(); break;
       case 'dropAsk': S.dropAsk = d.sid; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); break;
       case 'dropKind': S.drafts['drop-kind'] = d.k; render(); break;
+      case 'payEmail': {
+        if (!tplById('pay-overdue')) { toast('The Payment overdue email template is turned off or missing.'); return; }
+        S.emailDraft = { tplId: 'pay-overdue', sids: [d.sid], date: '', custom: false, idx: 0, edits: {} };
+        emLateDrafts(); render(); emSignLinks(); break;
+      }
+      // Pause / Unpause their Student Hub access (AD in the sheet). From an overdue payment to-do (d.id), paying unpauses them too.
+      case 'portalStatus': {
+        const s = studentBySid(d.sid), key = S.cohortKey;
+        if (!s || S.portalBusy) return;
+        const pause = !/^paused$/i.test(s.status);
+        if (!confirm(pause ? `Pause ${s.name}'s Student Hub access?\n\nThey won't be able to log in until you unpause them${d.id ? ' or their payment is ticked in the sheet' : ''}.`
+          : `Unpause ${s.name}? They'll be able to log in to the Student Hub again.`)) return;
+        S.portalBusy = s.sid; render();
+        try {
+          const res = await Sheets.setPortalStatus(key, s, pause ? 'Paused' : 'Active', d.id || '');
+          const row = S.sheet && S.sheet.students.find(x => x.name === s.name);
+          if (row && key === S.cohortKey) { row.status = res.status; sheetCopy(key, S.sheet); }
+          toast(pause ? `${s.name} is paused. They can't log in to the Student Hub.` : `${s.name} can log in again.`);
+        } catch (err) {
+          toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+        }
+        S.portalBusy = null; render(); break;
+      }
       case 'dropCancel': if (!S.dropBusy) dropClose(); break;
       case 'dropGo': {
         const s = studentBySid(S.dropAsk), kind = S.drafts['drop-kind'], key = S.cohortKey;
