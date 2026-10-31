@@ -278,6 +278,7 @@ function checkModal() {
 
 // Typing in the Pay window (times, role, the flat-rate line).
 function staffInput(t) {
+  if (t.id === 'stf-o-kind') { S.drafts['stf-o-kind'] = t.value; render(); if (t.value === 'Other') setTimeout(() => { const x = document.getElementById('stf-o-what'); if (x) x.focus(); }, 0); return true; }
   if (t.dataset.payf && S.pay) {
     const d = t.dataset.date, co = S.staffCo[S.pay.cohort], p = co && co.people.find(x => x.name === S.pay.name || x.staffName === S.pay.name);
     const day = p && p.days.find(x => x.date === d);
@@ -601,10 +602,10 @@ function stfDay(co, d, i, plan) {
     if (!need && !slots.some(x => x.extra)) return '';
     return `<div class="stf-sec"><div class="stf-sec-head"><b>${kind}s</b><span class="${have >= need ? 'stf-ok' : 'stf-short'}">${have}/${need}${have < need ? ' · ' + (need - have) + ' open' : ' ✓'}</span></div>
       ${slots.map(x => { const v = x.value, a = filled(v) ? availOf(co, v, d.date) : null;
-        return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" ${x.added ? 'data-added="1"' : ''}
+        return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" data-kind="${kind}" ${x.added ? 'data-added="1"' : ''}
           title="${x.extra ? 'Not needed for ' + need + ' station' + (need === 1 ? '' : 's') + '. Click to change.' : x.added ? 'A new row: added to the Staffing tab when you put the draft on it' : x.draft ? 'Draft: on the Staffing tab it’s ' + esc(x.cells[i] || 'OPEN') : ''}">
-          <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) : '<b class="stf-open-tag">OPEN</b>'}</span>
-          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : isVolunteer(co, v) ? '<em class="tag-soft">volunteer</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
+          <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) + (isVolunteer(co, v) ? ' <span class="muted small">· volunteer</span>' : '') : '<b class="stf-open-tag">OPEN</b>'}</span>
+          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
   }).join('');
   return `<section class="box stf-day ${open ? '' : 'covered'}">
     <div class="stf-day-head"><b>Day ${d.n} - ${esc(shortMd(d.date))}</b>${d.exam ? '<span class="muted small">Psychomotor exam</span>' : ''}</div>
@@ -664,29 +665,37 @@ function stfPickModal() {
   const k = S.stfPick, co = stfCo(), i = Number(k.day), rows = co.sections.flatMap(s => s.rows);
   const slot = rows.find(r => r.label === k.label) || { cells: [] }, cur = cellOf(co, slot, i);
   const taken = name => rows.find(r => r.label !== k.label && sameStaff(cellOf(co, r, i), name));
-  const groups = { yes: [], maybe: [], none: [], no: [] };
+  // Shown: ✓ Available, then ? Maybe, who can fill this kind of slot. Everyone else is behind "Show everyone else".
+  const groups = { yes: [], maybe: [], none: [], no: [], role: [] };
   const away = co.people.filter(p => p.inactive);
-  co.people.filter(p => !p.inactive).forEach(p => { const a = (p.avail || {})[k.date]; groups[a && a.s ? a.s : 'none'].push({ ...p, a }); });
+  co.people.filter(p => !p.inactive).forEach(p => { const a = (p.avail || {})[k.date];
+    if (!canFill(k.kind, p.role)) groups.role.push({ ...p, a }); else groups[a && a.s ? a.s : 'none'].push({ ...p, a }); });
   const person = (p, cls = '') => { const t = taken(p.name), on = sameStaff(cur, p.name);
     return `<button class="pick-row ${cls} ${on ? 'on' : ''}" data-act="stfSet" data-name="${esc(p.name)}" ${t || on || S.stfBusy ? 'disabled' : ''}>
       <span><b>${esc(p.name)}</b>${p.role ? `<span class="muted small"> · ${esc(p.role)}</span>` : ''}</span>
       <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : [k.other && usualOf(p.name) ? `<b class="usual">${esc(usualOf(p.name).what)} ${money(usualOf(p.name).amount)}</b>` : '', p.a && p.a.note ? esc(p.a.note) : ''].filter(Boolean).join(' · ')}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
   const usualOf = name => { const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, name)); return x && x.usual && x.usual.amount ? x.usual : null; };
   const group = (title, list, cls) => list.length ? `<p class="pick-h">${title}</p>${list.map(p => person(p, cls)).join('')}` : '';
-  const oth = k.other ? `<div class="stf-other-fields">
-      <label class="field">What for<input id="stf-o-what" data-draft="stf-o-what" list="stf-o-list" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Ex. Admin help" autocomplete="off"></label>
-      <datalist id="stf-o-list"><option>Admin help</option></datalist>
+  const okind = S.drafts['stf-o-kind'] === 'Other' ? 'Other' : 'Admin help';
+  const oth = k.other ? `<div class="stf-other-fields ${okind === 'Other' ? 'typed' : ''} ${filled(cur) ? 'has-save' : ''}">
+      <label class="field">What for<select id="stf-o-kind">${['Admin help', 'Other'].map(o => `<option ${o === okind ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
+      ${okind === 'Other' ? `<label class="field">What is it?<input id="stf-o-what" data-draft="stf-o-what" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Ex. Photographer" autocomplete="off"></label>` : ''}
       <label class="field">Flat amount<input id="stf-o-amt" data-draft="stf-o-amt" value="${esc(S.drafts['stf-o-amt'] ?? '')}" placeholder="$" inputmode="decimal" autocomplete="off"></label>
-      ${filled(cur) ? `<button class="btn small" data-act="stfOtherSave" ${S.stfBusy ? 'disabled' : ''}>Save</button>` : ''}</div>
+      ${filled(cur) ? `<div class="field stf-o-save"><span>&nbsp;</span><button class="btn small" data-act="stfOtherSave" ${S.stfBusy ? 'disabled' : ''}>Save</button></div>` : ''}</div>
       <p class="muted small">Added to their pay on that day as a flat amount (no timesheet).${filled(cur) ? '' : ' Then pick who:'}</p>` : '';
   return `<div class="overlay" data-act="stfPickClose"><div class="modal small-modal stf-pick" data-stop>
     <div class="modal-head"><h2>${esc(k.label)} · ${parseIso(k.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h2><button class="x big" data-act="stfPickClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${oth}
-      ${OWNERS.map(o => { const a = availOf(co, o, k.date); return person({ name: o, role: '', a: a && (a.s !== 'yes' || a.note) ? a : null }, a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''); }).join('')}
-      ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Unavailable', groups.no, 'bad')}
-      ${away.length ? (S.stfShowAway ? group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away')
-        : `<button class="link pick-away" data-act="stfShowAway">Show inactive (${away.length})</button>`) : ''}
+      ${OWNERS.filter(o => (availOf(co, o, k.date) || {}).s !== 'no' || S.stfShowAll).map(o => { const a = availOf(co, o, k.date); return person({ name: o, role: '', a: a && (a.s !== 'yes' || a.note) ? a : null }, a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''); }).join('')}
+      ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}
+      ${!groups.yes.length && !groups.maybe.length ? `<p class="muted small">Nobody${k.kind !== 'Other' && k.kind !== 'Patient' ? ' who can fill a ' + k.kind.toLowerCase() + ' slot' : ''} has said they’re available this day yet.</p>` : ''}
+      ${(() => { const rest = groups.none.length + groups.no.length + groups.role.length + away.length + OWNERS.filter(o => (availOf(co, o, k.date) || {}).s === 'no').length;
+        if (!rest) return '';
+        if (!S.stfShowAll) return `<button class="link pick-away" data-act="stfShowAll">Show everyone else (${rest})</button>`;
+        return group('No answer yet', groups.none, '') + group('Unavailable', groups.no, 'bad')
+          + group(k.kind === 'Instructor' ? 'Not an instructor' : 'Not an assistant or above', groups.role, 'away')
+          + group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away'); })()}
     </div>
     <div class="modal-foot pay-foot"><span class="muted small">${S.stfBusy ? 'Saving…' : 'Goes in the draft'}</span>
       <span>${k.other ? (filled(cur) ? `<button class="btn small" data-act="stfSet" data-name="—" ${S.stfBusy ? 'disabled' : ''}>Remove</button>` : '')
@@ -723,6 +732,12 @@ function stfQuick(calls) {
     stfPending--; render();
   });
 }
+// Other "What for": Admin help, or Other (typed in).
+const otherWhat = () => S.drafts['stf-o-kind'] === 'Other' ? String(S.drafts['stf-o-what'] || '').trim() : 'Admin help';
+const setOtherWhat = w => { if (!w || w === 'Admin help') { S.drafts['stf-o-kind'] = 'Admin help'; S.drafts['stf-o-what'] = ''; } else { S.drafts['stf-o-kind'] = 'Other'; S.drafts['stf-o-what'] = w; } };
+// Who can fill which slot (by Maximum Eligible Role). Volunteers: any slot.
+const SLOT_ROLES = { Instructor: ['EC & Equivalent', 'Non-Certified Instructor', 'Volunteer'], Assistant: ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Volunteer'] };
+const canFill = (kind, role) => !SLOT_ROLES[kind] || SLOT_ROLES[kind].includes(role);
 // The same change adminDraftSlot makes, here first (so the page shows it at once).
 function draftLocal(co, label, day, name, virtual, other) {
   const k = label + '|' + day, row = co.sections.flatMap(s => s.rows).find(r => r.label === label), sheet = row ? row.cells[day] : '';
@@ -802,31 +817,30 @@ async function staffingAct(a, el = {}) {
       return true;
     }
     case 'stfPick': if (!S.stfBusy) {
-      S.stfPick = { label: d.label, day: d.day, date: d.date, added: !!d.added, other: !!d.other };
-      if (d.other) { const x = ((co.plan && co.plan.other) || {})[d.label + '|' + d.day] || {}; S.drafts['stf-o-what'] = x.what || ''; S.drafts['stf-o-amt'] = x.amount ? String(x.amount) : ''; }
+      S.stfPick = { label: d.label, day: d.day, date: d.date, added: !!d.added, other: !!d.other, kind: d.other ? 'Other' : d.kind || 'Instructor' }; S.stfShowAll = false;
+      if (d.other) { const x = ((co.plan && co.plan.other) || {})[d.label + '|' + d.day] || {}; setOtherWhat(x.what || ''); S.drafts['stf-o-amt'] = x.amount ? String(x.amount) : ''; }
       render(); } return true;
     case 'stfOtherSave': {
       const k = S.stfPick, row = co.sections.flatMap(s => s.rows).find(r => r.label === k.label), cur = row ? cellOf(co, row, Number(k.day)) : (draftOf(co)[k.label + '|' + k.day] || '');
-      const other = { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '') };
+      const other = { what: otherWhat(), amount: String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '') };
       if (!String(other.what || '').trim() || !(parseFloat(other.amount) > 0)) { toast('Fill in what it’s for and the flat amount.'); return true; }
       draftLocal(co, k.label, Number(k.day), cur, k.added, other); S.stfPick = null; render();
       stfQuick([{ action: 'adminDraftSlot', params: { label: k.label, day: k.day, name: cur, virtual: k.added, other } }]);
       return true;
     }
-    case 'stfPickClose': S.stfPick = null; S.stfShowAway = false; render(); return true;
-    case 'stfShowAway': S.stfShowAway = true; render(); return true;
+    case 'stfPickClose': S.stfPick = null; S.stfShowAll = false; render(); return true;
+    case 'stfShowAll': S.stfShowAll = true; render(); return true;
     case 'stfSet': {
       const k = S.stfPick;
       if (k.other && d.name !== '—') { // (left empty: their usual, from last time)
         const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, d.name)), u = x && x.usual;
-        if (u && !String(S.drafts['stf-o-what'] || '').trim()) S.drafts['stf-o-what'] = u.what;
-        if (u && !String(S.drafts['stf-o-amt'] || '').trim()) S.drafts['stf-o-amt'] = String(u.amount);
+        if (u && !String(S.drafts['stf-o-amt'] || '').trim()) { setOtherWhat(u.what); S.drafts['stf-o-amt'] = String(u.amount); } // (amount left empty: their usual)
       }
-      if (k.other && d.name !== '—' && (!String(S.drafts['stf-o-what'] || '').trim() || !(parseFloat(String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '')) > 0))) { toast('Fill in what it’s for and the flat amount first.'); return true; }
-      const other = k.other && d.name !== '—' ? { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt']).replace(/[$,]/g, '') } : undefined;
+      if (k.other && d.name !== '—' && (!otherWhat() || !(parseFloat(String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '')) > 0))) { toast('Fill in what it’s for and the flat amount first.'); return true; }
+      const other = k.other && d.name !== '—' ? { what: otherWhat(), amount: String(S.drafts['stf-o-amt']).replace(/[$,]/g, '') } : undefined;
       const t = takenOn(co, k.label, Number(k.day), d.name);
       if (t) { toast(`${d.name} is already on ${t.label} that day.`); return true; }
-      draftLocal(co, k.label, Number(k.day), d.name, k.added, other); S.stfPick = null; S.stfShowAway = false; render();
+      draftLocal(co, k.label, Number(k.day), d.name, k.added, other); S.stfPick = null; S.stfShowAll = false; render();
       stfQuick([{ action: 'adminDraftSlot', params: { label: k.label, day: k.day, name: d.name, virtual: k.added, other } }]);
       return true;
     }

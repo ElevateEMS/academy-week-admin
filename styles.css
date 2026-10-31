@@ -1778,7 +1778,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .stf-stations .pm svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .stf-other .stf-slot.spare { border-style: dashed; background: transparent; }
 .stf-other .stf-slot.spare .muted { grid-column: 1 / -1; }
-.stf-other-fields { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: end; }
+.stf-other-fields { display: grid; grid-template-columns: 150px 120px auto; gap: 10px; align-items: end; justify-content: start; }
+.stf-other-fields.typed { grid-template-columns: 130px minmax(0, 1fr) 110px auto; justify-content: stretch; }
+.stf-other-fields .field { margin-bottom: 0; }
+.stf-other-fields .field input, .stf-other-fields .field select { height: 38px; box-sizing: border-box; }
+.stf-o-save .btn { height: 38px; padding-top: 0; padding-bottom: 0; }
 .stf-sched-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 14px; }
 .pick-row .usual { font-weight: 500; color: var(--taupe-dark); }
 .stf-saving { font-size: 12px; color: var(--muted); }
