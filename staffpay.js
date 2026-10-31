@@ -639,7 +639,7 @@ function stfAvailBox(co, days) {
   const people = co.people.filter(p => !p.inactive).sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name));
   const shown = hide ? people.filter(p => useful(p) || stfTouched.has(p.name)) : people, gone = people.length - shown.length;
   const owners = (co.owners || []).map(o => ({ ...o, owner: true }));
-  const ownerRows = owners.length ? `<span class="av-group">Nick &amp; Bella</span>` + owners.map(p => `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('') : '';
+  const ownerRows = owners.length ? owners.map(p => `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('') : '';
   const rows = ownerRows + shown.map((p, i) => (i === 0 || roleRank(shown[i - 1].role) !== roleRank(p.role) ? `<span class="av-group">${esc(ROLE_GROUP[roleRank(p.role)])}</span>` : '')
     + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
@@ -648,7 +648,8 @@ function stfAvailBox(co, days) {
   const left = `<aside class="stf-side">
       <div class="stf-card"><b>${n}</b> student${n === 1 ? '' : 's'}<span class="muted small">from the roster</span></div>
       <div class="stf-card">${co.locked ? '<b>Locked</b><span class="muted small">staff reach out to you now</span>' : co.lockOn ? `Staff availability due<b>${monthDay(co.lockOn)}</b>` : '<span class="muted small">No Academy Week date yet</span>'}</div></aside>`;
-  const right = '<aside class="stf-side"></aside>'; // (left empty for now)
+  const right = `<aside class="stf-side">${hide && gone ? `<div class="stf-card"><b>${gone}</b>${gone === 1 ? 'person' : 'people'} hidden<span class="muted small">no ✓ or ? yet</span>
+      <button class="link" data-act="stfHideNo">Show all</button></div>` : ''}</aside>`; // (the eye's count; empty otherwise)
   return `<section class="box stf-avail"><div class="box-head stf-av-head"><h2>Availability</h2>
       <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button>
         <button class="eye inq-reload ${stfLoading[key] ? 'spin' : ''}" data-act="stfRefresh" title="Read the Staffing tab again" aria-label="Refresh">${RESET}</button>
@@ -658,7 +659,6 @@ function stfAvailBox(co, days) {
       <span></span>${days.map(d => `<span class="av-h">${esc(shortMd(d.date))}<span class="muted small">${count(d)} available</span></span>`).join('')}
       ${rows}
     </div>
-    ${hide && gone ? `<p class="muted small av-hidden">${gone} ${gone === 1 ? 'person' : 'people'} hidden (no ✓ or ? this week) · <button class="link" data-act="stfHideNo">Show all</button></p>` : ''}
     ${hide && !shown.length ? '<p class="empty">Nobody has said they’re available yet.</p>' : ''}</div>${right}</div></section>`;
 }
 function stfPickModal() {
