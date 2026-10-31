@@ -1767,3 +1767,15 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .stf-draft-card .link { justify-self: center; }
 .stf-slot.extra { opacity: .75; border-style: dotted; }
 @media (max-width: 1100px) { .stf-av-body { grid-template-columns: 1fr; } .stf-side { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
+/* Scheduling: Schedule header above the day cards, centered − / +, Other slots */
+.stf-sched-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; padding: 8px 14px; border-radius: 12px; }
+.stf-sched-head h2 { font-size: 24px; margin-right: 4px; }
+.stf-sched-head.has { background: var(--honey-soft); border: 1px dashed var(--honey); }
+.stf-day-head b { font-size: 15px; }
+.stf-stations .pm { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--taupe-dark); cursor: pointer; }
+.stf-stations .pm:hover:not(:disabled) { border-color: var(--taupe); background: var(--blush-soft); }
+.stf-stations .pm:disabled { opacity: .35; cursor: default; }
+.stf-stations .pm svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.stf-other .stf-slot.spare { border-style: dashed; background: transparent; }
+.stf-other .stf-slot.spare .muted { grid-column: 1 / -1; }
+.stf-other-fields { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: end; }

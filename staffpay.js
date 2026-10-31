@@ -502,6 +502,19 @@ function dayPlan(co, day) {
   return { stations: st, auto: over == null, per: st ? Math.ceil(n / st) : 0, six: six < st ? six : null, need: { Instructor: st, Assistant: 0, Patient: 0 } };
 }
 const slotKind = role => role === 'EC' ? 'Instructor' : role;
+const PM_MINUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8"/></svg>', PM_PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M8 4v8"/></svg>';
+// Other slots (admin help, photographer…: a flat amount, never a station): everyone in one that day, plus one empty slot.
+function otherSlots(co, i) {
+  const rows = co.sections.filter(s => s.role === 'Other').flatMap(s => s.rows);
+  if (!rows.length) return [];
+  const info = r => ((co.plan && co.plan.other) || {})[r.label + '|' + i] || {};
+  const out = rows.map(r => ({ ...r, value: cellOf(co, r, i), draft: isDraft(co, r, i) })).filter(x => filled(x.value)).map(x => ({ ...x, info: info(x) }));
+  const spare = rows.find(r => !filled(cellOf(co, r, i)));
+  if (spare) out.push({ ...spare, value: 'OPEN', spare: true, info: {} });
+  else { const last = rows[rows.length - 1].label, m = last.match(/^(.*?)(\d+)\s*$/), label = m ? m[1] + (Number(m[2]) + 1) : 'Other ' + (rows.length + 1), dv = draftOf(co)[label + '|' + i];
+    out.push({ label, cells: [], value: dv !== undefined ? dv : 'OPEN', draft: dv !== undefined, added: true, spare: !filled(dv), info: info({ label }) }); }
+  return out;
+}
 const filled = v => v && v !== 'OPEN' && v !== '—';
 const draftOf = co => (co.plan && co.plan.draft) || {};
 // What's in a slot with the draft on top, and whether that's a draft pick.
@@ -522,7 +535,13 @@ function staffingPage() {
   if (co.missing) return `<section class="box"><p class="empty">${esc(key)}’s sheet doesn’t have a Staffing tab (with a “Role / Slot” row) yet.${co.staffingUrl ? ` <a href="${esc(co.staffingUrl)}" target="_blank" rel="noopener">Open the sheet ↗</a>` : ''}</p></section>`;
   co.plan = co.plan || { stations: {}, draft: {} };
   const days = co.days.filter(d => d.date);
-  return stfAvailBox(co, days) + `<div class="stf-week" style="--n:${days.length}">${days.map((d, i) => stfDay(co, d, i, dayPlan(co, d))).join('')}</div>`;
+  const ch = Object.keys(sheetChanges(co)).length;
+  return stfAvailBox(co, days) + `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>
+      ${ch ? `<span>${ch} update${ch === 1 ? '' : 's'} to send to the Staffing tab <span class="muted small">(staff don’t see ${ch === 1 ? 'it' : 'them'} yet)</span></span>
+        <button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Send to Staffing tab'}</button>
+        <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear</button>`
+      : '<span class="muted small">Picks are a draft until you send them to the Staffing tab.</span>'}</div>
+    <div class="stf-week" style="--n:${days.length}">${days.map((d, i) => stfDay(co, d, i, dayPlan(co, d))).join('')}</div>`;
 }
 // The slots a day shows for one kind (Instructor / Assistant / Patient): as many as it needs (the station count), in
 // Staffing tab order, plus new ones ("Instructor 6") when the tab doesn't have enough rows, plus any row past that
@@ -555,6 +574,11 @@ function sheetChanges(co) {
       });
       daySlots(co, i, kind, need).filter(x => x.added).forEach(x => { out[x.label + '|' + i] = x.value; });
     });
+    co.sections.filter(s => s.role === 'Other').flatMap(s => s.rows).forEach(r => { // (Other: a name, or "—")
+      const dv = draftOf(co)[r.label + '|' + i], cur = r.cells[i] || '', want = dv !== undefined ? (filled(dv) ? dv : '—') : (filled(cur) ? cur : '—');
+      if (want !== cur) out[r.label + '|' + i] = want;
+    });
+    otherSlots(co, i).filter(x => x.added && filled(x.value)).forEach(x => { out[x.label + '|' + i] = x.value; });
   });
   return out;
 }
@@ -575,15 +599,18 @@ function stfDay(co, d, i, plan) {
           ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
   }).join('');
   return `<section class="box stf-day ${open ? '' : 'covered'}">
-    <div class="stf-day-head"><b>${esc(shortMd(d.date))}</b><span class="muted small">Day ${d.n}${d.exam ? ' · Psychomotor exam' : ''}</span></div>
-    <div class="stf-stations"><button class="x" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations - 1}" ${plan.stations <= 1 ? 'disabled' : ''} aria-label="Fewer stations">−</button>
+    <div class="stf-day-head"><b>Day ${d.n} - ${esc(shortMd(d.date))}</b>${d.exam ? '<span class="muted small">Psychomotor exam</span>' : ''}</div>
+    <div class="stf-stations"><button class="pm" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations - 1}" ${plan.stations <= 1 ? 'disabled' : ''} aria-label="Fewer stations">${PM_MINUS}</button>
       <span><b>${plan.stations}</b> station${plan.stations === 1 ? '' : 's'}</span>
-      <button class="x" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations + 1}" aria-label="More stations">+</button>
+      <button class="pm" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations + 1}" aria-label="More stations">${PM_PLUS}</button>
       ${plan.auto ? '' : `<button class="link small" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="" title="Back to the count from the number of students">reset</button>`}</div>
-    <p class="muted small stf-math">${d.exam ? 'An instructor, an assistant and a patient at each' : `${plan.per} or fewer students each${plan.six ? ` · short? ${plan.six} stations works at 6 each` : ''}`}</p>
+    <p class="muted small stf-math">${d.exam ? 'An instructor, an assistant and a patient at each testing station.' : `${plan.per} or fewer students each${plan.six ? `<br>Or ${plan.six} station${plan.six === 1 ? '' : 's'} meets 6:1 ratio.` : ''}`}</p>
     <div class="stf-owners">${OWNERS.map(o => { const on = onDay(o), first = o.split(' ')[0];
       return `<button class="chip ${on ? 'on' : ''}" data-act="stfOwner" data-name="${o}" data-day="${i}" title="${on ? 'Take ' + first + ' off this day' : 'Put ' + first + ' in an open Instructor slot'}">${on ? first + ' ✓' : '+ ' + first}</button>`; }).join('')}</div>
     ${secs}
+    ${(() => { const os = otherSlots(co, i); return os.length ? `<div class="stf-sec stf-other"><div class="stf-sec-head"><b>Other</b><span class="muted small">flat amount</span></div>
+      ${os.map(x => `<button class="stf-slot ${x.spare ? 'spare' : 'has'} ${x.draft || (x.added && !x.spare) ? 'draft' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" data-other="1" ${x.added ? 'data-added="1"' : ''}>
+        ${x.spare ? '<span class="muted small">+ Other (admin help, photographer…)</span>' : `<span class="muted small">${esc(x.info.what || 'Other')}</span><span>${esc(x.value)}${x.info.amount ? ` <span class="muted small">· ${money(x.info.amount)}</span>` : ''}</span>`}</button>`).join('')}</div>` : ''; })()}
   </section>`;
 }
 const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient'];
@@ -606,15 +633,11 @@ function stfAvailBox(co, days) {
     + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
   const label = hide ? 'Show everyone' : 'Hide people who are unavailable or haven’t answered';
-  const key = stfKey(), n = studentCount(co), ch = Object.keys(sheetChanges(co)).length;
+  const key = stfKey(), n = studentCount(co);
   const left = `<aside class="stf-side">
       <div class="stf-card"><b>${n}</b> student${n === 1 ? '' : 's'}<span class="muted small">from the roster</span></div>
       <div class="stf-card">${co.locked ? '<b>Locked</b><span class="muted small">staff reach out to you now</span>' : co.lockOn ? `Staff availability due<b>${monthDay(co.lockOn)}</b>` : '<span class="muted small">No Academy Week date yet</span>'}</div></aside>`;
-  const right = `<aside class="stf-side">
-      <div class="stf-card stf-draft-card ${ch ? 'has' : ''}">${ch ? `<b>${ch} change${ch === 1 ? '' : 's'}</b><span class="small">not on the Staffing tab yet (staff don’t see ${ch === 1 ? 'it' : 'them'})</span>
-        <button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Put on the Staffing tab'}</button>
-        <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear draft</button>`
-        : '<span class="small">Picks here are a draft until you put them on the Staffing tab, so you can move people around first.</span>'}</div></aside>`;
+  const right = '<aside class="stf-side"></aside>'; // (left empty for now)
   return `<section class="box stf-avail"><div class="box-head stf-av-head"><h2>Availability</h2>
       <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button>
         <button class="eye inq-reload ${stfLoading[key] ? 'spin' : ''}" data-act="stfRefresh" title="Read the Staffing tab again" aria-label="Refresh">${RESET}</button>
@@ -639,17 +662,25 @@ function stfPickModal() {
       <span><b>${esc(p.name)}</b>${p.role ? `<span class="muted small"> · ${esc(p.role)}</span>` : ''}</span>
       <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : p.a && p.a.note ? esc(p.a.note) : ''}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
   const group = (title, list, cls) => list.length ? `<p class="pick-h">${title}</p>${list.map(p => person(p, cls)).join('')}` : '';
+  const oth = k.other ? `<div class="stf-other-fields">
+      <label class="field">What for<input id="stf-o-what" data-draft="stf-o-what" list="stf-o-list" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Admin help" autocomplete="off"></label>
+      <datalist id="stf-o-list"><option>Admin help</option><option>Photographer</option></datalist>
+      <label class="field">Flat amount<input id="stf-o-amt" data-draft="stf-o-amt" value="${esc(S.drafts['stf-o-amt'] ?? '')}" placeholder="$" inputmode="decimal" autocomplete="off"></label>
+      ${filled(cur) ? `<button class="btn small" data-act="stfOtherSave" ${S.stfBusy ? 'disabled' : ''}>Save</button>` : ''}</div>
+      <p class="muted small">Added to their pay on that day as a flat amount (no timesheet).${filled(cur) ? '' : ' Then pick who:'}</p>` : '';
   return `<div class="overlay" data-act="stfPickClose"><div class="modal small-modal stf-pick" data-stop>
     <div class="modal-head"><h2>${esc(k.label)} · ${parseIso(k.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h2><button class="x big" data-act="stfPickClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
+      ${oth}
       ${OWNERS.map(o => person({ name: o, role: '' })).join('')}
       ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Unavailable', groups.no, 'bad')}
       ${away.length ? (S.stfShowAway ? group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away')
         : `<button class="link pick-away" data-act="stfShowAway">Show inactive (${away.length})</button>`) : ''}
     </div>
     <div class="modal-foot pay-foot"><span class="muted small">${S.stfBusy ? 'Saving…' : 'Goes in the draft'}</span>
-      <span><button class="btn small" data-act="stfSet" data-name="OPEN" ${cur === 'OPEN' || !cur || S.stfBusy ? 'disabled' : ''}>OPEN</button>
-      <button class="btn small" data-act="stfSet" data-name="—" title="This slot isn't needed this day" ${cur === '—' || S.stfBusy ? 'disabled' : ''}>— not needed</button></span></div>
+      <span>${k.other ? (filled(cur) ? `<button class="btn small" data-act="stfSet" data-name="—" ${S.stfBusy ? 'disabled' : ''}>Remove</button>` : '')
+        : `<button class="btn small" data-act="stfSet" data-name="OPEN" ${cur === 'OPEN' || !cur || S.stfBusy ? 'disabled' : ''}>OPEN</button>
+      <button class="btn small" data-act="stfSet" data-name="—" title="This slot isn't needed this day" ${cur === '—' || S.stfBusy ? 'disabled' : ''}>— not needed</button>`}</span></div>
   </div></div>`;
 }
 function stfAvModal() {
@@ -733,12 +764,22 @@ async function staffingAct(a, el = {}) {
       });
       return true;
     }
-    case 'stfPick': if (!S.stfBusy) { S.stfPick = { label: d.label, day: d.day, date: d.date, added: !!d.added }; render(); } return true;
+    case 'stfPick': if (!S.stfBusy) {
+      S.stfPick = { label: d.label, day: d.day, date: d.date, added: !!d.added, other: !!d.other };
+      if (d.other) { const x = ((co.plan && co.plan.other) || {})[d.label + '|' + d.day] || {}; S.drafts['stf-o-what'] = x.what || ''; S.drafts['stf-o-amt'] = x.amount ? String(x.amount) : ''; }
+      render(); } return true;
+    case 'stfOtherSave': {
+      const k = S.stfPick, row = co.sections.flatMap(s => s.rows).find(r => r.label === k.label), cur = row ? cellOf(co, row, Number(k.day)) : (draftOf(co)[k.label + '|' + k.day] || '');
+      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: cur, virtual: k.added, other: { what: S.drafts['stf-o-what'], amount: S.drafts['stf-o-amt'] } }))) S.stfPick = null;
+      render(); return true;
+    }
     case 'stfPickClose': S.stfPick = null; S.stfShowAway = false; render(); return true;
     case 'stfShowAway': S.stfShowAway = true; render(); return true;
     case 'stfSet': {
       const k = S.stfPick;
-      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name, virtual: k.added }))) { S.stfPick = null; S.stfShowAway = false; }
+      if (k.other && d.name !== '—' && (!String(S.drafts['stf-o-what'] || '').trim() || !(parseFloat(String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '')) > 0))) { toast('Fill in what it’s for and the flat amount first.'); return true; }
+      const other = k.other && d.name !== '—' ? { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt']).replace(/[$,]/g, '') } : undefined;
+      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name, virtual: k.added, other }))) { S.stfPick = null; S.stfShowAway = false; }
       render(); return true;
     }
     case 'stfApply': {
