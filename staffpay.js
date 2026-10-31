@@ -114,6 +114,7 @@ function staffTabs() {
 function staffListBox(a) {
   const away = a.people.filter(p => p.inactive);
   const bar = p => {
+    if (p.role === 'Volunteer' && !p.year) return '<span class="muted small">Volunteer · unpaid</span>';
     const pct = Math.min(100, (p.year / a.limit) * 100), soon = Math.min(100, ((p.year + p.coming) / a.limit) * 100);
     const cls = p.year >= a.limit ? 'over' : p.year >= a.alerts[0] ? 'near' : '';
     return `<div class="yr ${cls}" title="${money(p.year)} so far${p.coming ? ' + about ' + money(p.coming) + ' still scheduled' : ''} (limit ${money(a.limit)})">
@@ -154,9 +155,9 @@ function staffEdModal() {
     <div class="modal-body pad-top">
       ${f('name', 'Name (as they should be paid)')}
       <label class="field">Maximum eligible role<select id="se-role" data-draft="se-role">
-        <option value="">Pick one</option>${[...PAY_ROLES, ...(S.drafts['se-role'] && !PAY_ROLES.includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
+        <option value="">Pick one</option>${[...PAY_ROLES, 'Volunteer', ...(S.drafts['se-role'] && ![...PAY_ROLES, 'Volunteer'].includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
           .map(r => `<option ${r === S.drafts['se-role'] ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
-      <p class="muted small se-hint">What they're paid on an Instructor day. Change it when someone gets certified; their unpaid Instructor days move to the new rate.</p>
+      <p class="muted small se-hint">What they're paid on an Instructor day. Change it when someone gets certified; their unpaid Instructor days move to the new rate. <b>Volunteer</b>: fills a slot and counts toward the stations, but is never paid (no timesheets or W-9).</p>
       ${f('phone', 'Phone', 'tel')}
       ${f('email', 'Email', 'email')}
       <div class="se-em"><span class="muted small">Emergency contact</span>
@@ -476,6 +477,7 @@ function staffingLink() {
    station; Nick counts like anyone in an Instructor slot (on unless you take him off that day), Bella if you add her. */
 const AV_LABEL = { yes: 'Available', maybe: 'Maybe', no: 'Unavailable' };
 const AV_NEXT = { '': 'yes', yes: 'maybe', maybe: 'no', no: '' };
+const isVolunteer = (co, name) => co.people.some(p => p.role === 'Volunteer' && sameStaff(p.name, name));
 const isOwner = name => OWNERS.some(o => sameStaff(o, name));
 const OWNERS = ['Nick Brown', 'Bella Brown'];
 const stfLoading = {}, stfFresh = {};
@@ -601,7 +603,7 @@ function stfDay(co, d, i, plan) {
         return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" ${x.added ? 'data-added="1"' : ''}
           title="${x.extra ? 'Not needed for ' + need + ' station' + (need === 1 ? '' : 's') + '. Click to change.' : x.added ? 'A new row: added to the Staffing tab when you put the draft on it' : x.draft ? 'Draft: on the Staffing tab it’s ' + esc(x.cells[i] || 'OPEN') : ''}">
           <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) : '<b class="stf-open-tag">OPEN</b>'}</span>
-          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
+          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : isVolunteer(co, v) ? '<em class="tag-soft">volunteer</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
   }).join('');
   return `<section class="box stf-day ${open ? '' : 'covered'}">
     <div class="stf-day-head"><b>Day ${d.n} - ${esc(shortMd(d.date))}</b>${d.exam ? '<span class="muted small">Psychomotor exam</span>' : ''}</div>
@@ -618,9 +620,9 @@ function stfDay(co, d, i, plan) {
         ${x.spare ? '<span class="muted small">+ Other · Ex. Admin help</span>' : `<span class="muted small">${esc(x.info.what || 'Other')}</span><span>${esc(x.value)}${x.info.amount ? ` <span class="muted small">· ${money(x.info.amount)}</span>` : ''}</span>`}</button>`).join('')}</div>` : ''; })()}
   </section>`;
 }
-const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient'];
-const ROLE_GROUP = ['EC & Equivalent', 'Non-Certified Instructors', 'Assistants', 'Patients', 'No role picked'];
-const roleRank = r => { const i = ROLE_ORDER.indexOf(r); return i < 0 ? 4 : i; };
+const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient', 'Volunteer'];
+const ROLE_GROUP = ['EC & Equivalent', 'Non-Certified Instructors', 'Assistants', 'Patients', 'Volunteers', 'No role picked'];
+const roleRank = r => { const i = ROLE_ORDER.indexOf(r); return i < 0 ? 5 : i; };
 // Availability: each click goes no answer → ✓ → ? → ✕ → no answer; ✎ (bottom right) for a note; * = has a note.
 // The eye hides people with no ✓ or ? that week (a row you've just changed stays until you leave or switch weeks).
 const stfTouched = new Set();
