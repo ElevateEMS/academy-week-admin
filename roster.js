@@ -134,7 +134,8 @@ function saveListSoon(r) {
     .catch(e => { console.warn('Roster list not saved yet:', e.message); setTimeout(() => listSaving.delete(id), 30000); }); // (tries again in a bit)
 }
 // (an orientation to schedule counts too: the Course To-Do shows even before the Setup Checklist is done)
-const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => (t.roster || t.orientFor) && !t.done);
+// (A Drop / Withdraw's to-dos count too, so they show before the Setup Checklist is done.)
+const hasRosterTodos = () => itemsFor(SETUP, 'ctodo').some(t => (t.roster || t.orientFor || t.dropFor || /^drop-/.test(t.id)) && !t.done);
 
 /* ---------- Students who need an orientation date ---------- */
 // Enrolled after the cohort's orientation with no date of their own yet, or marked Absent on the roster for the
