@@ -1062,7 +1062,10 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       if (kind === 'ctodo' && t.roster) open = rosterBtn(t);
       if (kind === 'ctodo' && isStaffingItem(t.text)) open = staffingLink();
       // A to-do the admin script added from a Ride Along Request: Open ↗ goes to their row in Clinical Tracking.
-      if (t.link && /^https:\/\//.test(t.link)) open = `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-name="${esc(t.linkName || 'Clinical Tracking')}" title="Their request in the Clinical Tracking sheet">Open ↗</a>`;
+      // A Drop / Withdraw's JBL to-do: Open ↗ goes to JB Learning in Chrome (it won't open in the app).
+      if (t.link && /^https:\/\//.test(t.link)) open = /\.google\.com\//.test(t.link)
+        ? `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-name="${esc(t.linkName || 'Clinical Tracking')}" title="Their request in the Clinical Tracking sheet">Open ↗</a>`
+        : `<a class="btn tiny" href="${esc(t.link)}" target="_blank" rel="noopener" data-chrome title="${esc(t.linkName || 'Open')} (opens in Chrome)">${esc(t.linkName || 'Open')} ↗</a>`;
       if (bag) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
@@ -2097,7 +2100,7 @@ function dropModal() {
         <li>Take them off the roster (everyone under them moves up a row) and put <b>${esc(s.name)} - ${kind} ${esc(when)}</b> under “Dropped/withdrawn students”, marked <b>Blocked</b>.</li>
         <li>Lock them out of the Student Hub and take them off every email, list and count here.</li>
         <li>Add them to the ${esc(S.cohortKey)} Dropped Students Record (Cert # left blank for you).</li>
-        <li>Add to the Course To-Do: download their JBL report, then remove JBL access, then update their VAOEMS disposition.</li>
+        <li>Add to the Course To-Do: download their JBL report and then remove JBL access, then update their VAOEMS disposition (${kind}).</li>
       </ul>
       <p class="muted small">There’s no undo.</p>` : '<p class="muted small">Pick Dropped or Withdrawn.</p>'}
     </div>

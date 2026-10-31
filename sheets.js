@@ -5,7 +5,7 @@
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
      dropStudent(key, s, drop)   -> Drop / Withdraw ({ kind, date, note }): off the main roster (the rows under them move
                                     up), onto the dropped list under it as Blocked, a row in the Dropped Students Record,
-                                    and three Course To-Dos (JBL report, JBL access, VAOEMS disposition)
+                                    and two Course To-Dos (JBL report then access, VAOEMS disposition)
      listScenarios               -> the scenario Docs in the Medical and Trauma folders (names, links)
      createCohort(key, info)     -> adds a cohort to the config sheet; the Student Hub script makes its folder + sheets,
                                     then any course details typed in go into its settings box
