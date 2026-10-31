@@ -1215,6 +1215,11 @@ li.done .x.due-add { display: none; }
 .ship-btns { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ship-btns .eye { opacity: .7; } .ship-btns .eye:hover { opacity: 1; }
 .checks li:has(.ship-btns) { flex-wrap: nowrap; }
+/* Overdue payment / Drop to-dos: the text gets the whole width, the buttons and due date go on the row under it. */
+.checks li.two-row { flex-wrap: wrap; row-gap: 6px; }
+.checks li.two-row > label { flex-basis: 100%; }
+.checks li.two-row > label + * { margin-left: 32px; }
+.checks li.two-row > .x { margin-left: auto; }
 /* Orientation roster to-dos: the date small beside the words, late names underneath, a compact signature button */
 .checks li:has(.ro-btn) { flex-wrap: nowrap; }
 .checks li:has(.ro-btn) label { min-width: 0; }

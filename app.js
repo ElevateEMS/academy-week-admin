@@ -1079,7 +1079,9 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
-      return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
+      // An overdue payment or a Drop / Withdraw to-do: its buttons and due date get their own row under the text.
+      const twoRow = kind === 'ctodo' && !compact && (t.payFor || t.dropFor || /^drop-/.test(t.id));
+      return `<li class="${done ? 'done' : ''} ${twoRow ? 'two-row' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
       <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
       ${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
     </li>`;
