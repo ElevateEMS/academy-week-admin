@@ -669,7 +669,8 @@ function stfPickModal() {
   const person = (p, cls = '') => { const t = taken(p.name), on = sameStaff(cur, p.name);
     return `<button class="pick-row ${cls} ${on ? 'on' : ''}" data-act="stfSet" data-name="${esc(p.name)}" ${t || on || S.stfBusy ? 'disabled' : ''}>
       <span><b>${esc(p.name)}</b>${p.role ? `<span class="muted small"> · ${esc(p.role)}</span>` : ''}</span>
-      <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : p.a && p.a.note ? esc(p.a.note) : ''}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
+      <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : [k.other && usualOf(p.name) ? `<b class="usual">${esc(usualOf(p.name).what)} ${money(usualOf(p.name).amount)}</b>` : '', p.a && p.a.note ? esc(p.a.note) : ''].filter(Boolean).join(' · ')}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
+  const usualOf = name => { const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, name)); return x && x.usual && x.usual.amount ? x.usual : null; };
   const group = (title, list, cls) => list.length ? `<p class="pick-h">${title}</p>${list.map(p => person(p, cls)).join('')}` : '';
   const oth = k.other ? `<div class="stf-other-fields">
       <label class="field">What for<input id="stf-o-what" data-draft="stf-o-what" list="stf-o-list" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Ex. Admin help" autocomplete="off"></label>
@@ -787,6 +788,11 @@ async function staffingAct(a, el = {}) {
     case 'stfShowAway': S.stfShowAway = true; render(); return true;
     case 'stfSet': {
       const k = S.stfPick;
+      if (k.other && d.name !== '—') { // (left empty: their usual, from last time)
+        const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, d.name)), u = x && x.usual;
+        if (u && !String(S.drafts['stf-o-what'] || '').trim()) S.drafts['stf-o-what'] = u.what;
+        if (u && !String(S.drafts['stf-o-amt'] || '').trim()) S.drafts['stf-o-amt'] = String(u.amount);
+      }
       if (k.other && d.name !== '—' && (!String(S.drafts['stf-o-what'] || '').trim() || !(parseFloat(String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '')) > 0))) { toast('Fill in what it’s for and the flat amount first.'); return true; }
       const other = k.other && d.name !== '—' ? { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt']).replace(/[$,]/g, '') } : undefined;
       if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name, virtual: k.added, other }))) { S.stfPick = null; S.stfShowAway = false; }
