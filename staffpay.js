@@ -474,7 +474,7 @@ function staffingLink() {
    Station math: skills days = the fewest stations with 5 or fewer students each (6 each shown as a hint if you're
    short); the last day (psychomotor exam) = 3 stations → 3 instructors + 3 assistants + 3 patients. 1 instructor per
    station; Nick counts like anyone in an Instructor slot (on unless you take him off that day), Bella if you add her. */
-const AV_LABEL = { yes: 'Available', maybe: 'Maybe', no: 'Can’t' };
+const AV_LABEL = { yes: 'Available', maybe: 'Maybe', no: 'Unavailable' };
 const AV_NEXT = { '': 'yes', yes: 'maybe', maybe: 'no', no: '' };
 const OWNERS = ['Nick Brown', 'Bella Brown'];
 const stfLoading = {}, stfFresh = {};
@@ -572,7 +572,7 @@ function stfDay(co, d, i, plan) {
         return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" ${x.added ? 'data-added="1"' : ''}
           title="${x.extra ? 'Not needed for ' + need + ' station' + (need === 1 ? '' : 's') + '. Click to change.' : x.added ? 'A new row: added to the Staffing tab when you put the draft on it' : x.draft ? 'Draft: on the Staffing tab it’s ' + esc(x.cells[i] || 'OPEN') : ''}">
           <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) : '<b class="stf-open-tag">OPEN</b>'}</span>
-          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">said can’t</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
+          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">unavailable</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
   }).join('');
   return `<section class="box stf-day ${open ? '' : 'covered'}">
     <div class="stf-day-head"><b>${esc(shortMd(d.date))}</b><span class="muted small">Day ${d.n}${d.exam ? ' · Psychomotor exam' : ''}</span></div>
@@ -605,7 +605,7 @@ function stfAvailBox(co, days) {
   const rows = shown.map((p, i) => (i === 0 || roleRank(shown[i - 1].role) !== roleRank(p.role) ? `<span class="av-group">${esc(ROLE_GROUP[roleRank(p.role)])}</span>` : '')
     + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
-  const label = hide ? 'Show everyone' : 'Hide people who can’t work or haven’t answered';
+  const label = hide ? 'Show everyone' : 'Hide people who are unavailable or haven’t answered';
   const key = stfKey(), n = studentCount(co), ch = Object.keys(sheetChanges(co)).length;
   const left = `<aside class="stf-side">
       <div class="stf-card"><b>${n}</b> student${n === 1 ? '' : 's'}<span class="muted small">from the roster</span></div>
@@ -643,7 +643,7 @@ function stfPickModal() {
     <div class="modal-head"><h2>${esc(k.label)} · ${parseIso(k.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h2><button class="x big" data-act="stfPickClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${OWNERS.map(o => person({ name: o, role: '' })).join('')}
-      ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Said they can’t', groups.no, 'bad')}
+      ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Unavailable', groups.no, 'bad')}
       ${away.length ? (S.stfShowAway ? group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away')
         : `<button class="link pick-away" data-act="stfShowAway">Show inactive (${away.length})</button>`) : ''}
     </div>
