@@ -673,7 +673,7 @@ function stfPickModal() {
   const person = (p, cls = '') => { const t = taken(p.name), on = sameStaff(cur, p.name);
     return `<button class="pick-row ${cls} ${on ? 'on' : ''}" data-act="stfSet" data-name="${esc(p.name)}" ${t || on || S.stfBusy ? 'disabled' : ''}>
       <span><b>${esc(p.name)}</b>${p.role ? `<span class="muted small"> · ${esc(p.role)}</span>` : ''}</span>
-      <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : [k.other && usualOf(p.name) ? `<b class="usual">${esc(usualOf(p.name).what)} ${money(usualOf(p.name).amount)}</b>` : '', p.a && p.a.note ? esc(p.a.note) : ''].filter(Boolean).join(' · ')}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
+      <span class="muted small">${on ? 'in this slot' : t ? 'on the schedule' : [k.other && usualOf(p.name) ? `<b class="usual">${esc(usualOf(p.name).what)} ${money(usualOf(p.name).amount)}</b>` : '', p.a && p.a.note ? esc(p.a.note) : ''].filter(Boolean).join(' · ')}</span></button>`; };
   const usualOf = name => { const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, name)); return x && x.usual && x.usual.amount ? x.usual : null; };
   const group = (title, list, cls) => list.length ? `<p class="pick-h">${title}</p>${list.map(p => person(p, cls)).join('')}` : '';
   const okind = S.drafts['stf-o-kind'] === 'Other' ? 'Other' : 'Admin help';
