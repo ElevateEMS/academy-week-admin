@@ -101,7 +101,7 @@ function staffTitle() {
   const when = x => monthDay(x.start) + '–' + monthDay(x.end);
   if (!key) return '<h1>Scheduling</h1>';
   return `<h1>Scheduling</h1><div class="stf-week-pick"><button class="stf-week-btn" data-act="stfWeekMenu" aria-expanded="${!!S.stfWeekMenu}">${esc(key)} Academy Week${w ? ' · ' + when(w) : ''}${weeks.length > 1 ? ' ▾' : ''}</button>
-    ${S.stfWeekMenu && weeks.length > 1 ? `<div class="stf-week-menu">${weeks.map(x => `<button class="${x.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(x.cohort)}">${esc(x.cohort)} Academy Week <span class="muted small">${when(x)}${x.test ? ' · test' : ''}</span></button>`).join('')}</div>` : ''}</div>`;
+    ${S.stfWeekMenu && weeks.length > 1 ? `<div class="stf-week-menu">${weeks.map(x => `<button class="${x.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(x.cohort)}">${esc(x.cohort)} Academy Week <span class="muted small">${when(x)}</span></button>`).join('')}</div>` : ''}</div>`;
 }
 // The week menu closes when you click anywhere else.
 document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest('.stf-week-pick')) { S.stfWeekMenu = false; render(); } }, true);
@@ -480,9 +480,9 @@ const OWNERS = ['Nick Brown', 'Bella Brown'];
 const stfLoading = {}, stfFresh = {};
 const stfKey = () => {
   const weeks = (S.staffAll && S.staffAll.weeks) || [];
-  if (S.stfKey && (weeks.some(w => w.cohort === S.stfKey) || (S.stf && S.stf[S.stfKey]))) return S.stfKey;
-  const real = weeks.find(w => !w.test) || weeks[0]; // (opens on the next real week, never a test cohort)
-  return (real && real.cohort) || pref('stfKey') || '';
+  if (S.stfKey && (weeks.some(w => w.cohort === S.stfKey) || (S.stf && S.stf[S.stfKey] && !isTestCohort(S.stfKey)))) return S.stfKey; // (never a test cohort)
+  const saved = pref('stfKey');
+  return (weeks[0] && weeks[0].cohort) || (saved && !isTestCohort(saved) ? saved : '');
 };
 async function loadStaffing(cohort, fresh = false) {
   if (!staffReady() || !cohort || stfLoading[cohort]) return;
