@@ -476,6 +476,7 @@ function staffingLink() {
    station; Nick counts like anyone in an Instructor slot (on unless you take him off that day), Bella if you add her. */
 const AV_LABEL = { yes: 'Available', maybe: 'Maybe', no: 'Unavailable' };
 const AV_NEXT = { '': 'yes', yes: 'maybe', maybe: 'no', no: '' };
+const isOwner = name => OWNERS.some(o => sameStaff(o, name));
 const OWNERS = ['Nick Brown', 'Bella Brown'];
 const stfLoading = {}, stfFresh = {};
 const stfKey = () => {
@@ -522,7 +523,10 @@ const draftOf = co => (co.plan && co.plan.draft) || {};
 const cellOf = (co, r, i) => { const d = draftOf(co)[r.label + '|' + i]; return d !== undefined ? d : r.cells[i]; };
 const isDraft = (co, r, i) => draftOf(co)[r.label + '|' + i] !== undefined;
 const sameStaff = (a, b) => { const n = x => String(x || '').toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim(); return !!a && !!b && n(a) === n(b); };
-const availOf = (co, name, date) => { const p = co.people.find(x => sameStaff(x.name, name)); return p ? (p.avail || {})[date] || null : null; };
+// (Nick and Bella: Available unless you changed that day)
+const availOf = (co, name, date) => { const o = (co.owners || []).find(x => sameStaff(x.name, name)); if (o) return (o.avail || {})[date] || { s: 'yes' };
+  const p = co.people.find(x => sameStaff(x.name, name)); return p ? (p.avail || {})[date] || null : null; };
+const AV_NEXT_OWNER = { yes: 'maybe', maybe: 'no', no: 'yes' };
 const shortMd = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 
 function staffingPage() {
@@ -593,7 +597,7 @@ function stfDay(co, d, i, plan) {
     open += Math.max(0, need - have);
     if (!need && !slots.some(x => x.extra)) return '';
     return `<div class="stf-sec"><div class="stf-sec-head"><b>${kind}s</b><span class="${have >= need ? 'stf-ok' : 'stf-short'}">${have}/${need}${have < need ? ' · ' + (need - have) + ' open' : ' ✓'}</span></div>
-      ${slots.map(x => { const v = x.value, a = filled(v) && !OWNERS.some(o => sameStaff(o, v)) ? availOf(co, v, d.date) : null;
+      ${slots.map(x => { const v = x.value, a = filled(v) ? availOf(co, v, d.date) : null;
         return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" ${x.added ? 'data-added="1"' : ''}
           title="${x.extra ? 'Not needed for ' + need + ' station' + (need === 1 ? '' : 's') + '. Click to change.' : x.added ? 'A new row: added to the Staffing tab when you put the draft on it' : x.draft ? 'Draft: on the Staffing tab it’s ' + esc(x.cells[i] || 'OPEN') : ''}">
           <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) : '<b class="stf-open-tag">OPEN</b>'}</span>
@@ -622,7 +626,7 @@ const roleRank = r => { const i = ROLE_ORDER.indexOf(r); return i < 0 ? 4 : i; }
 const stfTouched = new Set();
 function stfAvailBox(co, days) {
   const hide = pref('stfHideNo') === '1';
-  const cell = (p, d) => { const a = (p.avail || {})[d.date] || {};
+  const cell = (p, d) => { const a = (p.avail || {})[d.date] || (p.owner ? { s: 'yes' } : {});
     return `<span class="av-wrap"><button class="av-cell ${a.s ? 'is-' + a.s : ''}" data-act="stfAvCycle" data-name="${esc(p.name)}" data-date="${d.date}" title="${esc((a.s ? AV_LABEL[a.s] : 'No answer yet') + (a.note ? ': ' + a.note : '') + (a.by ? ' (entered by ' + a.by + ')' : a.s ? ' (from the Staff Portal)' : ''))}">
       ${a.s === 'yes' ? '✓' : a.s === 'maybe' ? '?' : a.s === 'no' ? '✕' : '·'}${a.note ? '<i class="av-star">*</i>' : ''}</button>
       <button class="av-pen" data-act="stfAvEd" data-name="${esc(p.name)}" data-date="${d.date}" title="Note" aria-label="Note">✎</button></span>`; };
@@ -630,7 +634,9 @@ function stfAvailBox(co, days) {
   // Fixed order (nothing moves when you click): by role, then A–Z. Inactive people (Staff Directory Status) aren't listed.
   const people = co.people.filter(p => !p.inactive).sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name));
   const shown = hide ? people.filter(p => useful(p) || stfTouched.has(p.name)) : people, gone = people.length - shown.length;
-  const rows = shown.map((p, i) => (i === 0 || roleRank(shown[i - 1].role) !== roleRank(p.role) ? `<span class="av-group">${esc(ROLE_GROUP[roleRank(p.role)])}</span>` : '')
+  const owners = (co.owners || []).map(o => ({ ...o, owner: true }));
+  const ownerRows = owners.length ? `<span class="av-group">Nick &amp; Bella</span>` + owners.map(p => `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('') : '';
+  const rows = ownerRows + shown.map((p, i) => (i === 0 || roleRank(shown[i - 1].role) !== roleRank(p.role) ? `<span class="av-group">${esc(ROLE_GROUP[roleRank(p.role)])}</span>` : '')
     + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
   const label = hide ? 'Show everyone' : 'Hide people who are unavailable or haven’t answered';
@@ -673,7 +679,7 @@ function stfPickModal() {
     <div class="modal-head"><h2>${esc(k.label)} · ${parseIso(k.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h2><button class="x big" data-act="stfPickClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${oth}
-      ${OWNERS.map(o => person({ name: o, role: '' })).join('')}
+      ${OWNERS.map(o => { const a = availOf(co, o, k.date); return person({ name: o, role: '', a: a && (a.s !== 'yes' || a.note) ? a : null }, a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''); }).join('')}
       ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Unavailable', groups.no, 'bad')}
       ${away.length ? (S.stfShowAway ? group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away')
         : `<button class="link pick-away" data-act="stfShowAway">Show inactive (${away.length})</button>`) : ''}
@@ -685,13 +691,14 @@ function stfPickModal() {
   </div></div>`;
 }
 function stfAvModal() {
-  const e = S.stfAv, co = stfCo(), p = co.people.find(x => x.name === e.name), a = (p.avail || {})[e.date] || {};
+  const e = S.stfAv, co = stfCo(), p = stfPerson(stfKey(), e.name), a = (p.avail || {})[e.date] || {};
   return `<div class="overlay" data-act="stfAvClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>${esc(e.name)} · ${parseIso(e.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h2><button class="x big" data-act="stfAvClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       <div class="seg av-seg">${['yes', 'maybe', 'no'].map(s => `<button class="${e.s === s ? 'on ' + s : ''}" data-act="stfAvS" data-s="${s}">${AV_LABEL[s]}</button>`).join('')}</div>
       <label class="field">Note<input id="stf-av-note" data-draft="stf-av-note" value="${esc(S.drafts['stf-av-note'] ?? a.note ?? '')}" placeholder="Optional, like “until 1500”" maxlength="200" autocomplete="off"></label>
-      <p class="muted small">${a.s ? (a.by ? `Entered by ${esc(a.by)}.` : `${esc(e.name.split(' ')[0])} picked this on the Staff Portal.`) : 'No answer yet.'} It shows on their Staff Portal as “added by ${S.user && /^nbrown@/i.test(S.user.email || '') ? 'Nick' : 'Bella'}”, and they can still change it until it locks.</p>
+      ${isOwner(e.name) ? '<p class="muted small">Just for you two to remember (Available unless you change it).</p>'
+        : `<p class="muted small">${a.s ? (a.by ? `Entered by ${esc(a.by)}.` : `${esc(e.name.split(' ')[0])} picked this on the Staff Portal.`) : 'No answer yet.'} It shows on their Staff Portal as “added by ${S.user && /^nbrown@/i.test(S.user.email || '') ? 'Nick' : 'Bella'}”, and they can still change it until it locks.</p>`}
     </div>
     <div class="modal-foot pay-foot">${a.s ? `<button class="link" data-act="stfAvSave" data-clear="1">Clear</button>` : '<span></span>'}
       <button class="btn primary" data-act="stfAvSave" ${!e.s ? 'disabled' : ''}>Save</button></div>
@@ -707,7 +714,7 @@ async function stfDo(fn) {
 // Availability clicks: shown at once, saved one after another.
 let avQueue = Promise.resolve();
 const avPending = {}; // "cohort|name|date" → { s, note, prev, t }
-const stfPerson = (key, name) => ((S.stf && S.stf[key]) || { people: [] }).people.find(x => x.name === name);
+const stfPerson = (key, name) => { const co = (S.stf && S.stf[key]) || { people: [] }; return co.people.concat(co.owners || []).find(x => x.name === name); };
 function stfSaveAvail(name, date, s, note) {
   const key = stfKey(), p = stfPerson(key, name), me = S.user && /^nbrown@/i.test(S.user.email || '') ? 'Nick' : 'Bella';
   if (!p) return;
@@ -799,8 +806,10 @@ async function staffingAct(a, el = {}) {
       await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: free.label, day: i, name: d.name, virtual: !!free.added }));
       return true;
     }
-    case 'stfAvCycle': { const p = stfPerson(key, d.name); if (!p) return true; const a = (p.avail || {})[d.date] || {}; stfSaveAvail(d.name, d.date, AV_NEXT[a.s || ''], a.note || ''); return true; }
-    case 'stfAvEd': { const p = co.people.find(x => x.name === d.name), cur = (p.avail || {})[d.date] || {};
+    case 'stfAvCycle': { const p = stfPerson(key, d.name); if (!p) return true;
+      if (isOwner(d.name)) { const a = (p.avail || {})[d.date] || { s: 'yes' }, next = AV_NEXT_OWNER[a.s || 'yes']; stfSaveAvail(d.name, d.date, next === 'yes' && !a.note ? '' : next, a.note || ''); return true; } // (✓ = the default: nothing saved)
+      const a = (p.avail || {})[d.date] || {}; stfSaveAvail(d.name, d.date, AV_NEXT[a.s || ''], a.note || ''); return true; }
+    case 'stfAvEd': { const p = stfPerson(key, d.name), cur = (p.avail || {})[d.date] || (isOwner(d.name) ? { s: 'yes' } : {});
       S.stfAv = { name: d.name, date: d.date, s: cur.s || '' }; S.drafts['stf-av-note'] = cur.note || ''; render();
       setTimeout(() => { const x = document.getElementById('stf-av-note'); if (x) x.focus(); }, 0); return true; }
     case 'stfAvS': S.stfAv.s = d.s; render(); return true;
