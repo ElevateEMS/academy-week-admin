@@ -1697,7 +1697,6 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .stf-add { justify-self: start; font-size: 12px; }
 .box.stf-avail { margin-bottom: 14px; flex: 0 0 auto; overflow: visible; }
 .stf-avail h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); line-height: 1.2; }
-.av-grid { display: grid; grid-template-columns: minmax(170px, auto) repeat(var(--n), minmax(64px, 1fr)); gap: 4px 6px; align-items: center; overflow-x: auto; }
 .av-h { text-align: center; font-size: 12px; color: var(--muted); }
 .av-name { display: grid; line-height: 1.2; padding: 3px 0; }
 .av-cell { position: relative; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); cursor: pointer; font-size: 15px; color: var(--muted); }
@@ -1705,11 +1704,6 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .av-cell.is-yes { background: var(--sage-soft); border-color: #c7d5c2; color: #4f6b4b; font-weight: 600; }
 .av-cell.is-maybe { background: var(--honey-soft); border-color: #e3cfa9; color: #8a6a35; font-weight: 600; }
 .av-cell.is-no { background: var(--rose-soft); border-color: #e4bdb6; color: #8d4f48; font-weight: 600; }
-.av-dot, .av-by-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--taupe-dark); vertical-align: middle; }
-.av-cell .av-dot { position: absolute; top: 4px; right: 4px; }
-.av-by-dot { background: transparent; border: 1.5px solid var(--taupe-dark); width: 7px; height: 7px; }
-.av-cell .av-by-dot { position: absolute; bottom: 4px; right: 4px; }
-.av-key { margin: 10px 0 0; }
 .av-seg { display: flex; margin-bottom: 12px; }
 .av-seg button { flex: 1; padding: 8px 10px; font-size: 14px; }
 .av-seg button.on.yes { background: var(--sage); color: #fff; }
@@ -1726,16 +1720,27 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pick-row.bad { border-left: 4px solid var(--rose); }
 /* Staff page → Scheduling */
 .staff-switch { align-self: center; }
-.stf-weeks { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
-.stf-weeks .chip { border-color: var(--line); color: var(--ink); }
-.stf-weeks .chip:hover { background: var(--blush-soft); }
-.stf-weeks .chip.on { background: var(--blush); border-color: var(--taupe); color: var(--ink); } /* (pink, like the selected day in the day strip) */
 .stf-draft-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--honey-soft); border: 1px dashed var(--honey); border-radius: 12px; padding: 8px 14px; margin-bottom: 14px; font-size: 14px; }
 .stf-draft-bar > span { flex: 1; }
 .stf-draft-hint { text-align: center; margin: -4px 0 12px; }
 .stf-slot.draft { border-style: dashed; border-width: 1.5px; border-color: var(--taupe-dark); }
 .av-wrap { position: relative; display: grid; }
-.av-pen { position: absolute; top: 50%; left: 4px; transform: translateY(-50%); border: 0; background: none; color: var(--taupe-dark); font-size: 12px; cursor: pointer; opacity: 0; padding: 2px; }
 .av-wrap:hover .av-pen, .av-pen:focus { opacity: .8; }
 .av-h { display: grid; }
 .av-h .muted { font-size: 11px; }
+/* Availability (bundle 2026-10-30): centered grid, * = note (top right), ✎ bottom right on hover, eye on the title line */
+.av-grid { display: grid; grid-template-columns: minmax(170px, max-content) repeat(var(--n), 92px); gap: 4px 8px; align-items: center; width: max-content; max-width: 100%; margin: 0 auto; overflow-x: auto; }
+.av-h { text-align: center; }
+.av-star { position: absolute; top: 1px; right: 5px; font-style: normal; font-weight: 700; font-size: 14px; color: var(--taupe-dark); line-height: 1; }
+.av-pen { position: absolute; bottom: 1px; right: 3px; border: 0; background: none; color: var(--taupe-dark); font-size: 12px; cursor: pointer; opacity: 0; padding: 1px 2px; line-height: 1; }
+.stf-av-head { cursor: default; }
+.stf-av-head:active { cursor: default; }
+.av-hidden { text-align: center; margin: 10px 0 0; }
+/* Scheduling: the week under the page title, with its ▾ menu */
+.stf-week-pick { position: relative; display: inline-block; }
+.stf-week-btn { border: 0; background: none; color: var(--muted); letter-spacing: .04em; font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+.stf-week-btn:hover { background: var(--blush-soft); color: var(--ink); }
+.stf-week-menu { position: absolute; left: 50%; transform: translateX(-50%); top: calc(100% + 4px); z-index: 30; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 4px; display: grid; min-width: 260px; }
+.stf-week-menu button { border: 0; background: none; text-align: left; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink); white-space: nowrap; }
+.stf-week-menu button:hover { background: var(--blush-soft); }
+.stf-week-menu button.on { background: var(--blush); }

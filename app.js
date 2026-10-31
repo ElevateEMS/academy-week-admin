@@ -793,7 +793,7 @@ function shell() {
 
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
-  if (S.view === 'staff') return '<h1>Staff</h1>';
+  if (S.view === 'staff') return staffTitle();
   if (S.view === 'course') {
     const f = cohortInfo().firstDay, n = S.sheet ? attending().length : 0; // (enrolled: dropped / not attending aren't counted)
     const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';

@@ -94,6 +94,17 @@ function staffView() {
     </div>
   </div>`;
 }
+// Staff page title: "Staff", or on Scheduling "Scheduling" with the week under it (▾ = the other upcoming weeks).
+function staffTitle() {
+  if (staffTab() !== 'stf') return '<h1>Staff</h1>';
+  const weeks = (S.staffAll && S.staffAll.weeks) || [], key = stfKey(), w = weeks.find(x => x.cohort === key);
+  const when = x => monthDay(x.start) + '–' + monthDay(x.end);
+  if (!key) return '<h1>Scheduling</h1>';
+  return `<h1>Scheduling</h1><div class="stf-week-pick"><button class="stf-week-btn" data-act="stfWeekMenu" aria-expanded="${!!S.stfWeekMenu}">${esc(key)} Academy Week${w ? ' · ' + when(w) : ''}${weeks.length > 1 ? ' ▾' : ''}</button>
+    ${S.stfWeekMenu && weeks.length > 1 ? `<div class="stf-week-menu">${weeks.map(x => `<button class="${x.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(x.cohort)}">${esc(x.cohort)} Academy Week <span class="muted small">${when(x)}</span></button>`).join('')}</div>` : ''}</div>`;
+}
+// The week menu closes when you click anywhere else.
+document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest('.stf-week-pick')) { S.stfWeekMenu = false; render(); } }, true);
 // Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
@@ -494,9 +505,8 @@ const shortMd = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'sho
 
 function staffingPage() {
   const weeks = (S.staffAll && S.staffAll.weeks) || [], key = stfKey();
-  const chips = `<div class="stf-weeks">${weeks.map(w => `<button class="chip ${w.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(w.cohort)}">${esc(w.cohort)} <span class="muted small">${monthDay(w.start)}–${monthDay(w.end)}</span></button>`).join('')}
-    ${key && !weeks.some(w => w.cohort === key) ? `<button class="chip on">${esc(key)}</button>` : ''}</div>`;
-  if (!key) return chips + '<section class="box"><p class="empty">No Academy Weeks coming up (a cohort needs an Academy Week Start date on its roster).</p></section>';
+  const chips = ''; // (the week picker is the page title's ▾)
+  if (!key) return '<section class="box"><p class="empty">No Academy Weeks coming up (a cohort needs an Academy Week Start date on its roster).</p></section>';
   if (!stfFresh[key] && !stfLoading[key] && !S.stfErr) setTimeout(() => loadStaffing(key), 0);
   S.stf = S.stf || {};
   const co = S.stf[key] || keepCopy('stf-' + key);
@@ -557,21 +567,28 @@ function stfDay(co, d, i, plan, open) {
     ${secs}
   </section>`;
 }
-// Availability: click a box to go no answer → ✓ → ? → ✕ → no answer (saved each click); ✎ for a note.
+// Availability: each click goes no answer → ✓ → ? → ✕ → no answer; ✎ (bottom right) for a note; * = has a note.
+// The eye hides people with no ✓ or ? that week (a row you've just changed stays until you leave or switch weeks).
+const stfTouched = new Set();
 function stfAvailBox(co, days) {
+  const hide = pref('stfHideNo') === '1';
   const cell = (p, d) => { const a = (p.avail || {})[d.date] || {};
-    return `<span class="av-wrap"><button class="av-cell ${a.s ? 'is-' + a.s : ''}" data-act="stfAvCycle" data-name="${esc(p.name)}" data-date="${d.date}" title="${esc((a.s ? AV_LABEL[a.s] : 'No answer yet') + (a.note ? ': ' + a.note : '') + (a.by ? ' (entered by ' + a.by + ')' : a.s ? ' (from the Staff Portal)' : '') + ' · click to change')}">
-      ${a.s === 'yes' ? '✓' : a.s === 'maybe' ? '?' : a.s === 'no' ? '✕' : '·'}${a.note ? '<i class="av-dot"></i>' : ''}${a.by ? '<i class="av-by-dot"></i>' : ''}</button>
+    return `<span class="av-wrap"><button class="av-cell ${a.s ? 'is-' + a.s : ''}" data-act="stfAvCycle" data-name="${esc(p.name)}" data-date="${d.date}" title="${esc((a.s ? AV_LABEL[a.s] : 'No answer yet') + (a.note ? ': ' + a.note : '') + (a.by ? ' (entered by ' + a.by + ')' : a.s ? ' (from the Staff Portal)' : ''))}">
+      ${a.s === 'yes' ? '✓' : a.s === 'maybe' ? '?' : a.s === 'no' ? '✕' : '·'}${a.note ? '<i class="av-star">*</i>' : ''}</button>
       <button class="av-pen" data-act="stfAvEd" data-name="${esc(p.name)}" data-date="${d.date}" title="Note" aria-label="Note">✎</button></span>`; };
-  const answered = p => days.some(d => ((p.avail || {})[d.date] || {}).s);
-  const people = [...co.people].sort((a, b) => (answered(b) - answered(a)) || a.name.localeCompare(b.name));
+  const useful = p => days.some(d => ['yes', 'maybe'].includes(((p.avail || {})[d.date] || {}).s));
+  const people = [...co.people].sort((a, b) => (useful(b) - useful(a)) || a.name.localeCompare(b.name));
+  const shown = hide ? people.filter(p => useful(p) || stfTouched.has(p.name)) : people, gone = people.length - shown.length;
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
-  return `<section class="box stf-avail"><div class="box-head static"><h2>Availability<small>click a box: ✓ available → ? maybe → ✕ can’t → no answer · ✎ adds a note</small></h2></div>
+  const label = hide ? 'Show everyone' : 'Hide people who can’t work or haven’t answered';
+  return `<section class="box stf-avail"><div class="box-head stf-av-head"><h2>Availability</h2>
+      <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button></span></div>
     <div class="av-grid" style="--n:${days.length}">
       <span></span>${days.map(d => `<span class="av-h">${esc(shortMd(d.date))}<span class="muted small">${count(d)} available</span></span>`).join('')}
-      ${people.map(p => `<span class="av-name">${esc(p.name)}<span class="muted small">${esc(p.role || '')}</span></span>${days.map(d => cell(p, d)).join('')}`).join('')}
+      ${shown.map(p => `<span class="av-name">${esc(p.name)}<span class="muted small">${esc(p.role || '')}</span></span>${days.map(d => cell(p, d)).join('')}`).join('')}
     </div>
-    <p class="muted small av-key"><i class="av-dot"></i> has a note · <i class="av-by-dot"></i> entered by you or Nick (the rest they picked on the Staff Portal)</p></section>`;
+    ${hide && gone ? `<p class="muted small av-hidden">${gone} ${gone === 1 ? 'person' : 'people'} hidden (no ✓ or ? this week) · <button class="link" data-act="stfHideNo">Show all</button></p>` : ''}
+    ${hide && !shown.length ? '<p class="empty">Nobody has said they’re available yet.</p>' : ''}</section>`;
 }
 function stfPickModal() {
   const k = S.stfPick, co = stfCo(), i = Number(k.day), rows = co.sections.flatMap(s => s.rows);
@@ -617,20 +634,43 @@ async function stfDo(fn) {
 }
 // Availability clicks: shown at once, saved one after another.
 let avQueue = Promise.resolve();
+const avPending = {}; // "cohort|name|date" → { s, note, prev, t }
+const stfPerson = (key, name) => ((S.stf && S.stf[key]) || { people: [] }).people.find(x => x.name === name);
 function stfSaveAvail(name, date, s, note) {
-  const key = stfKey(), co = stfCo(), p = co.people.find(x => x.name === name), me = S.user && /^nbrown@/i.test(S.user.email || '') ? 'Nick' : 'Bella';
+  const key = stfKey(), p = stfPerson(key, name), me = S.user && /^nbrown@/i.test(S.user.email || '') ? 'Nick' : 'Bella';
+  if (!p) return;
   p.avail = p.avail || {};
+  const k = key + '|' + name + '|' + date, was = avPending[k];
+  const prev = was ? was.prev : (p.avail[date] ? { ...p.avail[date] } : null); // (what's saved, if this save fails)
   if (!s && !note) delete p.avail[date]; else p.avail[date] = { s, note, by: me };
-  keepCopy('stf-' + key, co); render();
-  avQueue = avQueue.then(() => StaffApi.call('adminSaveAvail', { cohort: key, name, date, s, note })
-    .then(out => { p.avail = out.avail || p.avail; keepCopy('stf-' + key, co); })
-    .catch(e => { toast('Not saved: ' + e.message); loadStaffing(key, true); }));
+  stfTouched.add(name);
+  keepCopy('stf-' + key, S.stf[key]); render();
+  if (was) clearTimeout(was.t);
+  const e = avPending[k] = { s, note, prev };
+  e.t = setTimeout(() => {
+    avQueue = avQueue.then(() => StaffApi.call('adminSaveAvail', { cohort: key, name, date, s, note })
+      .then(out => { // (only this box, and only if you haven't clicked it again since)
+        if (avPending[k] !== e) return;
+        delete avPending[k];
+        const q = stfPerson(key, name), saved = (out.avail || {})[date];
+        if (q && saved) { q.avail = q.avail || {}; q.avail[date] = saved; keepCopy('stf-' + key, S.stf[key]); }
+      })
+      .catch(err => {
+        if (avPending[k] !== e) return;
+        delete avPending[k];
+        const q = stfPerson(key, name);
+        if (q) { q.avail = q.avail || {}; if (prev) q.avail[date] = prev; else delete q.avail[date]; keepCopy('stf-' + key, S.stf[key]); render(); }
+        toast('Not saved (' + name + ', ' + shortMd(date) + '): ' + err.message);
+      }));
+  }, 500);
 }
 async function staffingAct(a, el = {}) {
   const d = el.dataset || {}, key = stfKey(), co = stfCo();
   switch (a) {
-    case 'stfTab': S.staffTab = d.t; pref('staffTab', d.t); render(); return true;
-    case 'stfWeek': S.stfKey = d.cohort; pref('stfKey', d.cohort); S.stfErr = null; render(); return true;
+    case 'stfTab': S.staffTab = d.t; pref('staffTab', d.t); stfTouched.clear(); render(); return true;
+    case 'stfWeek': S.stfKey = d.cohort; pref('stfKey', d.cohort); S.stfErr = null; S.stfWeekMenu = false; stfTouched.clear(); render(); return true;
+    case 'stfWeekMenu': S.stfWeekMenu = !S.stfWeekMenu; render(); return true;
+    case 'stfHideNo': pref('stfHideNo', pref('stfHideNo') === '1' ? '0' : '1'); stfTouched.clear(); render(); return true;
     case 'stfGo': // the Finalize staffing to-do, or a cohort in Staffing by Cohort
       S.view = 'staff'; pref('view', 'staff'); S.staffTab = 'stf'; pref('staffTab', 'stf'); S.stfKey = d.cohort || S.cohortKey; pref('stfKey', S.stfKey);
       S.open = null; S.menuOpen = false; S.stfErr = null; render(); window.scrollTo(0, 0); return true;
@@ -672,7 +712,7 @@ async function staffingAct(a, el = {}) {
       await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: free.label, day: i, name: d.name }));
       return true;
     }
-    case 'stfAvCycle': { const p = co.people.find(x => x.name === d.name), a = (p.avail || {})[d.date] || {}; stfSaveAvail(d.name, d.date, AV_NEXT[a.s || ''], a.note || ''); return true; }
+    case 'stfAvCycle': { const p = stfPerson(key, d.name); if (!p) return true; const a = (p.avail || {})[d.date] || {}; stfSaveAvail(d.name, d.date, AV_NEXT[a.s || ''], a.note || ''); return true; }
     case 'stfAvEd': { const p = co.people.find(x => x.name === d.name), cur = (p.avail || {})[d.date] || {};
       S.stfAv = { name: d.name, date: d.date, s: cur.s || '' }; S.drafts['stf-av-note'] = cur.note || ''; render();
       setTimeout(() => { const x = document.getElementById('stf-av-note'); if (x) x.focus(); }, 0); return true; }
