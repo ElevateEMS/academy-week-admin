@@ -494,7 +494,7 @@ async function loadStaffing(cohort, fresh = false) {
 }
 const stfCo = () => (S.stf && S.stf[stfKey()]) || null;
 const enrolledCount = co => (stfKey() === S.cohortKey && S.sheet ? attending().length : (co && co.enrolled) || 0);
-const studentCount = co => { const o = co.plan && co.plan.students; return o != null && o !== '' ? Number(o) : enrolledCount(co); };
+const studentCount = co => enrolledCount(co); // (always the roster: you staff from it a few weeks out)
 function dayPlan(co, day) {
   const n = studentCount(co), over = ((co.plan && co.plan.stations) || {})[day.date];
   if (day.exam) { const st = over != null ? Number(over) : 3; return { stations: st, auto: over == null, need: { Instructor: st, Assistant: st, Patient: st } }; }
@@ -512,63 +512,74 @@ const availOf = (co, name, date) => { const p = co.people.find(x => sameStaff(x.
 const shortMd = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 
 function staffingPage() {
-  const weeks = (S.staffAll && S.staffAll.weeks) || [], key = stfKey();
-  const chips = ''; // (the week picker is the page title's ▾)
+  const key = stfKey();
   if (!key) return '<section class="box"><p class="empty">No Academy Weeks coming up (a cohort needs an Academy Week Start date on its roster).</p></section>';
   if (!stfFresh[key] && !stfLoading[key] && !S.stfErr) setTimeout(() => loadStaffing(key), 0);
   S.stf = S.stf || {};
   const co = S.stf[key] || keepCopy('stf-' + key);
   if (co && !S.stf[key]) S.stf[key] = co;
-  if (!co) return chips + (S.stfErr ? `<div class="alert">Couldn’t load staffing: ${esc(S.stfErr)} <button class="btn small" data-act="stfRefresh">Try again</button></div>` : '<p class="loading">Loading staffing…</p>');
-  if (co.missing) return chips + `<section class="box"><p class="empty">${esc(key)}’s sheet doesn’t have a Staffing tab (with a “Role / Slot” row) yet.${co.staffingUrl ? ` <a href="${esc(co.staffingUrl)}" target="_blank" rel="noopener">Open the sheet ↗</a>` : ''}</p></section>`;
-  co.plan = co.plan || { students: null, stations: {}, draft: {} };
-  const days = co.days.filter(d => d.date), plan = days.map(d => dayPlan(co, d));
-  const open = days.map((d, i) => openCount(co, i, plan[i])), totalOpen = open.reduce((s, x) => s + x, 0);
-  const nDraft = Object.keys(draftOf(co)).length, over = co.plan.students != null && co.plan.students !== '';
-  return chips + `<section class="box stf-bar">
-      <span>Planning for <b>${studentCount(co)}</b> student${studentCount(co) === 1 ? '' : 's'} <span class="muted small">${over ? `(you changed it; ${enrolledCount(co)} enrolled)` : '(from the roster)'}</span>
-        <button class="link" data-act="stfStudents">Change</button></span>
-      <span class="${totalOpen ? 'stf-open' : 'stf-done'}">${totalOpen ? totalOpen + ' slot' + (totalOpen === 1 ? '' : 's') + ' still to fill' : 'All slots filled ✓'}</span>
-      <span class="muted small">${co.locked ? 'Availability is locked (staff reach out to you now).' : co.lockOn ? 'Staff can change availability until ' + monthDay(co.lockOn) + '.' : ''}</span>
-      <span class="head-actions"><button class="eye inq-reload ${stfLoading[key] ? 'spin' : ''}" data-act="stfRefresh" title="Read the Staffing tab again" aria-label="Refresh">${RESET}</button>
-        ${co.staffingUrl ? `<a class="btn tiny" href="${esc(co.staffingUrl)}" target="_blank" rel="noopener" data-name="${esc(key)} Staffing">Staffing tab ↗</a>` : ''}</span>
-    </section>
-    ${nDraft ? `<div class="stf-draft-bar"><span><b>Draft:</b> ${nDraft} change${nDraft === 1 ? '' : 's'} not on the Staffing tab yet (staff don’t see ${nDraft === 1 ? 'it' : 'them'}).</span>
-      <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear draft</button>
-      <button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Put on the Staffing tab'}</button></div>`
-      : '<p class="muted small stf-draft-hint">Picks here are a draft until you put them on the Staffing tab, so you can move people around first.</p>'}
-    ${stfAvailBox(co, days)}
-    <div class="stf-week" style="--n:${days.length}">${days.map((d, i) => stfDay(co, d, i, plan[i], open[i])).join('')}</div>`;
+  if (!co) return S.stfErr ? `<div class="alert">Couldn’t load staffing: ${esc(S.stfErr)} <button class="btn small" data-act="stfRefresh">Try again</button></div>` : '<p class="loading">Loading staffing…</p>';
+  if (co.missing) return `<section class="box"><p class="empty">${esc(key)}’s sheet doesn’t have a Staffing tab (with a “Role / Slot” row) yet.${co.staffingUrl ? ` <a href="${esc(co.staffingUrl)}" target="_blank" rel="noopener">Open the sheet ↗</a>` : ''}</p></section>`;
+  co.plan = co.plan || { stations: {}, draft: {} };
+  const days = co.days.filter(d => d.date);
+  return stfAvailBox(co, days) + `<div class="stf-week" style="--n:${days.length}">${days.map((d, i) => stfDay(co, d, i, dayPlan(co, d))).join('')}</div>`;
 }
-function openCount(co, i, plan) {
-  let n = 0;
-  Object.entries(plan.need).forEach(([kind, need]) => {
-    const have = co.sections.filter(s => slotKind(s.role) === kind).reduce((s, sec) => s + sec.rows.filter(r => filled(cellOf(co, r, i))).length, 0);
-    n += Math.max(0, need - have);
+// The slots a day shows for one kind (Instructor / Assistant / Patient): as many as it needs (the station count), in
+// Staffing tab order, plus new ones ("Instructor 6") when the tab doesn't have enough rows, plus any row past that
+// count that still has someone in it (marked extra, so nobody disappears).
+function daySlots(co, i, kind, need) {
+  const rows = co.sections.filter(s => slotKind(s.role) === kind).flatMap(s => s.rows);
+  if (!rows.length) return [];
+  const out = rows.slice(0, need).map(r => ({ ...r, value: cellOf(co, r, i), draft: isDraft(co, r, i) }));
+  const last = rows[rows.length - 1].label, m = last.match(/^(.*?)(\d+)\s*$/), base = m ? m[1] : kind + ' ', n0 = m ? Number(m[2]) : rows.length;
+  for (let k = rows.length; k < need; k++) {
+    const label = base + (n0 + k - rows.length + 1), dv = draftOf(co)[label + '|' + i];
+    out.push({ label, cells: [], value: dv !== undefined ? dv : 'OPEN', draft: dv !== undefined, added: true });
+  }
+  rows.slice(need).forEach(r => { const v = cellOf(co, r, i); if (filled(v)) out.push({ ...r, value: v, draft: isDraft(co, r, i), extra: true }); });
+  return out;
+}
+// What goes on the Staffing tab: every slot of every day as the plan has it (needed slots OPEN until filled, the rest "—"),
+// only where that's different from the tab now.
+function sheetChanges(co) {
+  const out = {}, days = co.days.filter(d => d.date);
+  days.forEach((d, i) => {
+    const plan = dayPlan(co, d);
+    ['Instructor', 'Assistant', 'Patient'].forEach(kind => {
+      const rows = co.sections.filter(s => slotKind(s.role) === kind).flatMap(s => s.rows), need = plan.need[kind] || 0;
+      if (!rows.length) return;
+      rows.forEach((r, k) => {
+        const dv = draftOf(co)[r.label + '|' + i], cur = r.cells[i] || '';
+        const want = dv !== undefined ? dv : k < need ? (filled(cur) ? cur : 'OPEN') : (filled(cur) ? cur : '—');
+        if (want !== cur) out[r.label + '|' + i] = want;
+      });
+      daySlots(co, i, kind, need).filter(x => x.added).forEach(x => { out[x.label + '|' + i] = x.value; });
+    });
   });
-  return n;
+  return out;
 }
-function stfDay(co, d, i, plan, open) {
-  const onDay = name => co.sections.some(s => s.rows.some(r => sameStaff(cellOf(co, r, i), name)));
+function stfDay(co, d, i, plan) {
+  const onDay = name => co.sections.some(s => s.rows.some(r => sameStaff(cellOf(co, r, i), name))) || Object.entries(draftOf(co)).some(([k, v]) => k.endsWith('|' + i) && sameStaff(v, name));
+  let open = 0;
   const secs = ['Instructor', 'Assistant', 'Patient'].map(kind => {
-    const list = co.sections.filter(s => slotKind(s.role) === kind);
-    if (!list.length) return '';
-    const rows = list.flatMap(s => s.rows);
-    const have = rows.filter(r => filled(cellOf(co, r, i))).length, need = plan.need[kind];
-    if (!need && !have) return '';
+    const need = plan.need[kind] || 0, slots = daySlots(co, i, kind, need);
+    if (!slots.length) return need ? `<p class="muted small">No ${kind} rows on the Staffing tab.</p>` : '';
+    const have = slots.filter(x => !x.extra && filled(x.value)).length;
+    open += Math.max(0, need - have);
+    if (!need && !slots.some(x => x.extra)) return '';
     return `<div class="stf-sec"><div class="stf-sec-head"><b>${kind}s</b><span class="${have >= need ? 'stf-ok' : 'stf-short'}">${have}/${need}${have < need ? ' · ' + (need - have) + ' open' : ' ✓'}</span></div>
-      ${rows.map(r => { const v = cellOf(co, r, i), dr = isDraft(co, r, i), a = filled(v) && !OWNERS.some(o => sameStaff(o, v)) ? availOf(co, v, d.date) : null;
-        return `<button class="stf-slot ${filled(v) ? 'has' : v === '—' ? 'off' : 'open'} ${dr ? 'draft' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(r.label)}" data-day="${i}" data-date="${d.date}" ${dr ? `title="Draft: on the Staffing tab it's ${esc(r.cells[i] || 'OPEN')}"` : ''}>
-          <span class="muted small">${esc(r.label)}</span><span>${filled(v) ? esc(v) : v === '—' ? '<span class="muted">—</span>' : '<b class="stf-open-tag">OPEN</b>'}</span>
-          ${a && a.s === 'no' ? '<em class="tag-soft bad">said can’t</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}
-      ${rows.length < need ? `<button class="link stf-add" data-act="stfAddSlot" data-section="${esc(list[list.length - 1].title)}">+ add a ${kind.toLowerCase()} slot</button>` : ''}</div>`;
+      ${slots.map(x => { const v = x.value, a = filled(v) && !OWNERS.some(o => sameStaff(o, v)) ? availOf(co, v, d.date) : null;
+        return `<button class="stf-slot ${filled(v) ? 'has' : 'open'} ${x.draft || x.added ? 'draft' : ''} ${x.extra ? 'extra' : ''} ${a && a.s === 'no' ? 'bad' : a && a.s === 'maybe' ? 'meh' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" ${x.added ? 'data-added="1"' : ''}
+          title="${x.extra ? 'Not needed for ' + need + ' station' + (need === 1 ? '' : 's') + '. Click to change.' : x.added ? 'A new row: added to the Staffing tab when you put the draft on it' : x.draft ? 'Draft: on the Staffing tab it’s ' + esc(x.cells[i] || 'OPEN') : ''}">
+          <span class="muted small">${esc(x.label)}</span><span>${filled(v) ? esc(v) : '<b class="stf-open-tag">OPEN</b>'}</span>
+          ${x.extra ? '<em class="tag-soft">extra</em>' : a && a.s === 'no' ? '<em class="tag-soft bad">said can’t</em>' : a && a.s === 'maybe' ? '<em class="tag-soft meh">maybe</em>' : ''}</button>`; }).join('')}</div>`;
   }).join('');
   return `<section class="box stf-day ${open ? '' : 'covered'}">
     <div class="stf-day-head"><b>${esc(shortMd(d.date))}</b><span class="muted small">Day ${d.n}${d.exam ? ' · Psychomotor exam' : ''}</span></div>
-    <div class="stf-stations"><button class="x" data-act="stfStations" data-date="${d.date}" data-n="${plan.stations - 1}" ${plan.stations <= 1 ? 'disabled' : ''} aria-label="Fewer stations">−</button>
+    <div class="stf-stations"><button class="x" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations - 1}" ${plan.stations <= 1 ? 'disabled' : ''} aria-label="Fewer stations">−</button>
       <span><b>${plan.stations}</b> station${plan.stations === 1 ? '' : 's'}</span>
-      <button class="x" data-act="stfStations" data-date="${d.date}" data-n="${plan.stations + 1}" aria-label="More stations">+</button>
-      ${plan.auto ? '' : `<button class="link small" data-act="stfStations" data-date="${d.date}" data-n="" title="Back to the count from the number of students">reset</button>`}</div>
+      <button class="x" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations + 1}" aria-label="More stations">+</button>
+      ${plan.auto ? '' : `<button class="link small" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="" title="Back to the count from the number of students">reset</button>`}</div>
     <p class="muted small stf-math">${d.exam ? 'An instructor, an assistant and a patient at each' : `${plan.per} or fewer students each${plan.six ? ` · short? ${plan.six} stations works at 6 each` : ''}`}</p>
     <div class="stf-owners">${OWNERS.map(o => { const on = onDay(o), first = o.split(' ')[0];
       return `<button class="chip ${on ? 'on' : ''}" data-act="stfOwner" data-name="${o}" data-day="${i}" title="${on ? 'Take ' + first + ' off this day' : 'Put ' + first + ' in an open Instructor slot'}">${on ? first + ' ✓' : '+ ' + first}</button>`; }).join('')}</div>
@@ -595,14 +606,26 @@ function stfAvailBox(co, days) {
     + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
   const label = hide ? 'Show everyone' : 'Hide people who can’t work or haven’t answered';
+  const key = stfKey(), n = studentCount(co), ch = Object.keys(sheetChanges(co)).length;
+  const left = `<aside class="stf-side">
+      <div class="stf-card"><b>${n}</b> student${n === 1 ? '' : 's'}<span class="muted small">from the roster</span></div>
+      <div class="stf-card">${co.locked ? '<b>Locked</b><span class="muted small">staff reach out to you now</span>' : co.lockOn ? `Staff availability due<b>${monthDay(co.lockOn)}</b>` : '<span class="muted small">No Academy Week date yet</span>'}</div></aside>`;
+  const right = `<aside class="stf-side">
+      <div class="stf-card stf-draft-card ${ch ? 'has' : ''}">${ch ? `<b>${ch} change${ch === 1 ? '' : 's'}</b><span class="small">not on the Staffing tab yet (staff don’t see ${ch === 1 ? 'it' : 'them'})</span>
+        <button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Put on the Staffing tab'}</button>
+        <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear draft</button>`
+        : '<span class="small">Picks here are a draft until you put them on the Staffing tab, so you can move people around first.</span>'}</div></aside>`;
   return `<section class="box stf-avail"><div class="box-head stf-av-head"><h2>Availability</h2>
-      <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button></span></div>
+      <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button>
+        <button class="eye inq-reload ${stfLoading[key] ? 'spin' : ''}" data-act="stfRefresh" title="Read the Staffing tab again" aria-label="Refresh">${RESET}</button>
+        ${co.staffingUrl ? `<a class="btn tiny" href="${esc(co.staffingUrl)}" target="_blank" rel="noopener" data-name="${esc(key)} Staffing">Staffing tab ↗</a>` : ''}</span></div>
+    <div class="stf-av-body">${left}<div class="stf-av-main">
     <div class="av-grid" style="--n:${days.length}">
       <span></span>${days.map(d => `<span class="av-h">${esc(shortMd(d.date))}<span class="muted small">${count(d)} available</span></span>`).join('')}
       ${rows}
     </div>
     ${hide && gone ? `<p class="muted small av-hidden">${gone} ${gone === 1 ? 'person' : 'people'} hidden (no ✓ or ? this week) · <button class="link" data-act="stfHideNo">Show all</button></p>` : ''}
-    ${hide && !shown.length ? '<p class="empty">Nobody has said they’re available yet.</p>' : ''}</section>`;
+    ${hide && !shown.length ? '<p class="empty">Nobody has said they’re available yet.</p>' : ''}</div>${right}</div></section>`;
 }
 function stfPickModal() {
   const k = S.stfPick, co = stfCo(), i = Number(k.day), rows = co.sections.flatMap(s => s.rows);
@@ -692,42 +715,46 @@ async function staffingAct(a, el = {}) {
       S.view = 'staff'; pref('view', 'staff'); S.staffTab = 'stf'; pref('staffTab', 'stf'); S.stfKey = d.cohort || S.cohortKey; pref('stfKey', S.stfKey);
       S.open = null; S.menuOpen = false; S.stfErr = null; render(); window.scrollTo(0, 0); return true;
     case 'stfRefresh': S.stfErr = null; loadStaffing(key, true); return true;
-    case 'stfStudents': {
-      const v = prompt(`How many students should the station math use? (${enrolledCount(co)} enrolled. Leave it empty to go back to that.)`, co.plan.students ?? '');
-      if (v === null) return true;
-      const n = v.trim() === '' ? null : parseInt(v, 10);
-      if (n !== null && (isNaN(n) || n < 0)) { toast('Type a number.'); return true; }
-      co.plan.students = n; render();
-      await stfDo(() => StaffApi.call('adminSavePlan', { cohort: key, students: n })); return true;
-    }
     case 'stfStations': {
-      const st = { ...(co.plan.stations || {}) }; if (d.n === '') delete st[d.date]; else st[d.date] = Math.max(1, Number(d.n));
-      co.plan.stations = st; render();
-      await stfDo(() => StaffApi.call('adminSavePlan', { cohort: key, stations: st })); return true;
+      const old = co.plan.stations || {}, st = { ...old }, i = Number(d.day), day = co.days.filter(x => x.date)[i], before = dayPlan(co, day);
+      if (d.n === '') delete st[d.date]; else st[d.date] = Math.max(1, Number(d.n));
+      co.plan.stations = st; const now = dayPlan(co, day);
+      // Fewer stations: anyone in a slot that's no longer needed comes off that day (you're asked first).
+      const gone = [];
+      ['Instructor', 'Assistant', 'Patient'].forEach(kind => {
+        const was = before.need[kind] || 0, is = now.need[kind] || 0;
+        if (is < was) daySlots(co, i, kind, was).filter(x => !x.extra).slice(is).forEach(x => { if (filled(x.value)) gone.push(x); });
+      });
+      if (gone.length && !confirm(gone.map(x => `${x.value} is in ${x.label}`).join('\n') + `\n\nTake ${gone.length === 1 ? 'them' : 'them all'} off ${shortMd(d.date)}?`)) { co.plan.stations = old; render(); return true; }
+      render();
+      await stfDo(async () => {
+        for (const x of gone) await StaffApi.call('adminDraftSlot', { cohort: key, label: x.label, day: i, name: '—', virtual: !!x.added });
+        return StaffApi.call('adminSavePlan', { cohort: key, stations: st });
+      });
+      return true;
     }
-    case 'stfPick': if (!S.stfBusy) { S.stfPick = { label: d.label, day: d.day, date: d.date }; render(); } return true;
+    case 'stfPick': if (!S.stfBusy) { S.stfPick = { label: d.label, day: d.day, date: d.date, added: !!d.added }; render(); } return true;
     case 'stfPickClose': S.stfPick = null; S.stfShowAway = false; render(); return true;
     case 'stfShowAway': S.stfShowAway = true; render(); return true;
     case 'stfSet': {
       const k = S.stfPick;
-      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name }))) { S.stfPick = null; S.stfShowAway = false; }
+      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name, virtual: k.added }))) { S.stfPick = null; S.stfShowAway = false; }
       render(); return true;
     }
     case 'stfApply': {
-      const n = Object.keys(draftOf(co)).length;
+      const changes = sheetChanges(co), n = Object.keys(changes).length;
       if (!confirm(`Put ${n} change${n === 1 ? '' : 's'} on ${key}’s Staffing tab? Staff will see ${n === 1 ? 'it' : 'them'} on their Schedule.`)) return true;
-      if (await stfDo(() => StaffApi.call('adminApplyDraft', { cohort: key }))) toast('On the Staffing tab.');
+      if (await stfDo(() => StaffApi.call('adminApplyDraft', { cohort: key, changes }))) toast('On the Staffing tab.');
       return true;
     }
     case 'stfClearDraft': if (confirm('Clear the draft? The slots go back to what’s on the Staffing tab.')) await stfDo(() => StaffApi.call('adminSavePlan', { cohort: key, clearDraft: true })); return true;
-    case 'stfAddSlot': await stfDo(() => StaffApi.call('adminAddSlot', { cohort: key, section: d.section })); return true;
-    case 'stfOwner': { // Nick / Bella on or off a day (in the draft): into the first open Instructor slot, or that slot back to OPEN
-      const i = Number(d.day), rows = co.sections.flatMap(s => s.rows);
-      const mine = rows.find(r => sameStaff(cellOf(co, r, i), d.name));
-      if (mine) { await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: mine.label, day: i, name: 'OPEN' })); return true; }
-      const free = co.sections.filter(s => slotKind(s.role) === 'Instructor').flatMap(s => s.rows).find(r => !filled(cellOf(co, r, i)));
-      if (!free) { toast('No open Instructor slot that day. Add one first (+ add an instructor slot), or open one up.'); return true; }
-      await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: free.label, day: i, name: d.name }));
+    case 'stfOwner': { // Nick / Bella on or off a day (in the draft): into the first open Instructor slot it needs, or back off
+      const i = Number(d.day), day = co.days.filter(x => x.date)[i], need = dayPlan(co, day).need.Instructor, slots = daySlots(co, i, 'Instructor', need);
+      const mine = co.sections.flatMap(s => s.rows).map(r => ({ ...r, value: cellOf(co, r, i) })).concat(slots.filter(x => x.added)).find(x => sameStaff(x.value, d.name));
+      if (mine) { const extra = slots.find(x => x.label === mine.label && x.extra); await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: mine.label, day: i, name: extra ? '—' : 'OPEN', virtual: !!mine.added })); return true; }
+      const free = slots.find(x => !x.extra && !filled(x.value));
+      if (!free) { toast(`All ${need} instructor slot${need === 1 ? ' is' : 's are'} filled that day. Add a station (+) first.`); return true; }
+      await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: free.label, day: i, name: d.name, virtual: !!free.added }));
       return true;
     }
     case 'stfAvCycle': { const p = stfPerson(key, d.name); if (!p) return true; const a = (p.avail || {})[d.date] || {}; stfSaveAvail(d.name, d.date, AV_NEXT[a.s || ''], a.note || ''); return true; }

@@ -1755,3 +1755,15 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .se-away b { color: var(--ink); font-weight: 500; }
 .pick-away { justify-self: start; margin-top: 10px; }
 .pick-row.away { border-left: 4px solid var(--line); }
+/* Scheduling: info cards beside the availability grid; slots follow the station count */
+.stf-av-body { display: grid; grid-template-columns: 190px minmax(0, 1fr) 190px; gap: 18px; align-items: start; }
+.stf-av-main { min-width: 0; }
+.stf-side { display: grid; gap: 10px; }
+.stf-card { display: grid; gap: 2px; text-align: center; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); padding: 10px 12px; font-size: 13px; color: var(--ink); }
+.stf-card b { font-family: var(--serif); font-size: 22px; font-weight: 600; line-height: 1.15; }
+.stf-draft-card { color: var(--muted); }
+.stf-draft-card.has { background: var(--honey-soft); border: 1px dashed var(--honey); color: var(--ink); gap: 6px; }
+.stf-draft-card .btn { justify-self: center; margin-top: 4px; }
+.stf-draft-card .link { justify-self: center; }
+.stf-slot.extra { opacity: .75; border-style: dotted; }
+@media (max-width: 1100px) { .stf-av-body { grid-template-columns: 1fr; } .stf-side { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
