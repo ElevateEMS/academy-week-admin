@@ -101,7 +101,7 @@ function staffTitle() {
   const when = x => monthDay(x.start) + '–' + monthDay(x.end);
   if (!key) return '<h1>Scheduling</h1>';
   return `<h1>Scheduling</h1><div class="stf-week-pick"><button class="stf-week-btn" data-act="stfWeekMenu" aria-expanded="${!!S.stfWeekMenu}">${esc(key)} Academy Week${w ? ' · ' + when(w) : ''}${weeks.length > 1 ? ' ▾' : ''}</button>
-    ${S.stfWeekMenu && weeks.length > 1 ? `<div class="stf-week-menu">${weeks.map(x => `<button class="${x.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(x.cohort)}">${esc(x.cohort)} Academy Week <span class="muted small">${when(x)}</span></button>`).join('')}</div>` : ''}</div>`;
+    ${S.stfWeekMenu && weeks.length > 1 ? `<div class="stf-week-menu">${weeks.map(x => `<button class="${x.cohort === key ? 'on' : ''}" data-act="stfWeek" data-cohort="${esc(x.cohort)}">${esc(x.cohort)} Academy Week <span class="muted small">${when(x)}${x.test ? ' · test' : ''}</span></button>`).join('')}</div>` : ''}</div>`;
 }
 // The week menu closes when you click anywhere else.
 document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest('.stf-week-pick')) { S.stfWeekMenu = false; render(); } }, true);
@@ -481,7 +481,8 @@ const stfLoading = {}, stfFresh = {};
 const stfKey = () => {
   const weeks = (S.staffAll && S.staffAll.weeks) || [];
   if (S.stfKey && (weeks.some(w => w.cohort === S.stfKey) || (S.stf && S.stf[S.stfKey]))) return S.stfKey;
-  return (weeks[0] && weeks[0].cohort) || pref('stfKey') || '';
+  const real = weeks.find(w => !w.test) || weeks[0]; // (opens on the next real week, never a test cohort)
+  return (real && real.cohort) || pref('stfKey') || '';
 };
 async function loadStaffing(cohort, fresh = false) {
   if (!staffReady() || !cohort || stfLoading[cohort]) return;
@@ -538,8 +539,8 @@ function staffingPage() {
   const ch = Object.keys(sheetChanges(co)).length;
   return stfAvailBox(co, days) + `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>
       ${ch ? `<span>${ch} update${ch === 1 ? '' : 's'} to send to the Staffing tab <span class="muted small">(staff don’t see ${ch === 1 ? 'it' : 'them'} yet)</span></span>
-        <button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Send to Staffing tab'}</button>
-        <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear</button>`
+        <span class="stf-sched-actions"><button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Send to Staffing tab'}</button>
+        <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear</button></span>`
       : '<span class="muted small">Picks are a draft until you send them to the Staffing tab.</span>'}</div>
     <div class="stf-week" style="--n:${days.length}">${days.map((d, i) => stfDay(co, d, i, dayPlan(co, d))).join('')}</div>`;
 }
@@ -610,7 +611,7 @@ function stfDay(co, d, i, plan) {
     ${secs}
     ${(() => { const os = otherSlots(co, i); return os.length ? `<div class="stf-sec stf-other"><div class="stf-sec-head"><b>Other</b><span class="muted small">flat amount</span></div>
       ${os.map(x => `<button class="stf-slot ${x.spare ? 'spare' : 'has'} ${x.draft || (x.added && !x.spare) ? 'draft' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" data-other="1" ${x.added ? 'data-added="1"' : ''}>
-        ${x.spare ? '<span class="muted small">+ Other (admin help, photographer…)</span>' : `<span class="muted small">${esc(x.info.what || 'Other')}</span><span>${esc(x.value)}${x.info.amount ? ` <span class="muted small">· ${money(x.info.amount)}</span>` : ''}</span>`}</button>`).join('')}</div>` : ''; })()}
+        ${x.spare ? '<span class="muted small">+ Other · Ex. Admin help</span>' : `<span class="muted small">${esc(x.info.what || 'Other')}</span><span>${esc(x.value)}${x.info.amount ? ` <span class="muted small">· ${money(x.info.amount)}</span>` : ''}</span>`}</button>`).join('')}</div>` : ''; })()}
   </section>`;
 }
 const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient'];
@@ -663,8 +664,8 @@ function stfPickModal() {
       <span class="muted small">${on ? 'in this slot' : t ? 'on ' + esc(t.label) : p.a && p.a.note ? esc(p.a.note) : ''}${p.a && p.a.by ? ' (entered by ' + esc(p.a.by) + ')' : ''}</span></button>`; };
   const group = (title, list, cls) => list.length ? `<p class="pick-h">${title}</p>${list.map(p => person(p, cls)).join('')}` : '';
   const oth = k.other ? `<div class="stf-other-fields">
-      <label class="field">What for<input id="stf-o-what" data-draft="stf-o-what" list="stf-o-list" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Admin help" autocomplete="off"></label>
-      <datalist id="stf-o-list"><option>Admin help</option><option>Photographer</option></datalist>
+      <label class="field">What for<input id="stf-o-what" data-draft="stf-o-what" list="stf-o-list" value="${esc(S.drafts['stf-o-what'] ?? '')}" placeholder="Ex. Admin help" autocomplete="off"></label>
+      <datalist id="stf-o-list"><option>Admin help</option></datalist>
       <label class="field">Flat amount<input id="stf-o-amt" data-draft="stf-o-amt" value="${esc(S.drafts['stf-o-amt'] ?? '')}" placeholder="$" inputmode="decimal" autocomplete="off"></label>
       ${filled(cur) ? `<button class="btn small" data-act="stfOtherSave" ${S.stfBusy ? 'disabled' : ''}>Save</button>` : ''}</div>
       <p class="muted small">Added to their pay on that day as a flat amount (no timesheet).${filled(cur) ? '' : ' Then pick who:'}</p>` : '';

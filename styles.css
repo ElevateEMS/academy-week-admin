@@ -1779,3 +1779,4 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .stf-other .stf-slot.spare { border-style: dashed; background: transparent; }
 .stf-other .stf-slot.spare .muted { grid-column: 1 / -1; }
 .stf-other-fields { display: grid; grid-template-columns: 1fr 110px auto; gap: 8px; align-items: end; }
+.stf-sched-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 14px; }
