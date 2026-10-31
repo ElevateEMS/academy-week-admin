@@ -630,6 +630,9 @@ function inqAutoFollow(it, status) {
 const monthAhead = () => { const x = parseIso(todayIso()), day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + 1); x.setDate(Math.min(day, new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate())); return isoOf(x); };
 // The list's grey line: the latest "What happened" you logged, otherwise Notes (or what they wrote).
 const lastNote = x => [...inqContacts(x)].reverse().find(c => c.note && c.by !== 'Automatic' && !/^(Call|Email|Text|Website|Voicemail)$/.test(c.note));
+// Needs follow-up / Missed call with a follow-up date still to come: not due yet (listed under Follow up later; on the
+// date the hourly check puts it back under Needs follow-up).
+const inqLater = x => ['Needs follow-up', 'Missed call'].includes(inqStatus(x)) && isIsoDate(x.followUp) && x.followUp > todayIso();
 const fuText = iso => isIsoDate(iso) ? 'follow up ' + (iso <= todayIso() ? 'now' : inqDate(iso)) : '';
 
 /* ---------- Info Requests → Partners (agencies, schools, employers…) ---------- */
@@ -704,7 +707,8 @@ function adminInquiryBox({ calls = false } = {}) {
   const term = calls ? String(S.drafts['inq-search'] || '').trim().toLowerCase() : '', digits = term.replace(/\D/g, '');
   const found = term ? items.filter(x => [x.name, x.email, x.notes, x.message, x.cohort].some(v => String(v || '').toLowerCase().includes(term))
     || (digits.length >= 3 && String(x.phone || '').replace(/\D/g, '').includes(digits))) : null;
-  const of = st => items.filter(x => inqStatus(x) === st);
+  const of = st => items.filter(x => inqStatus(x) === st && !inqLater(x));
+  const later = items.filter(inqLater).sort((a, b) => a.followUp < b.followUp ? -1 : 1);
   const waiting = items.filter(x => x.reply === 'Waiting').length;
   const row = x => `<li class="inq-row" data-act="inqOpen" data-id="${esc(x.id)}">
       <span class="inq-ic" title="${esc(x.source)}">${LINK_ICONS[INQ_SOURCE_IC[x.source] || 'globe']}</span>
@@ -722,6 +726,8 @@ function adminInquiryBox({ calls = false } = {}) {
   const lists = found ? `<p class="mini-head inq-sec"><span>Search</span><span class="count">${found.length}</span></p>
       <ul class="checks inq-list">${found.map(row).join('') || '<li class="empty">Nobody matches.</li>'}</ul>`
     : (of('Missed call').length ? section('Missed call', true) : '') + section('Needs follow-up', true)
+      + (later.length ? `<p class="mini-head inq-sec toggle" data-act="inqSec" data-s="later"><span><span class="inq-caret">${open.later ? '▾' : '▸'}</span>Follow up later</span><span class="count">${later.length}</span></p>
+        ${open.later ? `<ul class="checks inq-list">${later.map(row).join('')}</ul>` : ''}` : '')
       + section('Plans to enroll') + section('Responded') + section('Enrolled') + section('Close Out');
   if (!S.inqTab) S.inqTab = pref('inqTab') === 'partners' ? 'partners' : 'students';
   const pt = S.inqTab === 'partners';
@@ -733,7 +739,7 @@ function adminInquiryBox({ calls = false } = {}) {
       <button class="${pt ? '' : 'on'}" data-act="inqTab" data-t="students">Students</button><button class="${pt ? 'on' : ''}" data-act="inqTab" data-t="partners">Partners</button></div>`;
   let otherNote = '';
   if (q && pt) {
-    const mc = q.items.filter(x => inqStatus(x) === 'Missed call').length, nf = q.items.filter(x => inqStatus(x) === 'Needs follow-up').length;
+    const mc = q.items.filter(x => inqStatus(x) === 'Missed call' && !inqLater(x)).length, nf = q.items.filter(x => inqStatus(x) === 'Needs follow-up' && !inqLater(x)).length;
     const bits = [mc ? mc + ' missed call' + (mc === 1 ? '' : 's') : '', nf ? nf + ' needs follow-up' : ''].filter(Boolean);
     if (bits.length) otherNote = '<b>Students:</b> ' + bits.join(', ') + '.';
   } else if (q) {
