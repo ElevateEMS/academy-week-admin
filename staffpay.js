@@ -112,6 +112,7 @@ function staffTabs() {
     .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
 }
 function staffListBox(a) {
+  const away = a.people.filter(p => p.inactive);
   const bar = p => {
     const pct = Math.min(100, (p.year / a.limit) * 100), soon = Math.min(100, ((p.year + p.coming) / a.limit) * 100);
     const cls = p.year >= a.limit ? 'over' : p.year >= a.alerts[0] ? 'near' : '';
@@ -124,15 +125,18 @@ function staffListBox(a) {
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table">
       <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>W-9</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span></div>
-      ${a.people.map(p => `<div class="st-row">
+      ${a.people.filter(p => !p.inactive).map(staffRow).join('')}
+      ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive (away for now) <span class="count">${away.length}</span></button>
+        ${S.staffShowAway ? away.map(staffRow).join('') : ''}` : ''}
+    </div></section>`;
+  function staffRow(p) { return `<div class="st-row ${p.inactive ? 'away' : ''}">
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         <span>${p.account ? '<span class="tag sage-tag">Set up</span>' : '<span class="muted small">Not yet</span>'}</span>
         <span>${p.w9 && p.w9.on ? `<span class="tag sage-tag" title="On file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>` : '<span class="muted small">Needed</span>'}</span>
         ${bar(p)}
-      </div>`).join('')}
-    </div></section>`;
+      </div>`; }
 }
 function showStaffQr() {
   const el = document.getElementById('staffQr');
@@ -158,6 +162,7 @@ function staffEdModal() {
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
+      <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
       ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
         ${e.account ? ` <button class="link" data-act="staffResetPw">Reset their password</button>` : ''}</p>` : ''}
       ${e.err ? `<div class="alert">${esc(e.err)}</div>` : ''}
@@ -390,10 +395,12 @@ async function staffAct(a, el = {}) {
       Object.entries({ name: base.name, role: base.role || base.roleText, phone: base.phone, email: base.email, notes: base.notes,
         emName: (base.emergency || {}).name, emPhone: (base.emergency || {}).phone, emRel: (base.emergency || {}).relation })
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
-      S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, busy: false, err: '' };
+      S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '' };
       render(); setTimeout(() => { const x = document.getElementById('se-' + (p ? 'phone' : 'name')); if (x) x.focus(); }, 0);
       return true;
     }
+    case 'staffEdInactive': S.staffEd.inactive = !S.staffEd.inactive; render(); return true;
+    case 'staffAway': S.staffShowAway = !S.staffShowAway; render(); return true;
     case 'staffEdClose': if (S.staffEd && !S.staffEd.busy) { S.staffEd = null; render(); } return true;
     case 'staffEdSave': {
       const e = S.staffEd, g = k => String(S.drafts['se-' + k] || '').trim();
@@ -402,9 +409,10 @@ async function staffAct(a, el = {}) {
       e.busy = true; e.err = ''; render();
       try {
         S.staffAll = await StaffApi.call('adminSavePerson', { orig: e.orig, name: g('name'), role: g('role'), phone: g('phone'), email: g('email'), notes: g('notes'),
-          emergency: { name: g('emName'), phone: g('emPhone'), relation: g('emRel') } });
+          emergency: { name: g('emName'), phone: g('emPhone'), relation: g('emRel') }, inactive: !!e.inactive });
         S.staffEd = null; toast('Saved to the Staff Directory.');
         if (S.cohortKey) loadStaffCohort(S.cohortKey, true);
+        Object.keys(stfFresh).forEach(k => { stfFresh[k] = false; }); // (Scheduling reads Inactive again)
       } catch (err) { e.err = err.message; e.busy = false; }
       render(); return true;
     }
@@ -518,10 +526,10 @@ function staffingPage() {
   const open = days.map((d, i) => openCount(co, i, plan[i])), totalOpen = open.reduce((s, x) => s + x, 0);
   const nDraft = Object.keys(draftOf(co)).length, over = co.plan.students != null && co.plan.students !== '';
   return chips + `<section class="box stf-bar">
-      <span><b>${studentCount(co)}</b> students${over ? ` <span class="muted small">(you changed it; ${enrolledCount(co)} enrolled)</span>` : ' <span class="muted small">enrolled</span>'}
+      <span>Planning for <b>${studentCount(co)}</b> student${studentCount(co) === 1 ? '' : 's'} <span class="muted small">${over ? `(you changed it; ${enrolledCount(co)} enrolled)` : '(from the roster)'}</span>
         <button class="link" data-act="stfStudents">Change</button></span>
-      <span class="${totalOpen ? 'stf-open' : 'stf-done'}">${totalOpen ? totalOpen + ' open' : 'All covered ✓'}</span>
-      <span class="muted small">${co.locked ? 'Availability is locked (staff reach out to you now).' : co.lockOn ? 'Staff can change their availability until ' + monthDay(co.lockOn) + '.' : ''}</span>
+      <span class="${totalOpen ? 'stf-open' : 'stf-done'}">${totalOpen ? totalOpen + ' slot' + (totalOpen === 1 ? '' : 's') + ' still to fill' : 'All slots filled ✓'}</span>
+      <span class="muted small">${co.locked ? 'Availability is locked (staff reach out to you now).' : co.lockOn ? 'Staff can change availability until ' + monthDay(co.lockOn) + '.' : ''}</span>
       <span class="head-actions"><button class="eye inq-reload ${stfLoading[key] ? 'spin' : ''}" data-act="stfRefresh" title="Read the Staffing tab again" aria-label="Refresh">${RESET}</button>
         ${co.staffingUrl ? `<a class="btn tiny" href="${esc(co.staffingUrl)}" target="_blank" rel="noopener" data-name="${esc(key)} Staffing">Staffing tab ↗</a>` : ''}</span>
     </section>
@@ -567,6 +575,9 @@ function stfDay(co, d, i, plan, open) {
     ${secs}
   </section>`;
 }
+const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient'];
+const ROLE_GROUP = ['EC & Equivalent', 'Non-Certified Instructors', 'Assistants', 'Patients', 'No role picked'];
+const roleRank = r => { const i = ROLE_ORDER.indexOf(r); return i < 0 ? 4 : i; };
 // Availability: each click goes no answer → ✓ → ? → ✕ → no answer; ✎ (bottom right) for a note; * = has a note.
 // The eye hides people with no ✓ or ? that week (a row you've just changed stays until you leave or switch weeks).
 const stfTouched = new Set();
@@ -577,15 +588,18 @@ function stfAvailBox(co, days) {
       ${a.s === 'yes' ? '✓' : a.s === 'maybe' ? '?' : a.s === 'no' ? '✕' : '·'}${a.note ? '<i class="av-star">*</i>' : ''}</button>
       <button class="av-pen" data-act="stfAvEd" data-name="${esc(p.name)}" data-date="${d.date}" title="Note" aria-label="Note">✎</button></span>`; };
   const useful = p => days.some(d => ['yes', 'maybe'].includes(((p.avail || {})[d.date] || {}).s));
-  const people = [...co.people].sort((a, b) => (useful(b) - useful(a)) || a.name.localeCompare(b.name));
+  // Fixed order (nothing moves when you click): by role, then A–Z. Inactive people (Staff Directory Status) aren't listed.
+  const people = co.people.filter(p => !p.inactive).sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name));
   const shown = hide ? people.filter(p => useful(p) || stfTouched.has(p.name)) : people, gone = people.length - shown.length;
+  const rows = shown.map((p, i) => (i === 0 || roleRank(shown[i - 1].role) !== roleRank(p.role) ? `<span class="av-group">${esc(ROLE_GROUP[roleRank(p.role)])}</span>` : '')
+    + `<span class="av-name">${esc(p.name)}</span>${days.map(d => cell(p, d)).join('')}`).join('');
   const count = d => co.people.filter(p => ((p.avail || {})[d.date] || {}).s === 'yes').length;
   const label = hide ? 'Show everyone' : 'Hide people who can’t work or haven’t answered';
   return `<section class="box stf-avail"><div class="box-head stf-av-head"><h2>Availability</h2>
       <span class="head-actions"><button class="eye ${hide ? 'off' : ''}" data-act="stfHideNo" title="${label}" aria-label="${label}">${hide ? EYE_OFF : EYE}</button></span></div>
     <div class="av-grid" style="--n:${days.length}">
       <span></span>${days.map(d => `<span class="av-h">${esc(shortMd(d.date))}<span class="muted small">${count(d)} available</span></span>`).join('')}
-      ${shown.map(p => `<span class="av-name">${esc(p.name)}<span class="muted small">${esc(p.role || '')}</span></span>${days.map(d => cell(p, d)).join('')}`).join('')}
+      ${rows}
     </div>
     ${hide && gone ? `<p class="muted small av-hidden">${gone} ${gone === 1 ? 'person' : 'people'} hidden (no ✓ or ? this week) · <button class="link" data-act="stfHideNo">Show all</button></p>` : ''}
     ${hide && !shown.length ? '<p class="empty">Nobody has said they’re available yet.</p>' : ''}</section>`;
@@ -595,7 +609,8 @@ function stfPickModal() {
   const slot = rows.find(r => r.label === k.label) || { cells: [] }, cur = cellOf(co, slot, i);
   const taken = name => rows.find(r => r.label !== k.label && sameStaff(cellOf(co, r, i), name));
   const groups = { yes: [], maybe: [], none: [], no: [] };
-  co.people.forEach(p => { const a = (p.avail || {})[k.date]; groups[a && a.s ? a.s : 'none'].push({ ...p, a }); });
+  const away = co.people.filter(p => p.inactive);
+  co.people.filter(p => !p.inactive).forEach(p => { const a = (p.avail || {})[k.date]; groups[a && a.s ? a.s : 'none'].push({ ...p, a }); });
   const person = (p, cls = '') => { const t = taken(p.name), on = sameStaff(cur, p.name);
     return `<button class="pick-row ${cls} ${on ? 'on' : ''}" data-act="stfSet" data-name="${esc(p.name)}" ${t || on || S.stfBusy ? 'disabled' : ''}>
       <span><b>${esc(p.name)}</b>${p.role ? `<span class="muted small"> · ${esc(p.role)}</span>` : ''}</span>
@@ -606,6 +621,8 @@ function stfPickModal() {
     <div class="modal-body pad-top">
       ${OWNERS.map(o => person({ name: o, role: '' })).join('')}
       ${group('Available', groups.yes, 'yes')}${group('Maybe', groups.maybe, 'meh')}${group('No answer yet', groups.none, '')}${group('Said they can’t', groups.no, 'bad')}
+      ${away.length ? (S.stfShowAway ? group('Inactive (away for now)', away.map(p => ({ ...p, a: (p.avail || {})[k.date] })), 'away')
+        : `<button class="link pick-away" data-act="stfShowAway">Show inactive (${away.length})</button>`) : ''}
     </div>
     <div class="modal-foot pay-foot"><span class="muted small">${S.stfBusy ? 'Saving…' : 'Goes in the draft'}</span>
       <span><button class="btn small" data-act="stfSet" data-name="OPEN" ${cur === 'OPEN' || !cur || S.stfBusy ? 'disabled' : ''}>OPEN</button>
@@ -689,10 +706,11 @@ async function staffingAct(a, el = {}) {
       await stfDo(() => StaffApi.call('adminSavePlan', { cohort: key, stations: st })); return true;
     }
     case 'stfPick': if (!S.stfBusy) { S.stfPick = { label: d.label, day: d.day, date: d.date }; render(); } return true;
-    case 'stfPickClose': S.stfPick = null; render(); return true;
+    case 'stfPickClose': S.stfPick = null; S.stfShowAway = false; render(); return true;
+    case 'stfShowAway': S.stfShowAway = true; render(); return true;
     case 'stfSet': {
       const k = S.stfPick;
-      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name }))) S.stfPick = null;
+      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name }))) { S.stfPick = null; S.stfShowAway = false; }
       render(); return true;
     }
     case 'stfApply': {

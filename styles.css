@@ -1744,3 +1744,14 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .stf-week-menu button { border: 0; background: none; text-align: left; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink); white-space: nowrap; }
 .stf-week-menu button:hover { background: var(--blush-soft); }
 .stf-week-menu button.on { background: var(--blush); }
+/* Availability grouped by role; Inactive staff */
+.av-group { grid-column: 1 / -1; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 8px 0 0; padding-bottom: 2px; border-bottom: 1px solid var(--line-soft); }
+.av-grid > .av-group:first-of-type { margin-top: 2px; }
+.st-away-head { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; text-align: left; padding: 12px 0 6px; font-size: 13px; color: var(--muted); cursor: pointer; letter-spacing: .03em; }
+.st-away-head .count { font-size: 12px; }
+.st-row.away { opacity: .6; }
+.se-away { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); margin: 6px 0 2px; cursor: pointer; }
+.se-away input { margin-top: 3px; accent-color: var(--taupe-dark); }
+.se-away b { color: var(--ink); font-weight: 500; }
+.pick-away { justify-self: start; margin-top: 10px; }
+.pick-row.away { border-left: 4px solid var(--line); }
