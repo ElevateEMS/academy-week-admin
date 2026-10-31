@@ -2071,8 +2071,7 @@ function drawer() {
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
-        <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw…</button>
-        <span class="muted small">Asks first. Takes them off the roster and the Student Hub.</span>
+        <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
       </section>`}
     </div>
   </aside></div>`;
