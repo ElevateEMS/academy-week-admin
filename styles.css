@@ -1249,6 +1249,11 @@ button.status-opt { cursor: pointer; } button.status-opt:hover { background: var
 .reset-list { margin: 8px 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
 .reset-name { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--paper); font: inherit; margin-top: 4px; }
 .reset-name:focus { outline: none; border-color: var(--taupe); }
+.drop-sec { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 6px; }
+.drop-btn { color: #a3625a; border-color: #d9b5b0; }
+.drop-btn:hover { background: #f6ebe9; }
+.modal.confirm .drop-date { margin: 10px 0; }
+.modal.confirm textarea#drop-note { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--paper); font: inherit; }
 .box.box-info { overflow: visible; } /* (so the status menu isn't cut off; the box fits its rows anyway) */
 
 /* Sticky Notes: the grip (beside the color dot) shows on hover, like the dot and × */

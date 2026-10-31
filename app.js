@@ -788,7 +788,8 @@ function shell() {
   ${S.packet ? packetModal() : ''}
   ${S.bp ? bpModal() : ''}
   ${S.roster ? rosterModal() : ''}
-  ${S.resetAsk ? resetModal() : ''}`;
+  ${S.resetAsk ? resetModal() : ''}
+  ${S.dropAsk ? dropModal() : ''}`;
 }
 
 function pageTitle() {
@@ -1165,6 +1166,7 @@ function statusMenu() {
       : `<button class="status-opt" role="menuitem" data-act="setStatus" data-k="${esc(S.cohortKey)}" data-s="${x}"><b>${x}</b><span>${STATUS_HELP[x]}</span></button>`).join('')}
       ${isTestCohort(S.cohortKey) ? `<button class="status-opt reset-opt" role="menuitem" data-act="resetAsk"><b>Reset test cohort</b><span>Back to brand new: clears its app data, its sheet’s rows and Course Details, and trashes its folder’s files.</span></button>` : ''}</div>` : ''}</span>`;
 }
+function dropClose() { S.dropAsk = null; S.datePick = null; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); }
 // Reset test cohort (Test/QA cohorts only; the Admin Apps Script checks again, and checks the folder and sheet names).
 function resetModal() {
   const key = S.cohortKey, typed = String(S.drafts.resetName || '').trim();
@@ -1195,9 +1197,10 @@ function infoBox() {
   const meet = i.meet ? `<a href="${esc(/^https?:/i.test(i.meet) ? i.meet : 'https://' + i.meet)}" target="_blank" rel="noopener">${esc(i.meet.replace(/^https?:\/\//i, ''))}</a>` : tbd;
   const rev = (i.reviews || []).map(v => isIsoDate(v) ? shortDate(v) : v);
   const upcoming = (i.reviews || []).filter(v => isIsoDate(v) && v >= todayIso());
-  // Enrolled includes paused students. Dropped = Blocked in the sheet + Not attending / Dropped · Day N in the app (not counted as enrolled).
+  // Enrolled includes paused students. Dropped = the dropped list under the roster (B37 down) + Blocked still on it
+  // + Not attending / Dropped · Day N in the app (not counted as enrolled).
   const list = attending(), paused = list.filter(x => /paused/i.test(x.status)).length;
-  const dropped = students().filter(x => x.out).length + S.sheet.students.filter(x => /^blocked$/i.test(x.status)).length;
+  const dropped = students().filter(x => x.out).length + S.sheet.students.filter(x => /^blocked$/i.test(x.status)).length + (S.sheet.dropped || []).length;
   const row = (label, val) => `<div class="info-row"><span>${label}</span><b>${val}</b></div>`;
   return `<div class="info-rows">
     ${row('Orientation', date(i.firstDay) + (isIsoDate(i.firstDay) ? ' · ' + esc(x.orientTime) : ''))}
@@ -2067,9 +2070,40 @@ function drawer() {
             ${w.note ? `<p>${esc(w.note)}</p>` : ''}</div>
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>` : ''}
-      ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : ''}
+      ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
+        <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw…</button>
+        <span class="muted small">Asks first. Takes them off the roster and the Student Hub.</span>
+      </section>`}
     </div>
   </aside></div>`;
+}
+
+// Drop / Withdraw (from a student's pop-up). Nothing happens until "Yes": the Admin Apps Script does it all (dropStudent_).
+function dropModal() {
+  const s = studentBySid(S.dropAsk);
+  if (!s) return '';
+  const kind = S.drafts['drop-kind'] || '', date = S.drafts['drop-date'] || todayIso();
+  if (S.dropBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>${kind === 'Dropped' ? 'Dropping' : 'Withdrawing'} ${esc(s.name)}…</h2></div>
+    <div class="modal-body"><p class="muted">Updating the roster, the Dropped Students Record and the Course To-Do. This takes a few seconds.</p></div></div></div>`;
+  const when = parseIso(date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  return `<div class="overlay" data-act="dropCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Drop / Withdraw</h2><button class="x big" data-act="dropCancel" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <p><b>${esc(s.name)}</b></p>
+      <div class="seg wide">${['Dropped', 'Withdrawn'].map(k => `<button class="${kind === k ? 'on' : ''}" data-act="dropKind" data-k="${k}">${k}</button>`).join('')}</div>
+      <div class="lbl drop-date">Date${datePicker('drop-date')}</div>
+      <textarea id="drop-note" data-draft="drop-note" rows="2" placeholder="Note for the Dropped Students Record (optional)">${esc(S.drafts['drop-note'] || '')}</textarea>
+      ${kind ? `<p>This will:</p>
+      <ul class="reset-list">
+        <li>Take them off the roster (everyone under them moves up a row) and put <b>${esc(s.name)} - ${kind} ${esc(when)}</b> under “Dropped/withdrawn students”, marked <b>Blocked</b>.</li>
+        <li>Lock them out of the Student Hub and take them off every email, list and count here.</li>
+        <li>Add them to the ${esc(S.cohortKey)} Dropped Students Record (Cert # left blank for you).</li>
+        <li>Add to the Course To-Do: download their JBL report, then remove JBL access, then update their VAOEMS disposition.</li>
+      </ul>
+      <p class="muted small">There’s no undo.</p>` : '<p class="muted small">Pick Dropped or Withdrawn.</p>'}
+    </div>
+    <div class="modal-foot"><button class="btn" data-act="dropCancel">Cancel</button><button class="btn primary danger" data-act="dropGo" ${kind ? '' : 'disabled'}>${kind ? `Yes, ${kind === 'Dropped' ? 'drop' : 'withdraw'} ${esc(firstName(s.name))}` : 'Yes'}</button></div>
+  </div></div>`;
 }
 
 /* ---------- Settings ---------- */
@@ -2584,6 +2618,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
+    if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
     else if (S.dueEd) { S.dueEd = null; delete S.drafts['due-date']; }
@@ -2658,6 +2693,24 @@ async function act(a, el = {}, e) {
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
       case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;
       case 'resetCancel': if (S.resetBusy) return; S.resetAsk = false; delete S.drafts.resetName; render(); break;
+      case 'dropAsk': S.dropAsk = d.sid; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); break;
+      case 'dropKind': S.drafts['drop-kind'] = d.k; render(); break;
+      case 'dropCancel': if (!S.dropBusy) dropClose(); break;
+      case 'dropGo': {
+        const s = studentBySid(S.dropAsk), kind = S.drafts['drop-kind'], key = S.cohortKey;
+        if (!s || !kind || S.dropBusy) return;
+        S.dropBusy = true; render();
+        try {
+          const res = await Sheets.dropStudent(key, s, { kind, date: S.drafts['drop-date'] || todayIso(), note: (S.drafts['drop-note'] || '').trim() });
+          S.dropBusy = false; dropClose(); S.open = null; S.openPart = null;
+          toast(`${s.name}: ${kind.toLowerCase()}.` + (res.warnings && res.warnings.length ? ' ' + res.warnings.join(' ') : ' Their JBL and VAOEMS to-dos are on the Course To-Do.'));
+          if (key === S.cohortKey) loadSheet();
+        } catch (err) {
+          S.dropBusy = false; render();
+          toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+        }
+        break;
+      }
       case 'resetGo': {
         const key = S.cohortKey, typed = String(S.drafts.resetName || '').trim();
         if (!isTestCohort(key) || typed !== key || S.resetBusy) return;
