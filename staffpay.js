@@ -543,7 +543,8 @@ function staffingPage() {
   co.plan = co.plan || { stations: {}, draft: {} };
   const days = co.days.filter(d => d.date);
   const ch = Object.keys(sheetChanges(co)).length;
-  return stfAvailBox(co, days) + `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>
+  const saving = stfPending ? '<span class="stf-saving">Saving…</span>' : S.stfSaved ? '<span class="stf-saved">Saved ✓</span>' : '';
+  return stfAvailBox(co, days) + `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>${saving}
       ${ch ? `<span>${ch} update${ch === 1 ? '' : 's'} to send to the Staffing tab <span class="muted small">(staff don’t see ${ch === 1 ? 'it' : 'them'} yet)</span></span>
         <span class="stf-sched-actions"><button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Send to Staffing tab'}</button>
         <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear</button></span>`
@@ -708,6 +709,33 @@ function stfAvModal() {
   </div></div>`;
 }
 function staffingModals() { return (S.stfPick && stfCo() ? stfPickModal() : '') + (S.stfAv && stfCo() ? stfAvModal() : ''); }
+// Picks, station counts, Nick/Bella: shown right away, saved in the background one after another (the banner says
+// Saving… / Saved ✓). If one doesn't go through, the page reloads what's really saved.
+let stfQueue = Promise.resolve(), stfPending = 0;
+function stfQuick(calls) {
+  const key = stfKey(); stfPending++; S.stfSaved = false; render();
+  stfQueue = stfQueue.then(async () => {
+    try {
+      let out; for (const c of calls) out = await StaffApi.call(c.action, { cohort: key, ...c.params });
+      if (stfPending === 1 && out && out.plan && S.stf[key]) { S.stf[key].plan = { ...S.stf[key].plan, ...out.plan }; keepCopy('stf-' + key, S.stf[key]); }
+      if (stfPending === 1) { S.stfSaved = true; setTimeout(() => { S.stfSaved = false; render(); }, 2000); }
+    } catch (e) { toast('Not saved: ' + e.message); loadStaffing(key, true); }
+    stfPending--; render();
+  });
+}
+// The same change adminDraftSlot makes, here first (so the page shows it at once).
+function draftLocal(co, label, day, name, virtual, other) {
+  const k = label + '|' + day, row = co.sections.flatMap(s => s.rows).find(r => r.label === label), sheet = row ? row.cells[day] : '';
+  co.plan.draft = { ...draftOf(co) }; co.plan.other = { ...(co.plan.other || {}) };
+  if (name === sheet || (name === 'OPEN' && !sheet && !virtual)) delete co.plan.draft[k]; else co.plan.draft[k] = name;
+  if (other && filled(name)) { co.plan.other[k] = { ...(co.plan.other[k] || {}), what: String(other.what).trim(), amount: Number(other.amount) };
+    const x = co.people.concat(co.owners || []).find(q => sameStaff(q.name, name)); if (x) x.usual = { what: String(other.what).trim(), amount: Number(other.amount) }; }
+  else if (!filled(name)) delete co.plan.other[k];
+  keepCopy('stf-' + stfKey(), co);
+}
+// (someone already on another slot that day?)
+const takenOn = (co, label, day, name) => filled(name) && co.sections.flatMap(s => s.rows).concat(Object.keys(draftOf(co)).filter(k => k.endsWith('|' + day)).map(k => ({ label: k.slice(0, k.lastIndexOf('|')), cells: [] })))
+  .find(r => r.label !== label && sameStaff(cellOf(co, r, day), name));
 async function stfDo(fn) {
   const key = stfKey(); S.stfBusy = true; render();
   try { const out = await fn(); if (out && out.sections) { S.stf[key] = out; keepCopy('stf-' + key, out); } return true; }
@@ -768,11 +796,9 @@ async function staffingAct(a, el = {}) {
         if (is < was) daySlots(co, i, kind, was).filter(x => !x.extra).slice(is).forEach(x => { if (filled(x.value)) gone.push(x); });
       });
       if (gone.length && !confirm(gone.map(x => `${x.value} is in ${x.label}`).join('\n') + `\n\nTake ${gone.length === 1 ? 'them' : 'them all'} off ${shortMd(d.date)}?`)) { co.plan.stations = old; render(); return true; }
-      render();
-      await stfDo(async () => {
-        for (const x of gone) await StaffApi.call('adminDraftSlot', { cohort: key, label: x.label, day: i, name: '—', virtual: !!x.added });
-        return StaffApi.call('adminSavePlan', { cohort: key, stations: st });
-      });
+      gone.forEach(x => draftLocal(co, x.label, i, '—', !!x.added));
+      keepCopy('stf-' + key, co); render();
+      stfQuick(gone.map(x => ({ action: 'adminDraftSlot', params: { label: x.label, day: i, name: '—', virtual: !!x.added } })).concat([{ action: 'adminSavePlan', params: { stations: st } }]));
       return true;
     }
     case 'stfPick': if (!S.stfBusy) {
@@ -781,8 +807,11 @@ async function staffingAct(a, el = {}) {
       render(); } return true;
     case 'stfOtherSave': {
       const k = S.stfPick, row = co.sections.flatMap(s => s.rows).find(r => r.label === k.label), cur = row ? cellOf(co, row, Number(k.day)) : (draftOf(co)[k.label + '|' + k.day] || '');
-      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: cur, virtual: k.added, other: { what: S.drafts['stf-o-what'], amount: S.drafts['stf-o-amt'] } }))) S.stfPick = null;
-      render(); return true;
+      const other = { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '') };
+      if (!String(other.what || '').trim() || !(parseFloat(other.amount) > 0)) { toast('Fill in what it’s for and the flat amount.'); return true; }
+      draftLocal(co, k.label, Number(k.day), cur, k.added, other); S.stfPick = null; render();
+      stfQuick([{ action: 'adminDraftSlot', params: { label: k.label, day: k.day, name: cur, virtual: k.added, other } }]);
+      return true;
     }
     case 'stfPickClose': S.stfPick = null; S.stfShowAway = false; render(); return true;
     case 'stfShowAway': S.stfShowAway = true; render(); return true;
@@ -795,10 +824,14 @@ async function staffingAct(a, el = {}) {
       }
       if (k.other && d.name !== '—' && (!String(S.drafts['stf-o-what'] || '').trim() || !(parseFloat(String(S.drafts['stf-o-amt'] || '').replace(/[$,]/g, '')) > 0))) { toast('Fill in what it’s for and the flat amount first.'); return true; }
       const other = k.other && d.name !== '—' ? { what: S.drafts['stf-o-what'], amount: String(S.drafts['stf-o-amt']).replace(/[$,]/g, '') } : undefined;
-      if (await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: k.label, day: k.day, name: d.name, virtual: k.added, other }))) { S.stfPick = null; S.stfShowAway = false; }
-      render(); return true;
+      const t = takenOn(co, k.label, Number(k.day), d.name);
+      if (t) { toast(`${d.name} is already on ${t.label} that day.`); return true; }
+      draftLocal(co, k.label, Number(k.day), d.name, k.added, other); S.stfPick = null; S.stfShowAway = false; render();
+      stfQuick([{ action: 'adminDraftSlot', params: { label: k.label, day: k.day, name: d.name, virtual: k.added, other } }]);
+      return true;
     }
     case 'stfApply': {
+      if (stfPending) await stfQueue; // (the last picks first)
       const changes = sheetChanges(co), n = Object.keys(changes).length;
       if (!confirm(`Put ${n} change${n === 1 ? '' : 's'} on ${key}’s Staffing tab? Staff will see ${n === 1 ? 'it' : 'them'} on their Schedule.`)) return true;
       if (await stfDo(() => StaffApi.call('adminApplyDraft', { cohort: key, changes }))) toast('On the Staffing tab.');
@@ -808,10 +841,13 @@ async function staffingAct(a, el = {}) {
     case 'stfOwner': { // Nick / Bella on or off a day (in the draft): into the first open Instructor slot it needs, or back off
       const i = Number(d.day), day = co.days.filter(x => x.date)[i], need = dayPlan(co, day).need.Instructor, slots = daySlots(co, i, 'Instructor', need);
       const mine = co.sections.flatMap(s => s.rows).map(r => ({ ...r, value: cellOf(co, r, i) })).concat(slots.filter(x => x.added)).find(x => sameStaff(x.value, d.name));
-      if (mine) { const extra = slots.find(x => x.label === mine.label && x.extra); await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: mine.label, day: i, name: extra ? '—' : 'OPEN', virtual: !!mine.added })); return true; }
+      if (mine) { const extra = slots.find(x => x.label === mine.label && x.extra), name = extra ? '—' : 'OPEN';
+        draftLocal(co, mine.label, i, name, !!mine.added); render();
+        stfQuick([{ action: 'adminDraftSlot', params: { label: mine.label, day: i, name, virtual: !!mine.added } }]); return true; }
       const free = slots.find(x => !x.extra && !filled(x.value));
       if (!free) { toast(`All ${need} instructor slot${need === 1 ? ' is' : 's are'} filled that day. Add a station (+) first.`); return true; }
-      await stfDo(() => StaffApi.call('adminDraftSlot', { cohort: key, label: free.label, day: i, name: d.name, virtual: !!free.added }));
+      draftLocal(co, free.label, i, d.name, !!free.added); render();
+      stfQuick([{ action: 'adminDraftSlot', params: { label: free.label, day: i, name: d.name, virtual: !!free.added } }]);
       return true;
     }
     case 'stfAvCycle': { const p = stfPerson(key, d.name); if (!p) return true;
