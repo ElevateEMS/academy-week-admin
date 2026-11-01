@@ -978,10 +978,10 @@ function fbModal() {
     <div class="modal-head"><h2>${esc(who)}<small class="muted"> · Instructor &amp; Course Feedback</small></h2><button class="x big" data-act="fbClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${f.n ? `<h3 class="fb-h">All cohorts <span class="muted small">${f.n} rating${f.n === 1 ? '' : 's'}</span></h3>${tiles(avg)}` : '<p class="muted">No ratings from real cohorts yet.</p>'}
-      ${f.byCohort.length ? `<h3 class="fb-h">By cohort</h3><ul class="fb-cohorts">${f.byCohort.map(c => `<li><span><b>${esc(c.key)}</b>${c.test ? ' <span class="tag">test</span>' : ''}<span class="muted small"> · ${c.n} rating${c.n === 1 ? '' : 's'} · Day ${c.days.sort().join(', ')}</span></span>
+      ${f.byCohort.length ? `<h3 class="fb-h">By cohort</h3><ul class="fb-cohorts">${f.byCohort.map(c => `<li><span><b>${esc(c.key)}</b>${c.test ? ' <span class="tag">test</span>' : ''}<span class="muted small"> · ${c.n} rating${c.n === 1 ? '' : 's'}</span></span>
         <span class="fb-mini">${FB_KEYS.map(([k, l]) => `<span title="${l}">${l} <b>${n1(c.avg[k])}</b></span>`).join('')}</span></li>`).join('')}</ul>` : ''}
       <h3 class="fb-h">Comments <span class="muted small">${f.comments.length}</span></h3>
-      ${f.comments.length ? `<ul class="fb-comments">${f.comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}${c.test ? ' (test)' : ''}, Day ${c.day}</span></li>`).join('')}</ul>` : '<p class="muted small">No written feedback yet.</p>'}
+      ${f.comments.length ? `<ul class="fb-comments">${f.comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}${c.test ? ' (test)' : ''}</span></li>`).join('')}</ul>` : '<p class="muted small">No written feedback yet.</p>'}
       ${f.rows.length ? `<details class="fb-each"><summary>Each rating (${f.rows.length})</summary><ul class="peer-rows">${f.rows.map(r => `<li>${FB_KEYS.map(([k, l]) => `<span>${l} <b>${r[k] ?? '–'}</b></span>`).join('<span class="dot">·</span>')}<span class="muted small"> · ${esc(r.key)}</span></li>`).join('')}</ul></details>` : ''}
     </div></div></div>`;
 }

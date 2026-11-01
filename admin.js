@@ -943,7 +943,7 @@ function fbAdminModal() {
   if (tab === 'course') {
     const rows = real.map(([k, l]) => ({ k, f: courseFeedback(l) })), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
     const said = (h, pick) => { const items = rows.flatMap(r => pick(r.f).map(x => ({ ...x, k: r.k })));
-      return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· ${esc(x.k)}, Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
+      return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· ${esc(x.k)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
     body = !rows.length ? '<p class="muted">No feedback from a real cohort yet.</p>' : `
       <table class="roster fb-table"><thead><tr><th>Cohort</th><th class="c">Responses</th><th class="c">The Program</th><th class="c">Academy Week</th></tr></thead>
         <tbody>${rows.map(r => `<tr><td><b>${esc(r.k)}</b></td><td class="c">${r.f.n}</td><td class="c">${n1(r.f.program)}</td><td class="c">${n1(r.f.aw)}</td></tr>`).join('')}
@@ -960,7 +960,7 @@ function fbAdminModal() {
         ${f.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${n1(f.avg[k])}</b></li>`).join('')}</ul>
           <p class="cf-h fb-sub">By cohort</p><ul class="cf-qs">${real2.map(c => `<li><span>${esc(c.key)} <span class="muted small">· ${c.n}</span></span><b>${n1(c.overall)}</b></li>`).join('')}</ul>
           <p class="cf-h fb-sub">Comments <span class="muted small">${comments.length}</span></p>
-          ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}, Day ${c.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
+          ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
         : '<p class="muted small">No ratings from a real cohort yet.</p>'}</div>`; }).join('')}</div>`;
   }
   return `<div class="overlay" data-act="fbAdminClose"><div class="modal fb-admin" data-stop>

@@ -2062,17 +2062,17 @@ function studentsView() {
     ${hasPeer ? `
     <details class="peer-sugg" ${S.peerSuggOpen ? 'open' : ''}><summary data-act="peerSuggToggle"><span class="peer-sugg-title">Suggestions for the groups/structure (${suggestions.length})</span>
       <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></summary>
-      ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul>` : ''}</details>` : ''}
+      ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} ${e.squad ? `<span class="muted small">· Squad ${e.squad}</span>` : ''}</li>`).join('')}</ul>` : ''}</details>` : ''}
     ${cf.n ? `<details class="peer-sugg cf" ${S.cfOpen ? 'open' : ''}><summary data-act="cfToggle"><span class="peer-sugg-title">Course feedback (${cf.n})</span>
       <span class="muted small">${cf.program != null ? 'Program ' + cf.program.toFixed(1) : ''}${cf.program != null && cf.aw != null ? ' · ' : ''}${cf.aw != null ? 'Academy Week ' + cf.aw.toFixed(1) : ''}</span></summary>
       <div class="cf-body">
         ${[['The Program', FB_PROGRAM, cf.q.program], ['Academy Week', FB_AW, cf.q.aw]].map(([h, qs, av]) => `<div class="cf-sec"><p class="cf-h">${h}</p>
           <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${av[i] != null ? av[i].toFixed(1) : '–'}</b></li>`).join('')}</ul></div>`).join('')}
         ${[['What worked well', cf.worked], ['Constructive criticism', cf.criticism]].map(([h, items]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>
-          ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
+          ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
         ${['Nick', 'Bella'].map(who => { const o = cf.owners[who]; return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${o.n} rating${o.n === 1 ? '' : 's'}</span></p>
           ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k] != null ? o.avg[k].toFixed(1) : '–'}</b></li>`).join('')}</ul>` : '<p class="muted small">No ratings yet.</p>'}
-          ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : ''}</div>`; }).join('')}
+          ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : ''}</div>`; }).join('')}
       </div></details>` : ''}
     ${fbPdfRow()}
   </section>` : ''}
@@ -2186,7 +2186,7 @@ function drawer() {
 
       ${show('peers') && peerStats()[s.name] ? (st => `<section>
         <h3>Peer Evaluations</h3>
-        <p class="muted small">${st.n} rating${st.n === 1 ? '' : 's'} from their squad${st.days.length ? ' (Day ' + st.days.sort().join(', ') + ')' : ''}, including their own.</p>
+        <p class="muted small">${st.n} rating${st.n === 1 ? '' : 's'} from their squad, including their own.</p>
         <div class="peer-grid">${PEER_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${st.avg[k].toFixed(1)}</b>${st.zeros[k] ? `<span class="peer-flag">⚑ ${st.zeros[k]} × 0</span>` : ''}</div>`).join('')}</div>
         ${st.zeroCount ? '<p class="peer-flag-note">⚑ Someone rated them 0 (Serious concern).</p>' : ''}
         <p class="peer-rows-head">Each rating</p>
