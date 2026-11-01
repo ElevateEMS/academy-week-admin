@@ -1610,7 +1610,17 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .sticky-ed .sn-li.sn-l3 { padding-left: calc(.8em + 60px); }
 .sticky-ed .sn-li.sn-l4 { padding-left: calc(.8em + 76px); }
 .sticky-ed mark.hl { cursor: pointer; }
-.ch-list li { flex-wrap: nowrap; }
+.ch-list li { flex-wrap: wrap; position: relative; row-gap: 4px; }
+/* Changes for Future Classes: the text gets the whole row. The hover-only + due date and × sit over its right end
+   (not saving room when hidden), and a due date goes on the line under the text. */
+.ch-list li > label { flex: 1 1 calc(100% - 24px); min-width: 0; }
+.ch-list li > .due-add, .ch-list li > .x:last-child { position: absolute; top: 50%; transform: translateY(-50%); background: var(--paper); box-shadow: -10px 0 8px var(--paper); }
+.ch-list li > .x:last-child { right: 0; }
+.ch-list li > .due-add { right: 28px; }
+.ch-list li:not(:hover) > .x { pointer-events: none; }
+.ch-list li:has(> .due-chip) > .x:last-child { top: 10px; transform: none; }
+.ch-list li > .due-chip { margin-left: 32px; }
+@media (hover: none) { .ch-list li > .due-add, .ch-list li > .x:last-child { position: static; transform: none; box-shadow: none; } .ch-list li:not(:hover) > .x { pointer-events: auto; } }
 .ch-list .ch-grip { flex: none; width: 14px; height: 18px; margin: 0 -4px 0 -6px; opacity: 0; cursor: grab; transition: opacity .15s; touch-action: none; }
 .ch-list .ch-grip svg { width: 14px; height: 14px; }
 .ch-list li:hover .ch-grip { opacity: .55; } .ch-list .ch-grip:hover { opacity: 1; }
