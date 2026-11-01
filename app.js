@@ -757,7 +757,10 @@ function shell() {
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
       ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
-        ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '') + icon('students', 'Students')}
+        ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '')
+        // Students page: Find a student sits up here, left of the Students icon.
+        + (S.view === 'students' && S.sheet ? `<input id="searchIn" class="search head-search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">` : '')
+        + icon('students', 'Students')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -1967,12 +1970,12 @@ function studentsView() {
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
+  // (Before the flip there's no filter row at all: search is in the header, and the Skills Tracking sheet waits for Academy Week.)
   return `
-  <div class="students-top">
-    <div class="chips">${chip('all', 'All')}${pre ? '' : chip('behind', 'Behind on skills') + chip('fixes', 'Contacts to fix')}</div>
-    <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button>
-      <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}"></div>
-  </div>
+  ${pre ? '' : `<div class="students-top">
+    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}</div>
+    <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button></div>
+  </div>`}
   ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}

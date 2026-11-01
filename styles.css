@@ -752,6 +752,8 @@ body select.pi-add:hover, body select.pi-add:focus { color: var(--ink); outline:
 
 /* Students: Skills Tracking sheet icon + PDF pop-up */
 .students-tools { display: flex; align-items: center; gap: 10px; }
+.icons .head-search { min-width: 0; width: 220px; margin-right: 4px; align-self: center; }
+@media (max-width: 720px) { .icons .head-search { width: 150px; } }
 .modal.pdf { width: min(1000px, 100%); height: calc(100vh - 40px); }
 .modal.pdf iframe { flex: 1; width: 100%; border: 0; border-radius: 0 0 18px 18px; background: #fff; }
 
