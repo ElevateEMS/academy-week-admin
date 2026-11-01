@@ -2008,13 +2008,13 @@ function courseFeedback(evals = S.evals) {
 const peerCell = st => st ? `<span class="peer-avg">${st.overall.toFixed(1)}</span>${st.zeroCount ? ` <span class="peer-flag" title="Rated 0 (Serious concern) ${st.zeroCount === 1 ? 'once' : st.zeroCount + ' times'}">⚑ 0</span>` : ''}` : '<span class="muted">–</span>';
 
 // Save PDFs (under the feedback on the Students page): both feedback PDFs into Admin - <cohort>, made by the Admin script
-// (which also saves them on its own at 6 PM on Day 5). When they were last saved, and links to open them.
+// (which also saves them on its own at 7 PM the day answers come in). When they were last saved, and links to open them.
 function fbPdfRow() {
   const f = (S.cohortDoc && S.cohortDoc.feedbackPdfs) || null;
   const when = f && f.at ? new Date(f.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   const link = (x, l) => x && x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${l}</a>` : '';
   const links = f ? [link(f.peer, 'Peer Evaluations'), link(f.feedback, 'Instructor &amp; Course Feedback')].filter(Boolean).join(' · ') : '';
-  return `<div class="fb-pdf-row"><span class="muted small">${f ? `Saved ${when}${f.by === 'auto' ? ' (on its own)' : ''}${links ? ' · ' + links : ''}` : 'PDFs save to the Admin folder on their own at 6 PM on Day 5.'}</span>
+  return `<div class="fb-pdf-row"><span class="muted small">${f ? `Saved ${when}${f.by === 'auto' ? ' (on its own)' : ''}${links ? ' · ' + links : ''}` : 'PDFs save to the Admin folder on their own at 7 PM the day answers come in.'}</span>
     <button class="btn tiny" data-act="fbPdfSave" ${S.fbPdfBusy ? 'disabled' : ''}>${S.fbPdfBusy ? 'Saving…' : f ? 'Save PDFs again' : 'Save PDFs'}</button></div>`;
 }
 function studentsView() {

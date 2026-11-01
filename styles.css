@@ -1904,6 +1904,10 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .fb-card { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; width: 100%; margin-top: 14px; text-align: left;
   background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font: inherit; cursor: pointer; box-shadow: var(--shadow); }
 .fb-card:hover { border-color: var(--taupe); }
+/* The Bulletin fills its column, so the feedback card sits at the very bottom of it (below however many stickies). */
+.admin-board .admin-notes { flex: 1 1 auto; display: flex; flex-direction: column; }
+.admin-board .admin-notes > .fb-card { margin-top: auto; }
+.admin-board .admin-notes > .stickies { margin-bottom: 14px; }
 .fb-card-title { font-family: var(--serif); font-size: 18px; color: var(--ink); }
 .fb-card-arrow { font-size: 13px; color: var(--taupe-dark); }
 .modal.fb-admin { width: min(900px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
