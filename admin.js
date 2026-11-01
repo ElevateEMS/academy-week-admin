@@ -328,7 +328,7 @@ function tdLine(t) {
   const w = tdWhen(t), who = tdWho(t);
   const cls = t.done ? 'done' : w && w < todayIso() ? 'td-late' : w === todayIso() ? 'td-today' : '';
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
-  return `<li class="td-line ${cls}">
+  return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
     <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open"><span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
       ${links || t.repeat || who !== 'both' || (!t.done && w) ? `<div class="td-meta">${links}
@@ -341,7 +341,11 @@ function adminTodoCard() {
   const soon = addDays(todayIso(), TD_SOON), open = S.adminTodos.filter(t => !t.done);
   const byWhen = (a, b) => tdWhen(a).localeCompare(tdWhen(b)) || (a.created || 0) - (b.created || 0);
   const now = open.filter(t => !tdWhen(t) || tdWhen(t) <= soon);
-  const dated = now.filter(t => tdWhen(t)).sort(byWhen), plain = now.filter(t => !tdWhen(t)).sort((a, b) => (a.created || 0) - (b.created || 0));
+  // Drag to reorder: once you've moved one, the list keeps your order (adminTodos/{id}.order); a new to-do starts at
+  // the bottom. Before any dragging: dated ones first (soonest first), then undated ones (oldest first).
+  const legacy = (a, b) => (!!tdWhen(b) - !!tdWhen(a)) || (tdWhen(a) && tdWhen(b) ? byWhen(a, b) : (a.created || 0) - (b.created || 0));
+  const mine = (a, b) => (a.order != null && b.order != null) ? a.order - b.order : a.order != null ? -1 : b.order != null ? 1 : legacy(a, b);
+  const dated = [], plain = now.sort(mine);
   const later = open.filter(t => tdWhen(t) > soon).sort(byWhen);
   const done = S.adminTodos.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   // The arrow by "To Do" shows everything: scheduled items (faded, under what's due) and the Completed section.
@@ -353,7 +357,7 @@ function adminTodoCard() {
     <div class="td-head"><h3>To Do${hidden ? `<button class="td-all" data-act="tdAllToggle" aria-expanded="${all}" title="${all ? 'Show only what’s due' : 'Show scheduled and completed'}" aria-label="${all ? 'Show only what’s due' : 'Show scheduled and completed'}">${all ? '▾' : '▸'}</button>` : ''}</h3><span class="head-actions">
       <button class="add-plus small-plus" data-act="tdNew" title="Add a to-do" aria-label="Add a to-do">+</button></span></div>
     <div class="td-scroll">
-      ${dated.length + plain.length || !(all && later.length) ? `<ul class="checks td-list">${[...dated, ...plain].map(tdLine).join('') || `<li class="empty">${empty}</li>`}</ul>` : ''}
+      ${dated.length + plain.length || !(all && later.length) ? `<ul class="checks td-list drop-list" data-drop="items" data-kind="admintodo">${[...dated, ...plain].map(tdLine).join('') || `<li class="empty">${empty}</li>`}</ul>` : ''}
       ${all && later.length ? `<ul class="checks td-list td-scheduled">${later.map(tdLine).join('')}</ul>` : ''}
       ${all && done.length ? `<button class="td-up-toggle" data-act="tdDoneToggle" aria-expanded="${!!S.tdDoneOpen}">${S.tdDoneOpen ? '▾' : '▸'} Completed (${done.length})</button>
         ${S.tdDoneOpen ? `<ul class="checks td-list td-done">${done.map(tdLine).join('')}</ul>` : ''}` : ''}

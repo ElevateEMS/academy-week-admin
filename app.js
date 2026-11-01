@@ -2556,6 +2556,14 @@ document.addEventListener('dragend', async () => {
       await saveLayout();
     } else {
       const list = moving.parentElement;
+      // The Admin page's To Do: everything in it gets its place in the order you left it.
+      if (list.dataset.kind === 'admintodo') {
+        S.dragging = null;
+        const ids = [...list.querySelectorAll(':scope > [data-id]')].map(li => li.dataset.id);
+        await Promise.all(ids.map((id, i) => { const t = S.adminTodos.find(x => x.id === id), order = (i + 1) * 1000;
+          return t && t.order !== order ? Store.set('adminTodos/' + id, { order }) : null; }));
+        return;
+      }
       const day = Number(list.dataset.day), kind = list.dataset.kind;
       const t = S.todos.find(x => x.id === drag.id);
       S.dragging = null;
