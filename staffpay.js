@@ -170,7 +170,7 @@ function staffEdModal() {
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
-      ${f('evalName', 'Name on forms', 'text', 'First name (e.g. Captain Lugo)')}
+      ${f('evalName', 'Name on forms', 'text', 'First name, nickname, rank, etc.')}
       <p class="muted small se-hint">What students see on the Instructor &amp; Course Feedback form. Leave it blank to use their first name.</p>
       <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
       ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
