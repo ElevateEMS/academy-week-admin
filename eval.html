@@ -6,7 +6,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Elevate EMS · Evaluation</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=292">
@@ -25,7 +25,11 @@
   .card { background: #fff; border-radius: 12px; padding: 16px 16px 14px; box-shadow: 0 1px 3px rgba(12, 42, 67, .1); margin-bottom: 12px; }
   .card h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--navy); margin: 0 0 10px; }
   .card p { margin: 0 0 8px; line-height: 1.45; font-size: 15px; color: #3a3f45; }
+  html { touch-action: manipulation; } /* (no double-tap zoom when tapping scores quickly) */
   .scale { font-size: 13px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
+  .scale-list { list-style: none; margin: 0; padding: 8px 12px; font-size: 14px; color: #3a3f45; background: var(--soft); border-radius: 8px; line-height: 1.7; }
+  .scale-list b { display: inline-block; min-width: 34px; color: var(--navy); }
+  .closing { font-size: 13px; color: var(--muted); font-style: italic; text-align: center; margin: 12px 0 0; }
   .scale b { color: var(--navy); }
   .q { padding: 10px 0; border-top: 1px dashed var(--line); }
   .q:first-of-type { border-top: 0; padding-top: 2px; }
@@ -106,14 +110,15 @@
     const people = group();
     return head() + `<div class="card"><p>Elevate EMS is committed to a safe, professional, and positive learning environment. In healthcare, evaluating your peers and taking constructive feedback is part of the job.</p>
       <p>This form is <b>anonymous</b>. Score everyone in your group honestly, <b>including yourself</b>. Your ratings help us support students and adjust groups where needed.</p>
-      <div class="scale"><b>0</b> Serious concern · <b>1–2</b> Needs improvement · <b>3</b> Meets expectations · <b>4–5</b> Strong / exceptional</div></div>`
+      <ul class="scale-list"><li><b>0</b> Serious concern</li><li><b>1–2</b> Needs improvement</li><li><b>3</b> Meets expectations</li><li><b>4–5</b> Strong / exceptional</li></ul></div>`
       + pick
       + (people.length ? `<div class="card"><h2>Rate your group</h2>${people.map(p => {
           const r = A.people[p.id] || {};
           return `<div class="person"><h3>${esc(p.name)}</h3>${PEER.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(0, r[k], `data-person="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}</div>`;
         }).join('')}</div>
         <div class="card"><h2>About the course</h2><label class="field"><span>Suggestions for the course or groups (optional)</span>
-          <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label></div>
+          <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label>
+          <p class="closing">Honest scores help everyone grow – ratings are reviewed by instructors only. Thank you.</p></div>
         <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>` : '');
   }
   function peerAnswers() {
@@ -131,7 +136,7 @@
   function feedbackHtml() {
     const qs = (list, key) => list.map((q, i) => `<div class="q"><div class="label">${esc(q)}</div>${nums(1, A[key][i], `data-list="${key}" data-i="${i}"`)}</div>`).join('');
     return head() + `<div class="card"><p>This form is <b>anonymous</b>. Please answer honestly: it helps us improve the course and support our instructors.</p>
-      <div class="scale"><b>1</b> Strongly disagree · <b>2</b> Disagree · <b>3</b> Neutral · <b>4</b> Agree · <b>5</b> Strongly agree</div></div>
+      <ul class="scale-list"><li><b>1</b> Strongly disagree</li><li><b>2</b> Disagree</li><li><b>3</b> Neutral</li><li><b>4</b> Agree</li><li><b>5</b> Strongly agree</li></ul></div>
       <div class="card"><h2>1 · The Program</h2>${qs(PROGRAM, 'program')}</div>
       <div class="card"><h2>2 · Academy Week</h2>${qs(AW, 'aw')}</div>
       ${(info.instructors || []).length ? `<div class="card"><h2>3 · Instructors</h2><p class="scale">Rate each 1–5 (5 = excellent).</p>${info.instructors.map(p => {
@@ -162,11 +167,12 @@
     if (!b) return;
     const box = b.closest('.nums');
     if (box && b.dataset.n != null) {
-      const n = Number(b.dataset.n), d = box.dataset;
+      // Tapping the picked score again clears it.
+      const off = b.classList.contains('on'), n = off ? undefined : Number(b.dataset.n), d = box.dataset;
       if (d.person) (A.people[d.person] = A.people[d.person] || {})[d.k] = n;
       else if (d.instr) (A.instructors[d.instr] = A.instructors[d.instr] || {})[d.k] = n;
       else if (d.list) A[d.list][Number(d.i)] = n;
-      box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      box.querySelectorAll('button').forEach(x => x.classList.toggle('on', !off && x === b));
       box.classList.remove('missing');
       return;
     }
