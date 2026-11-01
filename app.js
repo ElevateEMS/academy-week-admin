@@ -1949,9 +1949,12 @@ function studentsView() {
     behind: all.filter(s => s.skill === 'behind').length,
     fixes: all.filter(s => s.fixes).length,
   };
+  // Until a month before Academy Week (sideByDate): enrollment columns (Textbook, payments, Orientation, due dates, as in
+  // the Emails box's student list) in place of Patient contacts and Skills, and no skills/contacts filters or Behind card.
+  const pre = sideByDate() !== 'aw', filter = pre ? 'all' : S.filter;
   const q = S.search.trim().toLowerCase();
   const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
-    (S.filter === 'all' || (S.filter === 'behind' && s.skill === 'behind') || (S.filter === 'fixes' && s.fixes))
+    (filter === 'all' || (filter === 'behind' && s.skill === 'behind') || (filter === 'fixes' && s.fixes))
     && (!q || s.name.toLowerCase().includes(q)));
 
   // Who's behind on what, grouped by skill (for planning the next day).
@@ -1960,28 +1963,33 @@ function studentsView() {
   const order = DEFAULTS.skills.flatMap(g => g.items);
   const skillRows = Object.keys(bySkill).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
-  const chip = (k, l) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
+  const chip = (k, l) => `<button class="chip ${filter === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
+  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
   return `
   <div class="students-top">
-    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}</div>
+    <div class="chips">${chip('all', 'All')}${pre ? '' : chip('behind', 'Behind on skills') + chip('fixes', 'Contacts to fix')}</div>
     <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button>
       <input id="searchIn" class="search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}"></div>
   </div>
-  ${skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
+  ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
   <section class="box table-box">
     <table class="roster">
-      <thead><tr><th>#</th><th>Student</th><th class="c">Patient contacts</th><th class="c">Skills</th><th class="c">Conduct</th></tr></thead>
+      <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
+        : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
-        <td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
-        <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
+        ${pre ? (p => `<td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
+        <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
+        <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
+        : `<td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
+        <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>`}
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
-      </tr>`).join('') || '<tr><td colspan="5" class="empty">No students match.</td></tr>'}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${pre ? 8 : 5}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>`;
 }
