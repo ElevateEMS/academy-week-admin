@@ -677,6 +677,9 @@ function render() {
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? (window.CALLS_ONLY ? callsShell() : window.QUICKLOG_ONLY ? qlShell() : shell()) : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
+    // Header icons: the app's own hover label (data-tip, styles.css) instead of the browser's slow tooltip,
+    // which a redraw would cancel.
+    document.querySelectorAll('header.top [title]').forEach(el => { el.dataset.tip = el.title; el.removeAttribute('title'); });
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
     if (id) {
       const el = document.getElementById(id);
