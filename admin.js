@@ -134,6 +134,9 @@ const LINK_ICONS = {
   mail: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="M4 7l8 6 8-6"/></svg>',
   phone: '<svg viewBox="0 0 24 24"><path d="M6.5 3.8l2.6-.3 1.5 4-1.9 1.4a11 11 0 0 0 6.4 6.4l1.4-1.9 4 1.5-.3 2.6c-.1 1-1 1.8-2 1.7C10.6 18.8 5.2 13.4 4.8 5.8c-.1-1 .7-1.9 1.7-2z"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  // An open book (JB Learning) and the Star of Life (VAOEMS).
+  book: '<svg viewBox="0 0 24 24"><path d="M12 6.5c-1.8-1.4-4.6-2-8-1.8v12.8c3.4-.2 6.2.4 8 1.8 1.8-1.4 4.6-2 8-1.8V4.7c-3.4-.2-6.2.4-8 1.8z"/><path d="M12 6.5v12.8"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="M10.2 3h3.6v5.9l5.1-2.95 1.8 3.1L15.6 12l5.1 2.95-1.8 3.1-5.1-2.95V21h-3.6v-5.9l-5.1 2.95-1.8-3.1L8.4 12 3.3 9.05l1.8-3.1 5.1 2.95z"/><path d="M12 7.5v9"/></svg>',
 };
 const DEFAULT_LINK_ICON = { certkeeper: 'shield', finances: 'dollar', payroll: 'paycheck' };
 const linkIcon = l => LINK_ICONS[l.icon || DEFAULT_LINK_ICON[l.id]] || `<span class="ql-letter">${esc((l.name || '?').trim().charAt(0).toUpperCase())}</span>`;
@@ -267,10 +270,11 @@ function openPanel(name, url) { // a Drive folder or Meet goes to Chrome instead
   if (inChrome(url)) { window.open(url, '_blank', 'noopener'); return; }
   S.adminPanel = { name, url }; render();
 }
-// Sites that won't show inside the panel: Meet, Drive folders, and the Squarespace website (it says
-// "same site only"). The Student Portal and Docs/Sheets are fine in the panel.
+// Sites that won't show inside the panel: Meet, Drive folders, the Squarespace website (it says "same site only"),
+// JB Learning and the VAOEMS portal (both need their own sign-in in Chrome). The Student Portal and Docs/Sheets are fine in the panel.
 const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url)
-  || /\/\/(www\.)?elevateemsacademy\.com(\/|$)/i.test(url);
+  || /\/\/(www\.)?elevateemsacademy\.com(\/|$)/i.test(url)
+  || /\/\/([a-z0-9-]+\.)*jblearning\.com(\/|$)/i.test(url) || /\/\/vdhems\.vdh\.virginia\.gov(\/|$)/i.test(url);
 function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
