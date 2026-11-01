@@ -81,16 +81,12 @@ function staffView() {
         <p class="muted small">On a Staffing tab, but not on the Staff Directory tab (so they can’t sign in or be paid here yet).</p>
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
           <button class="btn tiny" data-act="staffEdOpen" data-new="${esc(u.name)}">Add</button></li>`).join('')}</ul></section>` : ''}
-      <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staff Portal<small>schedule and timesheets</small></h2></div>
-        <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
-          <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
-        <div class="staff-qr" id="staffQr"></div>
-      </section>
       <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staffing by Cohort<small>paid and not paid yet</small></h2></div>
         ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${weekOf(c.cohort) ? `<button class="link-btn" data-act="stfGo" data-cohort="${esc(c.cohort)}" title="Availability & Staffing for this week">${esc(c.cohort)}</button>` : esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
           <b>${money(c.total)}</b><span></span></li>`).join('')}</ul>`
           : '<p class="empty">Nothing on the Payroll tab for a cohort yet.</p>'}
       </section>
+      ${ownersFeedbackBox()}
     </div>
   </div>`;
 }
@@ -109,7 +105,8 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
   return `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
-    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
+    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>
+    <button class="icon-btn" data-act="portalQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`;
 }
 function staffListBox(a) {
   const away = a.people.filter(p => p.inactive);
@@ -125,7 +122,7 @@ function staffListBox(a) {
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table">
-      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>W-9</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span></div>
+      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>W-9</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span><span title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
       ${a.people.filter(p => !p.inactive).map(staffRow).join('')}
       ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive (away for now) <span class="count">${away.length}</span></button>
         ${S.staffShowAway ? away.map(staffRow).join('') : ''}` : ''}
@@ -137,7 +134,17 @@ function staffListBox(a) {
         <span>${p.account ? '<span class="tag sage-tag">Set up</span>' : '<span class="muted small">Not yet</span>'}</span>
         <span>${p.w9 && p.w9.on ? `<span class="tag sage-tag" title="On file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>` : '<span class="muted small">Needed</span>'}</span>
         ${bar(p)}
+        ${fbCell(p.name)}
       </div>`; }
+}
+// The Staff Portal pop-up (QR icon in the header): its web address, Copy link, and the QR code.
+function portalQrModal() {
+  return `<div class="overlay" data-act="portalQrClose"><div class="modal eval-qr" data-stop>
+    <div class="modal-head"><h2>Staff Portal</h2><button class="x big" data-act="portalQrClose" aria-label="Close">×</button></div>
+    <div class="pad"><p class="eval-qr-sub">Schedule and timesheets</p>
+      <div class="staff-qr" id="staffQr"></div>
+      <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a></p>
+      <div class="share-btns eval-qr-btns"><button class="btn" data-act="staffCopyLink">Copy link</button></div></div></div></div>`;
 }
 function showStaffQr() {
   const el = document.getElementById('staffQr');
@@ -163,6 +170,8 @@ function staffEdModal() {
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
+      ${f('evalName', 'Name on forms', 'text', 'First name (e.g. Captain Lugo)')}
+      <p class="muted small se-hint">What students see on the Student Feedback form. Leave it blank to use their first name.</p>
       <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
       ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
         ${e.account ? ` <button class="link" data-act="staffResetPw">Reset their password</button>` : ''}</p>` : ''}
@@ -311,6 +320,10 @@ async function staffAct(a, el = {}) {
   switch (a) {
     case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
     case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
+    case 'portalQrOpen': S.portalQr = true; render(); return true;
+    case 'portalQrClose': S.portalQr = false; render(); return true;
+    case 'fbOpen': S.fbOpen = d.who; render(); return true;
+    case 'fbClose': S.fbOpen = null; render(); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
     case 'payOpen': {
       if (!staffReady()) { toast('The Staff Apps Script isn’t connected yet.'); return true; }
@@ -397,6 +410,7 @@ async function staffAct(a, el = {}) {
       Object.entries({ name: base.name, role: base.role || base.roleText, phone: base.phone, email: base.email, notes: base.notes,
         emName: (base.emergency || {}).name, emPhone: (base.emergency || {}).phone, emRel: (base.emergency || {}).relation })
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
+      S.drafts['se-evalName'] = (S.evalNames || {})[fbKey(base.name)] || '';
       S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '' };
       render(); setTimeout(() => { const x = document.getElementById('se-' + (p ? 'phone' : 'name')); if (x) x.focus(); }, 0);
       return true;
@@ -412,6 +426,14 @@ async function staffAct(a, el = {}) {
       try {
         S.staffAll = await StaffApi.call('adminSavePerson', { orig: e.orig, name: g('name'), role: g('role'), phone: g('phone'), email: g('email'), notes: g('notes'),
           emergency: { name: g('emName'), phone: g('emPhone'), relation: g('emRel') }, inactive: !!e.inactive });
+        // Name on forms (the Student Feedback form): kept in the app's database by their name, blank = first name.
+        const en = g('evalName'), was = (S.evalNames || {})[fbKey(e.orig || g('name'))] || '';
+        if (en !== was || (e.orig && e.orig !== g('name'))) {
+          const names = { ...(S.evalNames || {}) };
+          if (e.orig) delete names[fbKey(e.orig)];
+          if (en) names[fbKey(g('name'))] = en;
+          await Store.set('meta/evalNames', { names }, false);
+        }
         S.staffEd = null; toast('Saved to the Staff Directory.');
         if (S.cohortKey) loadStaffCohort(S.cohortKey, true);
         Object.keys(stfFresh).forEach(k => { stfFresh[k] = false; }); // (Scheduling reads Inactive again)
@@ -880,4 +902,91 @@ function staffingEscape() {
   if (S.stfAv) { S.stfAv = null; return true; }
   if (S.stfPick) { S.stfPick = null; return true; }
   return false;
+}
+
+
+/* ---------- Instructor feedback (the Student Feedback form, eval.html) ----------
+   Every cohort's cohorts/{key}/evals (kind "feedback"), read while the Staff page is open. Each answer rates every
+   instructor who had worked so far that week (by their Staffing-tab name); here they're matched to the Staff
+   Directory the way the Staff page matches names ("Alianna (Ali) Tran" = "Ali Tran" = "Alianna Tran").
+   Nick and Bella aren't in the directory: theirs go in the "Nick & Bella" box. Test cohorts: only in each person's
+   by-cohort list (marked test), never in the averages. */
+const fbBare = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9() ]+/g, ' ').replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
+const fbKey = name => String(name || '').trim(); // (Name on forms is kept by their Staff Directory name)
+function fbAliases(name) {
+  const n = String(name || '').toLowerCase().replace(/\s+/g, ' ').trim(), out = [fbBare(name)];
+  const m = n.match(/^(\S+) \((.+?)\) (.+)$/);
+  if (m) out.push(fbBare(m[1] + ' ' + m[3]), fbBare(m[2] + ' ' + m[3]));
+  else out.push(fbBare(n.replace(/\s*\(.*?\)\s*/g, ' ')));
+  return out.filter((x, i) => x && out.indexOf(x) === i);
+}
+const FB_OWNERS = [{ who: 'Nick', names: ['nick', 'nicholas', 'nick brown', 'nicholas brown'] }, { who: 'Bella', names: ['bella', 'gabriella', 'bella brown', 'gabriella brown'] }];
+const FB_KEYS = [['knowledge', 'Knowledge'], ['teaching', 'Teaching'], ['approach', 'Approachability']];
+const isTestKey = k => /^(test|qa)\b/i.test(String(k || ''));
+let fbWatching = null;
+function watchAllEvals() {
+  const keys = (S.cohorts || []).map(c => c.key).filter(Boolean).sort().join('|');
+  if (!Store.configured || fbWatching === keys) return;
+  (S.fbUnwatch || []).forEach(u => u()); S.fbUnwatch = []; fbWatching = keys;
+  S.allEvals = S.allEvals || {};
+  keys.split('|').filter(Boolean).forEach(k => S.fbUnwatch.push(Store.watch('cohorts/' + k + '/evals', list => { S.allEvals[k] = list.filter(e => e.kind === 'feedback'); render(); })));
+  S.fbUnwatch.push(Store.watch('meta/evalNames', d => { S.evalNames = (d && d.names) || {}; }));
+}
+// Who an instructor rating belongs to: a directory name, or 'Nick' / 'Bella'.
+function fbWho(id) {
+  const b = fbBare(id), own = FB_OWNERS.find(o => o.names.includes(b));
+  if (own) return own.who;
+  const people = (S.staffAll && S.staffAll.people) || [];
+  let hit = people.filter(p => fbAliases(p.name).includes(b));
+  if (!hit.length && !b.includes(' ')) hit = people.filter(p => fbAliases(p.name).some(a => a.split(' ')[0] === b));
+  return hit.length === 1 ? hit[0].name : id;
+}
+// Everything for one person: all-time (not test cohorts), by cohort, comments, each rating.
+function fbFor(who) {
+  const out = { n: 0, sum: {}, byCohort: [], comments: [], rows: [] };
+  Object.entries(S.allEvals || {}).sort(([a], [b]) => (cohortRank(b) ?? 0) - (cohortRank(a) ?? 0)).forEach(([key, list]) => {
+    const c = { key, test: isTestKey(key), n: 0, sum: {}, days: [] };
+    list.forEach(e => (e.instructors || []).filter(x => fbWho(x.id) === who).forEach(x => {
+      c.n++; if (!c.days.includes(e.day)) c.days.push(e.day);
+      FB_KEYS.forEach(([k]) => { c.sum[k] = (c.sum[k] || 0) + (Number(x[k]) || 0); });
+      if (String(x.feedback || '').trim()) out.comments.push({ text: x.feedback, key, day: e.day, test: c.test });
+      out.rows.push({ key, test: c.test, ...Object.fromEntries(FB_KEYS.map(([k]) => [k, Number(x[k]) || 0])) });
+    }));
+    if (!c.n) return;
+    c.avg = Object.fromEntries(FB_KEYS.map(([k]) => [k, c.sum[k] / c.n]));
+    out.byCohort.push(c);
+    if (!c.test) { out.n += c.n; FB_KEYS.forEach(([k]) => { out.sum[k] = (out.sum[k] || 0) + c.sum[k]; }); }
+  });
+  if (out.n) { out.avg = Object.fromEntries(FB_KEYS.map(([k]) => [k, out.sum[k] / out.n])); out.overall = FB_KEYS.reduce((t, [k]) => t + out.avg[k], 0) / FB_KEYS.length; }
+  return out;
+}
+function fbCell(name) {
+  watchAllEvals();
+  const f = fbFor(name);
+  if (!f.n && !f.byCohort.length) return '<span class="muted small">–</span>';
+  return `<span><button class="link-btn fb-link" data-act="fbOpen" data-who="${esc(name)}">${f.n ? `<b>${f.overall.toFixed(1)}</b> <span class="muted small">· ${f.n}</span>` : '<span class="muted small">test only</span>'}</button></span>`;
+}
+function ownersFeedbackBox() {
+  watchAllEvals();
+  const row = who => { const f = fbFor(who);
+    return `<li><span><b>${who}</b><span class="muted small">${f.n ? f.n + ' rating' + (f.n === 1 ? '' : 's') : f.byCohort.length ? 'Test cohorts only so far' : 'No ratings yet'}</span></span>
+      ${f.n ? `<span class="fb-mini">${FB_KEYS.map(([k, l]) => `<span title="${l}">${l.slice(0, 1)} <b>${f.avg[k].toFixed(1)}</b></span>`).join('')}</span>` : '<span></span>'}
+      ${f.n || f.byCohort.length ? `<button class="btn tiny" data-act="fbOpen" data-who="${who}">View</button>` : '<span></span>'}</li>`; };
+  return `<section class="box"><div class="box-head admin-head"><h2>Nick &amp; Bella<small>student feedback</small></h2></div>
+    <ul class="pay-owed fb-owners">${row('Nick')}${row('Bella')}</ul></section>`;
+}
+// One person's feedback (from the Feedback column or the Nick & Bella box).
+function fbModal() {
+  const who = S.fbOpen, f = fbFor(who), avg = f.avg;
+  const tiles = a => `<div class="peer-grid fb-grid">${FB_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${a[k].toFixed(1)}</b></div>`).join('')}</div>`;
+  return `<div class="overlay" data-act="fbClose"><div class="modal fb-modal" data-stop>
+    <div class="modal-head"><h2>${esc(who)}<small class="muted"> · Student Feedback</small></h2><button class="x big" data-act="fbClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      ${f.n ? `<h3 class="fb-h">All cohorts <span class="muted small">${f.n} rating${f.n === 1 ? '' : 's'}</span></h3>${tiles(avg)}` : '<p class="muted">No ratings from real cohorts yet.</p>'}
+      ${f.byCohort.length ? `<h3 class="fb-h">By cohort</h3><ul class="fb-cohorts">${f.byCohort.map(c => `<li><span><b>${esc(c.key)}</b>${c.test ? ' <span class="tag">test</span>' : ''}<span class="muted small"> · ${c.n} rating${c.n === 1 ? '' : 's'} · Day ${c.days.sort().join(', ')}</span></span>
+        <span class="fb-mini">${FB_KEYS.map(([k, l]) => `<span title="${l}">${l} <b>${c.avg[k].toFixed(1)}</b></span>`).join('')}</span></li>`).join('')}</ul>` : ''}
+      <h3 class="fb-h">Comments <span class="muted small">${f.comments.length}</span></h3>
+      ${f.comments.length ? `<ul class="fb-comments">${f.comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}${c.test ? ' (test)' : ''}, Day ${c.day}</span></li>`).join('')}</ul>` : '<p class="muted small">No written feedback yet.</p>'}
+      ${f.rows.length ? `<details class="fb-each"><summary>Each rating (${f.rows.length})</summary><ul class="peer-rows">${f.rows.map(r => `<li>${FB_KEYS.map(([k, l]) => `<span>${l} <b>${r[k]}</b></span>`).join('<span class="dot">·</span>')}<span class="muted small"> · ${esc(r.key)}</span></li>`).join('')}</ul></details>` : ''}
+    </div></div></div>`;
 }

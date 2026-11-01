@@ -1620,7 +1620,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 @media (max-width: 1000px) { .staff-board { grid-template-columns: 1fr; } }
 .staff-board .board-col { display: grid; gap: 18px; align-content: start; }
 .staff-table { display: grid; margin-top: 6px; }
-.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px 56px minmax(190px, 1.3fr); gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
+.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px 56px minmax(120px, .8fr) 84px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
 .st-row > span { min-width: 0; overflow-wrap: anywhere; }
 .st-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); border-bottom: 1px solid var(--line); padding-top: 0; }
 .st-row a { color: var(--ink); text-underline-offset: 2px; }
@@ -1643,6 +1643,22 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pay-owed li > span:first-child { display: grid; }
 .staff-qr { display: grid; place-items: center; margin: 10px 0 4px; min-height: 150px; }
 .staff-qr img, .staff-qr canvas { border-radius: 8px; }
+/* Instructor feedback (Staff page): the Feedback column, the Nick & Bella box, one person's pop-up. */
+.fb-link { text-align: left; }
+.fb-link b { font-weight: 600; }
+.fb-owners li { grid-template-columns: 1fr auto auto; }
+.fb-mini { display: inline-flex; gap: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.fb-mini b { color: var(--ink); font-weight: 600; }
+.modal.fb-modal { width: min(640px, 100%); }
+.fb-modal .modal-head small { font-family: inherit; font-size: 14px; }
+.fb-h { font-size: 15px; margin: 16px 0 6px; }
+.fb-h:first-child { margin-top: 0; }
+.fb-grid { grid-template-columns: repeat(3, 1fr); }
+.fb-cohorts, .fb-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.fb-cohorts li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px dotted var(--line); }
+.fb-comments li { padding: 6px 0; border-bottom: 1px dotted var(--line); }
+.fb-each { margin-top: 14px; }
+.fb-each summary { cursor: pointer; color: var(--taupe-dark); font-size: 14px; margin-bottom: 6px; }
 .se-em { margin: 4px 0 8px; }
 .se-em-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
 @media (max-width: 560px) { .se-em-row { grid-template-columns: 1fr; } }

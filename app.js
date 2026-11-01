@@ -701,7 +701,7 @@ function render() {
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
     if (S.evalQr) showEvalQr();
-    if (S.view === 'staff') showStaffQr();
+    if (S.portalQr) showStaffQr();
   }, 0);
 }
 
@@ -781,6 +781,8 @@ function shell() {
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
   ${S.evalQr ? evalQrModal() : ''}
+  ${S.portalQr ? portalQrModal() : ''}
+  ${S.fbOpen ? fbModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
   ${S.bagEd ? bagEdModal() : ''}
@@ -2710,7 +2712,7 @@ document.addEventListener('keydown', e => {
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false; else if (S.bp) { if (S.bp.busy) return; bpClose(); return; }
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.fbOpen) S.fbOpen = null; else if (S.portalQr) S.portalQr = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.bag-ed input:not([data-add]), .bag-ed textarea')) { e.preventDefault(); e.target.blur(); return; } // renaming a pocket/item
