@@ -274,11 +274,11 @@ If you have any questions or experience issues submitting payment, please contac
   { id: 'next-day', name: 'Next installment · due tonight', subject: 'IMPORTANT: EMT Tuition Payment Due Tonight',
     when: { from: 'next', days: 0 }, who: 'unpaid-next', send: 'bcc', body: `{if group}Good morning everyone,{else}Good morning {first name},{end}
 
-This is a reminder that your next tuition installment of $500 is **due by 11:59pm tonight**.{if not late} This must be paid before the course start date of {orientation date}.{end}
+This is a reminder that your next tuition installment of $500 is **due by 11:59pm tonight**.{if before orientation} This must be paid before the course start date of {orientation date}.{end}
 
 Direct link to the payment portal can be found here: [Payment Portal](https://tally.so/r/RGZ8A9)
 
-{if not late}We look forward to meeting you at orientation!
+{if before orientation}We look forward to meeting you at orientation!
 
 {end}` },
 

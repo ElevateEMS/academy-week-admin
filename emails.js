@@ -218,6 +218,8 @@ function emailsBox() {
 // {if late}…{else}…{end}: words ("late", "group", "owes next", "has book" …) joined by "and", any of them with "not".
 const EM_IFS = {
   late: p => !!(p && p.late), group: (p, g) => g, 'one student': (p, g) => !g,
+  // Their Next payment is due before their own orientation (the cohort's students; not late enrollees or an extension past it).
+  'before orientation': p => !p || !(isIsoDate(p.next) && isIsoDate(p.orient)) || p.next < p.orient,
   'owes next': p => !!(p && !p.paidNext), 'owes final': p => !!(p && !p.paidFinal),
   'owes tuition': p => !!(p && (!p.paidNext || !p.paidFinal)), 'paid in full': p => !!(p && p.paidNext && p.paidFinal),
   'has book': p => !!(p && p.textbook), 'needs book': p => !!(p && !p.textbook), extension: p => !!(p && (p.ext.next || p.ext.final)),
@@ -517,7 +519,7 @@ function bookCodesModal() {
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
   <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {overdue payment} {overdue date} (the payment they’re late on: “next tuition installment” / “final tuition payment”, and when it was due) {sign link} (their orientation roster signing link)</p>
-  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
+  <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), before orientation (their Next payment is due before their orientation), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 function emailTplModal() {
   const ed = S.emailTplEd, list = emailTemplates({ all: true });
