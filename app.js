@@ -1986,12 +1986,13 @@ const FB_AW = ['Stations were well run and I got enough hands-on repetitions.', 
 function ownersFeedback(list) {
   const out = {};
   FB_OWNERS.forEach(o => {
-    const r = { n: 0, sum: {}, comments: [] };
+    const r = { n: 0, sum: {}, cnt: {}, comments: [] }, score = v => { const n = Number(v); return n >= 1 && n <= 5 ? n : null; };
     list.forEach(e => (e.instructors || []).filter(x => o.names.includes(fbBare(x.id))).forEach(x => {
-      r.n++; FB_KEYS.forEach(([k]) => { r.sum[k] = (r.sum[k] || 0) + (Number(x[k]) || 0); });
       if (String(x.feedback || '').trim()) r.comments.push({ text: x.feedback, day: e.day, key: e.key });
+      if (!FB_KEYS.some(([k]) => score(x[k]) != null)) return; // (ratings are optional: only the ones given count)
+      r.n++; FB_KEYS.forEach(([k]) => { const v = score(x[k]); if (v != null) { r.sum[k] = (r.sum[k] || 0) + v; r.cnt[k] = (r.cnt[k] || 0) + 1; } });
     }));
-    if (r.n) r.avg = Object.fromEntries(FB_KEYS.map(([k]) => [k, r.sum[k] / r.n]));
+    if (r.n) r.avg = Object.fromEntries(FB_KEYS.map(([k]) => [k, r.cnt[k] ? r.sum[k] / r.cnt[k] : null]));
     out[o.who] = r;
   });
   return out;
@@ -2060,8 +2061,8 @@ function studentsView() {
         ${[['What worked well', cf.worked], ['Constructive criticism', cf.criticism]].map(([h, items]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>
           ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
         ${['Nick', 'Bella'].map(who => { const o = cf.owners[who]; return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${o.n} rating${o.n === 1 ? '' : 's'}</span></p>
-          ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k].toFixed(1)}</b></li>`).join('')}</ul>
-            ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : ''}` : '<p class="muted small">No ratings yet.</p>'}</div>`; }).join('')}
+          ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k] != null ? o.avg[k].toFixed(1) : '–'}</b></li>`).join('')}</ul>` : '<p class="muted small">No ratings yet.</p>'}
+          ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : ''}</div>`; }).join('')}
       </div></details>` : ''}
   </section>` : ''}
   <section class="box table-box">

@@ -147,18 +147,19 @@
       ${(info.instructors || []).length ? `<h2 class="sec">3 · Instructors</h2><div class="card"><p class="scale">Rate each 1–5 (5 = excellent).</p>${info.instructors.map(p => {
         const r = A.instructors[p.id] || {};
         return `<div class="person"><h3>${esc(p.name)}</h3>${INSTR.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(1, r[k], `data-instr="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}
-          <label class="field"><span>Feedback for ${esc(p.name)} (optional)</span><textarea data-ifb="${esc(p.id)}">${esc(r.feedback || '')}</textarea></label></div>`;
+          <label class="field"><span>Feedback for ${esc(p.name)}</span><textarea data-ifb="${esc(p.id)}">${esc(r.feedback || '')}</textarea></label></div>`;
       }).join('')}</div>` : ''}
       <h2 class="sec">Comments</h2><div class="card"><label class="field" style="margin-top:0"><span>What worked well?</span><textarea data-text="worked">${esc(A.text.worked || '')}</textarea></label>
         <label class="field"><span>Constructive criticism</span><textarea data-text="criticism">${esc(A.text.criticism || '')}</textarea></label></div>
       <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>`;
   }
+  // Nothing on this one is required (the page doesn't say so): blanks are sent as null and left out of the averages.
   function feedbackAnswers() {
-    const full = l => l.length === 3 && [0, 1, 2].every(i => l[i] != null);
-    const instructors = (info.instructors || []).map(p => ({ id: p.id, ...(A.instructors[p.id] || {}) }));
-    if (!full(A.program) || !full(A.aw) || instructors.some(x => INSTR.some(([k]) => x[k] == null)))
-      return { err: 'Please answer every rating before submitting.' };
-    return { answers: { program: A.program, aw: A.aw, instructors, worked: A.text.worked || '', criticism: A.text.criticism || '' } };
+    const three = l => [0, 1, 2].map(i => l[i] ?? null);
+    const instructors = (info.instructors || []).map(p => ({ id: p.id, ...(A.instructors[p.id] || {}) }))
+      .map(x => ({ id: x.id, ...Object.fromEntries(INSTR.map(([k]) => [k, x[k] ?? null])), feedback: x.feedback || '' }))
+      .filter(x => INSTR.some(([k]) => x[k] != null) || String(x.feedback).trim());
+    return { answers: { program: three(A.program), aw: three(A.aw), instructors, worked: A.text.worked || '', criticism: A.text.criticism || '' } };
   }
 
   /* ---------- Drawing, answers, submit ---------- */

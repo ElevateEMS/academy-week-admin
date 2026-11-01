@@ -929,7 +929,8 @@ function fbReal() { // { cohortKey: [feedback answers] } without Test cohorts, n
 function fbBulletinCard() {
   const real = fbReal(), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
   const course = all.program != null && all.aw != null ? (all.program + all.aw) / 2 : all.program ?? all.aw;
-  const own = who => { const o = all.owners[who]; return o.n ? `${who} ${(FB_KEYS.reduce((t, [k]) => t + o.avg[k], 0) / FB_KEYS.length).toFixed(1)}` : ''; };
+  const mean = a => { const v = FB_KEYS.map(([k]) => a[k]).filter(x => x != null); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null; };
+  const own = who => { const o = all.owners[who], m = o.n ? mean(o.avg) : null; return m != null ? `${who} ${m.toFixed(1)}` : ''; };
   const bits = [course != null ? 'Course ' + course.toFixed(1) : '', own('Nick'), own('Bella')].filter(Boolean);
   return `<button class="fb-card" data-act="fbAdminOpen"><span class="fb-card-title">Instructor &amp; Course Feedback <span class="fb-card-arrow">▸</span></span>
     <span class="muted small">${bits.length ? bits.join(' · ') : 'No feedback yet'}</span></button>`;
@@ -956,8 +957,8 @@ function fbAdminModal() {
     body = `<div class="cf-body">${['Nick', 'Bella'].map(who => {
       const f = fbFor(who), real2 = f.byCohort.filter(c => !c.test), comments = f.comments.filter(c => !c.test);
       return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${f.n} rating${f.n === 1 ? '' : 's'}</span></p>
-        ${f.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${f.avg[k].toFixed(1)}</b></li>`).join('')}</ul>
-          <p class="cf-h fb-sub">By cohort</p><ul class="cf-qs">${real2.map(c => `<li><span>${esc(c.key)} <span class="muted small">· ${c.n}</span></span><b>${(FB_KEYS.reduce((t, [k]) => t + c.avg[k], 0) / FB_KEYS.length).toFixed(1)}</b></li>`).join('')}</ul>
+        ${f.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${n1(f.avg[k])}</b></li>`).join('')}</ul>
+          <p class="cf-h fb-sub">By cohort</p><ul class="cf-qs">${real2.map(c => `<li><span>${esc(c.key)} <span class="muted small">· ${c.n}</span></span><b>${n1(c.overall)}</b></li>`).join('')}</ul>
           <p class="cf-h fb-sub">Comments <span class="muted small">${comments.length}</span></p>
           ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}, Day ${c.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
         : '<p class="muted small">No ratings from a real cohort yet.</p>'}</div>`; }).join('')}</div>`;
