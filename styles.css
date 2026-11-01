@@ -271,6 +271,12 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .peer-grid span { font-size: 12px; color: var(--muted); }
 .peer-grid b { font-size: 20px; font-weight: 600; }
 .peer-flag-note { color: #b42318; font-size: 13px; margin: 6px 0 0; }
+.peer-rows-head { font-size: 13px; color: var(--muted); margin: 14px 0 4px; }
+.peer-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.peer-rows li { padding: 5px 0; border-bottom: 1px dotted var(--line); }
+.peer-rows li:last-child { border-bottom: 0; }
+.peer-rows .dot { color: var(--muted); margin: 0 7px; }
+.peer-rows b { font-weight: 600; }
 @media (max-width: 520px) { .peer-grid { grid-template-columns: repeat(2, 1fr); } }
 .behind-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 18px; }
 .behind-list > div { padding: 4px 0; }

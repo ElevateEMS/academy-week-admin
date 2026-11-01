@@ -1958,8 +1958,9 @@ const PEER_KEYS = [['pro', 'Professionalism'], ['team', 'Teamwork'], ['skills', 
 function peerStats() {
   const out = {};
   (S.evals || []).filter(e => e.kind === 'peer').forEach(e => (e.people || []).forEach(p => {
-    const o = out[p.id] = out[p.id] || { n: 0, sum: {}, zeros: {}, days: [] };
+    const o = out[p.id] = out[p.id] || { n: 0, sum: {}, zeros: {}, days: [], rows: [] };
     o.n++;
+    o.rows.push(Object.fromEntries(PEER_KEYS.map(([k]) => [k, Number(p[k]) || 0])));
     if (!o.days.includes(e.day)) o.days.push(e.day);
     PEER_KEYS.forEach(([k]) => { const v = Number(p[k]) || 0; o.sum[k] = (o.sum[k] || 0) + v; if (v === 0) o.zeros[k] = (o.zeros[k] || 0) + 1; });
   }));
@@ -2127,9 +2128,11 @@ function drawer() {
 
       ${show('peers') && peerStats()[s.name] ? (st => `<section>
         <h3>Peer Evaluations</h3>
-        <p class="muted small">${st.n} rating${st.n === 1 ? '' : 's'} from their squad${st.days.length ? ' (Day ' + st.days.sort().join(', ') + ')' : ''}, including their own. Anonymous.</p>
+        <p class="muted small">${st.n} rating${st.n === 1 ? '' : 's'} from their squad${st.days.length ? ' (Day ' + st.days.sort().join(', ') + ')' : ''}, including their own.</p>
         <div class="peer-grid">${PEER_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${st.avg[k].toFixed(1)}</b>${st.zeros[k] ? `<span class="peer-flag">⚑ ${st.zeros[k]} × 0</span>` : ''}</div>`).join('')}</div>
-        ${st.zeroCount ? '<p class="peer-flag-note">⚑ Someone rated them 0 (Serious concern). Only you and Nick see this.</p>' : ''}
+        ${st.zeroCount ? '<p class="peer-flag-note">⚑ Someone rated them 0 (Serious concern).</p>' : ''}
+        <p class="peer-rows-head">Each rating</p>
+        <ul class="peer-rows">${st.rows.map(r => `<li>${PEER_KEYS.map(([k, l]) => `<span class="${r[k] === 0 ? 'peer-flag' : ''}">${l} <b>${r[k]}</b></span>`).join('<span class="dot">·</span>')}</li>`).join('')}</ul>
       </section>`)(peerStats()[s.name]) : ''}
 
       ${show('attendance') ? `<section>
