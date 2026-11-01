@@ -3414,14 +3414,14 @@ async function showEvalQr() {
 async function downloadEvalQr(k, cohort, url) {
   await loadQr();
   const tmp = document.createElement('div');
-  new QRCode(tmp, { text: url, width: 820, height: 820, colorDark: '#0c2a43', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  new QRCode(tmp, { text: url, width: 640, height: 640, colorDark: '#0c2a43', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
   const qr = tmp.querySelector('canvas');
   const logo = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'logo.png'; });
   const c = document.createElement('canvas'); c.width = 1920; c.height = 1080;
   const g = c.getContext('2d'), navy = '#0c2a43', orange = '#e0702a', font = (w, px) => `${w} ${px}px "Helvetica Neue", Arial, sans-serif`;
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, 1920, 1080);
   g.fillStyle = orange; g.fillRect(0, 1060, 1920, 20);
-  g.drawImage(qr, 1000, 110, 820, 820);
+  g.drawImage(qr, 1120, 210, 640, 640);
   const x = 120;
   if (logo) g.drawImage(logo, x, 150, 170, 170);
   g.textBaseline = 'alphabetic';
