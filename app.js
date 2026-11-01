@@ -3349,6 +3349,11 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'evalQrClose': S.evalQr = null; render(); break;
+      case 'evalQrDownload': {
+        try { await downloadEvalQr(S.evalQr, S.cohortKey, new URL('eval.html?t=' + S.evalLinks[S.cohortKey][S.evalQr], location.href).href); }
+        catch (err) { toast('Couldn’t make the QR image: ' + err.message); }
+        break;
+      }
       case 'peerSuggToggle': e && e.preventDefault(); S.peerSuggOpen = !S.peerSuggOpen; render(); break;
       case 'cfToggle': e && e.preventDefault(); S.cfOpen = !S.cfOpen; render(); break;
       case 'fbPdfSave': {
@@ -3395,13 +3400,45 @@ function evalQrModal() {
       <p class="eval-qr-sub">${esc(S.cohortKey)} · Scan with your phone’s camera</p>
       <div id="evalQr" class="eval-qr-code">${url ? '' : '<p class="muted">Getting the link…</p>'}</div>
       ${url ? `<div class="share-btns eval-qr-btns"><button class="btn" data-act="evalQrCopy">Copy link</button>
-        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" data-name="${EVAL_TITLES[k]}">Open the form</a></div>` : ''}
+        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" data-name="${EVAL_TITLES[k]}">Open the form</a>
+        <button class="btn" data-act="evalQrDownload">Download QR</button></div>` : ''}
     </div></div></div>`;
 }
 async function showEvalQr() {
   const el = document.getElementById('evalQr'), links = (S.evalLinks || {})[S.cohortKey];
   if (!el || !links || el.dataset.drawn === S.evalQr) return;
   try { await loadQr(); el.dataset.drawn = S.evalQr; drawQr(el, new URL('eval.html?t=' + links[S.evalQr], location.href).href, 360); } catch (e) { el.textContent = e.message; }
+}
+// Download QR: a projector-sized (1920×1080) picture of a form's QR code, in the forms' navy and orange, to put in
+// Drive or slides and show without the Admin app. The link never changes for a cohort, so one picture lasts the week.
+async function downloadEvalQr(k, cohort, url) {
+  await loadQr();
+  const tmp = document.createElement('div');
+  new QRCode(tmp, { text: url, width: 820, height: 820, colorDark: '#0c2a43', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  const qr = tmp.querySelector('canvas');
+  const logo = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = 'logo.png'; });
+  const c = document.createElement('canvas'); c.width = 1920; c.height = 1080;
+  const g = c.getContext('2d'), navy = '#0c2a43', orange = '#e0702a', font = (w, px) => `${w} ${px}px "Helvetica Neue", Arial, sans-serif`;
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 1920, 1080);
+  g.fillStyle = orange; g.fillRect(0, 1060, 1920, 20);
+  g.drawImage(qr, 1000, 110, 820, 820);
+  const x = 120;
+  if (logo) g.drawImage(logo, x, 150, 170, 170);
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = orange; g.font = font('bold', 34); if ('letterSpacing' in g) g.letterSpacing = '8px';
+  g.fillText('ELEVATE EMS', x, 410);
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+  // The title, wrapped to the left half.
+  g.fillStyle = navy; g.font = font('bold', 86);
+  const lines = [], words = EVAL_TITLES[k].split(' ');
+  words.forEach(w => { const last = lines[lines.length - 1]; if (last && g.measureText(last + ' ' + w).width <= 800) lines[lines.length - 1] = last + ' ' + w; else lines.push(w); });
+  let y = 510; lines.forEach(l => { g.fillText(l, x, y); y += 100; });
+  g.fillStyle = orange; g.fillRect(x, y - 50, 120, 8);
+  g.fillStyle = '#3a3f45'; g.font = font('normal', 46); g.fillText(cohort, x, y + 40);
+  g.fillStyle = '#6a737d'; g.font = font('normal', 40); g.fillText('Scan with your phone’s camera', x, y + 110);
+  const blob = await new Promise(ok => c.toBlob(ok, 'image/png'));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${cohort} ${EVAL_TITLES[k]} QR.png`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 async function showShareQr() {
   const el = document.getElementById('shareQr');
