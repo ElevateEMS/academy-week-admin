@@ -168,6 +168,10 @@ function packetCounter(list, counts, act, dis = '') {
 const isBinderItem = text => /binder cover/i.test(text);
 const isBinderList = text => /prepare (student )?binders/i.test(text); // gets the list icon (what goes in each binder) and the binder packet's Print
 const isShirtItem = text => /ship.*shirt/i.test(text); // Course To-Do: gets the Print packet button (packet.js)
+// Academy Week to-dos for the evaluation forms (eval.html): their QR button opens that form's QR code.
+const evalKindOf = text => /peer eval/i.test(text) ? 'peer' : /(instructor|staff) eval|student feedback|course feedback|feedback form/i.test(text) ? 'feedback' : null;
+const EVAL_TITLES = { peer: 'Peer Evaluation', feedback: 'Student Feedback' };
+const QR_ICON = '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3h-3zM17.5 17.5h3v3h-3zM14 20.5h.5M20.5 14v.5"/></svg>';
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */
 const MAX_PRIORITIES = 3;
@@ -695,6 +699,7 @@ function render() {
     document.querySelectorAll('textarea[data-notes]').forEach(t => { const b = document.querySelector(`[data-back="${t.id}"]`); if (b) b.scrollTop = t.scrollTop; });
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
+    if (S.evalQr) showEvalQr();
     if (S.view === 'staff') showStaffQr();
   }, 0);
 }
@@ -774,6 +779,7 @@ function shell() {
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
+  ${S.evalQr ? evalQrModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
   ${S.bagEd ? bagEdModal() : ''}
@@ -1069,6 +1075,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       const done = t.done || (bag && bagsAllDone(t.day ?? 1));
       let open = '';
       if (kind === 'todo' && isBinderItem(t.text)) open = `<button class="btn tiny" data-act="binderOpen" data-id="${t.id}">Print · ${attending().length}</button>`;
+      if (kind === 'todo' && evalKindOf(t.text)) open = `<span class="ship-btns"><button class="eye" data-act="evalQr" data-k="${evalKindOf(t.text)}" title="${EVAL_TITLES[evalKindOf(t.text)]} QR code" aria-label="${EVAL_TITLES[evalKindOf(t.text)]} QR code">${QR_ICON}</button></span>`;
       if (kind === 'todo' && isBinderList(t.text)) open = `<span class="ship-btns">`
         + `<button class="eye" data-act="bpOpen" data-id="${t.id}" title="Print binder packets (${attending().length} student${attending().length === 1 ? '' : 's'})" aria-label="Print binder packets">${PRINTER}</button></span>`;
       // Ship student shirts: Print Packet and Shipping File as icons (names on hover), so it all fits on one row.
@@ -2661,7 +2668,7 @@ document.addEventListener('keydown', e => {
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false; else if (S.bp) { if (S.bp.busy) return; bpClose(); return; }
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.bag-ed input:not([data-add]), .bag-ed textarea')) { e.preventDefault(); e.target.blur(); return; } // renaming a pocket/item
@@ -3223,6 +3230,22 @@ async function act(a, el = {}, e) {
         if (a === 'shareNew') { await publish(); setTimeout(showShareQr, 30); }
         render(); break;
       }
+      case 'evalQr': {
+        S.evalQr = d.k; render();
+        const key = S.cohortKey;
+        if (!(S.evalLinks || {})[key]) {
+          try { const links = await Sheets.evalLinks(key); S.evalLinks = { ...(S.evalLinks || {}), [key]: links }; }
+          catch (err) { S.evalQr = null; toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
+          render();
+        }
+        break;
+      }
+      case 'evalQrClose': S.evalQr = null; render(); break;
+      case 'evalQrCopy': {
+        const url = new URL('eval.html?t=' + S.evalLinks[S.cohortKey][S.evalQr], location.href).href;
+        try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Couldn’t copy the link.'); }
+        break;
+      }
       case 'shareCopy': {
         const url = shareUrl(S.cohortDoc.shareToken);
         try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Select the link and copy it.'); }
@@ -3243,6 +3266,25 @@ async function act(a, el = {}, e) {
 }
 
 function dropSchDrafts(n) { Object.keys(S.drafts).forEach(k => { if (k.startsWith('sch-' + n + '-')) delete S.drafts[k]; }); }
+// The evaluation forms' QR codes (big, for the screen at the front of the room). The link code comes from the Admin
+// Apps Script (evalLinks) once per cohort; it never changes, so a printed QR keeps working.
+function evalQrModal() {
+  const k = S.evalQr, links = (S.evalLinks || {})[S.cohortKey], url = links ? new URL('eval.html?t=' + links[k], location.href).href : '';
+  return `<div class="overlay" data-act="evalQrClose"><div class="modal eval-qr" data-stop>
+    <div class="modal-head"><h2>${EVAL_TITLES[k]}</h2><button class="x big" data-act="evalQrClose" aria-label="Close">×</button></div>
+    <div class="pad">
+      <p class="eval-qr-sub">${esc(S.cohortKey)} · Scan with your phone’s camera</p>
+      <div id="evalQr" class="eval-qr-code">${url ? '' : '<p class="muted">Getting the link…</p>'}</div>
+      ${url ? `<div class="share-btns eval-qr-btns"><button class="btn" data-act="evalQrCopy">Copy link</button>
+        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" data-name="${EVAL_TITLES[k]}">Open the form</a></div>
+        <p class="muted small">Anonymous: students don’t sign in and nothing about who filled it out is saved. It ends on a Ticket to Leave screen they show you.</p>` : ''}
+    </div></div></div>`;
+}
+async function showEvalQr() {
+  const el = document.getElementById('evalQr'), links = (S.evalLinks || {})[S.cohortKey];
+  if (!el || !links || el.dataset.drawn === S.evalQr) return;
+  try { await loadQr(); el.dataset.drawn = S.evalQr; drawQr(el, new URL('eval.html?t=' + links[S.evalQr], location.href).href, 360); } catch (e) { el.textContent = e.message; }
+}
 async function showShareQr() {
   const el = document.getElementById('shareQr');
   const token = S.cohortDoc && S.cohortDoc.shareToken;

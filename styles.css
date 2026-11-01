@@ -428,6 +428,11 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .share-body { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
 .share-qr { width: 180px; height: 180px; background: #fff; padding: 0; border-radius: 8px; }
 .share-qr img, .share-qr canvas { display: block; }
+.modal.eval-qr { width: min(520px, 100%); text-align: center; }
+.eval-qr-sub { color: var(--muted); margin: 0 0 14px; }
+.eval-qr-code { width: 360px; max-width: 100%; aspect-ratio: 1; margin: 0 auto 16px; display: grid; place-items: center; }
+.eval-qr-code img, .eval-qr-code canvas { display: block; width: 100% !important; height: auto !important; }
+.eval-qr-btns { justify-content: center; }
 .share-url { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); font-size: 13px; margin-bottom: 10px; }
 .share-btns { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 a.btn { text-decoration: none; color: inherit; }

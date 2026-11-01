@@ -1,0 +1,223 @@
+<!doctype html>
+<!-- The Academy Week evaluation forms: eval.html?t=<the cohort's form link code> (from the QR code on the Academy Week
+     to-do). One page for both: Peer Evaluation and Student Feedback (the paper forms on the Desktop, made digital).
+     Anonymous: no sign-in, nothing about who filled it out is saved (Admin Apps Script evalInfo / evalSubmit).
+     Ends on "Ticket to Leave" (with the time they submitted), which they show an instructor. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Elevate EMS · Evaluation</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=292">
+<style>
+  :root { --navy: #0c2a43; --orange: #e0702a; --ink: #1f2328; --muted: #6a737d; --line: #d5dae0; --soft: #f3f5f7; --bg: #eef1f4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; font-size: 16px; color: var(--ink); background: var(--bg);
+    padding: max(14px, env(safe-area-inset-top)) 12px max(40px, env(safe-area-inset-bottom)); -webkit-text-size-adjust: 100%; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .head { display: flex; align-items: center; gap: 12px; margin: 4px 2px 14px; }
+  .head img { width: 46px; height: 46px; }
+  .head .kicker { font-size: 11px; letter-spacing: .22em; color: var(--orange); font-weight: 700; }
+  .head h1 { margin: 2px 0 0; font-size: 22px; color: var(--navy); letter-spacing: .02em; }
+  .head .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px 16px 14px; box-shadow: 0 1px 3px rgba(12, 42, 67, .1); margin-bottom: 12px; }
+  .card h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--navy); margin: 0 0 10px; }
+  .card p { margin: 0 0 8px; line-height: 1.45; font-size: 15px; color: #3a3f45; }
+  .scale { font-size: 13px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
+  .scale b { color: var(--navy); }
+  .q { padding: 10px 0; border-top: 1px dashed var(--line); }
+  .q:first-of-type { border-top: 0; padding-top: 2px; }
+  .q .label { font-size: 15px; margin-bottom: 8px; }
+  .nums { display: flex; gap: 6px; }
+  .nums button { flex: 1; min-width: 0; height: 42px; border-radius: 9px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 16px; font-weight: 600; color: var(--navy); cursor: pointer; }
+  .nums button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .person { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .person h3 { margin: 0 0 4px; font-size: 17px; color: var(--navy); }
+  .person .q .label { font-size: 14px; color: #3a3f45; margin-bottom: 6px; }
+  .missing { outline: 2px solid var(--orange); outline-offset: 3px; border-radius: 6px; }
+  textarea { width: 100%; min-height: 90px; border: 1px solid var(--line); border-radius: 9px; padding: 10px; font: inherit; font-size: 16px; resize: vertical; }
+  .field { margin-top: 10px; }
+  .field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .squads { display: grid; gap: 8px; }
+  .squads button { text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 12px 14px; font: inherit; cursor: pointer; }
+  .squads button b { display: block; color: var(--navy); font-size: 16px; }
+  .squads button span { font-size: 13px; color: var(--muted); }
+  .squads button.on { border-color: var(--navy); box-shadow: 0 0 0 2px var(--navy) inset; }
+  .picks { display: grid; gap: 6px; }
+  .picks label { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 16px; }
+  .picks input { width: 20px; height: 20px; }
+  .btn { font: inherit; font-size: 17px; font-weight: 600; border: 0; background: var(--navy); color: #fff; border-radius: 10px; padding: 14px 18px; width: 100%; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .link { background: none; border: 0; color: var(--navy); text-decoration: underline; font: inherit; font-size: 14px; cursor: pointer; padding: 0; }
+  .err { color: #b42318; font-size: 14px; margin: 10px 0 0; }
+  .loading { text-align: center; color: var(--muted); padding: 60px 0; }
+  /* Ticket to Leave */
+  .ticket { position: fixed; inset: 0; background: linear-gradient(160deg, #1e7e34, #14592a); color: #fff; display: grid; place-items: center; padding: 24px; text-align: center; z-index: 5; }
+  .ticket .in { max-width: 420px; }
+  .ticket .check { width: 92px; height: 92px; border-radius: 50%; background: rgba(255,255,255,.18); display: grid; place-items: center; font-size: 52px; margin: 0 auto 18px; animation: beat 1.6s ease-in-out infinite; }
+  @keyframes beat { 50% { transform: scale(1.08); } }
+  .ticket h1 { font-size: 36px; margin: 0 0 6px; letter-spacing: .02em; }
+  .ticket .what { font-size: 17px; opacity: .92; margin-bottom: 18px; }
+  .ticket .clock { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+  .ticket .date { font-size: 15px; opacity: .85; margin-top: 2px; }
+  .ticket .note { font-size: 15px; opacity: .9; margin-top: 22px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="loading">Opening the form…</p></div>
+
+<script src="config.js?v=292"></script>
+<script>
+  const token = new URLSearchParams(location.search).get('t') || '';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = s => document.querySelector(s);
+  let info = null;
+  const A = { squad: null, people: {}, picked: {}, program: [], aw: [], instructors: {}, text: {} }; // the answers so far
+
+  async function call(action, params) {
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, t: token, ...params }) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'Something went wrong. Please try again.');
+    return out;
+  }
+  // Submitted already on this phone (this form, this day): straight to the ticket.
+  const doneKey = () => 'eval-done-' + token.slice(-24) + '-' + (info ? info.day : '');
+  const saved = () => { try { return localStorage.getItem(doneKey()); } catch { return null; } };
+
+  const nums = (lo, val, attrs) => `<div class="nums" ${attrs}>${Array.from({ length: 6 - lo }, (_, i) => i + lo)
+    .map(n => `<button type="button" class="${val === n ? 'on' : ''}" data-n="${n}">${n}</button>`).join('')}</div>`;
+  const head = () => `<div class="head"><img src="logo.png" alt=""><div><div class="kicker">ELEVATE EMS</div>
+    <h1>${esc(info.title)}</h1><div class="meta">${esc(info.cohort)} · Academy Week Day ${info.day}</div></div></div>`;
+
+  /* ---------- Peer Evaluation ---------- */
+  const PEER = [['pro', 'Professionalism'], ['team', 'Teamwork'], ['skills', 'Skills'], ['safety', 'Safety']];
+  function group() {
+    if (info.squads && info.squads.length) { const sq = info.squads.find(s => s.n === A.squad); return sq ? sq.people : []; }
+    return (info.everyone || []).filter(p => A.picked[p.id]);
+  }
+  function peerHtml() {
+    const pick = info.squads && info.squads.length
+      ? `<div class="card"><h2>Your squad</h2><div class="squads">${info.squads.map(s => `<button type="button" class="${A.squad === s.n ? 'on' : ''}" data-squad="${s.n}">
+          <b>Squad ${s.n}</b><span>${s.people.map(p => esc(p.name.split(' ')[0])).join(', ')}</span></button>`).join('')}</div></div>`
+      : `<div class="card"><h2>Your group</h2><p>Tap everyone in your group, including yourself.</p><div class="picks">${(info.everyone || []).map(p =>
+          `<label><input type="checkbox" data-pick="${esc(p.id)}" ${A.picked[p.id] ? 'checked' : ''}> ${esc(p.name)}</label>`).join('')}</div></div>`;
+    const people = group();
+    return head() + `<div class="card"><p>Elevate EMS is committed to a safe, professional, and positive learning environment. In healthcare, evaluating your peers and taking constructive feedback is part of the job.</p>
+      <p>This form is <b>anonymous</b>. Score everyone in your group honestly, <b>including yourself</b>. Your ratings help us support students and adjust groups where needed.</p>
+      <div class="scale"><b>0</b> Serious concern · <b>1–2</b> Needs improvement · <b>3</b> Meets expectations · <b>4–5</b> Strong / exceptional</div></div>`
+      + pick
+      + (people.length ? `<div class="card"><h2>Rate your group</h2>${people.map(p => {
+          const r = A.people[p.id] || {};
+          return `<div class="person"><h3>${esc(p.name)}</h3>${PEER.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(0, r[k], `data-person="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}</div>`;
+        }).join('')}</div>
+        <div class="card"><h2>About the course</h2><label class="field"><span>Suggestions for the course or groups (optional)</span>
+          <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label></div>
+        <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>` : '');
+  }
+  function peerAnswers() {
+    const people = group();
+    if (!people.length) return { err: 'Pick your squad first.' };
+    const out = people.map(p => ({ id: p.id, ...(A.people[p.id] || {}) }));
+    if (out.some(x => PEER.some(([k]) => x[k] == null))) return { err: 'Please rate everyone on all four before submitting.' };
+    return { answers: { squad: A.squad || 0, people: out, suggestions: A.text.suggestions || '' } };
+  }
+
+  /* ---------- Student Feedback ---------- */
+  const PROGRAM = ['The course was well organized and the expectations were clear.', 'Materials and class time prepared me for testing and for the field.', 'I would recommend this program to a future student.'];
+  const AW = ['Stations were well run and I got enough hands-on repetitions.', 'Scenarios were realistic and equipment was ready to use.', 'I left academy week more confident and competent than I arrived.'];
+  const INSTR = [['knowledge', 'Knowledge'], ['teaching', 'Teaching'], ['approach', 'Approachability']];
+  function feedbackHtml() {
+    const qs = (list, key) => list.map((q, i) => `<div class="q"><div class="label">${esc(q)}</div>${nums(1, A[key][i], `data-list="${key}" data-i="${i}"`)}</div>`).join('');
+    return head() + `<div class="card"><p>This form is <b>anonymous</b>. Please answer honestly: it helps us improve the course and support our instructors.</p>
+      <div class="scale"><b>1</b> Strongly disagree · <b>2</b> Disagree · <b>3</b> Neutral · <b>4</b> Agree · <b>5</b> Strongly agree</div></div>
+      <div class="card"><h2>1 · The Program</h2>${qs(PROGRAM, 'program')}</div>
+      <div class="card"><h2>2 · Academy Week</h2>${qs(AW, 'aw')}</div>
+      ${(info.instructors || []).length ? `<div class="card"><h2>3 · Instructors</h2><p class="scale">Rate each 1–5 (5 = excellent).</p>${info.instructors.map(p => {
+        const r = A.instructors[p.id] || {};
+        return `<div class="person"><h3>${esc(p.name)}</h3>${INSTR.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(1, r[k], `data-instr="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}
+          <label class="field"><span>Feedback for ${esc(p.name)} (optional)</span><textarea data-ifb="${esc(p.id)}">${esc(r.feedback || '')}</textarea></label></div>`;
+      }).join('')}</div>` : ''}
+      <div class="card"><label class="field" style="margin-top:0"><span>What worked well?</span><textarea data-text="worked">${esc(A.text.worked || '')}</textarea></label>
+        <label class="field"><span>Constructive criticism</span><textarea data-text="criticism">${esc(A.text.criticism || '')}</textarea></label></div>
+      <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>`;
+  }
+  function feedbackAnswers() {
+    const full = l => l.length === 3 && [0, 1, 2].every(i => l[i] != null);
+    const instructors = (info.instructors || []).map(p => ({ id: p.id, ...(A.instructors[p.id] || {}) }));
+    if (!full(A.program) || !full(A.aw) || instructors.some(x => INSTR.some(([k]) => x[k] == null)))
+      return { err: 'Please answer every rating before submitting.' };
+    return { answers: { program: A.program, aw: A.aw, instructors, worked: A.text.worked || '', criticism: A.text.criticism || '' } };
+  }
+
+  /* ---------- Drawing, answers, submit ---------- */
+  function draw() {
+    const y = scrollY;
+    $('#app').innerHTML = info.kind === 'peer' ? peerHtml() : feedbackHtml();
+    scrollTo(0, y);
+  }
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const box = b.closest('.nums');
+    if (box && b.dataset.n != null) {
+      const n = Number(b.dataset.n), d = box.dataset;
+      if (d.person) (A.people[d.person] = A.people[d.person] || {})[d.k] = n;
+      else if (d.instr) (A.instructors[d.instr] = A.instructors[d.instr] || {})[d.k] = n;
+      else if (d.list) A[d.list][Number(d.i)] = n;
+      box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      box.classList.remove('missing');
+      return;
+    }
+    if (b.dataset.squad) { A.squad = Number(b.dataset.squad); draw(); return; }
+    if (b.hasAttribute('data-submit')) submit(b);
+  });
+  document.addEventListener('change', e => { const p = e.target.dataset.pick; if (p != null) { A.picked[p] = e.target.checked; draw(); } });
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.text) A.text[t.dataset.text] = t.value;
+    if (t.dataset.ifb) (A.instructors[t.dataset.ifb] = A.instructors[t.dataset.ifb] || {}).feedback = t.value;
+  });
+  async function submit(b) {
+    const r = info.kind === 'peer' ? peerAnswers() : feedbackAnswers(), err = $('#err');
+    if (r.err) {
+      err.textContent = r.err; err.hidden = false;
+      // Point at the first rating that's still blank.
+      const blank = [...document.querySelectorAll('.nums')].find(x => !x.querySelector('.on'));
+      if (blank) { blank.classList.add('missing'); blank.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      return;
+    }
+    b.disabled = true; b.textContent = 'Submitting…'; err.hidden = true;
+    try {
+      const out = await call('evalSubmit', { answers: r.answers });
+      const at = out.at || new Date().toISOString();
+      try { localStorage.setItem(doneKey(), at); } catch {}
+      ticket(at);
+    } catch (e) {
+      b.disabled = false; b.textContent = 'Submit'; err.textContent = e.message; err.hidden = false;
+    }
+  }
+
+  // The Ticket to Leave: when they submitted it.
+  function ticket(at) {
+    const d = new Date(at || Date.now());
+    document.body.innerHTML = `<div class="ticket"><div class="in"><div class="check">✓</div><h1>Ticket to Leave</h1>
+      <div class="what">${esc(info.title)} submitted · ${esc(info.cohort)}</div>
+      <div class="date">Submitted</div>
+      <div class="clock">${esc(d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))}</div>
+      <div class="date">${esc(d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }))}</div>
+      <div class="note">Show this screen to an instructor before you leave.<br>Thank you!</div></div></div>`;
+  }
+
+  (async () => {
+    const fail = msg => { $('#app').innerHTML = `<div class="card" style="margin-top:30px"><h2>Evaluation</h2><p class="err">${esc(msg)}</p></div>`; };
+    if (!token) { fail('This page needs the QR code from your instructor.'); return; }
+    try {
+      info = await call('evalInfo', {});
+      if (saved()) ticket(saved()); else draw();
+    } catch (e) { fail(e.message); }
+  })();
+</script>
+</body>
+</html>
