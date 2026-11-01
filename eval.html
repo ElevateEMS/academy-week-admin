@@ -25,6 +25,9 @@
   .head .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .card { background: #fff; border-radius: 12px; padding: 16px 16px 14px; box-shadow: 0 1px 3px rgba(12, 42, 67, .1); margin-bottom: 12px; }
   .card h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--navy); margin: 0 0 10px; }
+  /* Section headers, like the paper forms: "1 · THE PROGRAM" with an orange line running off to the right. */
+  h2.sec { display: flex; align-items: center; gap: 12px; font-size: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--navy); margin: 28px 2px 10px; }
+  h2.sec::after { content: ''; flex: 1; height: 2px; background: var(--orange); border-radius: 2px; }
   .card p { margin: 0 0 8px; line-height: 1.45; font-size: 15px; color: #3a3f45; }
   html { touch-action: manipulation; } /* (no double-tap zoom when tapping scores quickly) */
   .scale { font-size: 13px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
@@ -105,20 +108,20 @@
   }
   function peerHtml() {
     const pick = info.squads && info.squads.length
-      ? `<div class="card"><h2>Your squad</h2><div class="squads">${info.squads.map(s => `<button type="button" class="${A.squad === s.n ? 'on' : ''}" data-squad="${s.n}">
+      ? `<h2 class="sec">Your squad</h2><div class="card"><div class="squads">${info.squads.map(s => `<button type="button" class="${A.squad === s.n ? 'on' : ''}" data-squad="${s.n}">
           <b>Squad ${s.n}</b><span>${s.people.map(p => esc(p.name.split(' ')[0])).join(', ')}</span></button>`).join('')}</div></div>`
-      : `<div class="card"><h2>Your group</h2><p>Tap everyone in your group, including yourself.</p><div class="picks">${(info.everyone || []).map(p =>
+      : `<h2 class="sec">Your group</h2><div class="card"><p>Tap everyone in your group, including yourself.</p><div class="picks">${(info.everyone || []).map(p =>
           `<label><input type="checkbox" data-pick="${esc(p.id)}" ${A.picked[p.id] ? 'checked' : ''}> ${esc(p.name)}</label>`).join('')}</div></div>`;
     const people = group();
     return head() + `<div class="card"><p>Elevate EMS is committed to a safe, professional, and positive learning environment. In healthcare, evaluating your peers and taking constructive feedback is part of the job.</p>
       <p>This form is <b>anonymous</b>. Score everyone in your group honestly, <b>including yourself</b>. Your ratings help us support students and adjust groups where needed.</p>
       <ul class="scale-list"><li><b>0</b> Serious concern</li><li><b>1–2</b> Needs improvement</li><li><b>3</b> Meets expectations</li><li><b>4–5</b> Strong / exceptional</li></ul></div>`
       + pick
-      + (people.length ? `<div class="card"><h2>Rate your group</h2>${people.map(p => {
+      + (people.length ? `<h2 class="sec">Rate your group</h2><div class="card">${people.map(p => {
           const r = A.people[p.id] || {};
           return `<div class="person"><h3>${esc(p.name)}</h3>${PEER.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(0, r[k], `data-person="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}</div>`;
         }).join('')}</div>
-        <div class="card"><h2>Groups &amp; structure</h2><label class="field"><span>Suggestions for the groups/structure (optional)</span>
+        <h2 class="sec">Groups &amp; structure</h2><div class="card"><label class="field"><span>Suggestions for the groups/structure (optional)</span>
           <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label></div>
         <p class="closing">Honest scores help everyone grow – ratings are reviewed by instructors only. Thank you.</p>
         <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>` : '');
@@ -139,14 +142,14 @@
     const qs = (list, key) => list.map((q, i) => `<div class="q"><div class="label">${esc(q)}</div>${nums(1, A[key][i], `data-list="${key}" data-i="${i}"`)}</div>`).join('');
     return head() + `<div class="card"><p>This form is <b>anonymous</b>. Please answer honestly: it helps us improve the course and support our instructors.</p>
       <ul class="scale-list"><li><b>1</b> Strongly disagree</li><li><b>2</b> Disagree</li><li><b>3</b> Neutral</li><li><b>4</b> Agree</li><li><b>5</b> Strongly agree</li></ul></div>
-      <div class="card"><h2>1 · The Program</h2>${qs(PROGRAM, 'program')}</div>
-      <div class="card"><h2>2 · Academy Week</h2>${qs(AW, 'aw')}</div>
-      ${(info.instructors || []).length ? `<div class="card"><h2>3 · Instructors</h2><p class="scale">Rate each 1–5 (5 = excellent).</p>${info.instructors.map(p => {
+      <h2 class="sec">1 · The Program</h2><div class="card">${qs(PROGRAM, 'program')}</div>
+      <h2 class="sec">2 · Academy Week</h2><div class="card">${qs(AW, 'aw')}</div>
+      ${(info.instructors || []).length ? `<h2 class="sec">3 · Instructors</h2><div class="card"><p class="scale">Rate each 1–5 (5 = excellent).</p>${info.instructors.map(p => {
         const r = A.instructors[p.id] || {};
         return `<div class="person"><h3>${esc(p.name)}</h3>${INSTR.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(1, r[k], `data-instr="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}
           <label class="field"><span>Feedback for ${esc(p.name)} (optional)</span><textarea data-ifb="${esc(p.id)}">${esc(r.feedback || '')}</textarea></label></div>`;
       }).join('')}</div>` : ''}
-      <div class="card"><label class="field" style="margin-top:0"><span>What worked well?</span><textarea data-text="worked">${esc(A.text.worked || '')}</textarea></label>
+      <h2 class="sec">Comments</h2><div class="card"><label class="field" style="margin-top:0"><span>What worked well?</span><textarea data-text="worked">${esc(A.text.worked || '')}</textarea></label>
         <label class="field"><span>Constructive criticism</span><textarea data-text="criticism">${esc(A.text.criticism || '')}</textarea></label></div>
       <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>`;
   }

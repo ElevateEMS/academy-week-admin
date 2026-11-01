@@ -3374,8 +3374,7 @@ function evalQrModal() {
       <p class="eval-qr-sub">${esc(S.cohortKey)} · Scan with your phone’s camera</p>
       <div id="evalQr" class="eval-qr-code">${url ? '' : '<p class="muted">Getting the link…</p>'}</div>
       ${url ? `<div class="share-btns eval-qr-btns"><button class="btn" data-act="evalQrCopy">Copy link</button>
-        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" data-name="${EVAL_TITLES[k]}">Open the form</a></div>
-        <p class="muted small">Anonymous: students don’t sign in and nothing about who filled it out is saved. It ends on a Ticket to Leave screen they show you.</p>` : ''}
+        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" data-name="${EVAL_TITLES[k]}">Open the form</a></div>` : ''}
     </div></div></div>`;
 }
 async function showEvalQr() {
