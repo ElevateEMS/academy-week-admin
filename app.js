@@ -1977,7 +1977,7 @@ function studentsView() {
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
   <section class="box table-box">
-    <table class="roster">
+    <table class="roster ${pre ? 'enroll-table' : ''}">
       <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
         : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
