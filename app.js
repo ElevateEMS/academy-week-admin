@@ -1982,7 +1982,7 @@ function studentsView() {
         : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
+        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
         ${pre ? (p => `<td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
         <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
@@ -1996,16 +1996,16 @@ function studentsView() {
 
 // Under a name on the Students page (each one opens its pop-up): needs orientation date, late enrollee (the whole
 // course), make-up orientation (until it's happened), $ overdue (a deadline passed, box not ticked in the sheet),
-// $ extension (until the extended payments are ticked).
-function enrollTags(s) {
+// $ extension (until the extended payments are ticked). From a month before Academy Week (enroll: false) only $ overdue.
+function enrollTags(s, { enroll = true } = {}) {
   const p = emPerson(s), t = todayIso(), out = [];
   const tag = (label, act, cls = '') => out.push(`<button class="enroll-tag ${cls}" data-act="${act}" data-sid="${s.sid}">${label}</button>`);
-  if (needsOrientDate(p)) tag('needs orientation date', 'emLateOpen', 'warn');
-  if (p.late && !p.makeup) tag('late enrollee', 'emLateOpen');
-  else if (p.late && p.makeup && p.orient >= t && !missedOrient(p)) tag('make-up orientation', 'emLateOpen');
+  if (enroll && needsOrientDate(p)) tag('needs orientation date', 'emLateOpen', 'warn');
+  if (enroll && p.late && !p.makeup) tag('late enrollee', 'emLateOpen');
+  else if (enroll && p.late && p.makeup && p.orient >= t && !missedOrient(p)) tag('make-up orientation', 'emLateOpen');
   const overdue = (!p.paidNext && p.next && p.next < t) || (!p.paidFinal && p.final && p.final < t);
   if (overdue) tag('$ overdue', 'emExtOpen', 'warn');
-  else if ((p.ext.next && !p.paidNext) || (p.ext.final && !p.paidFinal)) tag('$ extension', 'emExtOpen');
+  else if (enroll && ((p.ext.next && !p.paidNext) || (p.ext.final && !p.paidFinal))) tag('$ extension', 'emExtOpen');
   return out.length ? `<div class="enroll-tags">${out.join('<span class="dot">·</span>')}</div>` : '';
 }
 

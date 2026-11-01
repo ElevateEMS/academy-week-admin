@@ -308,9 +308,10 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .pc-cell { display: inline-grid; grid-template-columns: minmax(0, 5.5em) auto minmax(0, 5.5em); align-items: center; gap: 10px; }
 /* Patient contacts, Skills and Conduct: same width, so they're evenly spaced (the To fix note uses the room beside the stepper) */
 .roster th.c { width: 19%; }
-/* Students page before the Academy Week flip: the other columns only as wide as they need; the rest goes to the names. */
-.roster.enroll-table th.c { width: 1%; }
-.roster.enroll-table th.c, .roster.enroll-table td.c { white-space: nowrap; padding-left: 18px; padding-right: 18px; }
+/* Students page before the Academy Week flip: the 6 columns share the same 57% the Academy Week version's 3 do
+   (3 x 19%), so # and the names sit in the same place on both. */
+.roster.enroll-table th.c { width: 9.5%; }
+.roster.enroll-table th.c, .roster.enroll-table td.c { white-space: nowrap; }
 .roster.enroll-table td:nth-child(2) > b { white-space: nowrap; }
 .to-fix { justify-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-style: italic; font-size: 13px; color: #8a6a35; cursor: pointer; }
 .to-fix:hover { text-decoration: underline; text-underline-offset: 2px; }
