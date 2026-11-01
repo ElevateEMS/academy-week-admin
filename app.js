@@ -2013,10 +2013,10 @@ function studentsView() {
   ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
-  ${hasPeer ? `<section class="box shaded peer-card"><div class="box-head static"><h2>Peer Evaluations</h2>
-      <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></div>
-    ${suggestions.length ? `<details class="peer-sugg"><summary>Suggestions for the course or groups (${suggestions.length})</summary>
-      <ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul></details>` : '<p class="muted small">No suggestions written yet.</p>'}
+  ${hasPeer ? `<section class="box shaded peer-card">
+    <details class="peer-sugg" ${S.peerSuggOpen ? 'open' : ''}><summary data-act="peerSuggToggle"><span class="peer-sugg-title">Suggestions for the course/groups (${suggestions.length})</span>
+      <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></summary>
+      ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul>` : ''}</details>
   </section>` : ''}
   <section class="box table-box">
     <table class="roster ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
@@ -3283,6 +3283,7 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'evalQrClose': S.evalQr = null; render(); break;
+      case 'peerSuggToggle': e && e.preventDefault(); S.peerSuggOpen = !S.peerSuggOpen; render(); break;
       case 'evalQrCopy': {
         const url = new URL('eval.html?t=' + S.evalLinks[S.cohortKey][S.evalQr], location.href).href;
         try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Couldn’t copy the link.'); }

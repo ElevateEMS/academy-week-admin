@@ -260,10 +260,13 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .search { border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; min-width: 220px; background: var(--paper); outline: none; }
 .behind-card { margin-bottom: 18px; }
 /* Peer Evaluations (Students page): the summary card, the column, and the section in a student's pop-up. */
-.peer-card { margin-bottom: 18px; }
-.peer-card .box-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.peer-sugg summary { cursor: pointer; color: var(--taupe-dark); font-size: 14px; }
-.peer-sugg ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.peer-card { margin-bottom: 18px; padding-top: 12px; padding-bottom: 12px; }
+.peer-sugg summary { cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; list-style: none; }
+.peer-sugg summary::-webkit-details-marker { display: none; }
+.peer-sugg-title { font-family: var(--serif); font-size: 18px; color: var(--ink); }
+.peer-sugg-title::before { content: '▸'; display: inline-block; margin-right: 8px; font-size: 13px; color: var(--taupe-dark); transition: transform .15s; }
+.peer-sugg[open] .peer-sugg-title::before { transform: rotate(90deg); }
+.peer-sugg ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
 .peer-avg { font-weight: 600; }
 .peer-flag { color: #b42318; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
 .peer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0; }
