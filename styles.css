@@ -27,6 +27,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ink); mar
 h2 { font-size: 21px; }
 h3 { font-size: 18px; margin: 18px 0 8px; }
 .muted { color: var(--muted); }
+/* Placeholder (example) text: faded + italic everywhere, so it never looks like something filled in. */
+input::placeholder, textarea::placeholder { color: var(--muted); font-style: italic; opacity: 1; }
 .small { font-size: 13px; }
 .center { text-align: center; }
 .loading { padding: 60px; text-align: center; color: var(--muted); font-family: var(--serif); font-size: 20px; font-style: italic; }
@@ -389,6 +391,7 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .set-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .set-foot input { flex: 1; min-width: 0; }
 .field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.field input, .field textarea, .field select { color: var(--ink); font-size: 14px; } /* (what you type: dark like the dropdowns, not the faded label color) */
 .day-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 14px; }
 .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin-bottom: 10px; }
 .grid-table { border-collapse: collapse; }
