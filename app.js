@@ -590,7 +590,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
-    emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
+    evals: [], emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
     studentsLoaded: false, rostersLoaded: false });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
@@ -600,6 +600,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   w(base + '/students', list => { S.studentsDoc = Object.fromEntries(list.map(d => [d.id, d])); S.studentsLoaded = true; });
   w(base + '/contacts', list => { S.contacts = list; });
   w(base + '/warnings', list => { S.warnings = list; });
+  w(base + '/evals', list => { S.evals = list; }); // Peer Evaluation / Student Feedback answers (eval.html, anonymous)
   w(base + '/days', list => { S.days = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/staff', list => { S.staff = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/todos', list => { S.todos = list; S.todosLoaded = true; if (S.sheet) rollOver(); });
@@ -1950,6 +1951,27 @@ async function setBagItem(n, b, it, s) {
 }
 
 /* ---------- Students ---------- */
+/* ---------- Peer Evaluations (eval.html) ----------
+   Each answer rates everyone in one squad (including the person filling it out; which one that is isn't known).
+   Per student: how many ratings, the average of each (0-5), and how many 0s ("Serious concern": flagged red). */
+const PEER_KEYS = [['pro', 'Professionalism'], ['team', 'Teamwork'], ['skills', 'Skills'], ['safety', 'Safety']];
+function peerStats() {
+  const out = {};
+  (S.evals || []).filter(e => e.kind === 'peer').forEach(e => (e.people || []).forEach(p => {
+    const o = out[p.id] = out[p.id] || { n: 0, sum: {}, zeros: {}, days: [] };
+    o.n++;
+    if (!o.days.includes(e.day)) o.days.push(e.day);
+    PEER_KEYS.forEach(([k]) => { const v = Number(p[k]) || 0; o.sum[k] = (o.sum[k] || 0) + v; if (v === 0) o.zeros[k] = (o.zeros[k] || 0) + 1; });
+  }));
+  Object.values(out).forEach(o => {
+    o.avg = Object.fromEntries(PEER_KEYS.map(([k]) => [k, o.sum[k] / o.n]));
+    o.overall = PEER_KEYS.reduce((t, [k]) => t + o.avg[k], 0) / PEER_KEYS.length;
+    o.zeroCount = Object.values(o.zeros).reduce((a, b) => a + b, 0);
+  });
+  return out;
+}
+const peerCell = st => st ? `<span class="peer-avg">${st.overall.toFixed(1)}</span>${st.zeroCount ? ` <span class="peer-flag" title="Rated 0 (Serious concern) ${st.zeroCount === 1 ? 'once' : st.zeroCount + ' times'}">⚑ 0</span>` : ''}` : '<span class="muted">–</span>';
+
 function studentsView() {
   if (!S.sheet) return loadingView();
   const everyone = students();
@@ -1962,6 +1984,10 @@ function studentsView() {
   // Until a month before Academy Week (sideByDate): enrollment columns (Textbook, payments, Orientation, due dates, as in
   // the Emails box's student list) in place of Patient contacts and Skills, and no skills/contacts filters or Behind card.
   const pre = sideByDate() !== 'aw', filter = pre ? 'all' : S.filter;
+  // Peer evaluation results (once any are in): a column, a pop-up section, and the suggestions card.
+  const peers = peerStats(), peerEvals = (S.evals || []).filter(e => e.kind === 'peer'), hasPeer = peerEvals.length > 0;
+  const suggestions = peerEvals.filter(e => String(e.suggestions || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const flagged = everyone.filter(s => peers[s.name] && peers[s.name].zeroCount).length;
   const q = S.search.trim().toLowerCase();
   const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
     (filter === 'all' || (filter === 'behind' && s.skill === 'behind') || (filter === 'fixes' && s.fixes))
@@ -1986,10 +2012,15 @@ function studentsView() {
   ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
+  ${hasPeer ? `<section class="box shaded peer-card"><div class="box-head static"><h2>Peer Evaluations</h2>
+      <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></div>
+    ${suggestions.length ? `<details class="peer-sugg"><summary>Suggestions for the course or groups (${suggestions.length})</summary>
+      <ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul></details>` : '<p class="muted small">No suggestions written yet.</p>'}
+  </section>` : ''}
   <section class="box table-box">
-    <table class="roster ${pre ? 'enroll-table' : ''}">
+    <table class="roster ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}<th class="c">Conduct</th></tr></thead>
+        : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
@@ -1998,8 +2029,9 @@ function studentsView() {
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
         : `<td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
         <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>`}
+        ${hasPeer ? `<td class="c" data-part="peers">${peerCell(peers[s.name])}</td>` : ''}
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
-      </tr>`).join('') || `<tr><td colspan="${pre ? 8 : 5}" class="empty">No students match.</td></tr>`}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${(pre ? 8 : 5) + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>`;
 }
@@ -2092,6 +2124,13 @@ function drawer() {
             `<button class="chip small ${s.behind.includes(k) ? 'on warn' : ''}" data-act="behind" data-sid="${s.sid}" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>`).join('')}` : ''}
         <textarea id="${dk('note')}" data-draft="${dk('note')}" data-change="note" data-sid="${s.sid}" rows="2" placeholder="Skills note (optional)">${esc(note)}</textarea>
       </section>` : ''}
+
+      ${show('peers') && peerStats()[s.name] ? (st => `<section>
+        <h3>Peer Evaluations</h3>
+        <p class="muted small">${st.n} rating${st.n === 1 ? '' : 's'} from their squad${st.days.length ? ' (Day ' + st.days.sort().join(', ') + ')' : ''}, including their own. Anonymous.</p>
+        <div class="peer-grid">${PEER_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${st.avg[k].toFixed(1)}</b>${st.zeros[k] ? `<span class="peer-flag">⚑ ${st.zeros[k]} × 0</span>` : ''}</div>`).join('')}</div>
+        ${st.zeroCount ? '<p class="peer-flag-note">⚑ Someone rated them 0 (Serious concern). Only you and Nick see this.</p>' : ''}
+      </section>`)(peerStats()[s.name]) : ''}
 
       ${show('attendance') ? `<section>
         <h3>Conduct</h3>
