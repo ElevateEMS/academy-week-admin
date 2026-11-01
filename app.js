@@ -1973,6 +1973,18 @@ function peerStats() {
   });
   return out;
 }
+// Student Feedback's course questions (the same wording as eval.html).
+const FB_PROGRAM = ['The course was well organized and the expectations were clear.', 'Materials and class time prepared me for testing and for the field.', 'I would recommend this program to a future student.'];
+const FB_AW = ['Stations were well run and I got enough hands-on repetitions.', 'Scenarios were realistic and equipment was ready to use.', 'I left academy week more confident and competent than I arrived.'];
+// The cohort's course feedback: each question's average, both sections' averages, and the written answers.
+function courseFeedback() {
+  const list = (S.evals || []).filter(e => e.kind === 'feedback');
+  const avgOf = (key, i) => { const v = list.map(e => Number((e[key] || [])[i])).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const section = key => { const q = [0, 1, 2].map(i => avgOf(key, i)).filter(x => x != null); return q.length ? q.reduce((a, b) => a + b, 0) / q.length : null; };
+  const said = k => list.filter(e => String(e[k] || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at))).map(e => ({ text: e[k], day: e.day }));
+  return { n: list.length, program: section('program'), aw: section('aw'), q: { program: [0, 1, 2].map(i => avgOf('program', i)), aw: [0, 1, 2].map(i => avgOf('aw', i)) },
+    worked: said('worked'), criticism: said('criticism') };
+}
 const peerCell = st => st ? `<span class="peer-avg">${st.overall.toFixed(1)}</span>${st.zeroCount ? ` <span class="peer-flag" title="Rated 0 (Serious concern) ${st.zeroCount === 1 ? 'once' : st.zeroCount + ' times'}">⚑ 0</span>` : ''}` : '<span class="muted">–</span>';
 
 function studentsView() {
@@ -1991,6 +2003,7 @@ function studentsView() {
   const peers = peerStats(), peerEvals = (S.evals || []).filter(e => e.kind === 'peer'), hasPeer = peerEvals.length > 0;
   const suggestions = peerEvals.filter(e => String(e.suggestions || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
   const flagged = everyone.filter(s => peers[s.name] && peers[s.name].zeroCount).length;
+  const cf = courseFeedback(); // the Student Feedback form's course questions and comments
   const q = S.search.trim().toLowerCase();
   const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
     (filter === 'all' || (filter === 'behind' && s.skill === 'behind') || (filter === 'fixes' && s.fixes))
@@ -2015,10 +2028,19 @@ function studentsView() {
   ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
-  ${hasPeer ? `<section class="box shaded peer-card">
+  ${hasPeer || cf.n ? `<section class="box shaded peer-card">
+    ${hasPeer ? `
     <details class="peer-sugg" ${S.peerSuggOpen ? 'open' : ''}><summary data-act="peerSuggToggle"><span class="peer-sugg-title">Suggestions for the course/groups (${suggestions.length})</span>
       <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></summary>
-      ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul>` : ''}</details>
+      ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul>` : ''}</details>` : ''}
+    ${cf.n ? `<details class="peer-sugg cf" ${S.cfOpen ? 'open' : ''}><summary data-act="cfToggle"><span class="peer-sugg-title">Course feedback (${cf.n})</span>
+      <span class="muted small">${cf.program != null ? 'Program ' + cf.program.toFixed(1) : ''}${cf.program != null && cf.aw != null ? ' · ' : ''}${cf.aw != null ? 'Academy Week ' + cf.aw.toFixed(1) : ''}</span></summary>
+      <div class="cf-body">
+        ${[['The Program', FB_PROGRAM, cf.q.program], ['Academy Week', FB_AW, cf.q.aw]].map(([h, qs, av]) => `<div class="cf-sec"><p class="cf-h">${h}</p>
+          <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${av[i] != null ? av[i].toFixed(1) : '–'}</b></li>`).join('')}</ul></div>`).join('')}
+        ${[['What worked well', cf.worked], ['Constructive criticism', cf.criticism]].map(([h, items]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>
+          ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
+      </div></details>` : ''}
   </section>` : ''}
   <section class="box table-box">
     <table class="roster ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
@@ -3286,6 +3308,7 @@ async function act(a, el = {}, e) {
       }
       case 'evalQrClose': S.evalQr = null; render(); break;
       case 'peerSuggToggle': e && e.preventDefault(); S.peerSuggOpen = !S.peerSuggOpen; render(); break;
+      case 'cfToggle': e && e.preventDefault(); S.cfOpen = !S.cfOpen; render(); break;
       case 'evalQrCopy': {
         const url = new URL('eval.html?t=' + S.evalLinks[S.cohortKey][S.evalQr], location.href).href;
         try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Couldn’t copy the link.'); }

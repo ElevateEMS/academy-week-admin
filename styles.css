@@ -267,6 +267,14 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .peer-sugg-title::before { content: '▸'; display: inline-block; margin-right: 8px; font-size: 13px; color: var(--taupe-dark); transition: transform .15s; }
 .peer-sugg[open] .peer-sugg-title::before { transform: rotate(90deg); }
 .peer-sugg ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.peer-sugg + .peer-sugg { border-top: 1px solid rgba(125, 101, 88, .2); margin-top: 10px; padding-top: 10px; }
+.cf-body { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 28px; margin-top: 10px; }
+.cf-h { font-weight: 600; font-size: 14px; margin: 0 0 4px; }
+.peer-sugg .cf-qs { list-style: none; padding: 0; margin: 0; gap: 4px; }
+.cf-qs li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
+.cf-qs b { font-weight: 600; }
+.peer-sugg .cf-said { margin: 0; }
+@media (max-width: 760px) { .cf-body { grid-template-columns: 1fr; } }
 .peer-avg { font-weight: 600; }
 .peer-flag { color: #b42318; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
 .peer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0; }
