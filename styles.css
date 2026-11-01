@@ -1501,6 +1501,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .td-link:hover { background: var(--blush); }
 .td-rep { font-size: 12px; color: var(--taupe-dark); white-space: nowrap; }
 .td-who { font-size: 10.5px; font-weight: 600; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--sage-soft); color: #5d7259; }
+.td-txt .td-who { margin-right: 7px; vertical-align: 1px; } /* (in front of the text, on its line) */
 .td-list li.td-today { background: var(--honey-soft); margin: 0 -6px; padding-left: 6px; padding-right: 6px; border-radius: 6px; }
 .td-list li.td-late { box-shadow: inset 3px 0 0 var(--rose); margin: 0 -6px; padding-left: 9px; padding-right: 6px; background: var(--rose-soft); border-radius: 0 6px 6px 0; }
 .td-list li.done .td-txt { color: var(--muted); }

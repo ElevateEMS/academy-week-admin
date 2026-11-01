@@ -334,10 +334,9 @@ function tdLine(t) {
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
   return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
-    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open"><span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
-      ${links || t.repeat || who !== 'both' || (!t.done && w) ? `<div class="td-meta">${links}
+    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
+      ${links || t.repeat || (!t.done && w) ? `<div class="td-meta">${links}
         ${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}
-        ${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}
         ${t.done ? '' : tdChip(t)}</div>` : ''}</div>
     ${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</li>`;
 }
