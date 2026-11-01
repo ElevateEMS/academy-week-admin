@@ -269,6 +269,8 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .peer-sugg-title::before { content: '▸'; display: inline-block; margin-right: 8px; font-size: 13px; color: var(--taupe-dark); transition: transform .15s; }
 .peer-sugg[open] .peer-sugg-title::before { transform: rotate(90deg); }
 .peer-sugg ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.fb-pdf-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(125, 101, 88, .2); margin-top: 10px; padding-top: 10px; }
+.fb-pdf-row a { color: var(--ink); text-underline-offset: 2px; }
 .peer-sugg + .peer-sugg { border-top: 1px solid rgba(125, 101, 88, .2); margin-top: 10px; padding-top: 10px; }
 .cf-body { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 28px; margin-top: 10px; }
 .cf-h { font-weight: 600; font-size: 14px; margin: 0 0 4px; }

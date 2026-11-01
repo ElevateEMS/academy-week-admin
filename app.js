@@ -2007,6 +2007,16 @@ function courseFeedback(evals = S.evals) {
 }
 const peerCell = st => st ? `<span class="peer-avg">${st.overall.toFixed(1)}</span>${st.zeroCount ? ` <span class="peer-flag" title="Rated 0 (Serious concern) ${st.zeroCount === 1 ? 'once' : st.zeroCount + ' times'}">⚑ 0</span>` : ''}` : '<span class="muted">–</span>';
 
+// Save PDFs (under the feedback on the Students page): both feedback PDFs into Admin - <cohort>, made by the Admin script
+// (which also saves them on its own at 6 PM on Day 5). When they were last saved, and links to open them.
+function fbPdfRow() {
+  const f = (S.cohortDoc && S.cohortDoc.feedbackPdfs) || null;
+  const when = f && f.at ? new Date(f.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const link = (x, l) => x && x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${l}</a>` : '';
+  const links = f ? [link(f.peer, 'Peer Evaluations'), link(f.feedback, 'Instructor &amp; Course Feedback')].filter(Boolean).join(' · ') : '';
+  return `<div class="fb-pdf-row"><span class="muted small">${f ? `Saved ${when}${f.by === 'auto' ? ' (on its own)' : ''}${links ? ' · ' + links : ''}` : 'PDFs save to the Admin folder on their own at 6 PM on Day 5.'}</span>
+    <button class="btn tiny" data-act="fbPdfSave" ${S.fbPdfBusy ? 'disabled' : ''}>${S.fbPdfBusy ? 'Saving…' : f ? 'Save PDFs again' : 'Save PDFs'}</button></div>`;
+}
 function studentsView() {
   if (!S.sheet) return loadingView();
   const everyone = students();
@@ -2064,6 +2074,7 @@ function studentsView() {
           ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k] != null ? o.avg[k].toFixed(1) : '–'}</b></li>`).join('')}</ul>` : '<p class="muted small">No ratings yet.</p>'}
           ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : ''}</div>`; }).join('')}
       </div></details>` : ''}
+    ${fbPdfRow()}
   </section>` : ''}
   <section class="box table-box">
     <table class="roster ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
@@ -3340,6 +3351,15 @@ async function act(a, el = {}, e) {
       case 'evalQrClose': S.evalQr = null; render(); break;
       case 'peerSuggToggle': e && e.preventDefault(); S.peerSuggOpen = !S.peerSuggOpen; render(); break;
       case 'cfToggle': e && e.preventDefault(); S.cfOpen = !S.cfOpen; render(); break;
+      case 'fbPdfSave': {
+        if (S.fbPdfBusy) break;
+        S.fbPdfBusy = true; render();
+        try {
+          const r = await Sheets.saveFeedbackPdfs(S.cohortKey);
+          toast(r.peer || r.feedback ? 'Saved to the Admin - ' + S.cohortKey + ' folder' + (r.peer && r.feedback ? '.' : r.peer ? ' (no instructor & course feedback yet).' : ' (no peer evaluations yet).') : 'No answers yet, so nothing was saved.');
+        } catch (err) { toast('Couldn’t save the PDFs: ' + err.message); }
+        S.fbPdfBusy = false; render(); break;
+      }
       case 'evalQrCopy': {
         const url = new URL('eval.html?t=' + S.evalLinks[S.cohortKey][S.evalQr], location.href).href;
         try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast('Couldn’t copy the link.'); }

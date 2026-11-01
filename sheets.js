@@ -28,6 +28,7 @@
      clearRosterSig(key, date, name) -> takes one off and unticks their Orientation Roster box (H)
      saveRosterPdf(key, name, pdf) -> the finished roster PDF (base64) into the cohort's Admin folder (replaces one of the same name)
      rosterPdfFile(url)          -> a saved roster PDF back out of Drive ({ pdf (base64), name }), for Download
+     saveFeedbackPdfs(key)       -> "<cohort> Peer Evaluations" + "<cohort> Instructor & Course Feedback" PDFs into the Admin folder (replaces the old ones)
      financeInfo(date)           -> the Quick Log's expense categories ({ tab, categories }) from "<year> Expenses" in $ Finances
      logExpense(item)            -> one expense as a row there ({ date, category, amount, notes, photo }) -> { tab, row, receipt }
      resetTestCohort(key, typed) -> a Test cohort back to brand new (app data, its sheet's rows, its folder's files to the trash)
@@ -188,6 +189,7 @@ const Sheets = (() => {
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
+    saveFeedbackPdfs: key => call('saveFeedbackPdfs', { cohort: key }), // { at, peer: { url, name, n } | null, feedback: … | null } (also saved on the cohort as feedbackPdfs)
     financeInfo: (date, kind) => call('financeInfo', { date, kind }),
     logExpense: async item => { const r = await viaOutbox('logExpense', { item }, () => ({ queued: true, tab: (item.date || '').slice(0, 4) + ' ' + item.kind })); return r.live || r.queued; },
     // A "Schedule ride alongs" to-do checked off (or not): ticks Confirmed on their Clinical Tracking row (outbox when offline).
@@ -322,6 +324,7 @@ function sampleSheets() {
     async dropStudent(key, student, drop) { console.log('Sample mode:', student.name, 'would be', drop); return wait({ line: 37, docUrl: 'https://drive.google.com/', warnings: [] }); },
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
+    async saveFeedbackPdfs(key) { console.log('Sample mode: the feedback PDFs would be saved for', key); return wait({ at: new Date().toISOString(), peer: { url: 'https://drive.google.com/', n: 1 }, feedback: { url: 'https://drive.google.com/', n: 1 } }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async savePartner(item) { const p = { id: item.id || 'p-' + Date.now(), added: todayIso(), status: 'New', contacts: [], followUp: '', ...item }; delete p.contact; return wait(p); },
     async deletePartner() { return wait({ deleted: true }); },
