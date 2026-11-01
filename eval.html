@@ -9,6 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Elevate EMS · Evaluation</title>
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#eef1f4">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=292">
 <style>
   :root { --navy: #0c2a43; --orange: #e0702a; --ink: #1f2328; --muted: #6a737d; --line: #d5dae0; --soft: #f3f5f7; --bg: #eef1f4; }
@@ -29,7 +30,7 @@
   .scale { font-size: 13px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
   .scale-list { list-style: none; margin: 0; padding: 8px 12px; font-size: 14px; color: #3a3f45; background: var(--soft); border-radius: 8px; line-height: 1.7; }
   .scale-list b { display: inline-block; min-width: 34px; color: var(--navy); }
-  .closing { font-size: 13px; color: var(--muted); font-style: italic; text-align: center; margin: 12px 0 0; }
+  .closing { font-size: 13px; color: var(--muted); font-style: italic; text-align: center; margin: 4px 8px 12px; }
   .scale b { color: var(--navy); }
   .q { padding: 10px 0; border-top: 1px dashed var(--line); }
   .q:first-of-type { border-top: 0; padding-top: 2px; }
@@ -58,6 +59,7 @@
   .err { color: #b42318; font-size: 14px; margin: 10px 0 0; }
   .loading { text-align: center; color: var(--muted); padding: 60px 0; }
   /* Ticket to Leave */
+  html.ticket-on, html.ticket-on body { background: #14592a; } /* (green behind Safari's toolbars too) */
   .ticket { position: fixed; inset: 0; background: linear-gradient(160deg, #1e7e34, #14592a); color: #fff; display: grid; place-items: center; padding: 24px; text-align: center; z-index: 5; }
   .ticket .in { max-width: 420px; }
   .ticket .check { width: 92px; height: 92px; border-radius: 50%; background: rgba(255,255,255,.18); display: grid; place-items: center; font-size: 52px; margin: 0 auto 18px; animation: beat 1.6s ease-in-out infinite; }
@@ -117,8 +119,8 @@
           return `<div class="person"><h3>${esc(p.name)}</h3>${PEER.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(0, r[k], `data-person="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}</div>`;
         }).join('')}</div>
         <div class="card"><h2>About the course</h2><label class="field"><span>Suggestions for the course or groups (optional)</span>
-          <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label>
-          <p class="closing">Honest scores help everyone grow – ratings are reviewed by instructors only. Thank you.</p></div>
+          <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label></div>
+        <p class="closing">Honest scores help everyone grow – ratings are reviewed by instructors only. Thank you.</p>
         <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>` : '');
   }
   function peerAnswers() {
@@ -208,6 +210,8 @@
   // The Ticket to Leave: when they submitted it.
   function ticket(at) {
     const d = new Date(at || Date.now());
+    document.documentElement.classList.add('ticket-on');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1e7e34');
     document.body.innerHTML = `<div class="ticket"><div class="in"><div class="check">✓</div><h1>Ticket to Leave</h1>
       <div class="what">${esc(info.title)} submitted · ${esc(info.cohort)}</div>
       <div class="date">Submitted</div>
