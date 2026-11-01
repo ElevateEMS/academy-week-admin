@@ -914,7 +914,57 @@ function adminNotesBox() {
           ${isIsoDate(n.remind) ? `<button class="sticky-remind" data-act="nrOpen" data-id="${n.id}" title="${due ? 'Reminder is due: tap to move or clear it' : 'Reminder: tap to change'}">${BELL}${inqDate(n.remind)}</button>` : ''}</div>
       </div>`;
     }).join('') || '<p class="empty">No sticky notes. Tap + to add one.</p>'}</div>
+    ${fbBulletinCard()}
   </section>`;
+}
+
+/* ---------- Student Feedback, every cohort (bottom of the Bulletin) ----------
+   The Student Feedback form's course questions and Nick's and Bella's ratings, all cohorts together (Test cohorts
+   left out). One line here; the pop-up has Course (cohort by cohort, all-time, comments) and Nick & Bella. */
+function fbReal() { // { cohortKey: [feedback answers] } without Test cohorts, newest cohort first
+  watchAllEvals();
+  return Object.entries(S.allEvals || {}).filter(([k, l]) => !isTestKey(k) && l.length)
+    .sort(([a], [b]) => (cohortRank(b) ?? 0) - (cohortRank(a) ?? 0));
+}
+function fbBulletinCard() {
+  const real = fbReal(), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
+  const course = all.program != null && all.aw != null ? (all.program + all.aw) / 2 : all.program ?? all.aw;
+  const own = who => { const o = all.owners[who]; return o.n ? `${who} ${(FB_KEYS.reduce((t, [k]) => t + o.avg[k], 0) / FB_KEYS.length).toFixed(1)}` : ''; };
+  const bits = [course != null ? 'Course ' + course.toFixed(1) : '', own('Nick'), own('Bella')].filter(Boolean);
+  return `<button class="fb-card" data-act="fbAdminOpen"><span class="fb-card-title">Student Feedback <span class="fb-card-arrow">▸</span></span>
+    <span class="muted small">${bits.length ? bits.join(' · ') : 'No feedback yet'}</span></button>`;
+}
+function fbAdminModal() {
+  const tab = S.fbAdmin === 'owners' ? 'owners' : 'course', real = fbReal();
+  const tabs = `<div class="side-switch fb-tabs">${[['course', 'Course'], ['owners', 'Nick & Bella']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="fbAdminOpen" data-t="${k}">${l}</button>`).join('')}</div>`;
+  const n1 = v => v != null ? v.toFixed(1) : '–';
+  let body;
+  if (tab === 'course') {
+    const rows = real.map(([k, l]) => ({ k, f: courseFeedback(l) })), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
+    const said = (h, pick) => { const items = rows.flatMap(r => pick(r.f).map(x => ({ ...x, k: r.k })));
+      return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· ${esc(x.k)}, Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
+    body = !rows.length ? '<p class="muted">No Student Feedback from a real cohort yet.</p>' : `
+      <table class="roster fb-table"><thead><tr><th>Cohort</th><th class="c">Responses</th><th class="c">The Program</th><th class="c">Academy Week</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><b>${esc(r.k)}</b></td><td class="c">${r.f.n}</td><td class="c">${n1(r.f.program)}</td><td class="c">${n1(r.f.aw)}</td></tr>`).join('')}
+        <tr class="fb-total"><td><b>All cohorts</b></td><td class="c">${all.n}</td><td class="c"><b>${n1(all.program)}</b></td><td class="c"><b>${n1(all.aw)}</b></td></tr></tbody></table>
+      <div class="cf-body">
+        ${[['The Program', FB_PROGRAM, all.q.program], ['Academy Week', FB_AW, all.q.aw]].map(([h, qs, av]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">all cohorts</span></p>
+          <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${n1(av[i])}</b></li>`).join('')}</ul></div>`).join('')}
+        ${said('What worked well', f => f.worked)}${said('Constructive criticism', f => f.criticism)}
+      </div>`;
+  } else {
+    body = `<div class="cf-body">${['Nick', 'Bella'].map(who => {
+      const f = fbFor(who), real2 = f.byCohort.filter(c => !c.test), comments = f.comments.filter(c => !c.test);
+      return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${f.n} rating${f.n === 1 ? '' : 's'}</span></p>
+        ${f.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${f.avg[k].toFixed(1)}</b></li>`).join('')}</ul>
+          <p class="cf-h fb-sub">By cohort</p><ul class="cf-qs">${real2.map(c => `<li><span>${esc(c.key)} <span class="muted small">· ${c.n}</span></span><b>${(FB_KEYS.reduce((t, [k]) => t + c.avg[k], 0) / FB_KEYS.length).toFixed(1)}</b></li>`).join('')}</ul>
+          <p class="cf-h fb-sub">Comments <span class="muted small">${comments.length}</span></p>
+          ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}, Day ${c.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
+        : '<p class="muted small">No ratings from a real cohort yet.</p>'}</div>`; }).join('')}</div>`;
+  }
+  return `<div class="overlay" data-act="fbAdminClose"><div class="modal fb-admin" data-stop>
+    <div class="modal-head"><h2>Student Feedback</h2>${tabs}<button class="x big" data-act="fbAdminClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top" data-keep-scroll="fbAdmin">${body}</div></div></div>`;
 }
 // Remind me: a date on a sticky. From that day it's in the Morning Email (Reminders) every morning and has a rose
 // edge here, until you move the date, clear it, or delete the note.
@@ -1414,6 +1464,8 @@ async function adminAct(a, el = {}) {
       const t = S.adminTodos.find(x => x.id === d.id); if (!t) return true;
       await tdTick(t); return true;
     }
+    case 'fbAdminOpen': S.fbAdmin = d.t || 'course'; render(); return true;
+    case 'fbAdminClose': S.fbAdmin = null; render(); return true;
     case 'tdNew': tdOpen(null); return true;
     case 'tdOpen': { const t = S.adminTodos.find(x => x.id === d.id); if (t) tdOpen(t); return true; }
     case 'tdClose': S.tdEd = null; S.datePick = null; render(); return true;

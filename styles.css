@@ -271,6 +271,8 @@ textarea.lined::placeholder { color: var(--taupe-dark); font-style: italic; opac
 .cf-body { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 28px; margin-top: 10px; }
 .cf-h { font-weight: 600; font-size: 14px; margin: 0 0 4px; }
 .peer-sugg .cf-qs { list-style: none; padding: 0; margin: 0; gap: 4px; }
+.cf-qs { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; font-size: 14px; }
+.cf-said { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
 .cf-qs li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
 .cf-qs b { font-weight: 600; }
 .peer-sugg .cf-said { margin: 0; }
@@ -1891,3 +1893,19 @@ header.top [data-tip]:hover::after { content: attr(data-tip); position: absolute
 header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .menu-wrap:last-child [data-tip]:hover::after { left: auto; right: 0; transform: none; }
 @keyframes tipIn { from { opacity: 0; } to { opacity: 1; } }
 @media (hover: none) { header.top [data-tip]:hover::after { display: none; } }
+
+/* Student Feedback card (bottom of the Bulletin) and its pop-up (all cohorts). */
+.fb-card { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; width: 100%; margin-top: 14px; text-align: left;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font: inherit; cursor: pointer; box-shadow: var(--shadow); }
+.fb-card:hover { border-color: var(--taupe); }
+.fb-card-title { font-family: var(--serif); font-size: 18px; color: var(--ink); }
+.fb-card-arrow { font-size: 13px; color: var(--taupe-dark); }
+.modal.fb-admin { width: min(900px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+.fb-admin .modal-head { gap: 14px; }
+.fb-admin .modal-body { overflow: auto; }
+.fb-tabs { margin-right: auto; }
+.fb-table { margin-bottom: 16px; }
+.fb-table tbody tr { cursor: default; }
+.fb-table tr.fb-total td { border-top: 1px solid var(--line); }
+.fb-sub { margin-top: 12px !important; }
+.fb-admin .cf-body { margin-top: 0; }

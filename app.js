@@ -704,7 +704,7 @@ function render() {
     document.querySelectorAll('textarea[data-grow]').forEach(grow);
     if (S.shareOpen) showShareQr();
     if (S.evalQr) showEvalQr();
-    if (S.portalQr) showStaffQr();
+    if (S.view === 'staff') showStaffQr();
   }, 0);
 }
 
@@ -784,8 +784,8 @@ function shell() {
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
   ${S.evalQr ? evalQrModal() : ''}
-  ${S.portalQr ? portalQrModal() : ''}
   ${S.fbOpen ? fbModal() : ''}
+  ${S.fbAdmin ? fbAdminModal() : ''}
   ${S.bagOpen !== false ? bagModal() : ''}
   ${S.tplOpen ? templatesModal() : ''}
   ${S.bagEd ? bagEdModal() : ''}
@@ -1980,13 +1980,27 @@ function peerStats() {
 const FB_PROGRAM = ['The course was well organized and the expectations were clear.', 'Materials and class time prepared me for testing and for the field.', 'I would recommend this program to a future student.'];
 const FB_AW = ['Stations were well run and I got enough hands-on repetitions.', 'Scenarios were realistic and equipment was ready to use.', 'I left academy week more confident and competent than I arrived.'];
 // The cohort's course feedback: each question's average, both sections' averages, and the written answers.
-function courseFeedback() {
-  const list = (S.evals || []).filter(e => e.kind === 'feedback');
+// Nick's and Bella's ratings in a set of Student Feedback answers: { Nick: { n, avg: { knowledge… }, comments: [{ text, day }] }, Bella: … }
+function ownersFeedback(list) {
+  const out = {};
+  FB_OWNERS.forEach(o => {
+    const r = { n: 0, sum: {}, comments: [] };
+    list.forEach(e => (e.instructors || []).filter(x => o.names.includes(fbBare(x.id))).forEach(x => {
+      r.n++; FB_KEYS.forEach(([k]) => { r.sum[k] = (r.sum[k] || 0) + (Number(x[k]) || 0); });
+      if (String(x.feedback || '').trim()) r.comments.push({ text: x.feedback, day: e.day, key: e.key });
+    }));
+    if (r.n) r.avg = Object.fromEntries(FB_KEYS.map(([k]) => [k, r.sum[k] / r.n]));
+    out[o.who] = r;
+  });
+  return out;
+}
+function courseFeedback(evals = S.evals) {
+  const list = (evals || []).filter(e => e.kind === 'feedback');
   const avgOf = (key, i) => { const v = list.map(e => Number((e[key] || [])[i])).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const section = key => { const q = [0, 1, 2].map(i => avgOf(key, i)).filter(x => x != null); return q.length ? q.reduce((a, b) => a + b, 0) / q.length : null; };
   const said = k => list.filter(e => String(e[k] || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at))).map(e => ({ text: e[k], day: e.day }));
   return { n: list.length, program: section('program'), aw: section('aw'), q: { program: [0, 1, 2].map(i => avgOf('program', i)), aw: [0, 1, 2].map(i => avgOf('aw', i)) },
-    worked: said('worked'), criticism: said('criticism') };
+    worked: said('worked'), criticism: said('criticism'), owners: ownersFeedback(list) };
 }
 const peerCell = st => st ? `<span class="peer-avg">${st.overall.toFixed(1)}</span>${st.zeroCount ? ` <span class="peer-flag" title="Rated 0 (Serious concern) ${st.zeroCount === 1 ? 'once' : st.zeroCount + ' times'}">⚑ 0</span>` : ''}` : '<span class="muted">–</span>';
 
@@ -2033,7 +2047,7 @@ function studentsView() {
   </section>` : ''}
   ${hasPeer || cf.n ? `<section class="box shaded peer-card">
     ${hasPeer ? `
-    <details class="peer-sugg" ${S.peerSuggOpen ? 'open' : ''}><summary data-act="peerSuggToggle"><span class="peer-sugg-title">Suggestions for the course/groups (${suggestions.length})</span>
+    <details class="peer-sugg" ${S.peerSuggOpen ? 'open' : ''}><summary data-act="peerSuggToggle"><span class="peer-sugg-title">Suggestions for the groups/structure (${suggestions.length})</span>
       <span class="muted small">${peerEvals.length} submitted${flagged ? ` · <span class="peer-flag">⚑ ${flagged} student${flagged === 1 ? '' : 's'} rated 0</span>` : ''}</span></summary>
       ${suggestions.length ? `<ul>${suggestions.map(e => `<li>${esc(e.suggestions)} <span class="muted small">· Day ${e.day}${e.squad ? ', Squad ' + e.squad : ''}</span></li>`).join('')}</ul>` : ''}</details>` : ''}
     ${cf.n ? `<details class="peer-sugg cf" ${S.cfOpen ? 'open' : ''}><summary data-act="cfToggle"><span class="peer-sugg-title">Course feedback (${cf.n})</span>
@@ -2043,6 +2057,9 @@ function studentsView() {
           <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${av[i] != null ? av[i].toFixed(1) : '–'}</b></li>`).join('')}</ul></div>`).join('')}
         ${[['What worked well', cf.worked], ['Constructive criticism', cf.criticism]].map(([h, items]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>
           ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
+        ${['Nick', 'Bella'].map(who => { const o = cf.owners[who]; return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${o.n} rating${o.n === 1 ? '' : 's'}</span></p>
+          ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k].toFixed(1)}</b></li>`).join('')}</ul>
+            ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)} <span class="muted small">· Day ${x.day}</span></li>`).join('')}</ul>` : ''}` : '<p class="muted small">No ratings yet.</p>'}</div>`; }).join('')}
       </div></details>` : ''}
   </section>` : ''}
   <section class="box table-box">
@@ -2745,7 +2762,7 @@ document.addEventListener('keydown', e => {
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false; else if (S.bp) { if (S.bp.busy) return; bpClose(); return; }
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.fbOpen) S.fbOpen = null; else if (S.portalQr) S.portalQr = false; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.fbOpen) S.fbOpen = null; else if (S.fbAdmin) S.fbAdmin = null; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.bag-ed input:not([data-add]), .bag-ed textarea')) { e.preventDefault(); e.target.blur(); return; } // renaming a pocket/item

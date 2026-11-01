@@ -118,7 +118,7 @@
           const r = A.people[p.id] || {};
           return `<div class="person"><h3>${esc(p.name)}</h3>${PEER.map(([k, l]) => `<div class="q"><div class="label">${l}</div>${nums(0, r[k], `data-person="${esc(p.id)}" data-k="${k}"`)}</div>`).join('')}</div>`;
         }).join('')}</div>
-        <div class="card"><h2>About the course</h2><label class="field"><span>Suggestions for the course or groups (optional)</span>
+        <div class="card"><h2>Groups &amp; structure</h2><label class="field"><span>Suggestions for the groups/structure (optional)</span>
           <textarea data-text="suggestions">${esc(A.text.suggestions || '')}</textarea></label></div>
         <p class="closing">Honest scores help everyone grow – ratings are reviewed by instructors only. Thank you.</p>
         <button class="btn" type="button" data-submit>Submit</button><p class="err" id="err" hidden></p>` : '');

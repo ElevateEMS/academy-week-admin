@@ -81,12 +81,16 @@ function staffView() {
         <p class="muted small">On a Staffing tab, but not on the Staff Directory tab (so they can’t sign in or be paid here yet).</p>
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
           <button class="btn tiny" data-act="staffEdOpen" data-new="${esc(u.name)}">Add</button></li>`).join('')}</ul></section>` : ''}
+      <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staff Portal<small>schedule and timesheets</small></h2></div>
+        <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
+          <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
+        <div class="staff-qr" id="staffQr"></div>
+      </section>
       <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staffing by Cohort<small>paid and not paid yet</small></h2></div>
         ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${weekOf(c.cohort) ? `<button class="link-btn" data-act="stfGo" data-cohort="${esc(c.cohort)}" title="Availability & Staffing for this week">${esc(c.cohort)}</button>` : esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
           <b>${money(c.total)}</b><span></span></li>`).join('')}</ul>`
           : '<p class="empty">Nothing on the Payroll tab for a cohort yet.</p>'}
       </section>
-      ${ownersFeedbackBox()}
     </div>
   </div>`;
 }
@@ -105,8 +109,7 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
   return `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
-    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>
-    <button class="icon-btn" data-act="portalQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`;
+    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
 }
 function staffListBox(a) {
   const away = a.people.filter(p => p.inactive);
@@ -142,15 +145,6 @@ function staffListBox(a) {
         ${bar(p)}
         ${fbCell(p.name)}
       </div>`; }
-}
-// The Staff Portal pop-up (QR icon in the header): its web address, Copy link, and the QR code.
-function portalQrModal() {
-  return `<div class="overlay" data-act="portalQrClose"><div class="modal eval-qr" data-stop>
-    <div class="modal-head"><h2>Staff Portal</h2><button class="x big" data-act="portalQrClose" aria-label="Close">×</button></div>
-    <div class="pad"><p class="eval-qr-sub">Schedule and timesheets</p>
-      <div class="staff-qr" id="staffQr"></div>
-      <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a></p>
-      <div class="share-btns eval-qr-btns"><button class="btn" data-act="staffCopyLink">Copy link</button></div></div></div></div>`;
 }
 function showStaffQr() {
   const el = document.getElementById('staffQr');
@@ -326,8 +320,6 @@ async function staffAct(a, el = {}) {
   switch (a) {
     case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
     case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
-    case 'portalQrOpen': S.portalQr = true; render(); return true;
-    case 'portalQrClose': S.portalQr = false; render(); return true;
     case 'fbOpen': S.fbOpen = d.who; render(); return true;
     case 'fbClose': S.fbOpen = null; render(); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
@@ -915,7 +907,7 @@ function staffingEscape() {
    Every cohort's cohorts/{key}/evals (kind "feedback"), read while the Staff page is open. Each answer rates every
    instructor who had worked so far that week (by their Staffing-tab name); here they're matched to the Staff
    Directory the way the Staff page matches names ("Alianna (Ali) Tran" = "Ali Tran" = "Alianna Tran").
-   Nick and Bella aren't in the directory: theirs go in the "Nick & Bella" box. Test cohorts: only in each person's
+   Nick and Bella aren't in the directory: theirs are in Course feedback (Students page) and the Bulletin's Student Feedback. Test cohorts: only in each person's
    by-cohort list (marked test), never in the averages. */
 const fbBare = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9() ]+/g, ' ').replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
 const fbKey = name => String(name || '').trim(); // (Name on forms is kept by their Staff Directory name)
@@ -972,16 +964,7 @@ function fbCell(name) {
   if (!f.n && !f.byCohort.length) return '<span class="muted small">–</span>';
   return `<span><button class="link-btn fb-link" data-act="fbOpen" data-who="${esc(name)}">${f.n ? `<b>${f.overall.toFixed(1)}</b> <span class="muted small">· ${f.n}</span>` : '<span class="muted small">test only</span>'}</button></span>`;
 }
-function ownersFeedbackBox() {
-  watchAllEvals();
-  const row = who => { const f = fbFor(who);
-    return `<li><span><b>${who}</b><span class="muted small">${f.n ? f.n + ' rating' + (f.n === 1 ? '' : 's') : f.byCohort.length ? 'Test cohorts only so far' : 'No ratings yet'}</span></span>
-      ${f.n ? `<span class="fb-mini">${FB_KEYS.map(([k, l]) => `<span title="${l}">${l.slice(0, 1)} <b>${f.avg[k].toFixed(1)}</b></span>`).join('')}</span>` : '<span></span>'}
-      ${f.n || f.byCohort.length ? `<button class="btn tiny" data-act="fbOpen" data-who="${who}">View</button>` : '<span></span>'}</li>`; };
-  return `<section class="box"><div class="box-head admin-head"><h2>Nick &amp; Bella<small>student feedback</small></h2></div>
-    <ul class="pay-owed fb-owners">${row('Nick')}${row('Bella')}</ul></section>`;
-}
-// One person's feedback (from the Feedback column or the Nick & Bella box).
+// One person's feedback (from the Feedback column).
 function fbModal() {
   const who = S.fbOpen, f = fbFor(who), avg = f.avg;
   const tiles = a => `<div class="peer-grid fb-grid">${FB_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${a[k].toFixed(1)}</b></div>`).join('')}</div>`;
