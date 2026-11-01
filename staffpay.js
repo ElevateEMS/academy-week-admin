@@ -171,7 +171,7 @@ function staffEdModal() {
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
       ${f('evalName', 'Name on forms', 'text', 'First name (e.g. Captain Lugo)')}
-      <p class="muted small se-hint">What students see on the Student Feedback form. Leave it blank to use their first name.</p>
+      <p class="muted small se-hint">What students see on the Instructor &amp; Course Feedback form. Leave it blank to use their first name.</p>
       <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
       ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
         ${e.account ? ` <button class="link" data-act="staffResetPw">Reset their password</button>` : ''}</p>` : ''}
@@ -969,7 +969,7 @@ function fbModal() {
   const who = S.fbOpen, f = fbFor(who), avg = f.avg;
   const tiles = a => `<div class="peer-grid fb-grid">${FB_KEYS.map(([k, l]) => `<div><span>${l}</span><b>${a[k].toFixed(1)}</b></div>`).join('')}</div>`;
   return `<div class="overlay" data-act="fbClose"><div class="modal fb-modal" data-stop>
-    <div class="modal-head"><h2>${esc(who)}<small class="muted"> · Student Feedback</small></h2><button class="x big" data-act="fbClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>${esc(who)}<small class="muted"> · Instructor &amp; Course Feedback</small></h2><button class="x big" data-act="fbClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       ${f.n ? `<h3 class="fb-h">All cohorts <span class="muted small">${f.n} rating${f.n === 1 ? '' : 's'}</span></h3>${tiles(avg)}` : '<p class="muted">No ratings from real cohorts yet.</p>'}
       ${f.byCohort.length ? `<h3 class="fb-h">By cohort</h3><ul class="fb-cohorts">${f.byCohort.map(c => `<li><span><b>${esc(c.key)}</b>${c.test ? ' <span class="tag">test</span>' : ''}<span class="muted small"> · ${c.n} rating${c.n === 1 ? '' : 's'} · Day ${c.days.sort().join(', ')}</span></span>

@@ -21,7 +21,7 @@
   .head { display: flex; align-items: center; gap: 12px; margin: 4px 2px 14px; }
   .head img { width: 46px; height: 46px; }
   .head .kicker { font-size: 11px; letter-spacing: .22em; color: var(--orange); font-weight: 700; }
-  .head h1 { margin: 2px 0 0; font-size: 22px; color: var(--navy); letter-spacing: .02em; }
+  .head h1 { margin: 2px 0 0; font-size: clamp(15px, 4.9vw, 22px); color: var(--navy); letter-spacing: .01em; white-space: nowrap; } /* (one line on a phone) */
   .head .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
   .card { background: #fff; border-radius: 12px; padding: 16px 16px 14px; box-shadow: 0 1px 3px rgba(12, 42, 67, .1); margin-bottom: 12px; }
   .card h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--navy); margin: 0 0 10px; }
@@ -228,6 +228,7 @@
     if (!token) { fail('This page needs the QR code from your instructor.'); return; }
     try {
       info = await call('evalInfo', {});
+      if (info.kind === 'feedback') info.title = 'Instructor & Course Feedback';
       if (saved()) ticket(saved()); else draw();
     } catch (e) { fail(e.message); }
   })();

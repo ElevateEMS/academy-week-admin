@@ -172,7 +172,7 @@ const isShirtItem = text => /ship.*shirt/i.test(text); // Course To-Do: gets the
 // (Peer: "peer" and "eval" anywhere in it. Student Feedback: "eval" with instructor / course / staff anywhere, or "student/course feedback".)
 const evalKindOf = text => /\bpeer\b/i.test(text) && /eval/i.test(text) ? 'peer'
   : (/eval/i.test(text) && /\b(instructors?|course|staff)\b/i.test(text)) || /(student|course) feedback|feedback form/i.test(text) ? 'feedback' : null;
-const EVAL_TITLES = { peer: 'Peer Evaluation', feedback: 'Student Feedback' };
+const EVAL_TITLES = { peer: 'Peer Evaluation', feedback: 'Instructor & Course Feedback' };
 const QR_ICON = '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3h-3zM17.5 17.5h3v3h-3zM14 20.5h.5M20.5 14v.5"/></svg>';
 
 /* ---------- To-dos and priorities (one collection, kind = todo | priority) ---------- */

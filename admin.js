@@ -931,7 +931,7 @@ function fbBulletinCard() {
   const course = all.program != null && all.aw != null ? (all.program + all.aw) / 2 : all.program ?? all.aw;
   const own = who => { const o = all.owners[who]; return o.n ? `${who} ${(FB_KEYS.reduce((t, [k]) => t + o.avg[k], 0) / FB_KEYS.length).toFixed(1)}` : ''; };
   const bits = [course != null ? 'Course ' + course.toFixed(1) : '', own('Nick'), own('Bella')].filter(Boolean);
-  return `<button class="fb-card" data-act="fbAdminOpen"><span class="fb-card-title">Student Feedback <span class="fb-card-arrow">▸</span></span>
+  return `<button class="fb-card" data-act="fbAdminOpen"><span class="fb-card-title">Instructor &amp; Course Feedback <span class="fb-card-arrow">▸</span></span>
     <span class="muted small">${bits.length ? bits.join(' · ') : 'No feedback yet'}</span></button>`;
 }
 function fbAdminModal() {
@@ -943,7 +943,7 @@ function fbAdminModal() {
     const rows = real.map(([k, l]) => ({ k, f: courseFeedback(l) })), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
     const said = (h, pick) => { const items = rows.flatMap(r => pick(r.f).map(x => ({ ...x, k: r.k })));
       return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· ${esc(x.k)}, Day ${x.day}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
-    body = !rows.length ? '<p class="muted">No Student Feedback from a real cohort yet.</p>' : `
+    body = !rows.length ? '<p class="muted">No feedback from a real cohort yet.</p>' : `
       <table class="roster fb-table"><thead><tr><th>Cohort</th><th class="c">Responses</th><th class="c">The Program</th><th class="c">Academy Week</th></tr></thead>
         <tbody>${rows.map(r => `<tr><td><b>${esc(r.k)}</b></td><td class="c">${r.f.n}</td><td class="c">${n1(r.f.program)}</td><td class="c">${n1(r.f.aw)}</td></tr>`).join('')}
         <tr class="fb-total"><td><b>All cohorts</b></td><td class="c">${all.n}</td><td class="c"><b>${n1(all.program)}</b></td><td class="c"><b>${n1(all.aw)}</b></td></tr></tbody></table>
@@ -963,7 +963,7 @@ function fbAdminModal() {
         : '<p class="muted small">No ratings from a real cohort yet.</p>'}</div>`; }).join('')}</div>`;
   }
   return `<div class="overlay" data-act="fbAdminClose"><div class="modal fb-admin" data-stop>
-    <div class="modal-head"><h2>Student Feedback</h2>${tabs}<button class="x big" data-act="fbAdminClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Instructor &amp; Course Feedback</h2>${tabs}<button class="x big" data-act="fbAdminClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top" data-keep-scroll="fbAdmin">${body}</div></div></div>`;
 }
 // Remind me: a date on a sticky. From that day it's in the Morning Email (Reminders) every morning and has a rose
