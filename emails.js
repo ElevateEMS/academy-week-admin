@@ -535,7 +535,7 @@ function emailTplModal() {
       <label class="field">Subject<input id="emt-subject" data-emtpl="subject" value="${esc(d.subject)}"></label>
       <div class="em-tpl-row">
         <label class="field">When<select id="emt-from" data-emtpl="from">${opt(FROM, d.when.from)}</select></label>
-        ${d.when.from === 'enroll' || d.when.from === 'manual' ? '' : `<label class="field em-days">Days<span><input id="emt-days" data-emtpl="days" type="number" min="0" value="${Math.abs(days)}">
+        ${d.when.from === 'enroll' || d.when.from === 'manual' ? '' : `<label class="field em-days">Days<span><input id="emt-days" data-emtpl="days" type="number" min="0" value="${Math.abs(days)}" ${days === 0 ? 'hidden' : ''}>
           <select id="emt-dir" data-emtpl="dir"><option value="-1" ${days < 0 ? 'selected' : ''}>before</option><option value="0" ${days === 0 ? 'selected' : ''}>day of</option><option value="1" ${days > 0 ? 'selected' : ''}>after</option></select></span></label>`}
         <label class="field">Who<select id="emt-who" data-emtpl="who">${opt(WHO, d.who)}</select></label>
       </div>
@@ -827,7 +827,8 @@ function emailInput(t) {
     else if (f === 'ccNick') dr.ccNick = t.checked;
     else if (f === 'from') { dr.when.from = t.value; if (t.value === 'enroll' || t.value === 'manual') dr.when.days = 0; else if (!dr.when.days) dr.when.days = -1; }
     else if (f === 'days' || f === 'dir') {
-      const n = Math.abs(Number((document.getElementById('emt-days') || {}).value) || 0), dir = Number((document.getElementById('emt-dir') || {}).value);
+      // (the number box is hidden on "day of": switching to before/after starts it at 1)
+      const dir = Number((document.getElementById('emt-dir') || {}).value), n = Math.abs(Number((document.getElementById('emt-days') || {}).value) || 0) || (dir ? 1 : 0);
       dr.when.days = dir < 0 ? -n : dir > 0 ? n : 0;
     } else dr[f] = t.value;
     ed.dirty = true;

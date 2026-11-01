@@ -937,8 +937,11 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .em-tpl-form select, .em-tpl-form input:not(.circle) { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper); outline: none; width: 100%; color: var(--ink); font-size: 14px; }
 .em-tpl-form .em-on { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; margin-bottom: 20px; cursor: pointer; }
 .em-tpl-form .seg { justify-self: start; }
-.em-days span { display: flex; gap: 6px; }
-.em-days input { width: 80px !important; }
+/* Days: the number and before / day of / after side by side (the number hides on "day of"). */
+.field.em-days > span { display: flex; gap: 6px; align-items: center; }
+.em-days input { width: 80px !important; flex: 0 0 80px; }
+.em-days input[hidden] { display: none; }
+.em-days select { flex: 1; min-width: 0; }
 .em-tpl-form .seg { margin-top: 2px; }
 .em-tpl-form .em-panes textarea { min-height: 460px; }
 .em-tpl-form .em-preview { max-height: 520px; }
