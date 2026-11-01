@@ -118,11 +118,16 @@ function staffListBox(a) {
       <div class="yr-bar"><span class="yr-soon" style="width:${soon}%"></span><span class="yr-now" style="width:${pct}%"></span></div>
       <span class="yr-num">${money(p.year)}${p.coming ? ` <span class="muted">+${money(p.coming)}</span>` : ''}</span></div>`;
   };
+  // Portal and W-9 are checkmarks, and each column hides once every active person has it (volunteers don't need a
+  // W-9); it comes back when someone new is missing one.
+  const active = a.people.filter(p => !p.inactive);
+  const showPortal = active.some(p => !p.account), showW9 = active.some(p => p.role !== 'Volunteer' && !(p.w9 && p.w9.on));
+  const cols = (showPortal ? '' : ' no-portal') + (showW9 ? '' : ' no-w9');
   return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
-    <div class="staff-table">
-      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span><span>Portal</span><span>W-9</span><span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span><span title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
+    <div class="staff-table${cols}">
+      <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span>${showPortal ? '<span class="c" title="Staff Portal account set up">Portal</span>' : ''}${showW9 ? '<span class="c">W-9</span>' : ''}<span title="Paid and not paid yet, from the Payroll tab. The faded part is days still on the schedule (about 8 hrs each). Limit ${money(a.limit)}.">${a.year} total</span><span title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
       ${a.people.filter(p => !p.inactive).map(staffRow).join('')}
       ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive (away for now) <span class="count">${away.length}</span></button>
         ${S.staffShowAway ? away.map(staffRow).join('') : ''}` : ''}
@@ -131,8 +136,9 @@ function staffListBox(a) {
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
-        <span>${p.account ? '<span class="tag sage-tag">Set up</span>' : '<span class="muted small">Not yet</span>'}</span>
-        <span>${p.w9 && p.w9.on ? `<span class="tag sage-tag" title="On file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>` : '<span class="muted small">Needed</span>'}</span>
+        ${showPortal ? `<span class="c">${p.account ? '<span class="st-check" title="Staff Portal account set up">✓</span>' : '<span class="muted" title="No Staff Portal account yet">–</span>'}</span>` : ''}
+        ${showW9 ? `<span class="c">${p.w9 && p.w9.on ? `<span class="st-check" title="W-9 on file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>`
+          : p.role === 'Volunteer' ? '<span class="muted" title="Volunteers don’t need a W-9">–</span>' : '<span class="st-need" title="W-9 needed">!</span>'}</span>` : ''}
         ${bar(p)}
         ${fbCell(p.name)}
       </div>`; }

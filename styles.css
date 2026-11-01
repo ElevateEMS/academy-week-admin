@@ -1639,13 +1639,20 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 @media (max-width: 1000px) { .staff-board { grid-template-columns: 1fr; } }
 .staff-board .board-col { display: grid; gap: 18px; align-content: start; }
 .staff-table { display: grid; margin-top: 6px; }
-.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 70px 56px minmax(120px, .8fr) 84px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
+.st-row { display: grid; grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 44px 36px minmax(120px, .8fr) 84px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
 .st-row > span { min-width: 0; overflow-wrap: anywhere; }
+/* Portal / W-9 as checkmarks; a column that's all done is left out (staffpay.js) and the grid closes up. */
+.staff-table.no-portal .st-row { grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 36px minmax(120px, .8fr) 84px; }
+.staff-table.no-w9 .st-row { grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) 44px minmax(120px, .8fr) 84px; }
+.staff-table.no-portal.no-w9 .st-row { grid-template-columns: minmax(160px, 1.3fr) 120px minmax(170px, 1.4fr) minmax(120px, .8fr) 84px; }
+.st-row > .c { text-align: center; }
+.st-check { color: var(--sage); font-weight: 700; }
+.st-need { color: #b42318; font-weight: 700; }
 .st-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); border-bottom: 1px solid var(--line); padding-top: 0; }
 .st-row a { color: var(--ink); text-underline-offset: 2px; }
 .st-role { display: block; }
 .st-email { font-size: 13px; }
-@media (max-width: 900px) { .st-row { grid-template-columns: 1fr 1fr; } .st-head { display: none; } }
+@media (max-width: 900px) { .st-row, .staff-table.no-portal .st-row, .staff-table.no-w9 .st-row, .staff-table.no-portal.no-w9 .st-row { grid-template-columns: 1fr 1fr; } .st-head { display: none; } }
 .sage-tag { background: var(--sage-soft); color: #56704f; }
 .yr { display: grid; gap: 3px; }
 .yr-bar { position: relative; height: 7px; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
