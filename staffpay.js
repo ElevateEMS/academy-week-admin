@@ -141,7 +141,7 @@ function staffListBox(a) {
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         ${showPortal ? `<span class="c">${p.account ? '<span class="st-check" title="Staff Portal account set up">✓</span>' : '<span class="muted" title="No Staff Portal account yet">–</span>'}</span>` : ''}
         ${showW9 ? `<span class="c">${p.w9 && p.w9.on ? `<span class="st-check" title="W-9 on file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>`
-          : p.role === 'Volunteer' ? '<span class="muted" title="Volunteers don’t need a W-9">–</span>' : '<span class="st-need" title="W-9 needed">!</span>'}</span>` : ''}
+          : p.role === 'Volunteer' ? '<span class="muted" title="Volunteers don’t need a W-9">–</span>' : '<span class="muted" title="No W-9 yet">–</span>'}</span>` : ''}
         ${bar(p)}
         ${fbCell(p.name)}
       </div>`; }
@@ -966,8 +966,8 @@ function fbFor(who) {
 function fbCell(name) {
   watchAllEvals();
   const f = fbFor(name);
-  if (!f.n && !f.byCohort.length) return '<span class="muted small">–</span>';
-  return `<span><button class="link-btn fb-link" data-act="fbOpen" data-who="${esc(name)}">${f.n ? `<b>${f.overall.toFixed(1)}</b> <span class="muted small">· ${f.n}</span>` : '<span class="muted small">test only</span>'}</button></span>`;
+  if (!f.n && !f.byCohort.length) return '<span class="c muted small">–</span>';
+  return `<span class="c"><button class="link-btn fb-link" data-act="fbOpen" data-who="${esc(name)}">${f.n ? `<b>${f.overall.toFixed(1)}</b> <span class="muted small">· ${f.n}</span>` : '<span class="muted small">test only</span>'}</button></span>`;
 }
 // One person's feedback (from the Feedback column).
 function fbModal() {
