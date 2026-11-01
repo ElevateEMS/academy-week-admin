@@ -557,9 +557,9 @@ function pickDay(key) {
   const saved = pref('day-' + key);
   S.day = currentWeekDay() ?? phaseDay() ?? (saved != null && !isNaN(saved) ? Number(saved) : 1);
 }
-// Opening a cohort: the Course side until 6 weeks before academy week (or while its start
-// date isn't in the sheet yet), then the Academy Week side. Students and Setup stay put.
-const AW_LEAD_DAYS = 42;
+// The side the date suggests: Course until a month before academy week (or while its start
+// date isn't in the sheet yet), then Academy Week. Students and Setup stay put.
+const AW_LEAD_DAYS = 30; // (about a month before Academy Week)
 function sideByDate() {
   const start = S.sheet && S.sheet.academyStart;
   if (!isIsoDate(start)) return 'course';
@@ -567,14 +567,20 @@ function sideByDate() {
   return todayIso() >= isoOf(from) ? 'aw' : 'course';
 }
 let sidePickedFor = null;
+// Opening a cohort: back to the side you were last on for it (Course, or the Academy Week page you used last).
+// The first time it's within AW_LEAD_DAYS of Academy Week, it moves over to Academy Week once; after that it
+// remembers again. A cohort you haven't opened yet goes by the date.
 function pickSide(key) {
   if (sidePickedFor === key) return;
   sidePickedFor = key;
   if (!['course', 'day', 'week', 'schedule'].includes(S.view)) return;
-  const side = sideByDate();
-  if (side === 'course') S.view = 'course';
-  else if (S.view === 'course') S.view = 'day';
+  const goAw = () => { if (S.view === 'course') S.view = ['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day'; };
+  const byDate = sideByDate();
+  if (byDate === 'aw' && !pref('awAuto-' + key)) { pref('awAuto-' + key, '1'); pref('side-' + key, 'aw'); goAw(); return; }
+  if ((pref('side-' + key) || byDate) === 'course') S.view = 'course'; else goAw();
 }
+// Remembers which side you're on, for each cohort.
+const noteSide = v => { if (S.cohortKey && ['course', 'day', 'week', 'schedule'].includes(v)) pref('side-' + S.cohortKey, v === 'course' ? 'course' : 'aw'); };
 
 async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
@@ -2692,17 +2698,17 @@ async function act(a, el = {}, e) {
         let v = d.v;
         if (v === 'students' && S.view === 'students') v = back.includes(pref('studentsFrom')) ? pref('studentsFrom') : 'course';
         else if (v === 'students' && back.includes(S.view)) pref('studentsFrom', S.view);
-        S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; noteSide(v);
         if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
       }
       case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
         const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
-        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; noteSide(v); render(); window.scrollTo(0, 0); break;
       }
       case 'day':
         S.day = Number(d.n); pref('day-' + S.cohortKey, d.n);
-        if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
+        if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); noteSide('day'); window.scrollTo(0, 0); }
         render(); break;
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
       case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;
