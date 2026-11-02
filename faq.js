@@ -25,6 +25,8 @@ const FAQ = [
       'The portal keeps a copy of each Staffing tab for up to 10 minutes so it opens faster. Changes made from the app’s Scheduling page show right away; changes typed into the sheet by hand show within 10 minutes.'],
     ['How do I reset someone’s Staff Portal password?',
       'Click their row in the Staff Directory → <b>Reset their Staff Portal password</b> at the bottom. They set up their account again with their name and phone number.'],
+    ['Where are staff shirt sizes and the shirt links?',
+      'Sizes (and the <b>Quarter zip</b> box for the regulars) are in each person’s edit window. The <b>shirt icon</b> at the top of the Staff page lists who needs which shirt, the count by size for ordering, a Made ✓ for each person, and the Amazon and Ninja Print links (tap the pencil to paste one).'],
     ['What’s the Additional Role box for?',
       'Just a label after their role in the Staff Directory, like “Patient · Admin assist”. It doesn’t change pay: flat-rate pay is set on Scheduling.'],
   ]],

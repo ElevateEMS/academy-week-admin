@@ -104,7 +104,8 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 // Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
-  return `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
+  return `<button class="icon-btn ql-icon" data-act="shirtsOpen" title="Staff Shirts" aria-label="Staff Shirts">${SHIRT_ICON}</button>`
+    + `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="docs" title="Payroll Documents" aria-label="Payroll Documents">${LINK_ICONS.folder}</button>`
     + '<span class="head-div ql-div" aria-hidden="true"></span>'
@@ -225,6 +226,9 @@ function staffEdModal() {
         <option value="">Pick one</option>${[...PAY_ROLES, 'Volunteer', ...(S.drafts['se-role'] && ![...PAY_ROLES, 'Volunteer'].includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
           .map(r => `<option ${r === S.drafts['se-role'] ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
       ${f('also', 'Additional Role', 'text', 'Ex. Admin assist')}
+      <div class="se-shirt"><label class="field">Shirt size${sizeSel('se-shirt')}</label>
+        <label class="check-line se-zip"><input type="checkbox" data-act="staffEdZip" ${S.drafts['se-zipOn'] ? 'checked' : ''}> <span>Quarter zip</span></label>
+        ${S.drafts['se-zipOn'] ? `<label class="field">Quarter zip size${sizeSel('se-zip')}</label>` : ''}</div>
       ${f('phone', 'Phone', 'tel')}
       ${f('email', 'Email', 'email')}
       <div class="se-em"><span class="muted small">Emergency contact</span>
@@ -310,7 +314,55 @@ function payModal() {
   </div></div>`;
 }
 
-function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : '') + (S.staffQrOpen ? staffQrModal() : '') + staffingModals(); }
+function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : '') + (S.staffQrOpen ? staffQrModal() : '') + (S.shirtsOpen ? shirtsModal() : '') + staffingModals(); }
+/* ---------- Staff Shirts (the header's shirt icon) ----------
+   One shirt each (and a quarter zip for the regulars), logo on the front. Instructor style (Dark Heather, INSTRUCTOR on
+   the back): EC & Equivalent, Non-Certified Instructors and volunteers. Patients & Assistants: Graphite Heather, nothing
+   on the back. Quarter zips match their shirt color, nothing on the back. Sizes come from the edit window
+   (meta/staffSizes); the links and who's made are in meta/staffShirts. Inactive staff are left off. */
+const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+const SHIRT_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3.5l-5 2.5-1.5 4.5 3.5 1.5V20.5h12V12l3.5-1.5L20 6l-5-2.5c-.5 1.5-1.6 2.3-3 2.3S9.5 5 9 3.5z"/></svg>';
+const SHIRT_LINKS = [['ninja', 'Ninja Print labels'], ['instShirt', 'Instructor shirt · Dark Heather'], ['othShirt', 'Patient & Assistant shirt · Graphite Heather'],
+  ['instZip', 'Instructor quarter zip · Dark Heather'], ['othZip', 'Patient & Assistant quarter zip · Graphite Heather']];
+const staffSize = name => (S.staffSizes || {})[fbKey(name)] || {};
+const shirtLinks = () => (S.staffShirts && S.staffShirts.links) || {};
+const shirtMade = (name, k) => !!((((S.staffShirts && S.staffShirts.made) || {})[fbKey(name)] || {})[k]);
+const sizeSel = id => `<select id="${id}" data-draft="${id}"><option value="">Pick a size</option>${SHIRT_SIZES.map(z => `<option ${S.drafts[id] === z ? 'selected' : ''}>${z}</option>`).join('')}</select>`;
+function shirtsModal() {
+  const a = S.staffAll || { people: [] }, people = a.people.filter(p => !p.inactive);
+  const inst = p => ['EC & Equivalent', 'Non-Certified Instructor', 'Volunteer'].includes(p.role), oth = p => ['Assistant', 'Patient'].includes(p.role);
+  const links = shirtLinks();
+  const linkLine = k => S.shirtLinkEd === k
+    ? `<span class="shirt-link-ed"><input id="shirt-link" data-draft="shirt-link" value="${esc(S.drafts['shirt-link'] || '')}" placeholder="Paste the link" autocomplete="off">
+        <button class="btn tiny" data-act="shirtLinkSave">Save</button><button class="link" data-act="shirtLinkCancel">Cancel</button></span>`
+    : `${links[k] ? `<a href="${esc(links[k])}" target="_blank" rel="noopener" data-chrome>Open link ↗</a>` : '<span class="muted small">No link yet</span>'}
+       <button class="eye" data-act="shirtLinkEd" data-k="${k}" title="${links[k] ? 'Change' : 'Add'} the link" aria-label="Edit link">${ICONS.pencil}</button>`;
+  const section = (title, key, note, list, k) => {
+    const sizeOf = p => k === 'zip' ? staffSize(p.name).zip : staffSize(p.name).shirt;
+    const counts = SHIRT_SIZES.map(z => [z, list.filter(p => sizeOf(p) === z).length]).filter(([, n]) => n);
+    const made = list.filter(p => shirtMade(p.name, k)).length;
+    return `<section class="shirt-sec"><div class="shirt-head"><h3>${title}</h3><span class="shirt-link">${linkLine(key)}</span></div>
+      <p class="muted small">${note}${list.length ? ` · ${made} of ${list.length} made` : ''}</p>
+      ${counts.length ? `<p class="shirt-counts">${counts.map(([z, n]) => `<span><b>${n}</b> ${z}</span>`).join('')}</p>` : ''}
+      ${list.length ? `<ul class="shirt-list">${list.sort((x, y) => x.name.localeCompare(y.name)).map(p => `<li>
+        <label class="check-line"><input type="checkbox" data-act="shirtMade" data-name="${esc(p.name)}" data-k="${k}" ${shirtMade(p.name, k) ? 'checked' : ''}> <span>${esc(p.name)}</span></label>
+        <span class="${sizeOf(p) ? '' : 'tbd small'}">${esc(sizeOf(p) || 'no size yet')}</span></li>`).join('')}</ul>` : '<p class="empty">Nobody yet.</p>'}
+    </section>`;
+  };
+  const zips = p => staffSize(p.name).zipOn;
+  return `<div class="overlay" data-act="shirtsClose"><div class="modal shirts-modal" data-stop>
+    <div class="modal-head"><h2>Staff Shirts<small>logo on the front · one each</small></h2><button class="x big" data-act="shirtsClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      <div class="shirt-ninja"><b>${SHIRT_LINKS[0][1]}</b><span class="shirt-link">${linkLine('ninja')}</span></div>
+      <div class="shirt-grid">
+        ${section('Instructor shirts', 'instShirt', 'Dark Heather · <b>INSTRUCTOR</b> on the back · ECs, Non-Certified Instructors, volunteers', people.filter(inst), 'shirt')}
+        ${section('Patient &amp; Assistant shirts', 'othShirt', 'Graphite Heather · nothing on the back', people.filter(oth), 'shirt')}
+        ${section('Instructor quarter zips', 'instZip', 'Dark Heather · nothing on the back', people.filter(p => inst(p) && zips(p)), 'zip')}
+        ${section('Patient &amp; Assistant quarter zips', 'othZip', 'Graphite Heather · nothing on the back', people.filter(p => oth(p) && zips(p)), 'zip')}
+      </div>
+      <p class="muted small">Sizes and the quarter zip box are in each person’s edit window (click their row in the Staff Directory). Inactive staff aren’t listed.</p>
+    </div></div></div>`;
+}
 // The Staff Portal's link and QR code (the header's QR icon): to show a new staff member where to sign up.
 function staffQrModal() {
   return `<div class="overlay qr-overlay" data-act="staffQrClose"><div class="modal small-modal staff-qr-modal" data-stop>
@@ -379,6 +431,7 @@ function staffInput(t) {
 function staffEscape() {
   if (staffingEscape()) return true;
   if (S.staffQrOpen) { S.staffQrOpen = false; return true; }
+  if (S.shirtsOpen) { if (S.shirtLinkEd) S.shirtLinkEd = null; else S.shirtsOpen = false; return true; }
   if (S.staffEd) { if (S.staffEd.busy) return true; S.staffEd = null; return true; }
   if (S.pay && S.pay.check) { if (S.pay.busy) return true; S.pay.check = false; return true; }
   if (S.pay) { if (S.pay.busy) return true; S.pay = null; return true; }
@@ -408,6 +461,16 @@ async function staffAct(a, el = {}) {
     case 'fbOpen': S.fbOpen = d.who; render(); return true;
     case 'fbClose': S.fbOpen = null; render(); return true;
     case 'staffQrOpen': S.staffQrOpen = true; render(); return true;
+    case 'shirtsOpen': S.shirtsOpen = true; S.shirtLinkEd = null; render(); return true;
+    case 'shirtsClose': S.shirtsOpen = false; S.shirtLinkEd = null; render(); return true;
+    case 'shirtMade': await Store.set('meta/staffShirts', { made: { [fbKey(d.name)]: { [d.k]: !shirtMade(d.name, d.k) } } }); return true;
+    case 'shirtLinkEd': S.shirtLinkEd = d.k; S.drafts['shirt-link'] = (shirtLinks()[d.k] || ''); render(); setTimeout(() => { const x = document.getElementById('shirt-link'); if (x) x.focus(); }, 0); return true;
+    case 'shirtLinkCancel': S.shirtLinkEd = null; render(); return true;
+    case 'shirtLinkSave': {
+      const v = String(S.drafts['shirt-link'] || '').trim();
+      if (v && !/^https?:\/\//i.test(v)) { toast('Paste the whole link (starting with https://).'); return true; }
+      await Store.set('meta/staffShirts', { links: { [S.shirtLinkEd]: v } }); S.shirtLinkEd = null; render(); return true;
+    }
     case 'staffQrClose': S.staffQrOpen = false; render(); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
     case 'payOpen': {
@@ -501,6 +564,7 @@ async function staffAct(a, el = {}) {
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
       S.drafts['se-evalName'] = (S.evalNames || {})[fbKey(base.name)] || '';
       S.drafts['se-also'] = staffAlso(base.name);
+      { const z = staffSize(base.name); S.drafts['se-shirt'] = z.shirt || ''; S.drafts['se-zip'] = z.zip || ''; S.drafts['se-zipOn'] = !!z.zipOn; }
       const w9 = (p && p.w9) || {};
       S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '',
         w9On: !!w9.on, w9Date: w9.date || '', w9Paper: !!(w9.on && w9.paper), w9PaperWas: !!(w9.on && w9.paper) };
@@ -508,6 +572,7 @@ async function staffAct(a, el = {}) {
       return true;
     }
     case 'staffEdInactive': S.staffEd.inactive = !S.staffEd.inactive; render(); return true;
+    case 'staffEdZip': S.drafts['se-zipOn'] = !S.drafts['se-zipOn']; render(); return true;
     case 'staffEdW9Paper': S.staffEd.w9Paper = !S.staffEd.w9Paper; render(); return true;
     case 'staffAway': S.staffShowAway = !S.staffShowAway; render(); return true;
     case 'staffEdClose': if (S.staffEd && !S.staffEd.busy) { S.staffEd = null; render(); } return true;
@@ -534,6 +599,14 @@ async function staffAct(a, el = {}) {
           if (e.orig) delete names[fbKey(e.orig)];
           if (al) names[fbKey(g('name'))] = al;
           await Store.set('meta/staffAlso', { names }, false);
+        }
+        // Shirt and quarter zip sizes (app database, by their Staff Directory name).
+        const zNew = { shirt: g('shirt'), zip: S.drafts['se-zipOn'] ? g('zip') : '', zipOn: !!S.drafts['se-zipOn'] }, zWas = staffSize(e.orig || g('name'));
+        if (JSON.stringify(zNew) !== JSON.stringify({ shirt: zWas.shirt || '', zip: zWas.zip || '', zipOn: !!zWas.zipOn }) || (e.orig && e.orig !== g('name'))) {
+          const names = { ...(S.staffSizes || {}) };
+          if (e.orig) delete names[fbKey(e.orig)];
+          if (zNew.shirt || zNew.zipOn) names[fbKey(g('name'))] = zNew;
+          await Store.set('meta/staffSizes', { names }, false);
         }
         S.staffEd = null; toast('Saved to the Staff Directory.');
         if (S.cohortKey) loadStaffCohort(S.cohortKey, true);
@@ -1032,6 +1105,8 @@ function watchAllEvals() {
   S.allEvals = S.allEvals || {};
   keys.split('|').filter(Boolean).forEach(k => S.fbUnwatch.push(Store.watch('cohorts/' + k + '/evals', list => { S.allEvals[k] = list.filter(e => e.kind === 'feedback'); render(); })));
   S.fbUnwatch.push(Store.watch('meta/evalNames', d => { S.evalNames = (d && d.names) || {}; }));
+  S.fbUnwatch.push(Store.watch('meta/staffSizes', d => { S.staffSizes = (d && d.names) || {}; render(); })); // (shirt / quarter zip sizes)
+  S.fbUnwatch.push(Store.watch('meta/staffShirts', d => { S.staffShirts = d || {}; render(); })); // (the links and who's made)
   S.fbUnwatch.push(Store.watch('meta/staffAlso', d => { S.staffAlso = (d && d.names) || {}; render(); })); // (the Staff list's "Also" labels)
 }
 // Who an instructor rating belongs to: a directory name, or 'Nick' / 'Bella'.
