@@ -597,7 +597,7 @@ async function claimBookCode(p) {
       return c.code;
     }
   }
-  throw new Error('No unused book codes left. Add more in Setup → Book Codes.');
+  throw new Error('No unused book codes left. Add more in Settings → Book Codes.');
 }
 
 async function emCreate() {

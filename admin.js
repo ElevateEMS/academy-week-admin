@@ -1155,7 +1155,7 @@ function layoutStickies() {
 
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
-  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.inqSet ? inqSetModal() : '')
+  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.inqSet ? inqSetModal() : '')
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
@@ -1188,6 +1188,7 @@ function adminInput(t) {
   return false;
 }
 function adminEscape() {
+  if (S.faqOpen) { S.faqOpen = false; return true; }
   if (S.histEd) { if (S.histEd.busy) return true; S.histEd = null; S.datePick = null; }
   else if (S.noteRemind) { S.noteRemind = null; S.datePick = null; }
   else if (S.tdEd) { if (S.datePick) S.datePick = null; else S.tdEd = null; }
@@ -1275,6 +1276,8 @@ async function adminAct(a, el = {}) {
       S.inqSaving = false; render(); return true;
     }
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
+    case 'faqOpen': S.faqOpen = true; S.faqQ = ''; render(); setTimeout(() => { const x = document.getElementById('faq-q'); if (x) x.focus(); }, 0); return true;
+    case 'faqClose': S.faqOpen = false; render(); return true;
     case 'adminInfoOpen': {
       const i = adminInfo();
       Object.keys(INFO_FIELDS).forEach(k => { S.drafts['ai-' + k] = i[k] || ''; });

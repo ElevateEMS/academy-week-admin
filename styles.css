@@ -1938,3 +1938,17 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .fb-table tr.fb-total td { border-top: 1px solid var(--line); }
 .fb-sub { margin-top: 12px !important; }
 .fb-admin .cf-body { margin-top: 0; }
+
+/* Settings → How it works: a search, then the questions by page (tap one to open its answer). */
+.faq-modal { width: min(720px, 100%); max-height: 86vh; display: flex; flex-direction: column; }
+.faq-modal .modal-body { overflow-y: auto; padding-top: 4px; }
+.faq-search { padding: 12px 22px 6px; }
+.faq-search input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); font: inherit; font-size: 15px; color: var(--ink); outline: none; box-sizing: border-box; }
+.faq-search input:focus { border-color: var(--taupe); }
+.faq-group { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--taupe-dark); margin: 18px 0 4px; font-family: Jost, system-ui, sans-serif; font-weight: 500; }
+.faq-item { border-bottom: 1px dotted rgba(125, 101, 88, .25); }
+.faq-item summary { cursor: pointer; list-style: none; padding: 10px 0; font-size: 15px; color: var(--ink); display: flex; gap: 8px; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::before { content: '▸'; color: var(--taupe-dark); font-size: 12px; margin-top: 3px; transition: transform .15s; }
+.faq-item[open] summary::before { transform: rotate(90deg); }
+.faq-item p { margin: 0 0 12px 20px; font-size: 14px; line-height: 1.5; color: var(--ink); }

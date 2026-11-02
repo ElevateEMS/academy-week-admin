@@ -829,7 +829,7 @@ function pageTitle() {
     const out = students().filter(s => s.out).length;
     return `<h1>Students</h1><p>${S.sheet ? attending().length + ' students' + (out ? ` · ${out} not attending` : '') : ''}</p>`;
   }
-  if (S.view === 'settings') return '<h1>Setup</h1><p>Shared by you and Nick</p>';
+  if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
   if (S.view === 'schedule') {
     const d = weekDays().find(x => x.n === schedDay()) || {};
     return `<h1>Schedule</h1><p>Day ${schedDay()}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
@@ -861,7 +861,7 @@ function menu() {
     <div class="menu-field"><div class="menu-field-head">Cohort<button class="menu-add" data-act="newCohortOpen" title="New cohort" aria-label="New cohort">+</button></div>
       <select id="cohortSel" data-change="cohort" aria-label="Cohort"${old.length ? ` data-dd-foot="${S.showOld ? 'Hide' : 'Show'} former &amp; test cohorts" data-dd-foot-act="toggleOld"` : ''}>${opts || '<option>Loading…</option>'}</select></div>
     <button class="menu-item" data-act="refresh">${S.loading ? 'Loading…' : 'Refresh from the Google Sheet'}</button>
-    <button class="menu-item" data-act="view" data-v="settings">Setup</button>
+    <button class="menu-item" data-act="view" data-v="settings">Settings</button>
     <button class="menu-item" data-act="signout">Sign out <span class="muted small">${esc(S.user.email)}</span></button>
   </div>`;
 }
@@ -1809,7 +1809,7 @@ function binderListModal() {
   return `<div class="overlay" data-act="binderListClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>Binder Paperwork</h2><button class="x big" data-act="binderListClose" aria-label="Close">×</button></div>
     <div class="modal-body"><ul class="plain-list">${cfg().packet.filter(x => x.copies).map(x => `<li>${esc(packetLine(x))}</li>`).join('')}</ul></div>
-    <div class="modal-foot"><span class="muted small">Change the counts in Setup → Templates → Prep.</span></div>
+    <div class="modal-foot"><span class="muted small">Change the counts in Settings → Templates → Prep.</span></div>
   </div></div>`;
 }
 
@@ -2270,6 +2270,7 @@ function settingsView() {
         `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
           `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),
       tile('Page Layout', 'Put every box you’ve dragged back where it started.', `<button class="btn small" data-act="resetLayout">Reset layout</button>`),
+      tile('How it works', 'Answers to how things work, like Pay as, paper W-9s and when PDFs save.', open('faqOpen')),
     ])}
   </div>`;
 }
