@@ -2270,7 +2270,7 @@ function settingsView() {
         `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
           `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),
       tile('Page Layout', 'Put every box you’ve dragged back where it started.', `<button class="btn small" data-act="resetLayout">Reset layout</button>`),
-      tile('How it works', 'Answers to how things work, like Pay as, paper W-9s and when PDFs save.', open('faqOpen')),
+      tile('FAQ - How it works', 'Answers to how things work, like Pay as, paper W-9s and when PDFs save.', open('faqOpen')),
     ])}
   </div>`;
 }

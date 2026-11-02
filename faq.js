@@ -1,4 +1,4 @@
-/* Settings → How it works: short answers to "how does this work?" questions, grouped by page, with a search.
+/* Settings → FAQ - How it works: short answers to "how does this work?" questions, grouped by page, with a search.
    Keep these in step with the app: when how something works changes, change its answer here in the same update.
    Answers are HTML (b, i only). */
 const FAQ = [
@@ -78,16 +78,26 @@ const FAQ = [
   ]],
 ];
 
+// Opens on the categories (tiles); tap one for its questions (← All categories goes back). Searching looks in every category.
 function faqModal() {
   const q = String(S.faqQ || '').trim().toLowerCase();
   const plain = h => h.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-  const groups = FAQ.map(([g, items]) => [g, items.filter(([qq, a]) => !q || (g + ' ' + qq + ' ' + plain(a)).toLowerCase().includes(q))]).filter(([, l]) => l.length);
+  const item = ([qq, a], open) => `<details class="faq-item" ${open ? 'open' : ''}><summary>${esc(qq)}</summary><p>${a}</p></details>`;
+  let body;
+  if (q) {
+    const groups = FAQ.map(([g, items]) => [g, items.filter(([qq, a]) => (g + ' ' + qq + ' ' + plain(a)).toLowerCase().includes(q))]).filter(([, l]) => l.length);
+    body = groups.length ? groups.map(([g, items]) => `<h3 class="faq-group">${esc(g)}</h3>${items.map(x => item(x, true)).join('')}`).join('')
+      : '<p class="empty">Nothing matches that. Try another word.</p>';
+  } else if (S.faqCat != null && FAQ[S.faqCat]) {
+    const [g, items] = FAQ[S.faqCat];
+    body = `<button class="link faq-back" data-act="faqBack">← All categories</button><h3 class="faq-group">${esc(g)}</h3>${items.map(x => item(x, false)).join('')}`;
+  } else {
+    body = `<div class="faq-cats">${FAQ.map(([g, items], i) => `<button class="faq-cat" data-act="faqCat" data-c="${i}"><b>${esc(g)}</b><span>${items.length} question${items.length === 1 ? '' : 's'}</span></button>`).join('')}</div>`;
+  }
   return `<div class="overlay" data-act="faqClose"><div class="modal faq-modal" data-stop>
-    <div class="modal-head"><h2>How it works</h2><button class="x big" data-act="faqClose" aria-label="Close">×</button></div>
-    <div class="faq-search"><input id="faq-q" type="search" placeholder="Search, like “W-9” or “PDF”" value="${esc(S.faqQ || '')}" autocomplete="off"></div>
-    <div class="modal-body">${groups.length ? groups.map(([g, items]) => `<h3 class="faq-group">${esc(g)}</h3>
-      ${items.map(([qq, a]) => `<details class="faq-item" ${q ? 'open' : ''}><summary>${esc(qq)}</summary><p>${a}</p></details>`).join('')}`).join('')
-      : '<p class="empty">Nothing matches that. Try another word.</p>'}</div>
+    <div class="modal-head"><h2>FAQ - How it works</h2><button class="x big" data-act="faqClose" aria-label="Close">×</button></div>
+    <div class="faq-search"><input id="faq-q" type="search" placeholder="Search" value="${esc(S.faqQ || '')}" autocomplete="off"></div>
+    <div class="modal-body">${body}</div>
   </div></div>`;
 }
 // The search box filters as you type (render keeps the cursor in it).

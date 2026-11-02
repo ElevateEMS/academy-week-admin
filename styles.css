@@ -1953,3 +1953,10 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .faq-item summary::before { content: '▸'; color: var(--taupe-dark); font-size: 12px; margin-top: 3px; transition: transform .15s; }
 .faq-item[open] summary::before { transform: rotate(90deg); }
 .faq-item p { margin: 0 0 12px 20px; font-size: 14px; line-height: 1.5; color: var(--ink); }
+
+.faq-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; padding: 10px 0 6px; }
+.faq-cat { display: grid; gap: 4px; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 16px; font: inherit; cursor: pointer; }
+.faq-cat:hover { border-color: var(--taupe); }
+.faq-cat b { font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--ink); }
+.faq-cat span { font-size: 13px; color: var(--muted); }
+.faq-back { margin: 10px 0 0; font-size: 14px; }

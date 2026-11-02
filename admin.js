@@ -1276,7 +1276,9 @@ async function adminAct(a, el = {}) {
       S.inqSaving = false; render(); return true;
     }
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
-    case 'faqOpen': S.faqOpen = true; S.faqQ = ''; render(); setTimeout(() => { const x = document.getElementById('faq-q'); if (x) x.focus(); }, 0); return true;
+    case 'faqCat': S.faqCat = Number(d.c); render(); return true;
+    case 'faqBack': S.faqCat = null; render(); return true;
+    case 'faqOpen': S.faqOpen = true; S.faqQ = ''; S.faqCat = null; render(); setTimeout(() => { const x = document.getElementById('faq-q'); if (x) x.focus(); }, 0); return true;
     case 'faqClose': S.faqOpen = false; render(); return true;
     case 'adminInfoOpen': {
       const i = adminInfo();
