@@ -163,9 +163,11 @@ function staffListBox(a) {
       </div>`; }
 }
 /* ---------- Academy Week Pay (the Staff page's right column, top) ----------
-   The next Academy Week (a.weeks: not over yet, never Test cohorts): everyone on its Staffing tab, by role, with where they
+   The next Academy Week (a.weeks: not over yet, never Test cohorts): everyone paid on its Staffing tab (not volunteers), by role, with where they
    are (scheduled / working / payment due on their last day / paid). Tap someone: their Pay window, every day of the week,
    where "Pay as" can be changed before they work. Anyone still owed from another cohort is under Also owed. */
+const weekRange = (a, b) => { const x = parseIso(a), y = parseIso(b), m = d => d.toLocaleDateString('en-US', { month: 'short' });
+  return m(x) + ' ' + x.getDate() + '–' + (m(y) !== m(x) ? m(y) + ' ' + y.getDate() : y.getDate()); };
 const EST_HRS = 8; // (the Staff script's estimate for a day without times: EST_HOURS_PER_DAY)
 function weekPayBox(a, owed) {
   const w = [...(a.weeks || [])].sort((x, y) => x.start < y.start ? -1 : 1)[0];
@@ -179,7 +181,8 @@ function weekPayBox(a, owed) {
   else if (!co) body = S.staffCoErr ? `<div class="alert">${esc(S.staffCoErr)}</div>` : '<p class="loading">Loading…</p>';
   else {
     const t = co.today || todayIso(), rates = co.rates || {};
-    const rows = co.people.filter(p => p.matched || p.days.length || (p.others || []).length).map(p => {
+    const rows = co.people.filter(p => !(p.volunteer || p.maxRole === 'Volunteer')) // (never paid: they're on Scheduling)
+      .filter(p => p.matched || p.days.length || (p.others || []).length).map(p => {
       const sched = p.days.filter(d => d.n > 0 && d.date), dates = [...new Set(sched.map(d => d.date).concat((p.others || []).map(o => o.date)))].filter(Boolean).sort();
       const first = dates[0], last = dates[dates.length - 1], n = dates.length;
       // What it comes to: days with times as they are, the rest about 8 hours at their Pay as rate, plus extra pay and flat slots.
@@ -188,19 +191,21 @@ function weekPayBox(a, owed) {
       const vol = p.volunteer || p.maxRole === 'Volunteer';
       let status, due = false;
       if (!n) status = 'Not on the schedule';
-      else if (t < first) status = `Scheduled ${n} day${n === 1 ? '' : 's'}${vol ? '' : ' · about ' + money(est)}`;
+      else if (t < first) status = `Scheduled ${n} day${n === 1 ? '' : 's'}`;
       else if (t > last) { if (vol) status = 'Done'; else if (p.paid && !p.unpaid) status = 'Paid ✓'; else { status = 'Payment due · since ' + shortDay(last); due = true; } }
       else if (t === last) { status = vol ? 'Last day today' : (p.paid && !p.unpaid ? 'Paid ✓' : 'Last day today · payment due'); due = !vol && !(p.paid && !p.unpaid); }
       else if (dates.includes(t)) status = `Working today · day ${dates.indexOf(t) + 1} of ${n}`;
       else { const nx = dates.find(x => x > t); status = `Worked ${dates.filter(x => x < t).length} of ${n} · next: ${parseIso(nx).toLocaleDateString('en-US', { weekday: 'short' })}`; }
-      return { p, status, due, amount: vol ? null : p.paid && !p.unpaid && t >= (last || t) ? p.total : est, vol };
+      const final = p.paid && !p.unpaid && t >= (last || t), exact = final || !p.days.some(d => !d.row && d.date && d.n > 0) && !(p.others || []).some(o => !o.made && !o.unpaid);
+      return { p, status, due, amount: vol ? null : final ? p.total : est, approx: !exact, vol };
     });
     body = rows.length ? staffGroups(rows, r => r.vol ? 'Volunteer' : r.p.maxRole).map(([g, list]) => `<p class="wp-group">${esc(g)}</p><ul class="pay-owed wp-list">${list.map(r => `<li class="${r.due ? 'wp-due' : ''}">
-        <button class="wp-person" data-act="payOpen" data-name="${esc(r.p.name)}" data-cohort="${esc(w.cohort)}"><b>${esc(r.p.name)}</b><span class="small wp-status">${esc(r.status)}</span></button>
-        <b class="wp-amt">${r.amount == null ? '<span class="muted small">unpaid</span>' : money(r.amount)}</b></li>`).join('')}</ul>`).join('')
+        <button class="wp-person" data-act="payOpen" data-name="${esc(r.p.name)}" data-cohort="${esc(w.cohort)}"><b>${esc(r.p.name)}</b>
+          <span class="small wp-amt" ${r.approx ? 'title="About 8 hours a day until they put in their times"' : ''}>${(r.approx ? 'about ' : '') + money(r.amount)}</span></button>
+        <span class="small wp-status">${esc(r.status)}</span></li>`).join('')}</ul>`).join('')
       : '<p class="empty">Nobody on this week’s Staffing tab yet.</p>';
   }
-  return `<section class="box week-pay"><div class="box-head admin-head"><h2>Academy Week Pay${w ? `<small>${esc(w.cohort)} · ${shortDay(w.start)}–${shortDay(w.end)}</small>` : ''}</h2></div>
+  return `<section class="box week-pay"><div class="box-head admin-head"><h2>Academy Week Pay${w ? `<small>${esc(w.cohort)} · ${weekRange(w.start, w.end)}</small>` : ''}</h2></div>
     ${body}
     ${others.length ? `<p class="wp-group">Also owed</p><ul class="pay-owed">${others.map(ownRow).join('')}</ul>` : ''}
   </section>`;
@@ -247,7 +252,7 @@ function staffEdModal() {
 function payModal() {
   const P = S.pay, co = S.staffCo && S.staffCo[P.cohort];
   const p = co && co.people.find(x => x.name === P.name || x.staffName === P.name);
-  const head = `<div class="modal-head"><h2>Pay ${esc(p ? p.name : P.name)}</h2><button class="x big" data-act="payClose" aria-label="Close">×</button></div>`;
+  const head = `<div class="modal-head"><h2>${esc(p ? p.name : P.name)}</h2><button class="x big" data-act="payClose" aria-label="Close">×</button></div>`;
   if (!co || !p) return `<div class="overlay" data-act="payClose"><div class="modal pay-modal" data-stop>${head}
     <div class="modal-body pad-top">${S.staffCoErr && !co ? `<div class="alert">${esc(S.staffCoErr)}</div>`
       : co ? `<p class="empty">${esc(P.name)} isn’t on ${esc(P.cohort)}’s Staffing tab and has nothing on the Payroll tab for it.</p>` : '<p class="loading">Loading…</p>'}</div></div></div>`;

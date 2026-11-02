@@ -1684,9 +1684,9 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .wp-person { display: grid; gap: 1px; text-align: left; background: none; border: 0; padding: 0; font: inherit; color: var(--ink); cursor: pointer; }
 .wp-person b { font-weight: 500; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .wp-person:hover b { text-decoration-color: var(--taupe); }
-.wp-status { color: var(--muted); }
+.wp-status { color: var(--muted); text-align: right; max-width: 190px; line-height: 1.3; }
 .wp-due .wp-status { color: var(--rose); font-weight: 500; }
-.wp-amt { font-weight: 500; }
+.wp-amt { color: var(--muted); }
 .staff-qr { display: grid; place-items: center; margin: 10px 0 4px; min-height: 150px; }
 .staff-qr img, .staff-qr canvas { border-radius: 8px; }
 /* Instructor feedback (Staff page): the Feedback column, the Nick & Bella box, one person's pop-up. */
@@ -1753,7 +1753,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .staff-board.fit > .board-col { display: flex; flex-direction: column; min-height: 0; }
 .staff-board.fit > .board-col > .box { flex: 0 0 auto; }
 .staff-board.fit > .board-col > .box:last-child { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.staff-portal-box h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); margin-top: 0; line-height: 1.2; }
+.staff-portal-box h2 small, .week-pay h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); margin-top: 0; line-height: 1.2; }
 .staff-portal-box .staff-link { margin: 2px 0 6px; }
 .staff-portal-box .staff-qr { margin: 4px 0 2px; min-height: 0; }
 .pay-row .tag-soft.sage-soft { background: var(--sage-soft); color: #56704f; }
