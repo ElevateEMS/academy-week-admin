@@ -695,11 +695,14 @@ async function loadStaffing(cohort, fresh = false) {
 const stfCo = () => (S.stf && S.stf[stfKey()]) || null;
 const enrolledCount = co => (stfKey() === S.cohortKey && S.sheet ? attending().length : (co && co.enrolled) || 0);
 const studentCount = co => enrolledCount(co); // (always the roster: you staff from it a few weeks out)
+// Assistants and Patients: one per station on the exam day, none on other days, unless you set a number for that day
+// (plan.extra[date] = { Assistant, Patient }: an event or scenario that needs patients, like the day before the exam).
 function dayPlan(co, day) {
-  const n = studentCount(co), over = ((co.plan && co.plan.stations) || {})[day.date];
-  if (day.exam) { const st = over != null ? Number(over) : 3; return { stations: st, auto: over == null, need: { Instructor: st, Assistant: st, Patient: st } }; }
+  const n = studentCount(co), over = ((co.plan && co.plan.stations) || {})[day.date], ex = ((co.plan && co.plan.extra) || {})[day.date] || {};
+  const pick = (kind, def) => ex[kind] != null ? Number(ex[kind]) : def;
+  if (day.exam) { const st = over != null ? Number(over) : 3; return { stations: st, auto: over == null, need: { Instructor: st, Assistant: pick('Assistant', st), Patient: pick('Patient', st) } }; }
   const st = over != null ? Number(over) : Math.max(1, Math.ceil(n / 5)), six = Math.max(1, Math.ceil(n / 6));
-  return { stations: st, auto: over == null, per: st ? Math.ceil(n / st) : 0, six: six < st ? six : null, need: { Instructor: st, Assistant: 0, Patient: 0 } };
+  return { stations: st, auto: over == null, per: st ? Math.ceil(n / st) : 0, six: six < st ? six : null, need: { Instructor: st, Assistant: pick('Assistant', 0), Patient: pick('Patient', 0) } };
 }
 const slotKind = role => role === 'EC' ? 'Instructor' : role;
 const PM_MINUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8"/></svg>', PM_PLUS = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M8 4v8"/></svg>';
@@ -809,6 +812,8 @@ function stfDay(co, d, i, plan) {
       <button class="pm" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="${plan.stations + 1}" aria-label="More stations">${PM_PLUS}</button>
       ${plan.auto ? '' : `<button class="link small" data-act="stfStations" data-date="${d.date}" data-day="${i}" data-n="" title="Back to the count from the number of students">reset</button>`}</div>
     <p class="muted small stf-math">${d.exam ? 'An instructor, an assistant and a patient at each testing station.' : `${plan.per} or fewer students each${plan.six ? `<br>Or ${plan.six} station${plan.six === 1 ? '' : 's'} meets 6:1 ratio.` : ''}`}</p>
+    <div class="stf-extra">${['Assistant', 'Patient'].map(kind => { const v = plan.need[kind] || 0;
+      return `<span><span class="muted small">${kind}s</span><button class="pm" data-act="stfExtra" data-kind="${kind}" data-date="${d.date}" data-day="${i}" data-n="${v - 1}" ${v <= 0 ? 'disabled' : ''} aria-label="Fewer ${kind.toLowerCase()}s">${PM_MINUS}</button><b>${v}</b><button class="pm" data-act="stfExtra" data-kind="${kind}" data-date="${d.date}" data-day="${i}" data-n="${v + 1}" aria-label="More ${kind.toLowerCase()}s">${PM_PLUS}</button></span>`; }).join('')}</div>
     <div class="stf-owners">${OWNERS.map(o => { const on = onDay(o), first = o.split(' ')[0];
       return `<button class="chip ${on ? 'on' : ''}" data-act="stfOwner" data-name="${o}" data-day="${i}" title="${on ? 'Take ' + first + ' off this day' : 'Put ' + first + ' in an open Instructor slot'}">${on ? first + ' ✓' : '+ ' + first}</button>`; }).join('')}</div>
     ${secs}
@@ -995,6 +1000,17 @@ async function staffingAct(a, el = {}) {
       S.view = 'staff'; pref('view', 'staff'); S.staffTab = 'stf'; pref('staffTab', 'stf'); S.stfKey = d.cohort || S.cohortKey; pref('stfKey', S.stfKey);
       S.open = null; S.menuOpen = false; S.stfErr = null; render(); window.scrollTo(0, 0); return true;
     case 'stfRefresh': S.stfErr = null; loadStaffing(key, true); return true;
+    case 'stfExtra': { // Assistants / Patients on a day (− n +): like stations, anyone in a slot no longer needed comes off (asked first)
+      const old = co.plan.extra || {}, ex = JSON.parse(JSON.stringify(old)), i = Number(d.day), day = co.days.filter(x => x.date)[i], before = dayPlan(co, day);
+      ex[d.date] = { ...(ex[d.date] || {}), [d.kind]: Math.max(0, Number(d.n)) };
+      co.plan.extra = ex; const now = dayPlan(co, day), was = before.need[d.kind] || 0, is = now.need[d.kind] || 0;
+      const gone = is < was ? daySlots(co, i, d.kind, was).filter(x => !x.extra).slice(is).filter(x => filled(x.value)) : [];
+      if (gone.length && !confirm(gone.map(x => `${x.value} is in ${x.label}`).join('\n') + `\n\nTake ${gone.length === 1 ? 'them' : 'them all'} off ${shortMd(d.date)}?`)) { co.plan.extra = old; render(); return true; }
+      gone.forEach(x => draftLocal(co, x.label, i, '—', !!x.added));
+      keepCopy('stf-' + key, co); render();
+      stfQuick(gone.map(x => ({ action: 'adminDraftSlot', params: { label: x.label, day: i, name: '—', virtual: !!x.added } })).concat([{ action: 'adminSavePlan', params: { extra: ex } }]));
+      return true;
+    }
     case 'stfStations': {
       const old = co.plan.stations || {}, st = { ...old }, i = Number(d.day), day = co.days.filter(x => x.date)[i], before = dayPlan(co, day);
       if (d.n === '') delete st[d.date]; else st[d.date] = Math.max(1, Number(d.n));

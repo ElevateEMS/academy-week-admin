@@ -11,6 +11,8 @@ const FAQ = [
       'It’s an estimate: days without times count as about 8 hours at that day’s pay rate, plus any extra pay and flat-rate jobs. It becomes the exact amount once every day has times.'],
     ['What do the statuses on Academy Week Pay mean?',
       '<b>Scheduled</b> before the week, <b>Working today</b> / <b>Worked</b> during it, <b>Last day today · payment due</b> on their last day, <b>Payment due · since …</b> after it until they’re paid (both in red), and <b>Paid ✓</b>. Volunteers aren’t listed (they’re never paid). The card always shows the next Academy Week.'],
+    ['How do I add patients or assistants to a day other than the exam?',
+      'Staff → <b>Scheduling</b> → that day’s card → <b>Patients − 0 +</b> (or Assistants). Each one you add is an OPEN slot to fill, and sending to the Staffing tab keeps it. The exam day starts at one per station; other days start at 0.'],
     ['How do flat-rate jobs (admin help, photographer) get paid?',
       'Put them in an <b>Other</b> slot on Scheduling, with what it’s for and the amount. It counts in their “+” estimate and on Academy Week Pay right away, and goes on the Payroll tab on the day itself.'],
     ['Where do I mark a paper W-9?',
