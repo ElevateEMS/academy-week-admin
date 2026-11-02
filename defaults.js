@@ -165,7 +165,6 @@ DEFAULTS.schedule = {
 DEFAULTS.email = {
   nick: 'nbrown@elevateemsacademy.com',
   orientationTime: '11:00 AM', // every cohort's orientation (late enrollees get their own)
-  lowCodes: 5,                 // the Emails box warns when fewer unused book codes than this are left
 };
 const JBL_STEPS = `- [Redeeming an access code with a NEW account](https://www.jblearning.com/faq-standalone/lists/student/redeem-an-access-code-as-a-new-user)
 - [Redeeming an access code with an EXISTING account](https://www.jblearning.com/blog/pdfs/2022/06/01/video-redeem-an-access-code-as-an-existing-user)

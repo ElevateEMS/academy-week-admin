@@ -201,7 +201,12 @@ function emailsBox() {
   if (rows.undated.has('academy')) notes.push('Add the Academy Week start date in Course Details to schedule the Academy Week emails.');
   const needCodes = rows.filter(r => r.tpl.id === 'bookcode').reduce((n, r) => n + r.sids.filter(sid => !(emPersonBySid(sid) || {}).bookCode).length, 0);
   const free = freeCodes().length;
-  if (free < needCodes || free < DEFAULTS.email.lowCodes) notes.push(`Only ${free} unused book code${free === 1 ? '' : 's'} left${needCodes ? ` (${needCodes} needed)` : ''}. <button class="link" data-act="bookCodesOpen">Add codes</button>`);
+  // Book codes: the same rule and words as the Morning Email: once everyone waiting has one, 1 (or none) left.
+  if (free - needCodes <= 1) {
+    const n = (k, w) => k + ' ' + w + (k === 1 ? '' : 's'), left = free - needCodes;
+    notes.push((needCodes ? `Book codes: ${n(free, 'unused code')}, ${n(needCodes, 'student')} waiting for one. ${left < 0 ? `You’re ${-left} short.` : left === 0 ? 'That uses them all.' : 'You’ll have 1 left.'}`
+      : free === 0 ? 'No unused book codes left.' : 'Only 1 unused book code left.') + ' <button class="link" data-act="bookCodesOpen">Add codes</button>');
+  }
   const log = [...(S.emailLog || [])].sort((a, b) => (b.at || 0) - (a.at || 0));
   return `${notes.map(n => `<p class="em-note">${n}</p>`).join('')}
     ${due.length ? `<p class="mini-head">Due now <span class="count">${due.length}</span></p>
