@@ -143,7 +143,7 @@ function staffListBox(a) {
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table${cols}">
       <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span>${showPortal ? '<span class="c" title="Staff Portal account set up">Portal</span>' : ''}${showW9 ? '<span class="c">W-9</span>' : ''}<span class="c yr-head" title="Paid and not paid yet, from the Payroll tab. The faded part is what’s still on the schedule: about 8 hrs a day, plus flat amounts. Limit ${money(a.limit)}.">${a.year} total</span><span class="c" title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
-      ${staffGroups(active).map(([g, list]) => `<div class="st-group">${esc(g)} <span class="count">${list.length}</span></div>${list.map(staffRow).join('')}`).join('')}
+      ${staffGroups(active).map(([g, list]) => `<div class="st-group">${esc(g)}</div>${list.map(staffRow).join('')}`).join('')}
       ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive <span class="count">${away.length}</span></button>
         ${S.staffShowAway ? staffGroups(away).flatMap(([, list]) => list).map(staffRow).join('') : ''}` : ''}
     </div></section>`;
@@ -313,7 +313,7 @@ function payModal() {
 function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : '') + (S.staffQrOpen ? staffQrModal() : '') + staffingModals(); }
 // The Staff Portal's link and QR code (the header's QR icon): to show a new staff member where to sign up.
 function staffQrModal() {
-  return `<div class="overlay" data-act="staffQrClose"><div class="modal small-modal staff-qr-modal" data-stop>
+  return `<div class="overlay qr-overlay" data-act="staffQrClose"><div class="modal small-modal staff-qr-modal" data-stop>
     <div class="modal-head"><h2>Staff Portal<small>schedule and timesheets</small></h2><button class="x big" data-act="staffQrClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top">
       <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
