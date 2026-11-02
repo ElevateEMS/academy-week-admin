@@ -1711,7 +1711,7 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 
 .modal.pay-modal { width: min(820px, 100%); }
 .pay-table { display: grid; margin-top: 6px; }
-.pay-row { display: grid; grid-template-columns: 124px 180px minmax(140px, 1fr) 54px 92px 76px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
+.pay-row { display: grid; grid-template-columns: 124px 180px minmax(140px, 1fr) 54px 92px 76px; gap: 8px; align-items: center; padding: 8px 10px; /* (room inside the highlight; every row, so the columns line up) */ border-bottom: 1px dotted rgba(125, 101, 88, .25); font-size: 14px; }
 .pay-row.flat .pr-desc { grid-column: span 3; }
 .pay-row.flat > span:nth-child(3) { display: none; }
 .pay-row.paid { color: var(--muted); }
