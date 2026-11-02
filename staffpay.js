@@ -8,9 +8,11 @@
      S.staffEd          the add/edit person window */
 
 const STAFF_PORTAL_URL = 'https://staff.elevateemsacademy.com';
-// The To Pay card's links (open in the app's panel). The folder uses Drive's embeddable view: a plain folder link won't show in a panel.
-const PAYROLL_SHEET = 'https://docs.google.com/spreadsheets/d/1OHXZrBqAfqAfkyB3tsH9g5VRt0qeuHeDnzRXX1pyriI/edit';
+// The Staff page's header icons (like the Admin page's; they open in the app's panel): the Staff Directory tab of
+// $ Finances, and Payroll Documents (Drive's embeddable folder view: a plain folder link won't show in a panel).
+const STAFF_DIR_SHEET = 'https://docs.google.com/spreadsheets/d/1RndW9t7N04G9RWRbkXRst-FXoY9NFePo5xiXJqBEf3Y/edit?gid=1674059817#gid=1674059817';
 const PAYROLL_DOCS = '1bT0NbX2dRtObD7-64ytWag_XaTKGPC2a';
+const PEOPLE_ICON = '<svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.4-3.2 2.6-5.2 5.5-5.2s5.1 2 5.5 5.2"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.2 14.1c.4-.1.9-.2 1.3-.2 2.4 0 4.2 1.7 4.5 4.5"/></svg>';
 const PAY_ROLES = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient']; // the pay scale's names (rates: Payroll tab)
 const staffReady = () => typeof STAFF_SCRIPT_URL === 'string' && !/PASTE/.test(STAFF_SCRIPT_URL) && Store.configured;
 
@@ -75,7 +77,7 @@ function staffView() {
   return `<div class="board staff-board">
     <div class="board-col staff-main">${staffListBox(a)}</div>
     <div class="board-col">
-      <section class="box">${adminHead('To Pay', '<button class="btn tiny" data-act="payLink" data-k="sheet">Payroll</button><button class="btn tiny" data-act="payLink" data-k="docs">Payroll Documents</button>')}
+      <section class="box"><div class="box-head admin-head"><h2>To Pay</h2></div>
         ${owed.length ? `<ul class="pay-owed">${owed.map(o => `<li><span><b>${esc(o.name)}</b><span class="muted small">${o.cohort ? esc(o.cohort) + ' Academy Week' : 'Other (on the Payroll tab)'}</span></span>
           <b>${money(o.amount)}</b>${o.cohort ? `<button class="btn tiny" data-act="payOpen" data-name="${esc(o.name)}" data-cohort="${esc(o.cohort)}">Pay</button>` : '<span></span>'}</li>`).join('')}</ul>`
           : '<p class="empty">Nobody’s waiting on a check.</p>'}
@@ -111,7 +113,10 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 // Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
-  return `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
+  return `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
+    + `<button class="icon-btn ql-icon" data-act="payLink" data-k="docs" title="Payroll Documents" aria-label="Payroll Documents">${LINK_ICONS.folder}</button>`
+    + '<span class="head-div ql-div" aria-hidden="true"></span>'
+    + `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
     .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
 }
 function staffListBox(a) {
@@ -324,7 +329,7 @@ async function staffAct(a, el = {}) {
     case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
     case 'payLink': S.adminPanel = d.k === 'docs'
       ? { name: 'Payroll Documents', url: 'https://drive.google.com/embeddedfolderview?id=' + PAYROLL_DOCS + '#list', chrome: 'https://drive.google.com/drive/folders/' + PAYROLL_DOCS }
-      : { name: 'Payroll', url: PAYROLL_SHEET }; render(); return true;
+      : { name: 'Staff Directory', url: STAFF_DIR_SHEET }; render(); return true;
     case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
     case 'fbOpen': S.fbOpen = d.who; render(); return true;
     case 'fbClose': S.fbOpen = null; render(); return true;
