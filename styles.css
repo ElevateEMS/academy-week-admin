@@ -31,6 +31,13 @@ h3 { font-size: 18px; margin: 18px 0 8px; }
 input::placeholder, textarea::placeholder { color: var(--muted); font-style: italic; opacity: 1; }
 /* Plain checkboxes and radio buttons: the app's warm brown, not the system blue. */
 input[type=checkbox], input[type=radio] { accent-color: var(--taupe-dark); }
+/* No system blue anywhere: plain links in the app's ink (classes that set their own color still win), focus rings in
+   taupe, and selected text with a soft warm highlight. */
+:where(a) { color: var(--ink); text-underline-offset: 2px; }
+:where(a:visited) { color: var(--ink); }
+:focus-visible { outline-color: var(--taupe); }
+input:focus, select:focus, textarea:focus, button:focus { outline-color: var(--taupe); }
+::selection { background: rgba(193, 154, 98, .32); color: inherit; }
 .small { font-size: 13px; }
 .center { text-align: center; }
 .loading { padding: 60px; text-align: center; color: var(--muted); font-family: var(--serif); font-size: 20px; font-style: italic; }
