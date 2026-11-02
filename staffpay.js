@@ -435,7 +435,11 @@ async function staffAct(a, el = {}) {
       const what = days.map(x => `${shortDay(x.date)} ${milT(x.start)}–${milT(x.end)}`).join(' · ');
       const png = await sigPadOpen(`${p.name} signs ${dates.length > 1 ? dates.length + ' days' : shortDay(dates[0])}`, `${p.name.split(' ')[0]} signs with the trackpad or mouse. ${what}`);
       if (!png) return true;
-      await payDo(async () => { const out = await StaffApi.call('adminSign', { cohort: P.cohort, name: p.name, dates, png }); toast('Signed.'); return out; });
+      await payDo(async () => {
+        const out = await StaffApi.call('adminSign', { cohort: P.cohort, name: p.name, dates, png }); toast('Signed.');
+        StaffApi.call('adminRefreshTimesheet', { cohort: P.cohort, name: p.name }).catch(() => {}); // (the timesheet PDF catches up in the background)
+        return out;
+      });
       return true;
     }
     case 'payCheckOpen': {
