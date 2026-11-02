@@ -138,7 +138,7 @@ function staffListBox(a) {
   const active = a.people.filter(p => !p.inactive);
   const showPortal = active.some(p => !p.account), showW9 = active.some(p => p.role !== 'Volunteer' && !(p.w9 && p.w9.on));
   const cols = (showPortal ? '' : ' no-portal') + (showW9 ? '' : ' no-w9');
-  return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff</h2><span class="head-actions">
+  return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff Directory</h2><span class="head-actions">
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table${cols}">
