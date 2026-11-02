@@ -1685,11 +1685,6 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .pay-owed li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dotted rgba(125, 101, 88, .25); }
 .pay-owed li:last-child { border-bottom: 0; }
 .pay-owed li > span:first-child { display: grid; }
-/* Scheduling: Assistants / Patients counts on each day (− n +), under the stations. */
-.stf-extra { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin: 2px 0 8px; }
-.stf-extra > span { display: inline-flex; align-items: center; gap: 6px; }
-.stf-extra b { min-width: 12px; text-align: center; }
-.stf-extra .pm { transform: scale(.85); }
 /* Staff list: a heading per role group (EC & Equivalent, Non-Certified Instructors, Assistants, Patients). */
 .st-group { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--taupe-dark); padding: 14px 0 4px; border-bottom: 1px solid var(--line); }
 .st-group .count { color: var(--muted); letter-spacing: 0; margin-left: 4px; }
