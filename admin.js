@@ -22,7 +22,7 @@ function adminWatch() {
   ];
 }
 const adminInfo = () => ({ ...DEFAULTS.adminInfo, ...((S.admin && S.admin.info) || {}) });
-const adminLinks = () => (S.admin && S.admin.links) || DEFAULTS.adminLinks;
+const adminLinks = () => ((S.admin && S.admin.links) || DEFAULTS.adminLinks).filter(l => l.id !== 'payroll'); // (Payroll moved to the Staff page's To Pay card)
 const fullUrl = u => { u = String(u || '').trim(); return !u || /^https?:\/\//i.test(u) ? u : 'https://' + u; };
 
 // Left: Business Info over Changes for Future Classes; middle: Inquiries; right: the Bulletin (To Do card + sticky notes).
@@ -279,7 +279,7 @@ function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
     <div class="modal-head"><h2>${esc(p.name)}</h2><span class="panel-actions">
-      <a class="btn small" href="${esc(p.url)}" target="_blank" rel="noopener" data-chrome data-act="adminPanelClose">Open in Chrome ↗</a>
+      <a class="btn small" href="${esc(p.chrome || p.url)}" target="_blank" rel="noopener" data-chrome data-act="adminPanelClose">Open in Chrome ↗</a>
       <button class="x big" data-act="adminPanelClose" aria-label="Close">×</button></span></div>
     <iframe src="${esc(p.url)}" title="${esc(p.name)}" allow="clipboard-read; clipboard-write"></iframe>
   </div></div>`;

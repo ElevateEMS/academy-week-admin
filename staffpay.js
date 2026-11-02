@@ -8,6 +8,9 @@
      S.staffEd          the add/edit person window */
 
 const STAFF_PORTAL_URL = 'https://staff.elevateemsacademy.com';
+// The To Pay card's links (open in the app's panel). The folder uses Drive's embeddable view: a plain folder link won't show in a panel.
+const PAYROLL_SHEET = 'https://docs.google.com/spreadsheets/d/1OHXZrBqAfqAfkyB3tsH9g5VRt0qeuHeDnzRXX1pyriI/edit';
+const PAYROLL_DOCS = '1bT0NbX2dRtObD7-64ytWag_XaTKGPC2a';
 const PAY_ROLES = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient']; // the pay scale's names (rates: Payroll tab)
 const staffReady = () => typeof STAFF_SCRIPT_URL === 'string' && !/PASTE/.test(STAFF_SCRIPT_URL) && Store.configured;
 
@@ -72,7 +75,7 @@ function staffView() {
   return `<div class="board staff-board">
     <div class="board-col staff-main">${staffListBox(a)}</div>
     <div class="board-col">
-      <section class="box"><div class="box-head admin-head"><h2>To Pay</h2></div>
+      <section class="box">${adminHead('To Pay', '<button class="btn tiny" data-act="payLink" data-k="sheet">Payroll</button><button class="btn tiny" data-act="payLink" data-k="docs">Payroll Documents</button>')}
         ${owed.length ? `<ul class="pay-owed">${owed.map(o => `<li><span><b>${esc(o.name)}</b><span class="muted small">${o.cohort ? esc(o.cohort) + ' Academy Week' : 'Other (on the Payroll tab)'}</span></span>
           <b>${money(o.amount)}</b>${o.cohort ? `<button class="btn tiny" data-act="payOpen" data-name="${esc(o.name)}" data-cohort="${esc(o.cohort)}">Pay</button>` : '<span></span>'}</li>`).join('')}</ul>`
           : '<p class="empty">Nobody’s waiting on a check.</p>'}
@@ -319,6 +322,9 @@ async function staffAct(a, el = {}) {
   const d = el.dataset || {};
   switch (a) {
     case 'staffRefresh': S.staffAllErr = null; loadStaffAll(true); return true;
+    case 'payLink': S.adminPanel = d.k === 'docs'
+      ? { name: 'Payroll Documents', url: 'https://drive.google.com/embeddedfolderview?id=' + PAYROLL_DOCS + '#list', chrome: 'https://drive.google.com/drive/folders/' + PAYROLL_DOCS }
+      : { name: 'Payroll', url: PAYROLL_SHEET }; render(); return true;
     case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
     case 'fbOpen': S.fbOpen = d.who; render(); return true;
     case 'fbClose': S.fbOpen = null; render(); return true;

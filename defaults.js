@@ -408,7 +408,6 @@ Bella & Nick` },
 DEFAULTS.adminLinks = [
   { id: 'certkeeper', name: 'CertKeeper', url: 'https://glaynebrown.github.io/certkeeper/' },
   { id: 'finances', name: 'Finances', url: 'https://docs.google.com/spreadsheets/d/1RndW9t7N04G9RWRbkXRst-FXoY9NFePo5xiXJqBEf3Y/edit' },
-  { id: 'payroll', name: 'Payroll', url: 'https://docs.google.com/spreadsheets/d/1OHXZrBqAfqAfkyB3tsH9g5VRt0qeuHeDnzRXX1pyriI/edit' },
 ];
 DEFAULTS.adminInfo = { portal: 'https://student.elevateemsacademy.com/', website: 'https://www.elevateemsacademy.com/' };
 
