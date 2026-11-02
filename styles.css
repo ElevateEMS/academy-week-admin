@@ -159,6 +159,7 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .box-head h2 { text-align: center; }
 .box-head.static { cursor: default; justify-content: space-between; }
 .head-actions { position: absolute; right: 0; display: flex; gap: 10px; align-items: center; }
+.box-head .box-head-left { position: absolute; left: 0; display: flex; gap: 10px; align-items: center; } /* (Staff Directory: the shirt icon) */
 /* Show/hide checked: a small, quiet eye. */
 .eye { background: none; border: 0; padding: 2px; cursor: pointer; color: var(--taupe-dark); opacity: .45; display: inline-grid; place-items: center; vertical-align: middle; }
 .eye:hover { opacity: .9; }

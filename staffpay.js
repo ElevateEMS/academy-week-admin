@@ -104,8 +104,7 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 // Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
-  return `<button class="icon-btn ql-icon" data-act="shirtsOpen" title="Staff Shirts" aria-label="Staff Shirts">${SHIRT_ICON}</button>`
-    + `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
+  return `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="docs" title="Payroll Documents" aria-label="Payroll Documents">${LINK_ICONS.folder}</button>`
     + '<span class="head-div ql-div" aria-hidden="true"></span>'
@@ -139,7 +138,7 @@ function staffListBox(a) {
   const active = a.people.filter(p => !p.inactive);
   const showPortal = active.some(p => !p.account), showW9 = active.some(p => p.role !== 'Volunteer' && !(p.w9 && p.w9.on));
   const cols = (showPortal ? '' : ' no-portal') + (showW9 ? '' : ' no-w9');
-  return `<section class="box staff-list-box"><div class="box-head admin-head"><h2>Staff Directory</h2><span class="head-actions">
+  return `<section class="box staff-list-box"><div class="box-head admin-head"><span class="box-head-left"><button class="eye" data-act="shirtsOpen" title="Staff Shirts" aria-label="Staff Shirts">${SHIRT_ICON}</button></span><h2>Staff Directory</h2><span class="head-actions">
       <button class="eye inq-reload ${staffLoading.all ? 'spin' : ''}" data-act="staffRefresh" title="${staffLoading.all ? 'Checking for changes…' : 'Read the sheets again'}" aria-label="Refresh">${RESET}</button>
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table${cols}">
@@ -351,7 +350,7 @@ function shirtsModal() {
   };
   const zips = p => staffSize(p.name).zipOn;
   return `<div class="overlay" data-act="shirtsClose"><div class="modal shirts-modal" data-stop>
-    <div class="modal-head"><h2>Staff Shirts<small>logo on the front · one each</small></h2><span class="panel-actions">
+    <div class="modal-head"><h2>Staff Shirts</h2><span class="panel-actions">
       <a class="icon-btn" href="${NINJA_URL}" target="_blank" rel="noopener" data-chrome title="Ninja Transfers (your orders)" aria-label="Ninja Transfers">${PRINT_ICON}</a>
       <button class="x big" data-act="shirtsClose" aria-label="Close">×</button></span></div>
     <div class="modal-body pad-top">
