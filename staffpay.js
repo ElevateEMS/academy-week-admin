@@ -223,13 +223,12 @@ function staffEdModal() {
       <label class="field">Maximum eligible role<select id="se-role" data-draft="se-role">
         <option value="">Pick one</option>${[...PAY_ROLES, 'Volunteer', ...(S.drafts['se-role'] && ![...PAY_ROLES, 'Volunteer'].includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
           .map(r => `<option ${r === S.drafts['se-role'] ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
+      ${f('also', 'Additional Role', 'text', 'Ex. Admin assist')}
       ${f('phone', 'Phone', 'tel')}
       ${f('email', 'Email', 'email')}
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
-      ${f('also', 'Also', 'text', 'An extra role, like Admin assist')}
-      <p class="muted small se-hint">Shows after their role on the Staff list (just a label; flat-rate pay is set on Scheduling).</p>
       ${f('evalName', 'Name on the Instructor &amp; Course Feedback forms', 'text', 'First name, nickname, rank, etc.')}
       <p class="muted small se-hint">Leave it blank to use their first name.</p>
       ${e.orig ? '<hr class="se-sep">' : ''}
