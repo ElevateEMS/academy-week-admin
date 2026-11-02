@@ -223,7 +223,6 @@ function staffEdModal() {
       <label class="field">Maximum eligible role<select id="se-role" data-draft="se-role">
         <option value="">Pick one</option>${[...PAY_ROLES, 'Volunteer', ...(S.drafts['se-role'] && ![...PAY_ROLES, 'Volunteer'].includes(S.drafts['se-role']) ? [S.drafts['se-role']] : [])]
           .map(r => `<option ${r === S.drafts['se-role'] ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
-      <p class="muted small se-hint">What they're paid on an Instructor day. Change it when someone gets certified; their unpaid Instructor days move to the new rate. <b>Volunteer</b>: fills a slot and counts toward the stations, but is never paid (no timesheets or W-9).</p>
       ${f('phone', 'Phone', 'tel')}
       ${f('email', 'Email', 'email')}
       <div class="se-em"><span class="muted small">Emergency contact</span>
@@ -231,14 +230,14 @@ function staffEdModal() {
       ${f('notes', 'Notes')}
       ${f('also', 'Also', 'text', 'An extra role, like Admin assist')}
       <p class="muted small se-hint">Shows after their role on the Staff list (just a label; flat-rate pay is set on Scheduling).</p>
-      ${f('evalName', 'Name on forms', 'text', 'First name, nickname, rank, etc.')}
-      <p class="muted small se-hint">What students see on the Instructor &amp; Course Feedback form. Leave it blank to use their first name.</p>
+      ${f('evalName', 'Name on the Instructor &amp; Course Feedback forms', 'text', 'First name, nickname, rank, etc.')}
+      <p class="muted small se-hint">Leave it blank to use their first name.</p>
+      ${e.orig ? '<hr class="se-sep">' : ''}
       ${e.orig && S.drafts['se-role'] !== 'Volunteer' ? (e.w9On && !e.w9PaperWas
         ? `<p class="muted small">W-9 on file since ${esc(e.w9Date)} (sent from the Staff Portal).</p>`
-        : `<label class="check-line se-away"><input type="checkbox" data-act="staffEdW9Paper" ${e.w9Paper ? 'checked' : ''}> <span><b>W-9 received on paper</b>${e.w9PaperWas ? ' since ' + esc(e.w9Date) : ''} · their W-9 shows ✓ and the Staff Portal stops asking for one.</span></label>`) : ''}
+        : `<label class="check-line se-away"><input type="checkbox" data-act="staffEdW9Paper" ${e.w9Paper ? 'checked' : ''}> <span><b>W-9 received on paper</b>${e.w9PaperWas ? ' since ' + esc(e.w9Date) : ''} · W-9 shows ✓ and Staff Portal clears reminder</span></label>`) : ''}
       <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
-      ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
-        ${e.account ? ` <button class="link" data-act="staffResetPw">Reset their password</button>` : ''}</p>` : ''}
+      ${e.orig && e.account ? `<p class="small"><button class="link" data-act="staffResetPw">Reset their Staff Portal password</button></p>` : ''}
       ${e.err ? `<div class="alert">${esc(e.err)}</div>` : ''}
     </div>
     <div class="modal-foot"><button class="btn primary" data-act="staffEdSave" ${e.busy ? 'disabled' : ''}>${e.busy ? 'Saving…' : 'Save'}</button></div>
