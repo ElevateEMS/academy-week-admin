@@ -148,7 +148,7 @@ function staffListBox(a) {
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         ${showPortal ? `<span class="c">${p.account ? '<span class="st-check" title="Staff Portal account set up">✓</span>' : '<span class="muted" title="No Staff Portal account yet">–</span>'}</span>` : ''}
-        ${showW9 ? `<span class="c">${p.w9 && p.w9.on ? `<span class="st-check" title="W-9 on file since ${esc(p.w9.date)} (Payroll Docs → ${esc(p.name)})">✓</span>`
+        ${showW9 ? `<span class="c">${p.w9 && p.w9.on ? `<span class="st-check" title="${p.w9.paper ? 'Paper W-9 received ' + esc(p.w9.date) : 'W-9 on file since ' + esc(p.w9.date) + ' (Payroll Docs → ' + esc(p.name) + ')'}">✓</span>`
           : p.role === 'Volunteer' ? '<span class="muted" title="Volunteers don’t need a W-9">–</span>' : '<span class="muted" title="No W-9 yet">–</span>'}</span>` : ''}
         ${bar(p)}
         ${fbCell(p.name)}
@@ -180,6 +180,9 @@ function staffEdModal() {
       ${f('notes', 'Notes')}
       ${f('evalName', 'Name on forms', 'text', 'First name, nickname, rank, etc.')}
       <p class="muted small se-hint">What students see on the Instructor &amp; Course Feedback form. Leave it blank to use their first name.</p>
+      ${e.orig && S.drafts['se-role'] !== 'Volunteer' ? (e.w9On && !e.w9PaperWas
+        ? `<p class="muted small">W-9 on file since ${esc(e.w9Date)} (sent from the Staff Portal).</p>`
+        : `<label class="check-line se-away"><input type="checkbox" data-act="staffEdW9Paper" ${e.w9Paper ? 'checked' : ''}> <span><b>W-9 received on paper</b>${e.w9PaperWas ? ' since ' + esc(e.w9Date) : ''} · their W-9 shows ✓ and the Staff Portal stops asking for one.</span></label>`) : ''}
       <label class="check-line se-away"><input type="checkbox" data-act="staffEdInactive" ${e.inactive ? 'checked' : ''}> <span><b>Inactive</b> · away for now (school, out of town). Not listed for scheduling; their pay and info stay. Saved in the Staff Directory’s Status column.</span></label>
       ${e.orig ? `<p class="muted small">${e.account ? 'They’ve set up their Staff Portal account.' : 'They haven’t set up their Staff Portal account yet.'}
         ${e.account ? ` <button class="link" data-act="staffResetPw">Reset their password</button>` : ''}</p>` : ''}
@@ -420,11 +423,14 @@ async function staffAct(a, el = {}) {
         emName: (base.emergency || {}).name, emPhone: (base.emergency || {}).phone, emRel: (base.emergency || {}).relation })
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
       S.drafts['se-evalName'] = (S.evalNames || {})[fbKey(base.name)] || '';
-      S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '' };
+      const w9 = (p && p.w9) || {};
+      S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '',
+        w9On: !!w9.on, w9Date: w9.date || '', w9Paper: !!(w9.on && w9.paper), w9PaperWas: !!(w9.on && w9.paper) };
       render(); setTimeout(() => { const x = document.getElementById('se-' + (p ? 'phone' : 'name')); if (x) x.focus(); }, 0);
       return true;
     }
     case 'staffEdInactive': S.staffEd.inactive = !S.staffEd.inactive; render(); return true;
+    case 'staffEdW9Paper': S.staffEd.w9Paper = !S.staffEd.w9Paper; render(); return true;
     case 'staffAway': S.staffShowAway = !S.staffShowAway; render(); return true;
     case 'staffEdClose': if (S.staffEd && !S.staffEd.busy) { S.staffEd = null; render(); } return true;
     case 'staffEdSave': {
@@ -434,7 +440,8 @@ async function staffAct(a, el = {}) {
       e.busy = true; e.err = ''; render();
       try {
         S.staffAll = await StaffApi.call('adminSavePerson', { orig: e.orig, name: g('name'), role: g('role'), phone: g('phone'), email: g('email'), notes: g('notes'),
-          emergency: { name: g('emName'), phone: g('emPhone'), relation: g('emRel') }, inactive: !!e.inactive });
+          emergency: { name: g('emName'), phone: g('emPhone'), relation: g('emRel') }, inactive: !!e.inactive,
+          ...(e.w9Paper !== e.w9PaperWas ? { w9Paper: e.w9Paper } : {}) });
         // Name on forms (the Student Feedback form): kept in the app's database by their name, blank = first name.
         const en = g('evalName'), was = (S.evalNames || {})[fbKey(e.orig || g('name'))] || '';
         if (en !== was || (e.orig && e.orig !== g('name'))) {
