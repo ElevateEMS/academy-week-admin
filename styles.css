@@ -1935,7 +1935,7 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 /* The Bulletin fills its column, so the feedback card sits at the very bottom of it (below however many stickies). */
 .admin-board .admin-notes { flex: 1 1 auto; display: flex; flex-direction: column; }
 .admin-board .admin-notes > .fb-card { margin-top: auto; }
-.admin-notes > .fb-card { background: #f6ebc8; border-color: rgba(125, 101, 88, .18); } /* (sticky yellow) */
+.admin-notes > .fb-card { background: #f6ebc8; border: 2px solid #fff; } /* (sticky yellow, outlined in white like the To Do card) */
 .admin-notes > .fb-card:hover { border-color: var(--taupe); }
 .admin-board .admin-notes > .stickies { margin-bottom: 14px; }
 .fb-card-title { font-family: var(--serif); font-size: 18px; color: var(--ink); }
