@@ -62,7 +62,7 @@ const FAQ = [
   ]],
   ['Course & Academy Week', [
     ['What puts the bag check on a day’s To Do?',
-      '<b>Settings → Templates → Every day</b>: everything on that list goes on Day 1–5’s To Do (not Prep or Finalize), and “Bag check” is one of them. Any to-do with “bag check”, “check bag” or “check bags” in it opens the bag pop-up, and checks itself off once every bag in use that day is checked. To have it only on some days, move it from Every day to those days’ lists.'],
+      '<b>Settings → Templates → Every day</b>: everything on that list goes on Day 1–5’s To Do (not Prep or Finalize), and “Bag check” is one of them. Any to-do with “bag check”, “check bags”, “verify bags” or “put together bags” in it opens the bag pop-up, and checks itself off once every bag in use that day is checked. To have it only on some days, move it from Every day to those days’ lists.'],
     ['Where’s the Reset test cohort button?',
       'Open the Test cohort → Course page → <b>Course Details</b> box → the status pill (Upcoming / Active / Former) → <b>Reset test cohort</b>, at the bottom of that menu. It only shows on Test cohorts, and you type the cohort’s name to confirm.'],
     ['What does Reset do on a Test cohort?',

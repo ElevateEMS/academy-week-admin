@@ -153,7 +153,7 @@ function bagCarries(item, bagNo) {
   return !list || list.includes(bagNo);
 }
 const bagsInUse = () => (S.cohortDoc && S.cohortDoc.bagsInUse) || Array.from({ length: cfg().bagCount }, (_, i) => i + 1);
-const isBagItem = text => /bags? check|check bags?/i.test(text); // ("Bag check", "Check bag", "Check bags")
+const isBagItem = text => /bags? check|check bags?|verify bags?|put together\W+(verify\W+)?bags?/i.test(text); // ("Bag check", "Check bag(s)", "Verify bags", "Put together bags", "Put together/verify bags")
 // The binder packet's sheets with this program's copy counts (Setup → Templates → Prep; 0 = left out). The cover is always 1.
 const packetKey = x => x.cover ? 'cover' : x.pdf;
 const binderPacket = (copies = {}) => DEFAULTS.binderPacket.map(x => ({ ...x, copies: x.cover ? 1 : copies[packetKey(x)] ?? x.copies }));
@@ -2338,7 +2338,7 @@ function templatesModal() {
        <p class="muted small">The Course To-Do shows on the Course page once the Setup Checklist is done. One per line; a <b>[due …]</b> ending works here too. Anything with “ship” and “shirt” in it gets the Print packet and Shipping file buttons.</p>
        <label class="field">Course To-Do<textarea id="tpl-ctodo" data-draft="tpl-ctodo" rows="5">${dv('tpl-ctodo', c.courseTodo.join('\n'))}</textarea></label>`
     : tab === 'every'
-    ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line; a <b>[due 3 days before academy week]</b>-style ending gives one a due date. Anything with “bag check”, “check bag” or “check bags” in it opens the bag pop-up.</p>
+    ? `<p class="muted small">These go on Day 1–5’s To Do (not Prep or Finalize). One per line; a <b>[due 3 days before academy week]</b>-style ending gives one a due date. Anything with “bag check”, “check bags”, “verify bags” or “put together bags” in it opens the bag pop-up.</p>
        <label class="field">Every day<textarea id="tpl-every" data-draft="tpl-every" rows="8">${dv('tpl-every', (c.checklist.everyDay || []).join('\n'))}</textarea></label>`
     : `${tab === '6' ? '' : `<label class="field">${dayName(Number(tab))} to-dos <span class="small">(one per line${tab === '0' ? '' : ', added after the every-day ones'})</span>
          <textarea id="tpl-todo-${tab}" data-draft="tpl-todo-${tab}" rows="7">${dv('tpl-todo-' + tab, ((c.checklist.days || {})[tab] || []).join('\n'))}</textarea></label>`}
