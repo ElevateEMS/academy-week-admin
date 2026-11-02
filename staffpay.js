@@ -82,11 +82,6 @@ function staffView() {
         <p class="muted small">On a Staffing tab, but not on the Staff Directory tab (so they can’t sign in or be paid here yet).</p>
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
           <button class="btn tiny" data-act="staffEdOpen" data-new="${esc(u.name)}">Add</button></li>`).join('')}</ul></section>` : ''}
-      <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staff Portal<small>schedule and timesheets</small></h2></div>
-        <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
-          <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
-        <div class="staff-qr" id="staffQr"></div>
-      </section>
       <section class="box staff-portal-box"><div class="box-head admin-head"><h2>Staffing by Cohort<small>paid and not paid yet</small></h2></div>
         ${(a.cohorts || []).length ? `<ul class="pay-owed st-cohorts">${a.cohorts.map(c => `<li><span><b>${weekOf(c.cohort) ? `<button class="link-btn" data-act="stfGo" data-cohort="${esc(c.cohort)}" title="Availability & Staffing for this week">${esc(c.cohort)}</button>` : esc(c.cohort)}</b><span class="muted small">Academy Week${c.waiting ? ` · ${c.waiting} not paid yet (${money(c.unpaid)})` : ' · all paid'}</span></span>
           <b>${money(c.total)}</b><span></span></li>`).join('')}</ul>`
@@ -109,7 +104,8 @@ document.addEventListener('click', e => { if (S.stfWeekMenu && !e.target.closest
 // Staff page: Staff & Pay | Scheduling (in the header, like Course | Academy Week).
 const staffTab = () => S.staffTab || pref('staffTab') || 'pay';
 function staffTabs() {
-  return `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
+  return `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
+    + `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="docs" title="Payroll Documents" aria-label="Payroll Documents">${LINK_ICONS.folder}</button>`
     + '<span class="head-div ql-div" aria-hidden="true"></span>'
     + `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
@@ -148,10 +144,10 @@ function staffListBox(a) {
     <div class="staff-table${cols}">
       <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span>${showPortal ? '<span class="c" title="Staff Portal account set up">Portal</span>' : ''}${showW9 ? '<span class="c">W-9</span>' : ''}<span class="c yr-head" title="Paid and not paid yet, from the Payroll tab. The faded part is what’s still on the schedule: about 8 hrs a day, plus flat amounts. Limit ${money(a.limit)}.">${a.year} total</span><span class="c" title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
       ${staffGroups(active).map(([g, list]) => `<div class="st-group">${esc(g)} <span class="count">${list.length}</span></div>${list.map(staffRow).join('')}`).join('')}
-      ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive (away for now) <span class="count">${away.length}</span></button>
+      ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive <span class="count">${away.length}</span></button>
         ${S.staffShowAway ? staffGroups(away).flatMap(([, list]) => list).map(staffRow).join('') : ''}` : ''}
     </div></section>`;
-  function staffRow(p) { return `<div class="st-row ${p.inactive ? 'away' : ''}">
+  function staffRow(p) { return `<div class="st-row st-click ${p.inactive ? 'away' : ''}" data-act="staffEdOpen" data-name="${esc(p.name)}">
         <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}${staffAlso(p.name) ? ' · ' + esc(staffAlso(p.name)) : ''}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
@@ -214,7 +210,7 @@ function showStaffQr() {
   const el = document.getElementById('staffQr');
   if (!el || el.dataset.done) return;
   el.dataset.done = '1';
-  loadQr().then(() => drawQr(el, STAFF_PORTAL_URL, 150)).catch(e => { el.textContent = e.message; });
+  loadQr().then(() => drawQr(el, STAFF_PORTAL_URL, 220)).catch(e => { el.textContent = e.message; });
 }
 
 /* ---------- Add / edit a person ---------- */
@@ -314,7 +310,17 @@ function payModal() {
   </div></div>`;
 }
 
-function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : '') + staffingModals(); }
+function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal() : '') : '') + (S.staffEd ? staffEdModal() : '') + (S.staffQrOpen ? staffQrModal() : '') + staffingModals(); }
+// The Staff Portal's link and QR code (the header's QR icon): to show a new staff member where to sign up.
+function staffQrModal() {
+  return `<div class="overlay" data-act="staffQrClose"><div class="modal small-modal staff-qr-modal" data-stop>
+    <div class="modal-head"><h2>Staff Portal<small>schedule and timesheets</small></h2><button class="x big" data-act="staffQrClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">
+      <p class="center staff-link"><a href="${STAFF_PORTAL_URL}" target="_blank" rel="noopener" data-chrome>${STAFF_PORTAL_URL.replace('https://', '')}</a>
+        <button class="eye" data-act="staffCopyLink" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg></button></p>
+      <div class="staff-qr" id="staffQr"></div>
+    </div></div></div>`;
+}
 
 /* ---------- Writing the check (Pay → this → Check given · Paid) ---------- */
 const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -372,6 +378,7 @@ function staffInput(t) {
 }
 function staffEscape() {
   if (staffingEscape()) return true;
+  if (S.staffQrOpen) { S.staffQrOpen = false; return true; }
   if (S.staffEd) { if (S.staffEd.busy) return true; S.staffEd = null; return true; }
   if (S.pay && S.pay.check) { if (S.pay.busy) return true; S.pay.check = false; return true; }
   if (S.pay) { if (S.pay.busy) return true; S.pay = null; return true; }
@@ -400,6 +407,8 @@ async function staffAct(a, el = {}) {
     case 'w9Info': toast('They fill out their W-9 on the Staff Portal (the person icon → W-9). This checks itself off when it’s in.'); return true;
     case 'fbOpen': S.fbOpen = d.who; render(); return true;
     case 'fbClose': S.fbOpen = null; render(); return true;
+    case 'staffQrOpen': S.staffQrOpen = true; render(); return true;
+    case 'staffQrClose': S.staffQrOpen = false; render(); return true;
     case 'staffCopyLink': try { await navigator.clipboard.writeText(STAFF_PORTAL_URL); toast('Link copied.'); } catch { toast(STAFF_PORTAL_URL); } return true;
     case 'payOpen': {
       if (!staffReady()) { toast('The Staff Apps Script isn’t connected yet.'); return true; }

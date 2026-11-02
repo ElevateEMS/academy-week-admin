@@ -2805,6 +2805,7 @@ document.addEventListener('click', e => {
   // Only the backdrop itself closes a pop-up, and the +/− box doesn't open the student.
   if (el.classList.contains('overlay') && e.target !== el) return;
   if (el.tagName === 'TR') { const stop = e.target.closest('[data-stop]'); if (stop && el.contains(stop)) return; } // (a pop-up around the table doesn't count)
+  if (el.classList.contains('st-click') && e.target.closest('a')) return; // (a Staff list row opens their edit window, but its phone link just calls)
   act(el.dataset.act, el, e);
 });
 

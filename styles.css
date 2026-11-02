@@ -1753,9 +1753,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .staff-board.fit > .board-col { display: flex; flex-direction: column; min-height: 0; }
 .staff-board.fit > .board-col > .box { flex: 0 0 auto; }
 .staff-board.fit > .board-col > .box:last-child { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.staff-portal-box h2 small, .week-pay h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); margin-top: 0; line-height: 1.2; }
+.staff-portal-box h2 small, .week-pay h2 small, .staff-qr-modal h2 small { display: block; font-family: Jost, system-ui, sans-serif; font-size: 12px; font-weight: 400; letter-spacing: .03em; color: var(--muted); margin-top: 0; line-height: 1.2; }
 .staff-portal-box .staff-link { margin: 2px 0 6px; }
 .staff-portal-box .staff-qr { margin: 4px 0 2px; min-height: 0; }
+.staff-qr-modal { max-width: 360px; }
+.staff-qr-modal .staff-qr { margin: 6px 0 4px; min-height: 220px; }
 .pay-row .tag-soft.sage-soft { background: var(--sage-soft); color: #56704f; }
 .pr-times input { letter-spacing: .05em; }
 .pay-sign-note { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--honey-soft); color: #7a5d30; border-radius: 10px; padding: 8px 12px; font-size: 13px; margin: 8px 0 0; }
@@ -1865,6 +1867,8 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 .st-away-head { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; text-align: left; padding: 12px 0 6px; font-size: 13px; color: var(--muted); cursor: pointer; letter-spacing: .03em; }
 .st-away-head .count { font-size: 12px; }
 .st-row.away { opacity: .6; }
+.st-row.st-click { cursor: pointer; border-radius: 6px; }
+.st-row.st-click:hover { background: rgba(230, 211, 200, .25); }
 .se-away { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); margin: 6px 0 2px; cursor: pointer; }
 .se-away input { margin-top: 3px; accent-color: var(--taupe-dark); }
 .se-away b { color: var(--ink); font-weight: 500; }
