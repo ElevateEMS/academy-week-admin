@@ -15,6 +15,8 @@ const FAQ = [
       'Put them in an <b>Other</b> slot on Scheduling, with what it’s for and the amount. It counts in their “+” estimate and on Academy Week Pay right away, and goes on the Payroll tab on the day itself.'],
     ['Where do I mark a paper W-9?',
       'Click their row in the Staff Directory → tick <b>W-9 received on paper</b> → Save. Their W-9 column shows ✓ and the Staff Portal stops reminding them. Someone who sent their W-9 from the Staff Portal doesn’t get the box (it’s already on file).'],
+    ['Who gets a 1099?',
+      'Anyone paid $2,000 or more in a calendar year (the federal threshold as of 2026). The Staff Portal’s W-9 pop-up tells staff they won’t be issued a 1099 under that. Reimbursements don’t count toward it.'],
     ['What do the yearly pay limit alerts do?',
       'You and Nick get one email when someone’s pay for the year reaches $1,500, and one at $2,000 (the 1099 line on the Staff Directory’s bar). Reimbursements don’t count toward it.'],
     ['When does availability lock?',
