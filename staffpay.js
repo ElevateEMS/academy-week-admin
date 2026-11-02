@@ -77,11 +77,7 @@ function staffView() {
   return `<div class="board staff-board">
     <div class="board-col staff-main">${staffListBox(a)}</div>
     <div class="board-col">
-      <section class="box"><div class="box-head admin-head"><h2>To Pay</h2></div>
-        ${owed.length ? `<ul class="pay-owed">${owed.map(o => `<li><span><b>${esc(o.name)}</b><span class="muted small">${o.cohort ? esc(o.cohort) + ' Academy Week' : 'Other (on the Payroll tab)'}</span></span>
-          <b>${money(o.amount)}</b>${o.cohort ? `<button class="btn tiny" data-act="payOpen" data-name="${esc(o.name)}" data-cohort="${esc(o.cohort)}">Pay</button>` : '<span></span>'}</li>`).join('')}</ul>`
-          : '<p class="empty">Nobody’s waiting on a check.</p>'}
-      </section>
+      ${weekPayBox(a, owed)}
       ${a.unmatched.length ? `<section class="box"><div class="box-head admin-head"><h2>Not in the Staff Directory</h2></div>
         <p class="muted small">On a Staffing tab, but not on the Staff Directory tab (so they can’t sign in or be paid here yet).</p>
         <ul class="pay-owed">${a.unmatched.map(u => `<li><span><b>${esc(u.name)}</b><span class="muted small">${esc(u.cohort)}</span></span><span></span>
@@ -119,6 +115,18 @@ function staffTabs() {
     + `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
     .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
 }
+// The Staff list and the Academy Week Pay card: grouped by role (the pay scale's order), A–Z by first name in each.
+// Volunteers go with EC & Equivalent (ours is an EC: the app only knows "Volunteer", not their level).
+const STAFF_GROUPS = [['EC & Equivalent', ['EC & Equivalent', 'Volunteer']], ['Non-Certified Instructors', ['Non-Certified Instructor']], ['Assistants', ['Assistant']], ['Patients', ['Patient']]];
+function staffGroups(list, roleOf = p => p.role) {
+  const nm = x => x.name || (x.p && x.p.name) || '', byName = (a, b) => nm(a).localeCompare(nm(b));
+  const out = STAFF_GROUPS.map(([g, roles]) => [g, list.filter(p => roles.includes(roleOf(p))).sort(byName)]);
+  out.push(['No role picked', list.filter(p => !STAFF_GROUPS.some(([, roles]) => roles.includes(roleOf(p)))).sort(byName)]);
+  return out.filter(([, l]) => l.length);
+}
+// "Also" (the edit window): an extra role shown after their role, like "Patient · Admin assist". Just a label: kept in the
+// app's database by their Staff Directory name (meta/staffAlso), like Name on forms.
+const staffAlso = name => ((S.staffAlso || {})[fbKey(name)] || '').trim();
 function staffListBox(a) {
   const away = a.people.filter(p => p.inactive);
   const bar = p => {
@@ -139,12 +147,12 @@ function staffListBox(a) {
       <button class="add-plus small-plus" data-act="staffEdOpen" title="Add someone" aria-label="Add someone">+</button></span></div>
     <div class="staff-table${cols}">
       <div class="st-row st-head"><span>Name</span><span>Phone</span><span>Email</span>${showPortal ? '<span class="c" title="Staff Portal account set up">Portal</span>' : ''}${showW9 ? '<span class="c">W-9</span>' : ''}<span class="c yr-head" title="Paid and not paid yet, from the Payroll tab. The faded part is what’s still on the schedule: about 8 hrs a day, plus flat amounts. Limit ${money(a.limit)}.">${a.year} total</span><span class="c" title="Student Feedback (instructor ratings), every cohort">Feedback</span></div>
-      ${a.people.filter(p => !p.inactive).map(staffRow).join('')}
+      ${staffGroups(active).map(([g, list]) => `<div class="st-group">${esc(g)} <span class="count">${list.length}</span></div>${list.map(staffRow).join('')}`).join('')}
       ${away.length ? `<button class="st-away-head" data-act="staffAway"><span class="inq-caret">${S.staffShowAway ? '▾' : '▸'}</span> Inactive (away for now) <span class="count">${away.length}</span></button>
-        ${S.staffShowAway ? away.map(staffRow).join('') : ''}` : ''}
+        ${S.staffShowAway ? staffGroups(away).flatMap(([, list]) => list).map(staffRow).join('') : ''}` : ''}
     </div></section>`;
   function staffRow(p) { return `<div class="st-row ${p.inactive ? 'away' : ''}">
-        <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
+        <span><button class="link-btn" data-act="staffEdOpen" data-name="${esc(p.name)}">${esc(p.name)}</button>${p.role || p.roleText ? `<span class="muted small st-role">${esc(p.role || p.roleText)}${staffAlso(p.name) ? ' · ' + esc(staffAlso(p.name)) : ''}</span>` : '<span class="small st-role tbd">No role picked</span>'}</span>
         <span>${p.phone ? `<a href="tel:${esc(p.phone.replace(/[^\d+]/g, ''))}">${esc(p.phone)}</a>` : '<span class="tbd">None</span>'}</span>
         <span class="st-email">${p.email ? esc(p.email) : '<span class="tbd">None</span>'}</span>
         ${showPortal ? `<span class="c">${p.account ? '<span class="st-check" title="Staff Portal account set up">✓</span>' : '<span class="muted" title="No Staff Portal account yet">–</span>'}</span>` : ''}
@@ -153,6 +161,49 @@ function staffListBox(a) {
         ${bar(p)}
         ${fbCell(p.name)}
       </div>`; }
+}
+/* ---------- Academy Week Pay (the Staff page's right column, top) ----------
+   The next Academy Week (a.weeks: not over yet, never Test cohorts): everyone on its Staffing tab, by role, with where they
+   are (scheduled / working / payment due on their last day / paid). Tap someone: their Pay window, every day of the week,
+   where "Pay as" can be changed before they work. Anyone still owed from another cohort is under Also owed. */
+const EST_HRS = 8; // (the Staff script's estimate for a day without times: EST_HOURS_PER_DAY)
+function weekPayBox(a, owed) {
+  const w = [...(a.weeks || [])].sort((x, y) => x.start < y.start ? -1 : 1)[0];
+  const co = w && S.staffCo && S.staffCo[w.cohort];
+  if (w && !staffFresh['co:' + w.cohort] && !staffLoading['co:' + w.cohort]) setTimeout(() => loadStaffCohort(w.cohort), 0);
+  const others = owed.filter(o => !w || o.cohort !== w.cohort);
+  const ownRow = o => `<li><span><b>${esc(o.name)}</b><span class="muted small">${o.cohort ? esc(o.cohort) + ' Academy Week' : 'Other (on the Payroll tab)'}</span></span>
+    <b>${money(o.amount)}</b>${o.cohort ? `<button class="btn tiny" data-act="payOpen" data-name="${esc(o.name)}" data-cohort="${esc(o.cohort)}">Pay</button>` : '<span></span>'}</li>`;
+  let body;
+  if (!w) body = '<p class="empty">No Academy Week coming up.</p>';
+  else if (!co) body = S.staffCoErr ? `<div class="alert">${esc(S.staffCoErr)}</div>` : '<p class="loading">Loading…</p>';
+  else {
+    const t = co.today || todayIso(), rates = co.rates || {};
+    const rows = co.people.filter(p => p.matched || p.days.length || (p.others || []).length).map(p => {
+      const sched = p.days.filter(d => d.n > 0 && d.date), dates = [...new Set(sched.map(d => d.date).concat((p.others || []).map(o => o.date)))].filter(Boolean).sort();
+      const first = dates[0], last = dates[dates.length - 1], n = dates.length;
+      // What it comes to: days with times as they are, the rest about 8 hours at their Pay as rate, plus extra pay and flat slots.
+      const est = p.days.reduce((t2, d) => t2 + (d.row ? d.total : d.date && d.n > 0 ? EST_HRS * (rates[d.role] || 0) : 0), 0)
+        + p.flats.reduce((t2, f) => t2 + (f.reimb ? 0 : f.total), 0) + (p.others || []).filter(o => !o.made && !o.unpaid).reduce((t2, o) => t2 + o.amount, 0);
+      const vol = p.volunteer || p.maxRole === 'Volunteer';
+      let status, due = false;
+      if (!n) status = 'Not on the schedule';
+      else if (t < first) status = `Scheduled ${n} day${n === 1 ? '' : 's'}${vol ? '' : ' · about ' + money(est)}`;
+      else if (t > last) { if (vol) status = 'Done'; else if (p.paid && !p.unpaid) status = 'Paid ✓'; else { status = 'Payment due · since ' + shortDay(last); due = true; } }
+      else if (t === last) { status = vol ? 'Last day today' : (p.paid && !p.unpaid ? 'Paid ✓' : 'Last day today · payment due'); due = !vol && !(p.paid && !p.unpaid); }
+      else if (dates.includes(t)) status = `Working today · day ${dates.indexOf(t) + 1} of ${n}`;
+      else { const nx = dates.find(x => x > t); status = `Worked ${dates.filter(x => x < t).length} of ${n} · next: ${parseIso(nx).toLocaleDateString('en-US', { weekday: 'short' })}`; }
+      return { p, status, due, amount: vol ? null : p.paid && !p.unpaid && t >= (last || t) ? p.total : est, vol };
+    });
+    body = rows.length ? staffGroups(rows, r => r.vol ? 'Volunteer' : r.p.maxRole).map(([g, list]) => `<p class="wp-group">${esc(g)}</p><ul class="pay-owed wp-list">${list.map(r => `<li class="${r.due ? 'wp-due' : ''}">
+        <button class="wp-person" data-act="payOpen" data-name="${esc(r.p.name)}" data-cohort="${esc(w.cohort)}"><b>${esc(r.p.name)}</b><span class="small wp-status">${esc(r.status)}</span></button>
+        <b class="wp-amt">${r.amount == null ? '<span class="muted small">unpaid</span>' : money(r.amount)}</b></li>`).join('')}</ul>`).join('')
+      : '<p class="empty">Nobody on this week’s Staffing tab yet.</p>';
+  }
+  return `<section class="box week-pay"><div class="box-head admin-head"><h2>Academy Week Pay${w ? `<small>${esc(w.cohort)} · ${shortDay(w.start)}–${shortDay(w.end)}</small>` : ''}</h2></div>
+    ${body}
+    ${others.length ? `<p class="wp-group">Also owed</p><ul class="pay-owed">${others.map(ownRow).join('')}</ul>` : ''}
+  </section>`;
 }
 function showStaffQr() {
   const el = document.getElementById('staffQr');
@@ -178,6 +229,8 @@ function staffEdModal() {
       <div class="se-em"><span class="muted small">Emergency contact</span>
         <div class="se-em-row">${f('emName', 'Name')}${f('emPhone', 'Phone', 'tel')}${f('emRel', 'Relationship')}</div></div>
       ${f('notes', 'Notes')}
+      ${f('also', 'Also', 'text', 'An extra role, like Admin assist')}
+      <p class="muted small se-hint">Shows after their role on the Staff list (just a label; flat-rate pay is set on Scheduling).</p>
       ${f('evalName', 'Name on forms', 'text', 'First name, nickname, rank, etc.')}
       <p class="muted small se-hint">What students see on the Instructor &amp; Course Feedback form. Leave it blank to use their first name.</p>
       ${e.orig && S.drafts['se-role'] !== 'Volunteer' ? (e.w9On && !e.w9PaperWas
@@ -205,9 +258,10 @@ function payModal() {
     const ed = P.ed[d.date] || {}, role = ed.role ?? d.role, start = ed.start ?? milT(d.start), end = ed.end ?? milT(d.end);
     const hrs = qHours(hmT(start), hmT(end)), rate = rates[role] ?? d.rate, dirty = P.ed[d.date] && (role !== d.role || start !== milT(d.start) || end !== milT(d.end));
     const lock = d.paid || !d.editable;
-    const sigTag = !d.row ? '<span class="tag-soft notimes">no times yet</span>'
+    const slotTag = d.slotRole && role !== d.slotRole && !d.paid ? `<span class="tag-soft" title="Their slot on Staffing is ${esc(d.slot)}; this day is paid as ${esc(role)}">${esc(d.slot === 'EC' ? 'EC' : d.slotRole)} slot</span>` : '';
+    const sigTag = slotTag + (!d.row ? '<span class="tag-soft notimes">no times yet</span>'
       : d.needsSig ? `<span class="tag-soft warn" title="${d.fix ? 'Changed by ' + esc(d.fix.by) + (d.fix.from ? ' from ' + esc(d.fix.from) : '') : ''}">${d.fix ? 'correction · ' : ''}needs signature</span>`
-      : d.signed ? `<span class="tag-soft sage-soft">signed${d.signedHow === 'inperson' ? ' in person' : ''} ✓</span>` : '';
+      : d.signed ? `<span class="tag-soft sage-soft">signed${d.signedHow === 'inperson' ? ' in person' : ''} ✓</span>` : '');
     return `<div class="pay-row ${d.paid ? 'paid' : ''} ${!d.row ? 'empty-day' : ''}">
       <span class="pr-date">${shortDay(d.date)}${d.exam ? ' <span class="muted small">exam</span>' : ''}${sigTag}${d.over && !d.paid ? `<span class="tag-soft warn" title="Their maximum eligible role is ${esc(p.maxRole)}">above ${esc(p.maxRole)}</span>` : ''}</span>
       ${lock ? `<span>${esc(d.role)}</span><span>${d.start ? milT(d.start) + '–' + milT(d.end) : '—'}</span>`
@@ -215,7 +269,7 @@ function payModal() {
            <span class="pr-times"><input type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="${esc((d.sched || '0800–1700').split('–')[0])}" id="pay-s-${d.date}" data-payf="start" data-date="${d.date}" value="${esc(start)}" aria-label="Start">
            <input type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="${esc((d.sched || '0800–1700').split('–')[1] || '')}" id="pay-e-${d.date}" data-payf="end" data-date="${d.date}" value="${esc(end)}" aria-label="End"></span>`}
       <span class="pr-num">${hrs || d.hours ? (lock ? d.hours : hrs) + ' hrs' : ''}</span>
-      <span class="pr-num">${lock ? money(d.total) : hrs ? money(hrs * rate) : ''}<span class="muted small"> ${money(rate)}/hr</span></span>
+      <span class="pr-num">${lock ? money(d.total) : hrs ? money(hrs * rate) : !d.row && d.n > 0 ? `<span class="muted" title="About ${EST_HRS} hours, until they put in their times">≈ ${money(EST_HRS * rate)}</span>` : ''}<span class="muted small"> ${money(rate)}/hr</span></span>
       <span class="pr-act">${dirty ? `<button class="btn tiny" data-act="paySaveDay" data-date="${d.date}" ${P.busy ? 'disabled' : ''}>Save</button>`
         : d.row && d.needsSig ? `<button class="btn tiny" data-act="paySign" data-date="${d.date}" ${P.busy ? 'disabled' : ''} title="They sign on this computer">Sign here</button>`
         : d.paid ? `<span class="tag sage-tag">Paid${d.check ? ' #' + esc(d.check) : ''}</span>`
@@ -240,6 +294,7 @@ function payModal() {
       <p class="muted small">${esc(P.cohort)} Academy Week${p.maxRole ? ' · ' + esc(p.maxRole) : p.matched ? ' · no maximum eligible role picked yet' : ''}${p.phone ? ' · ' + esc(p.phone) : ''}${p.email ? ' · ' + esc(p.email) : ''}${p.matched ? (p.account ? '' : ' · hasn’t set up the Staff Portal yet') : ''}</p>
       ${!p.matched ? `<div class="alert">${esc(p.name)} isn’t on the Staff Directory tab, so they can’t sign in to put in times. <button class="btn small" data-act="staffEdOpen" data-new="${esc(p.name)}">Add them</button></div>` : ''}
       <div class="pay-table">${p.days.map(dayRow).join('')}${p.flats.map(flatRow).join('')}</div>
+      ${p.days.some(d => !d.row && !d.paid && d.n > 0 && d.editable) ? '<p class="muted small">A day without times yet: change its role to pay it differently from its Staffing slot (like EC pay on an Assistant day). It saves right away, and they see it on the Staff Portal. ≈ is about 8 hours, until they put in their times.</p>' : ''}
       <div class="pay-under">${p.paid ? '' : flatForm}<span class="pay-total">Total <b>${money(p.total)}</b>${p.unpaid && p.unpaid !== p.total ? ` · <span class="muted">${money(p.unpaid)} not paid yet</span>` : ''}</span></div>
       ${p.missing.length && !p.paid ? `<p class="muted small">No times yet for ${p.missing.map(shortDay).join(', ')}. They can fill them in on the Staff Portal, or you can type them here (military time, like 0800), and then they sign.</p>` : ''}
       ${(p.unsigned || []).length ? `<p class="pay-sign-note"><span>${p.unsigned.length} day${p.unsigned.length === 1 ? '' : 's'} need${p.unsigned.length === 1 ? 's' : ''} ${esc(p.name.split(' ')[0])}’s signature (${p.unsigned.map(shortDay).join(', ')}). They can sign on their phone, or here.</span>
@@ -302,6 +357,8 @@ function staffInput(t) {
   if (t.dataset.payf && S.pay) {
     const d = t.dataset.date, co = S.staffCo[S.pay.cohort], p = co && co.people.find(x => x.name === S.pay.name || x.staffName === S.pay.name);
     const day = p && p.days.find(x => x.date === d);
+    // Pay as, on a day without times yet: saved right away (the portal and estimates use it from then on).
+    if (t.dataset.payf === 'role' && day && !day.row && !S.pay.ed[d]) { payAsSet(p.name, d, t.value); return true; }
     const ed = S.pay.ed[d] = S.pay.ed[d] || { role: day.role, start: milT(day.start), end: milT(day.end) };
     if (t.dataset.payf === 'role') ed.role = t.value;
     else { const digits = t.value.replace(/\D/g, '').slice(0, 4); if (t.value !== digits) t.value = digits; ed[t.dataset.payf] = digits; }
@@ -318,6 +375,10 @@ function staffEscape() {
   return false;
 }
 
+function payAsSet(name, date, role) {
+  const P = S.pay;
+  return payDo(async () => { const out = await StaffApi.call('adminPayAs', { cohort: P.cohort, name, date, role }); toast(`${shortDay(date)}: paid as ${role}.`); return out; });
+}
 async function payDo(fn) {
   const P = S.pay; P.busy = true; P.err = ''; render();
   try { const out = await fn(); if (out && out.people) { S.staffCo[P.cohort] = out; keepCopy('staffco-' + P.cohort, out); } staffFresh.all = false; }
@@ -423,6 +484,7 @@ async function staffAct(a, el = {}) {
         emName: (base.emergency || {}).name, emPhone: (base.emergency || {}).phone, emRel: (base.emergency || {}).relation })
         .forEach(([k, v]) => { S.drafts['se-' + k] = v || ''; });
       S.drafts['se-evalName'] = (S.evalNames || {})[fbKey(base.name)] || '';
+      S.drafts['se-also'] = staffAlso(base.name);
       const w9 = (p && p.w9) || {};
       S.staffEd = { orig: p ? p.name : '', account: p ? p.account : false, inactive: !!(p && p.inactive), busy: false, err: '',
         w9On: !!w9.on, w9Date: w9.date || '', w9Paper: !!(w9.on && w9.paper), w9PaperWas: !!(w9.on && w9.paper) };
@@ -449,6 +511,13 @@ async function staffAct(a, el = {}) {
           if (e.orig) delete names[fbKey(e.orig)];
           if (en) names[fbKey(g('name'))] = en;
           await Store.set('meta/evalNames', { names }, false);
+        }
+        const al = g('also'), alWas = staffAlso(e.orig || g('name'));
+        if (al !== alWas || (e.orig && e.orig !== g('name') && alWas)) {
+          const names = { ...(S.staffAlso || {}) };
+          if (e.orig) delete names[fbKey(e.orig)];
+          if (al) names[fbKey(g('name'))] = al;
+          await Store.set('meta/staffAlso', { names }, false);
         }
         S.staffEd = null; toast('Saved to the Staff Directory.');
         if (S.cohortKey) loadStaffCohort(S.cohortKey, true);
@@ -947,6 +1016,7 @@ function watchAllEvals() {
   S.allEvals = S.allEvals || {};
   keys.split('|').filter(Boolean).forEach(k => S.fbUnwatch.push(Store.watch('cohorts/' + k + '/evals', list => { S.allEvals[k] = list.filter(e => e.kind === 'feedback'); render(); })));
   S.fbUnwatch.push(Store.watch('meta/evalNames', d => { S.evalNames = (d && d.names) || {}; }));
+  S.fbUnwatch.push(Store.watch('meta/staffAlso', d => { S.staffAlso = (d && d.names) || {}; render(); })); // (the Staff list's "Also" labels)
 }
 // Who an instructor rating belongs to: a directory name, or 'Nick' / 'Bella'.
 function fbWho(id) {
