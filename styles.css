@@ -29,6 +29,8 @@ h3 { font-size: 18px; margin: 18px 0 8px; }
 .muted { color: var(--muted); }
 /* Placeholder (example) text: faded + italic everywhere, so it never looks like something filled in. */
 input::placeholder, textarea::placeholder { color: var(--muted); font-style: italic; opacity: 1; }
+/* Plain checkboxes and radio buttons: the app's warm brown, not the system blue. */
+input[type=checkbox], input[type=radio] { accent-color: var(--taupe-dark); }
 .small { font-size: 13px; }
 .center { text-align: center; }
 .loading { padding: 60px; text-align: center; color: var(--muted); font-family: var(--serif); font-size: 20px; font-style: italic; }
