@@ -679,6 +679,7 @@ function render() {
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? (window.CALLS_ONLY ? callsShell() : window.QUICKLOG_ONLY ? qlShell() : shell()) : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
+    if (typeof syncAdminPanel === 'function') syncAdminPanel(); // (the link panel: outside #app, admin.js)
     // Header icons: the app's own hover label (data-tip, styles.css) instead of the browser's slow tooltip,
     // which a redraw would cancel.
     document.querySelectorAll('header.top [title]').forEach(el => { el.dataset.tip = el.title; el.removeAttribute('title'); });

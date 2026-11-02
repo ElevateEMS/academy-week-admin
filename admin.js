@@ -275,6 +275,15 @@ function openPanel(name, url) { // a Drive folder or Meet goes to Chrome instead
 const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url)
   || /\/\/(www\.)?elevateemsacademy\.com(\/|$)/i.test(url)
   || /\/\/([a-z0-9-]+\.)*jblearning\.com(\/|$)/i.test(url) || /\/\/vdhems\.vdh\.virginia\.gov(\/|$)/i.test(url);
+// The panel lives outside #app, drawn only when it opens or changes: the page redraws a lot (the Staff page several
+// times while its data comes in), and redrawing an iframe reloads the sheet inside it.
+function syncAdminPanel() {
+  let root = document.getElementById('panelRoot');
+  if (!root) { root = document.createElement('div'); root.id = 'panelRoot'; document.body.appendChild(root); }
+  const p = S.adminPanel, key = p ? p.name + '|' + p.url : '';
+  if (root.dataset.key === key) return;
+  root.dataset.key = key; root.innerHTML = p ? adminPanel() : '';
+}
 function adminPanel() {
   const p = S.adminPanel;
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
@@ -1146,7 +1155,7 @@ function layoutStickies() {
 
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
-  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.adminPanel ? adminPanel() : '') + (S.inqSet ? inqSetModal() : '')
+  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.inqSet ? inqSetModal() : '')
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
