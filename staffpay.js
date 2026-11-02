@@ -322,8 +322,8 @@ function staffModals() { return (S.pay ? payModal() + (S.pay.check ? checkModal(
    (meta/staffSizes); the links and who's made are in meta/staffShirts. Inactive staff are left off. */
 const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
 const SHIRT_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3.5l-5 2.5-1.5 4.5 3.5 1.5V20.5h12V12l3.5-1.5L20 6l-5-2.5c-.5 1.5-1.6 2.3-3 2.3S9.5 5 9 3.5z"/></svg>';
-const SHIRT_LINKS = [['ninja', 'Ninja Print labels'], ['instShirt', 'Instructor shirt · Dark Heather'], ['othShirt', 'Patient & Assistant shirt · Graphite Heather'],
-  ['instZip', 'Instructor quarter zip · Dark Heather'], ['othZip', 'Patient & Assistant quarter zip · Graphite Heather']];
+const NINJA_URL = 'https://ninjatransfers.com/pages/welcome?tab=my-orders'; // (the logo transfers: Ninja Transfers, your orders)
+const PRINT_ICON = '<svg viewBox="0 0 24 24"><path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14h10v6.5H7z"/><path d="M17 12h.01"/></svg>';
 const staffSize = name => (S.staffSizes || {})[fbKey(name)] || {};
 const shirtLinks = () => (S.staffShirts && S.staffShirts.links) || {};
 const shirtMade = (name, k) => !!((((S.staffShirts && S.staffShirts.made) || {})[fbKey(name)] || {})[k]);
@@ -351,16 +351,16 @@ function shirtsModal() {
   };
   const zips = p => staffSize(p.name).zipOn;
   return `<div class="overlay" data-act="shirtsClose"><div class="modal shirts-modal" data-stop>
-    <div class="modal-head"><h2>Staff Shirts<small>logo on the front · one each</small></h2><button class="x big" data-act="shirtsClose" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Staff Shirts<small>logo on the front · one each</small></h2><span class="panel-actions">
+      <a class="icon-btn" href="${NINJA_URL}" target="_blank" rel="noopener" data-chrome title="Ninja Transfers (your orders)" aria-label="Ninja Transfers">${PRINT_ICON}</a>
+      <button class="x big" data-act="shirtsClose" aria-label="Close">×</button></span></div>
     <div class="modal-body pad-top">
-      <div class="shirt-ninja"><b>${SHIRT_LINKS[0][1]}</b><span class="shirt-link">${linkLine('ninja')}</span></div>
       <div class="shirt-grid">
-        ${section('Instructor shirts', 'instShirt', 'Dark Heather · <b>INSTRUCTOR</b> on the back · ECs, Non-Certified Instructors, volunteers', people.filter(inst), 'shirt')}
+        ${section('Instructor shirts', 'instShirt', 'Dark Heather · <b>INSTRUCTOR</b> on the back', people.filter(inst), 'shirt')}
         ${section('Patient &amp; Assistant shirts', 'othShirt', 'Graphite Heather · nothing on the back', people.filter(oth), 'shirt')}
         ${section('Instructor quarter zips', 'instZip', 'Dark Heather · nothing on the back', people.filter(p => inst(p) && zips(p)), 'zip')}
         ${section('Patient &amp; Assistant quarter zips', 'othZip', 'Graphite Heather · nothing on the back', people.filter(p => oth(p) && zips(p)), 'zip')}
       </div>
-      <p class="muted small">Sizes and the quarter zip box are in each person’s edit window (click their row in the Staff Directory). Inactive staff aren’t listed.</p>
     </div></div></div>`;
 }
 // The Staff Portal's link and QR code (the header's QR icon): to show a new staff member where to sign up.

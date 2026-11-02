@@ -26,7 +26,7 @@ const FAQ = [
     ['How do I reset someone’s Staff Portal password?',
       'Click their row in the Staff Directory → <b>Reset their Staff Portal password</b> at the bottom. They set up their account again with their name and phone number.'],
     ['Where are staff shirt sizes and the shirt links?',
-      'Sizes (and the <b>Quarter zip</b> box for the regulars) are in each person’s edit window. The <b>shirt icon</b> at the top of the Staff page lists who needs which shirt, the count by size for ordering, a Made ✓ for each person, and the Amazon and Ninja Print links (tap the pencil to paste one).'],
+      'Sizes (and the <b>Quarter zip</b> box for the regulars) are in each person’s edit window. The <b>shirt icon</b> at the top of the Staff page lists who needs which shirt, the count by size for ordering, a Made ✓ for each person, the Amazon links (tap the pencil to paste one), and a printer icon for Ninja Transfers.'],
     ['What’s the Additional Role box for?',
       'Just a label after their role in the Staff Directory, like “Patient · Admin assist”. It doesn’t change pay: flat-rate pay is set on Scheduling.'],
   ]],
