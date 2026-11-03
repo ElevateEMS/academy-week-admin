@@ -1046,7 +1046,7 @@ document.addEventListener('click', e => {
   }
   // On those items only the circle checks it off (not the rest of the row).
   if (e.target.closest && e.target.closest('.ro-label') && !e.target.matches('input')) { e.preventDefault(); return; }
-  if (e.target.closest && e.target.closest('.rev-btn')) { e.preventDefault(); return; } // (💬: opens the review, doesn't tick or edit the item)
+  if (e.target.closest && e.target.closest('.rev-btn, .howto-btn')) { e.preventDefault(); return; } // (💬 / the steps icon: opens its pop-up, doesn't tick or edit the item)
   const lab = e.target.closest && e.target.closest('label');
   const own = lab && lab.querySelector('.txt[data-hl], .txt-edit');
   if (own && !e.target.matches('input') && EDITABLE.includes((own.dataset.hl || own.dataset.edit).split(':')[0])) { e.preventDefault(); e.stopPropagation(); }
@@ -1108,7 +1108,7 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
       // An overdue payment or a Drop / Withdraw to-do: its buttons and due date get their own row under the text.
       const twoRow = kind === 'ctodo' && !compact && (t.payFor || t.dropFor || /^drop-/.test(t.id));
       return `<li class="${done ? 'done' : ''} ${twoRow ? 'two-row' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
+      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl) + howtoBtn(t.text)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
       ${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
     </li>`;
     }).join('') || empty}
@@ -1279,6 +1279,9 @@ function setupAuto(text) {
   } else if (/active/i.test(text) && /(upcoming|flip|this)/i.test(text)) {
     out.done = /active/i.test(st);
     if (!out.done && st) out.btn = statusBtn(S.cohortKey, 'Active');
+  } else if (/copy/i.test(text) && /course/i.test(text) && /(jbl|jb ?learning)/i.test(text)) { // the JBL course code goes in Course Details (and from there the emails)
+    if (i.jbl) { out.done = true; out.note = ` <em class="tag-soft">${esc(i.jbl)}</em>`; }
+    else out.btn = '<button class="btn tiny" data-act="jblCodeOpen">Enter Course Code</button>';
   } else if (/vaoems/i.test(text) && /register/i.test(text)) { // the course # goes in AF4 (Course Details)
     if (i.courseNo) { out.done = true; out.note = ` <em class="tag-soft">${esc(courseNoText(i.courseNos))}</em>`; }
     else out.btn = '<button class="btn tiny" data-act="courseNoOpen">Enter Course No.</button>';
@@ -1308,7 +1311,7 @@ function setupList() {
       const auto = setupAuto(t.text), done = auto.done === true || t.done;
       const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${reviewBtn(t)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${reviewBtn(t)}${howtoBtn(t.text)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
         <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
     }).join('') || '<li class="empty">Nothing yet.</li>'}
   </ul>`;
@@ -3132,6 +3135,9 @@ async function act(a, el = {}, e) {
         S.infoEdit = { busy: false, err: '', reviews: [...orig.reviews], orig };
         render(); break;
       }
+      case 'jblCodeOpen': // Setup Checklist → "Enter Course Code" (JBL copy course): Course Details with the JBL code box ready to type in
+        await act('infoEditOpen');
+        setTimeout(() => { const el = document.getElementById('ie-jbl'); if (el) el.focus(); }, 30); break;
       case 'courseNoOpen': // Setup Checklist → "Enter Course No.": Course Details with the course # box ready to type in
         await act('infoEditOpen');
         setTimeout(() => { const el = document.getElementById('ie-courseNos'); if (el) el.focus(); }, 30); break;

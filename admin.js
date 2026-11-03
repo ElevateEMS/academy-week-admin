@@ -1032,6 +1032,25 @@ function starBtn(key, text, src) {
 const BUBBLE = '<svg viewBox="0 0 24 24"><path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5V16.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/></svg>';
 // (A span, not a button: it sits inline at the end of the title, even inside the To Do card's title button.)
 const reviewBtn = x => x && x.review && x.review.text ? `<span class="rev-btn" role="button" tabindex="0" data-act="reviewShow" data-text="${esc(x.review.text)}" data-src="${esc(x.review.src || '')}" title="See the full review" aria-label="See the full review">${BUBBLE}</span>` : '';
+// Steps for a checklist item (a list icon at the end of its title opens them), matched by the item's words.
+const HOWTO = [
+  [/jbl settings/i, 'JBL settings', `<h4>Each chapter</h4><ul>
+    <li>Hide Skills if present</li><li>Show Clinical Judgement Scenario</li>
+    <li>Add “(practice quiz)” after “Assessment in Action”</li><li>Add “(practice NREMT style questions)” after “Clinical Judgement Scenario”</li>
+    <li>Add quiz “Chapter __ Quiz”<ul><li>Timing: course dates</li><li>Category: quizzes</li><li>Grade to pass: 0</li><li>Unlimited attempts</li><li>Highest grade</li><li>20 questions</li></ul></li></ul>
+    <h4>Module exams</h4><ul>
+    <li>“Module __ Exam”</li><li>Listed with the last chapter of the module</li><li>Timing: course dates</li><li>Time limit: 2 hours, enabled</li>
+    <li>Category: exams</li><li>Grade to pass: 0</li><li>Attempts: 1</li><li>70 questions</li></ul>`],
+];
+const howtoOf = text => HOWTO.find(([re]) => re.test(String(text || '')));
+const LIST_ICON = '<svg viewBox="0 0 24 24"><path d="M9 6.5h10.5M9 12h10.5M9 17.5h10.5"/><circle cx="5" cy="6.5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17.5" r="1"/></svg>';
+const howtoBtn = text => { const h = howtoOf(text); return h ? `<span class="rev-btn howto-btn" role="button" tabindex="0" data-act="howtoShow" data-k="${HOWTO.indexOf(h)}" title="${esc(h[1])} steps" aria-label="${esc(h[1])} steps">${LIST_ICON}</span>` : ''; };
+function howtoModal() {
+  const [, title, html] = HOWTO[S.howto] || [];
+  return `<div class="overlay" data-act="howtoClose"><div class="modal small-modal howto-modal" data-stop>
+    <div class="modal-head"><h2>${esc(title || '')}</h2><button class="x big" data-act="howtoClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top">${html || ''}</div></div></div>`;
+}
 function reviewModal() {
   const x = S.reviewShow;
   return `<div class="overlay" data-act="reviewClose"><div class="modal small-modal" data-stop>
@@ -1230,7 +1249,7 @@ function layoutStickies() {
 
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
-  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.fbStarEd ? fbStarModal() : '') + (S.reviewShow ? reviewModal() : '') + (S.inqSet ? inqSetModal() : '')
+  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.fbStarEd ? fbStarModal() : '') + (S.reviewShow ? reviewModal() : '') + (S.howto != null ? howtoModal() : '') + (S.inqSet ? inqSetModal() : '')
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
@@ -1264,6 +1283,7 @@ function adminInput(t) {
   return false;
 }
 function adminEscape() {
+  if (S.howto != null) { S.howto = null; return true; }
   if (S.reviewShow) { S.reviewShow = null; return true; }
   if (S.fbStarEd) { S.fbStarEd = null; return true; }
   if (S.faqOpen) { S.faqOpen = false; return true; }
@@ -1361,6 +1381,8 @@ async function adminAct(a, el = {}, e) {
     case 'fbStarClose': S.fbStarEd = null; render(); return true;
     case 'reviewShow': S.reviewShow = { text: d.text, src: d.src }; render(); return true;
     case 'reviewClose': S.reviewShow = null; render(); return true;
+    case 'howtoShow': S.howto = Number(d.k); render(); return true;
+    case 'howtoClose': S.howto = null; render(); return true;
     case 'fbStarTo': {
       const x = S.fbStarEd; if (!x) return true;
       const text = String(S.drafts['star-title'] || '').replace(/\s+/g, ' ').trim() || x.text.replace(/\s+/g, ' ').trim();

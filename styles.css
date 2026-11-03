@@ -2010,3 +2010,6 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .rev-btn { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--taupe-dark); cursor: pointer; } /* (💬 at the end of the title) */
 .rev-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
 .rev-btn:hover { color: var(--ink); }
+.howto-modal h4 { margin: 4px 0 4px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); font-family: Jost, system-ui, sans-serif; font-weight: 500; }
+.howto-modal ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.howto-modal ul ul { margin: 2px 0 4px; }
