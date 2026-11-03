@@ -187,7 +187,9 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .checks label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; flex: 1; min-width: 120px; }
 /* Checklist rows: a button (Make, Enter Course No.…) sits right after the words, and the calendar and × sit together
    at the far right. (Changes for Future Classes keeps its own layout.) */
-.checks:not(.ch-list) > li > label { flex: 0 1 auto; }
+.checks:not(.ch-list) > li:not(.two-row) { flex-wrap: nowrap; } /* (one line: long words wrap inside, the icons never drop to a second row) */
+.checks:not(.ch-list) > li > label { flex: 0 1 auto; min-width: 0; }
+.checks:not(.ch-list) > li > :not(label) { flex-shrink: 0; }
 .checks:not(.ch-list) > li > .due-add, .checks:not(.ch-list) > li > .due-chip, .checks:not(.ch-list) > li > .x:last-child { margin-left: auto; }
 .checks:not(.ch-list) > li > .due-add + .x:last-child, .checks:not(.ch-list) > li > .due-chip + .x:last-child { margin-left: -4px; }
 .checks:not(.ch-list) > li.done > .due-add + .x:last-child { margin-left: auto; } /* (checked off: the calendar is hidden, so the × goes right) */
