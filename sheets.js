@@ -189,6 +189,7 @@ const Sheets = (() => {
     clearRosterSig: (key, date, name) => call('clearRosterSig', { cohort: key, date, name }),
     saveRosterPdf: (key, name, pdf) => call('saveRosterPdf', { cohort: key, name, pdf }), // { url, name, replaced }
     rosterPdfFile: url => call('rosterPdfFile', { url }), // { pdf (base64), name }
+    moduleReviews: () => call('moduleReviews'), // { rows: [{ at, cohort, module, weakest, strongest, comments }], url } (the Module Evaluation form)
     saveFeedbackPdfs: key => call('saveFeedbackPdfs', { cohort: key }), // { at, peer: { url, name, n } | null, feedback: … | null } (also saved on the cohort as feedbackPdfs)
     financeInfo: (date, kind) => call('financeInfo', { date, kind }),
     logExpense: async item => { const r = await viaOutbox('logExpense', { item }, () => ({ queued: true, tab: (item.date || '').slice(0, 4) + ' ' + item.kind })); return r.live || r.queued; },
@@ -324,6 +325,9 @@ function sampleSheets() {
     async dropStudent(key, student, drop) { console.log('Sample mode:', student.name, 'would be', drop); return wait({ line: 37, docUrl: 'https://drive.google.com/', warnings: [] }); },
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
+    async moduleReviews() { return wait({ url: 'https://docs.google.com/', rows: [
+      { at: '2026-06-04T13:22:55', cohort: 'Summer 2026', module: 'Module 1', weakest: 'Chapter 8: hard to show lifting on slides. More pictures.', strongest: 'Chapter 7, the tips and tricks', comments: 'Maybe add a study guide for the exam.' },
+      { at: '2026-06-16T16:21:58', cohort: 'Summer 2026', module: 'Module 2', weakest: 'Pharmacology', strongest: 'BLS', comments: 'n/a' }] }); },
     async saveFeedbackPdfs(key) { console.log('Sample mode: the feedback PDFs would be saved for', key); return wait({ at: new Date().toISOString(), peer: { url: 'https://drive.google.com/', n: 1 }, feedback: { url: 'https://drive.google.com/', n: 1 } }); },
     async saveRosterPdf(key, name) { console.log('Sample mode: the roster PDF would be saved as', name); return wait({ url: 'https://drive.google.com/', name, replaced: false }); },
     async savePartner(item) { const p = { id: item.id || 'p-' + Date.now(), added: todayIso(), status: 'New', contacts: [], followUp: '', ...item }; delete p.contact; return wait(p); },

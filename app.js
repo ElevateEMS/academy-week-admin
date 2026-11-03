@@ -1989,7 +1989,7 @@ function ownersFeedback(list) {
   FB_OWNERS.forEach(o => {
     const r = { n: 0, sum: {}, cnt: {}, comments: [] }, score = v => { const n = Number(v); return n >= 1 && n <= 5 ? n : null; };
     list.forEach(e => (e.instructors || []).filter(x => o.names.includes(fbBare(x.id))).forEach(x => {
-      if (String(x.feedback || '').trim()) r.comments.push({ text: x.feedback, day: e.day, key: e.key });
+      if (String(x.feedback || '').trim()) r.comments.push({ text: x.feedback, day: e.day, key: e.key, id: e.id });
       if (!FB_KEYS.some(([k]) => score(x[k]) != null)) return; // (ratings are optional: only the ones given count)
       r.n++; FB_KEYS.forEach(([k]) => { const v = score(x[k]); if (v != null) { r.sum[k] = (r.sum[k] || 0) + v; r.cnt[k] = (r.cnt[k] || 0) + 1; } });
     }));
@@ -2002,7 +2002,7 @@ function courseFeedback(evals = S.evals) {
   const list = (evals || []).filter(e => e.kind === 'feedback');
   const avgOf = (key, i) => { const v = list.map(e => Number((e[key] || [])[i])).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const section = key => { const q = [0, 1, 2].map(i => avgOf(key, i)).filter(x => x != null); return q.length ? q.reduce((a, b) => a + b, 0) / q.length : null; };
-  const said = k => list.filter(e => String(e[k] || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at))).map(e => ({ text: e[k], day: e.day }));
+  const said = k => list.filter(e => String(e[k] || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at))).map(e => ({ text: e[k], day: e.day, id: e.id, f: k }));
   return { n: list.length, program: section('program'), aw: section('aw'), q: { program: [0, 1, 2].map(i => avgOf('program', i)), aw: [0, 1, 2].map(i => avgOf('aw', i)) },
     worked: said('worked'), criticism: said('criticism'), owners: ownersFeedback(list) };
 }
@@ -2070,10 +2070,10 @@ function studentsView() {
         ${[['The Program', FB_PROGRAM, cf.q.program], ['Academy Week', FB_AW, cf.q.aw]].map(([h, qs, av]) => `<div class="cf-sec"><p class="cf-h">${h}</p>
           <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${av[i] != null ? av[i].toFixed(1) : '–'}</b></li>`).join('')}</ul></div>`).join('')}
         ${[['What worked well', cf.worked], ['Constructive criticism', cf.criticism]].map(([h, items]) => `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>
-          ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
+          ${items.length ? `<ul class="cf-said">${items.map(x => `<li>${starBtn('cf:' + S.cohortKey + ':' + x.id + ':' + x.f, x.text, (x.f === 'worked' ? 'What worked well' : 'Constructive criticism') + ' · ' + S.cohortKey)}${esc(x.text)}</li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`).join('')}
         ${['Nick', 'Bella'].map(who => { const o = cf.owners[who]; return `<div class="cf-sec"><p class="cf-h">${who} <span class="muted small">${o.n} rating${o.n === 1 ? '' : 's'}</span></p>
           ${o.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${o.avg[k] != null ? o.avg[k].toFixed(1) : '–'}</b></li>`).join('')}</ul>` : '<p class="muted small">No ratings yet.</p>'}
-          ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : ''}</div>`; }).join('')}
+          ${o.comments.length ? `<ul class="cf-said">${o.comments.map(x => `<li>${starBtn('own:' + S.cohortKey + ':' + x.id + ':' + who, x.text, who + ' feedback · ' + S.cohortKey)}${esc(x.text)}</li>`).join('')}</ul>` : ''}</div>`; }).join('')}
       </div></details>` : ''}
     ${fbPdfRow()}
   </section>` : ''}

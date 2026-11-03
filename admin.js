@@ -945,14 +945,14 @@ function fbBulletinCard() {
     <span class="muted small">${bits.length ? bits.join(' · ') : 'No feedback yet'}</span></button>`;
 }
 function fbAdminModal() {
-  const tab = S.fbAdmin === 'owners' ? 'owners' : 'course', real = fbReal();
-  const tabs = `<div class="side-switch fb-tabs">${[['course', 'Course'], ['owners', 'Nick & Bella']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="fbAdminOpen" data-t="${k}">${l}</button>`).join('')}</div>`;
+  const tab = S.fbAdmin === 'owners' || S.fbAdmin === 'reviews' ? S.fbAdmin : 'course', real = fbReal();
+  const tabs = `<div class="side-switch fb-tabs">${[['course', 'Course'], ['owners', 'Nick & Bella'], ['reviews', 'Module Reviews']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="fbAdminOpen" data-t="${k}">${l}</button>`).join('')}</div>`;
   const n1 = v => v != null ? v.toFixed(1) : '–';
   let body;
   if (tab === 'course') {
     const rows = real.map(([k, l]) => ({ k, f: courseFeedback(l) })), all = courseFeedback(real.flatMap(([k, l]) => l.map(e => ({ ...e, key: k }))));
     const said = (h, pick) => { const items = rows.flatMap(r => pick(r.f).map(x => ({ ...x, k: r.k })));
-      return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${esc(x.text)} <span class="muted small">· ${esc(x.k)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
+      return `<div class="cf-sec"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(x => `<li>${starBtn('cf:' + x.k + ':' + x.id + ':' + x.f, x.text, h + ' · ' + x.k)}${esc(x.text)} <span class="muted small">· ${esc(x.k)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}</div>`; };
     body = !rows.length ? '<p class="muted">No feedback from a real cohort yet.</p>' : `
       <table class="roster fb-table"><thead><tr><th>Cohort</th><th class="c">Responses</th><th class="c">The Program</th><th class="c">Academy Week</th></tr></thead>
         <tbody>${rows.map(r => `<tr><td><b>${esc(r.k)}</b></td><td class="c">${r.f.n}</td><td class="c">${n1(r.f.program)}</td><td class="c">${n1(r.f.aw)}</td></tr>`).join('')}
@@ -962,6 +962,8 @@ function fbAdminModal() {
           <ul class="cf-qs">${qs.map((q, i) => `<li><span>${esc(q)}</span><b>${n1(av[i])}</b></li>`).join('')}</ul></div>`).join('')}
         ${said('What worked well', f => f.worked)}${said('Constructive criticism', f => f.criticism)}
       </div>`;
+  } else if (tab === 'reviews') {
+    body = moduleReviewsBody();
   } else {
     body = `<div class="cf-body">${['Nick', 'Bella'].map(who => {
       const f = fbFor(who), real2 = f.byCohort.filter(c => !c.test), comments = f.comments.filter(c => !c.test);
@@ -969,13 +971,67 @@ function fbAdminModal() {
         ${f.n ? `<ul class="cf-qs">${FB_KEYS.map(([k, l]) => `<li><span>${l}</span><b>${n1(f.avg[k])}</b></li>`).join('')}</ul>
           <p class="cf-h fb-sub">By cohort</p><ul class="cf-qs">${real2.map(c => `<li><span>${esc(c.key)} <span class="muted small">· ${c.n}</span></span><b>${n1(c.overall)}</b></li>`).join('')}</ul>
           <p class="cf-h fb-sub">Comments <span class="muted small">${comments.length}</span></p>
-          ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${esc(c.text)} <span class="muted small">· ${esc(c.key)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
+          ${comments.length ? `<ul class="cf-said">${comments.map(c => `<li>${starBtn('own:' + c.key + ':' + c.id + ':' + who, c.text, who + ' feedback · ' + c.key)}${esc(c.text)} <span class="muted small">· ${esc(c.key)}</span></li>`).join('')}</ul>` : '<p class="muted small">None written yet.</p>'}`
         : '<p class="muted small">No ratings from a real cohort yet.</p>'}</div>`; }).join('')}</div>`;
   }
   return `<div class="overlay" data-act="fbAdminClose"><div class="modal fb-admin" data-stop>
     <div class="modal-head"><h2>Instructor &amp; Course Feedback</h2>${tabs}<button class="x big" data-act="fbAdminClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top" data-keep-scroll="fbAdmin">${body}</div></div></div>`;
 }
+/* ---------- Module Reviews (the "Module Evaluation" Google Form, read by the Admin script) ----------
+   No ratings on that form: which module, the weakest and strongest presentation, and comments, all typed. Grouped by
+   cohort (by the date it was sent) and module. Blank / "n/a" / "no" answers are left out. */
+const MR_SKIP = /^(n\/?a|na|no|nope|none|nothing|no comments?|not really|nah|-+|\.+)$/i;
+const mrKeep = t => { const x = String(t || '').trim().replace(/[!.:)\s]+$/, ''); return x && !MR_SKIP.test(x); };
+async function loadModuleReviews() {
+  if (S.mrLoading) return;
+  S.mrLoading = true; S.mrErr = ''; render();
+  try { S.mr = await Sheets.moduleReviews(); } catch (e) { S.mrErr = /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message; }
+  S.mrLoading = false; render();
+}
+function moduleReviewsBody() {
+  if (!S.mr && !S.mrLoading && !S.mrErr) setTimeout(loadModuleReviews, 0);
+  if (S.mrErr) return `<div class="alert">${esc(S.mrErr)} <button class="btn small" data-act="mrReload">Try again</button></div>`;
+  if (!S.mr) return '<p class="loading">Reading the Module Evaluation responses…</p>';
+  const rows = S.mr.rows.filter(r => r.cohort), cohorts = [...new Set(rows.map(r => r.cohort))].reverse(); // (newest first)
+  if (!cohorts.length) return '<p class="muted">No module reviews yet.</p>';
+  const key = cohorts.includes(S.mrCohort) ? S.mrCohort : cohorts[0], mine = rows.filter(r => r.cohort === key);
+  const mods = [...new Set(mine.map(r => r.module).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const when = at => parseIso(at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const list = (h, m, f) => { const items = mine.filter(r => r.module === m && mrKeep(r[f])).sort((a, b) => b.at.localeCompare(a.at));
+    return `<div class="mr-col"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(r =>
+      `<li>${starBtn('mr:' + r.at + ':' + f, r[f], m + ' review · ' + key + (f === 'weakest' ? ' (weakest)' : f === 'strongest' ? ' (strongest)' : ''))}${esc(r[f])} <span class="muted small">· ${when(r.at)}</span></li>`).join('')}</ul>` : '<p class="muted small">None.</p>'}</div>`; };
+  return `<div class="mr-top"><label class="mr-pick">Cohort <select data-mr="cohort" aria-label="Cohort">${cohorts.map(c => `<option ${c === key ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
+      <span class="muted small">${mine.length} response${mine.length === 1 ? '' : 's'}</span>
+      <button class="link small" data-act="adminOpenUrl" data-name="Module Evaluation (Responses)" data-url="${esc(S.mr.url)}">Open the responses ↗</button>
+      <button class="eye inq-reload ${S.mrLoading ? 'spin' : ''}" data-act="mrReload" title="Read the responses again" aria-label="Refresh">${RESET}</button></div>
+    ${mods.map(m => { const n = mine.filter(r => r.module === m).length;
+      return `<details class="mr-mod" ${S.mrOpen === key + '|' + m ? 'open' : ''}><summary data-act="mrMod" data-k="${esc(key + '|' + m)}"><b>${esc(m)}</b> <span class="muted small">${n} response${n === 1 ? '' : 's'}</span></summary>
+        <div class="mr-cols">${list('Weakest', m, 'weakest')}${list('Strongest', m, 'strongest')}${list('Comments', m, 'comments')}</div></details>`; }).join('')}`;
+}
+
+/* ---------- Stars (feedback → a list) ----------
+   ☆ on a Module Review answer or a course feedback comment: pick To Do, Do before next cohort, or Future updates, and
+   the comment becomes an item there (with where it came from). ★ shows where it went; Unstar doesn't delete the item.
+   meta/feedbackStars: { stars: { <key>: { to, at } } }. */
+const STAR_TO = { todo: 'To Do', next: 'Do before next cohort', future: 'Future updates' };
+let starWatching = false;
+function starBtn(key, text, src) {
+  if (!starWatching && Store.configured !== undefined) { starWatching = true; Store.watch('meta/feedbackStars', d => { S.fbStars = (d && d.stars) || {}; render(); }); }
+  const st = (S.fbStars || {})[key];
+  return `<button class="star-btn ${st ? 'on' : ''}" data-act="fbStar" data-k="${esc(key)}" data-text="${esc(text)}" data-src="${esc(src)}" title="${st ? 'Added to ' + STAR_TO[st.to] : 'Add to a list'}" aria-label="${st ? 'Starred' : 'Star'}">${st ? '★' : '☆'}</button>`;
+}
+function fbStarModal() {
+  const x = S.fbStarEd, st = (S.fbStars || {})[x.key];
+  return `<div class="overlay" data-act="fbStarClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>${st ? 'Starred' : 'Add to a list'}</h2><button class="x big" data-act="fbStarClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top"><blockquote class="star-quote">${esc(x.text)}</blockquote><p class="muted small">${esc(x.src)}</p>
+      ${st ? `<p>Added to <b>${STAR_TO[st.to]}</b>.</p>` : `<div class="star-picks">${Object.entries(STAR_TO).map(([k, l]) => `<button class="btn" data-act="fbStarTo" data-to="${k}" ${k === 'next' && !changesHome().src ? 'disabled title="No cohort to put it on yet"' : ''}>${l}</button>`).join('')}</div>`}
+    </div>
+    ${st ? `<div class="modal-foot"><button class="btn" data-act="fbUnstar">Unstar</button></div>` : ''}
+  </div></div>`;
+}
+
 // Remind me: a date on a sticky. From that day it's in the Morning Email (Reminders) every morning and has a rose
 // edge here, until you move the date, clear it, or delete the note.
 const BELL = '<svg viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>';
@@ -1155,7 +1211,7 @@ function layoutStickies() {
 
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
-  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.inqSet ? inqSetModal() : '')
+  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.fbStarEd ? fbStarModal() : '') + (S.inqSet ? inqSetModal() : '')
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
@@ -1185,9 +1241,11 @@ function adminInput(t) {
   if (t.id === 'td-rn') { S.drafts['td-rn'] = t.value; return true; }
   if (t.dataset.lk && S.linksDraft) { const [i, k] = t.dataset.lk.split(':'); S.linksDraft[Number(i)][k] = t.value; return true; }
   if (t.dataset.anote) return true; // (sticky notes save themselves: see the sticky note input listener)
+  if (t.dataset.mr === 'cohort') { S.mrCohort = t.value; S.mrOpen = null; render(); return true; } // (Module Reviews: which cohort)
   return false;
 }
 function adminEscape() {
+  if (S.fbStarEd) { S.fbStarEd = null; return true; }
   if (S.faqOpen) { S.faqOpen = false; return true; }
   if (S.histEd) { if (S.histEd.busy) return true; S.histEd = null; S.datePick = null; }
   else if (S.noteRemind) { S.noteRemind = null; S.datePick = null; }
@@ -1276,6 +1334,26 @@ async function adminAct(a, el = {}) {
       S.inqSaving = false; render(); return true;
     }
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
+    case 'mrReload': S.mr = null; loadModuleReviews(); return true;
+    case 'mrMod': e && e.preventDefault(); S.mrOpen = S.mrOpen === d.k ? null : d.k; render(); return true;
+    case 'fbStar': S.fbStarEd = { key: d.k, text: d.text, src: d.src }; render(); return true;
+    case 'fbStarClose': S.fbStarEd = null; render(); return true;
+    case 'fbStarTo': {
+      const x = S.fbStarEd; if (!x) return true;
+      const text = x.text.replace(/\s+/g, ' ').trim();
+      S.fbStarEd = null; render();
+      if (d.to === 'todo') await Store.add('adminTodos', { text, note: 'From ' + x.src, due: '', repeat: null, who: 'both', links: [], snooze: '', done: false, created: Date.now() });
+      else if (d.to === 'next') { const src = changesHome().src; if (!src) { toast('No cohort to put it on yet.'); return true; }
+        await Store.add('cohorts/' + src + '/todos', { text: text + ' (' + x.src + ')', done: false, day: SETUP, kind: 'next', order: Date.now(), created: Date.now() }); }
+      else await Store.add('updates', { text: text + ' (' + x.src + ')', done: false, created: Date.now(), from: '' });
+      await Store.set('meta/feedbackStars', { stars: { [x.key]: { to: d.to, at: Date.now() } } });
+      toast('Added to ' + STAR_TO[d.to] + '.'); return true;
+    }
+    case 'fbUnstar': {
+      const x = S.fbStarEd; S.fbStarEd = null;
+      const stars = { ...(S.fbStars || {}) }; delete stars[x.key];
+      await Store.set('meta/feedbackStars', { stars }, false); render(); return true;
+    }
     case 'faqCat': S.faqCat = Number(d.c); render(); return true;
     case 'faqBack': S.faqCat = null; render(); return true;
     case 'faqOpen': S.faqOpen = true; S.faqQ = ''; S.faqCat = null; render(); setTimeout(() => { const x = document.getElementById('faq-q'); if (x) x.focus(); }, 0); return true;

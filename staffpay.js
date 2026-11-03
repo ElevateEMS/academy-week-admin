@@ -1132,7 +1132,7 @@ function fbFor(who) {
   Object.entries(S.allEvals || {}).sort(([a], [b]) => (cohortRank(b) ?? 0) - (cohortRank(a) ?? 0)).forEach(([key, list]) => {
     const c = { key, test: isTestKey(key), n: 0, sum: {}, cnt: {}, days: [] };
     list.forEach(e => (e.instructors || []).filter(x => fbWho(x.id) === who).forEach(x => {
-      if (String(x.feedback || '').trim()) out.comments.push({ text: x.feedback, key, day: e.day, test: c.test });
+      if (String(x.feedback || '').trim()) out.comments.push({ text: x.feedback, key, day: e.day, test: c.test, id: e.id });
       if (!FB_KEYS.some(([k]) => score(x[k]) != null)) return; // (a comment only)
       c.n++; if (!c.days.includes(e.day)) c.days.push(e.day);
       FB_KEYS.forEach(([k]) => { const v = score(x[k]); if (v != null) { c.sum[k] = (c.sum[k] || 0) + v; c.cnt[k] = (c.cnt[k] || 0) + 1; } });

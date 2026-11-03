@@ -1989,3 +1989,20 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .shirt-list .check-line { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .se-shirt { display: grid; grid-template-columns: 1fr; gap: 0; }
 .se-zip { display: flex; gap: 8px; align-items: center; margin: -4px 0 10px; font-size: 14px; cursor: pointer; }
+
+/* Feedback stars (☆ → a list) and Module Reviews */
+.star-btn { background: none; border: 0; padding: 0 6px 0 0; font-size: 15px; line-height: 1; color: var(--taupe); cursor: pointer; vertical-align: -1px; }
+.star-btn:hover { color: var(--taupe-dark); }
+.star-btn.on { color: #c19a62; }
+.star-quote { margin: 0 0 6px; padding: 8px 12px; border-left: 3px solid var(--line); color: var(--ink); font-size: 14px; }
+.star-picks { display: grid; gap: 8px; margin-top: 12px; }
+.star-picks .btn { width: 100%; }
+.mr-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.mr-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.mr-pick select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 28px 5px 10px; background-color: var(--paper); font: inherit; font-size: 14px; color: var(--ink); }
+.mr-mod { border-top: 1px solid var(--line); padding: 8px 0; }
+.mr-mod summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+.mr-mod summary::-webkit-details-marker { display: none; }
+.mr-mod summary::before { content: '▸'; color: var(--taupe-dark); font-size: 12px; transition: transform .15s; }
+.mr-mod[open] summary::before { transform: rotate(90deg); }
+.mr-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 22px; margin-top: 6px; }
