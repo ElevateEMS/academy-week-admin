@@ -2029,3 +2029,6 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .howto-modal h4 { margin: 4px 0 4px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--taupe-dark); font-family: Jost, system-ui, sans-serif; font-weight: 500; }
 .howto-modal ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.55; }
 .howto-modal ul ul { margin: 2px 0 4px; }
+/* Make Upcoming / Active / Former pop-up */
+.status-ask { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; }
+.status-ask .warn-text { color: var(--rose); font-weight: 500; }

@@ -813,7 +813,8 @@ function shell() {
   ${S.bp ? bpModal() : ''}
   ${S.roster ? rosterModal() : ''}
   ${S.resetAsk ? resetModal() : ''}
-  ${S.dropAsk ? dropModal() : ''}`;
+  ${S.dropAsk ? dropModal() : ''}
+  ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
 function pageTitle() {
@@ -1205,6 +1206,32 @@ function statusMenu() {
       ? `<div class="status-opt on"><b>${x} ✓</b><span>${STATUS_HELP[x]}</span></div>`
       : `<button class="status-opt" role="menuitem" data-act="setStatus" data-k="${esc(S.cohortKey)}" data-s="${x}"><b>${x}</b><span>${STATUS_HELP[x]}</span></button>`).join('')}
       ${isTestCohort(S.cohortKey) ? `<button class="status-opt reset-opt" role="menuitem" data-act="resetAsk"><b>Reset test cohort</b><span>Back to brand new: clears its app data, its sheet’s rows and Course Details, and trashes its folder’s files.</span></button>` : ''}</div>` : ''}</span>`;
+}
+// Make Upcoming / Active / Former: a pop-up that says everything it changes before it does it.
+function statusAskModal() {
+  const { key, status, busy } = S.statusAsk, was = ((S.cohorts || []).find(c => c.key === key) || {}).status || '';
+  const items = status === 'Former' ? [
+    'Its students only see the <b>Resources</b> tab in the Student Hub.',
+    'Its folder moves into <b>Former/Test Cohorts</b> in Drive.',
+    '<b class="warn-text">Roster signatures and roster lists come out of the app’s database. This can’t be undone.</b> The finished roster PDFs in Drive stay.',
+    'The automatic checks stop for it: Ride Along requests, overdue payments, Tally sign-ups and the 7 PM feedback PDFs.',
+    'The Morning Email stops listing its emails and to-dos.',
+    'Its Academy Week comes off the Staff Portal and the Staff page’s pay estimates. Anyone still unpaid shows under <b>Also owed</b>.',
+  ] : status === 'Active' ? [
+    'Students on its roster can <b>log in to the Student Hub</b>.',
+    'Its emails, Morning Email, automatic checks and staff schedule keep running, as they did while Upcoming.',
+    ...(/former/i.test(was) ? ['Its folder moves back out of Former/Test Cohorts, and the automatic checks start again.'] : []),
+  ] : [
+    'Students can’t log in to the Student Hub yet.',
+    'Its emails, Morning Email, automatic checks and staff schedule run as usual.',
+    ...(/former/i.test(was) ? ['Its folder moves back out of Former/Test Cohorts.'] : []),
+  ];
+  return `<div class="overlay" data-act="statusAskClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Make ${esc(key)} ${esc(status)}?</h2><button class="x big" data-act="statusAskClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top"><ul class="status-ask">${items.map(x => `<li>${x}</li>`).join('')}</ul></div>
+    <div class="modal-foot"><button class="btn" data-act="statusAskClose" ${busy ? 'disabled' : ''}>Cancel</button>
+      <button class="btn primary ${status === 'Former' ? 'danger' : ''}" data-act="setStatusGo" ${busy ? 'disabled' : ''}>${busy ? 'Saving…' : 'Make ' + esc(status)}</button></div>
+  </div></div>`;
 }
 function dropClose() { S.dropAsk = null; S.datePick = null; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); }
 // Reset test cohort (Test/QA cohorts only; the Admin Apps Script checks again, and checks the folder and sheet names).
@@ -2772,6 +2799,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
+    if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
     else if (S.dueEd) { S.dueEd = null; delete S.drafts['due-date']; }
@@ -2906,13 +2934,13 @@ async function act(a, el = {}, e) {
         }
         break;
       }
-      case 'setStatus': {
-        const key = d.k, status = d.s;
-        S.statusMenu = false;
-        const why = status === 'Active' ? 'Students on its roster will be able to log in to the Student Hub.'
-          : status === 'Former' ? 'Its students will only see the Resources tab in the Student Hub, and its folder moves to Former/Test Cohorts.' : '';
-        if (!confirm(`Make ${key} ${status} in the config sheet?\n\n${why}`)) return;
-        const res = await Sheets.setStatus(key, status);
+      case 'setStatus': S.statusMenu = false; S.statusAsk = { key: d.k, status: d.s }; render(); break; // (the pop-up says what it means first)
+      case 'statusAskClose': if (!(S.statusAsk && S.statusAsk.busy)) { S.statusAsk = null; render(); } break;
+      case 'setStatusGo': {
+        const { key, status } = S.statusAsk || {}; if (!key) break;
+        S.statusAsk.busy = true; render();
+        let res; try { res = await Sheets.setStatus(key, status); } catch (err) { S.statusAsk.busy = false; toast('Couldn’t change it: ' + err.message); render(); break; }
+        S.statusAsk = null;
         S.kdAt = 0; // Key Dates picks up the change
         S.cohorts = S.cohorts.map(c => c.key === key ? { ...c, status } : c);
         if (key === S.cohortKey && S.sheet) { S.sheet = { ...S.sheet, status }; sheetCopy(key, S.sheet); }
