@@ -191,6 +191,7 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .checks:not(.ch-list) > li { position: relative; }
 .checks:not(.ch-list) > li:not(.two-row) { flex-wrap: nowrap; }
 .checks:not(.ch-list) > li > label { flex: 0 1 auto; min-width: 0; }
+.checks:not(.ch-list) > li > label:has(.txt-edit) { flex: 1 1 auto; } /* (editing the words: the box runs right up to the button) */
 .checks:not(.ch-list) > li > :not(label) { flex-shrink: 0; }
 .checks:not(.ch-list) > li > .due-chip { margin-left: auto; }
 .checks:not(.ch-list) > li > .due-chip + .x:last-child { margin-left: -4px; }
