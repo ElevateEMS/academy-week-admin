@@ -1225,7 +1225,8 @@ function resetModal() {
     <div class="modal-foot"><button class="btn" data-act="resetCancel">Cancel</button><button class="btn primary danger" data-act="resetGo" ${typed === key ? '' : 'disabled'}>Reset</button></div>
   </div></div>`;
 }
-const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}">Make ${key === S.cohortKey ? '' : esc(key) + ' '}${status}</button>`;
+// Short label ("Make Former") so it fits beside its checklist item; which cohort is in the hover text.
+const statusBtn = (key, status) => `<button class="btn tiny" data-act="setStatus" data-k="${esc(key)}" data-s="${status}" title="Make ${esc(key)} ${status}">Make ${status}</button>`;
 
 // Course Details box: what's in the sheet's settings box, TBD where it's blank.
 function infoBox() {
