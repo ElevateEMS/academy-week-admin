@@ -2007,5 +2007,6 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .mr-mod[open] summary::before { transform: rotate(90deg); }
 .mr-h { color: var(--taupe-dark); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; } /* (Weakest / Strongest / Comments: set apart from the module above) */
 .mr-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 22px; margin-top: 6px; }
-.rev-btn { flex: none; align-self: center; }
-.rev-btn svg { width: 16px; height: 16px; }
+.rev-btn { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--taupe-dark); cursor: pointer; } /* (💬 at the end of the title) */
+.rev-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.rev-btn:hover { color: var(--ink); }

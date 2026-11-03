@@ -1046,6 +1046,7 @@ document.addEventListener('click', e => {
   }
   // On those items only the circle checks it off (not the rest of the row).
   if (e.target.closest && e.target.closest('.ro-label') && !e.target.matches('input')) { e.preventDefault(); return; }
+  if (e.target.closest && e.target.closest('.rev-btn')) { e.preventDefault(); return; } // (💬: opens the review, doesn't tick or edit the item)
   const lab = e.target.closest && e.target.closest('label');
   const own = lab && lab.querySelector('.txt[data-hl], .txt-edit');
   if (own && !e.target.matches('input') && EDITABLE.includes((own.dataset.hl || own.dataset.edit).split(':')[0])) { e.preventDefault(); e.stopPropagation(); }
@@ -1307,7 +1308,7 @@ function setupList() {
       const auto = setupAuto(t.text), done = auto.done === true || t.done;
       const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${reviewBtn(t)}${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${reviewBtn(t)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
         <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
     }).join('') || '<li class="empty">Nothing yet.</li>'}
   </ul>`;
@@ -1317,7 +1318,7 @@ function prevChanges() {
   if (!prevFor || !S.prevTodos.length) return '';
   const list = [...S.prevTodos].sort((a, b) => orderOf(a) - orderOf(b));
   return `<p class="mini-head">From ${esc(prevFor)}’s changes</p>
-    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('prev', x, x.done)}
+    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label>${dueBits('prev', x, x.done)}
       <button class="x" data-act="prevDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('')}</ul>`;
 }
 

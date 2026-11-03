@@ -343,7 +343,7 @@ function tdLine(t) {
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
   return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
-    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>${reviewBtn(t)}
+    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
       ${links || t.repeat || (!t.done && w) ? `<div class="td-meta">${links}
         ${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}
         ${t.done ? '' : tdChip(t)}</div>` : ''}</div>
@@ -503,12 +503,12 @@ function adminChangesBox() {
     <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
     ${S.changesAdd === 'anext' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="adminNext" data-chadd="anext" placeholder="Type a change, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : ''}
     <ul class="checks ch-list" data-chlist="anext">${nxt.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('anext', x, x.done)}
+      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label>${dueBits('anext', x, x.done)}
       <button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
     <hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
     ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
     <ul class="checks ch-list" data-chlist="upd">${upd.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('upd', x, x.done)}
+      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label>${dueBits('upd', x, x.done)}
       <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
@@ -1030,7 +1030,8 @@ function starBtn(key, text, src) {
 }
 // 💬 on an item made from a starred review: the whole review in a small pop-up.
 const BUBBLE = '<svg viewBox="0 0 24 24"><path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5V16.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/></svg>';
-const reviewBtn = x => x && x.review && x.review.text ? `<button class="eye rev-btn" data-act="reviewShow" data-text="${esc(x.review.text)}" data-src="${esc(x.review.src || '')}" title="See the full review" aria-label="See the full review">${BUBBLE}</button>` : '';
+// (A span, not a button: it sits inline at the end of the title, even inside the To Do card's title button.)
+const reviewBtn = x => x && x.review && x.review.text ? `<span class="rev-btn" role="button" tabindex="0" data-act="reviewShow" data-text="${esc(x.review.text)}" data-src="${esc(x.review.src || '')}" title="See the full review" aria-label="See the full review">${BUBBLE}</span>` : '';
 function reviewModal() {
   const x = S.reviewShow;
   return `<div class="overlay" data-act="reviewClose"><div class="modal small-modal" data-stop>
