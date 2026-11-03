@@ -1307,7 +1307,7 @@ function setupList() {
       const auto = setupAuto(t.text), done = auto.done === true || t.done;
       const box = auto.done === true ? circle(true, 'disabled title="Checked automatically from the Google Sheet"') : circle(done, `data-act="todo" data-id="${t.id}"`);
       return `<li class="${done ? 'done' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
+        <label>${box}<span>${hlTxt('todo', t.id, t.text, t.hl)}${auto.note}</span></label>${reviewBtn(t)}${auto.btn}${S.sheet.folderUrl ? setupDocBtn(t.text) : ''}${dueBits('setup', t, done)}
         <button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button></li>`;
     }).join('') || '<li class="empty">Nothing yet.</li>'}
   </ul>`;
@@ -1317,7 +1317,7 @@ function prevChanges() {
   if (!prevFor || !S.prevTodos.length) return '';
   const list = [...S.prevTodos].sort((a, b) => orderOf(a) - orderOf(b));
   return `<p class="mini-head">From ${esc(prevFor)}’s changes</p>
-    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label>${dueBits('prev', x, x.done)}
+    <ul class="checks">${list.map(x => `<li class="${x.done ? 'done' : ''}"><label>${circle(x.done, `data-act="prevTodo" data-id="${x.id}"`)}<span>${hlTxt('prev', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('prev', x, x.done)}
       <button class="x" data-act="prevDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('')}</ul>`;
 }
 
@@ -3379,7 +3379,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el)) && !(await staffAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el, e)) && !(await staffAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });

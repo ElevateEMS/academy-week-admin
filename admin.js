@@ -343,7 +343,7 @@ function tdLine(t) {
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
   return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
-    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
+    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>${reviewBtn(t)}
       ${links || t.repeat || (!t.done && w) ? `<div class="td-meta">${links}
         ${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}
         ${t.done ? '' : tdChip(t)}</div>` : ''}</div>
@@ -503,12 +503,12 @@ function adminChangesBox() {
     <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
     ${S.changesAdd === 'anext' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="adminNext" data-chadd="anext" placeholder="Type a change, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : ''}
     <ul class="checks ch-list" data-chlist="anext">${nxt.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}</span></label>${dueBits('anext', x, x.done)}
+      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('anext', x, x.done)}
       <button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
     <hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
     ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
     <ul class="checks ch-list" data-chlist="upd">${upd.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>${dueBits('upd', x, x.done)}
+      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}</span></label>${reviewBtn(x)}${dueBits('upd', x, x.done)}
       <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
@@ -982,7 +982,10 @@ function fbAdminModal() {
    No ratings on that form: which module, the weakest and strongest presentation, and comments, all typed. Grouped by
    cohort (by the date it was sent) and module. Blank / "n/a" / "no" answers are left out. */
 const MR_SKIP = /^(n\/?a|na|no|nope|none|nothing|no comments?|not really|nah|-+|\.+|(no(ne|thing)?,? )?not (at )?(this|the) (time|moment)|nothing (at )?(this|the) (time|moment))$/i;
-const mrKeep = t => { const x = String(t || '').trim().replace(/[!.:)\s]+$/, ''); return x && !MR_SKIP.test(x); };
+const MR_SKIP_WORDS = ['n/a', 'na', 'n.a', 'no', 'nope', 'none', 'nothing', 'nah'];
+const mrKeep = t => { const x = String(t || '').trim().replace(/[!.:)\s]+$/, ''); if (!x || MR_SKIP.test(x)) return false;
+  const words = x.toLowerCase().split(/[\s,;\-–—]+/).map(w => w.replace(/[!.:)(]+$/, '')).filter(Boolean); // ("n/a none", "N/A - none")
+  return !words.every(w => MR_SKIP_WORDS.includes(w)); };
 // The last copy (kept on this computer) shows right away; a fresh read replaces it in the background, once per visit.
 let mrFresh = false;
 async function loadModuleReviews() {
@@ -1025,12 +1028,23 @@ function starBtn(key, text, src) {
   const st = (S.fbStars || {})[key];
   return `<button class="star-btn ${st ? 'on' : ''}" data-act="fbStar" data-k="${esc(key)}" data-text="${esc(text)}" data-src="${esc(src)}" title="${st ? 'Added to ' + STAR_TO[st.to] : 'Add to a list'}" aria-label="${st ? 'Starred' : 'Star'}">${st ? '★' : '☆'}</button>`;
 }
+// 💬 on an item made from a starred review: the whole review in a small pop-up.
+const BUBBLE = '<svg viewBox="0 0 24 24"><path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4.5 3.5V16.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/></svg>';
+const reviewBtn = x => x && x.review && x.review.text ? `<button class="eye rev-btn" data-act="reviewShow" data-text="${esc(x.review.text)}" data-src="${esc(x.review.src || '')}" title="See the full review" aria-label="See the full review">${BUBBLE}</button>` : '';
+function reviewModal() {
+  const x = S.reviewShow;
+  return `<div class="overlay" data-act="reviewClose"><div class="modal small-modal" data-stop>
+    <div class="modal-head"><h2>Full review</h2><button class="x big" data-act="reviewClose" aria-label="Close">×</button></div>
+    <div class="modal-body pad-top"><blockquote class="star-quote">${esc(x.text)}</blockquote>${x.src ? `<p class="muted small">${esc(x.src)}</p>` : ''}</div>
+  </div></div>`;
+}
 function fbStarModal() {
   const x = S.fbStarEd, st = (S.fbStars || {})[x.key];
   return `<div class="overlay" data-act="fbStarClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>${st ? 'Starred' : 'Add to a list'}</h2><button class="x big" data-act="fbStarClose" aria-label="Close">×</button></div>
     <div class="modal-body pad-top"><blockquote class="star-quote">${esc(x.text)}</blockquote><p class="muted small">${esc(x.src)}</p>
-      ${st ? `<p>Added to <b>${STAR_TO[st.to]}</b>.</p>` : `<div class="star-picks">${Object.entries(STAR_TO).map(([k, l]) => `<button class="btn" data-act="fbStarTo" data-to="${k}" ${k === 'next' && !changesHome().src ? 'disabled title="No cohort to put it on yet"' : ''}>${l}</button>`).join('')}</div>`}
+      ${st ? `<p>Added to <b>${STAR_TO[st.to]}</b>.</p>` : `<label class="field">Title<input id="star-title" data-draft="star-title" value="${esc(S.drafts['star-title'] ?? '')}" autocomplete="off"></label>
+        <p class="muted small">Shorten it if you like. The full review stays with it (💬 on the item).</p><div class="star-picks">${Object.entries(STAR_TO).map(([k, l]) => `<button class="btn" data-act="fbStarTo" data-to="${k}" ${k === 'next' && !changesHome().src ? 'disabled title="No cohort to put it on yet"' : ''}>${l}</button>`).join('')}</div>`}
     </div>
     ${st ? `<div class="modal-foot"><button class="btn" data-act="fbUnstar">Unstar</button></div>` : ''}
   </div></div>`;
@@ -1215,7 +1229,7 @@ function layoutStickies() {
 
 /* ---------- Hooks called from app.js ---------- */
 function adminModals() {
-  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.fbStarEd ? fbStarModal() : '') + (S.inqSet ? inqSetModal() : '')
+  return (S.ql && !window.QUICKLOG_ONLY ? qlModal() : '') + (S.adminInfoEd ? adminInfoModal() : '') + (S.faqOpen && typeof faqModal === 'function' ? faqModal() : '') + (S.fbStarEd ? fbStarModal() : '') + (S.reviewShow ? reviewModal() : '') + (S.inqSet ? inqSetModal() : '')
     + (S.inqEd ? inqEdModal() : '') + (S.ptEd ? ptEdModal() : '') + (S.logEd ? logContactModal() : '') + (S.histEd ? histEdModal() : '') + (S.noteRemind ? noteRemindModal() : '') + (S.linksDraft ? linksEdModal() : '') + (S.tdEd ? tdModal() : '');
 }
 function adminInput(t) {
@@ -1249,6 +1263,7 @@ function adminInput(t) {
   return false;
 }
 function adminEscape() {
+  if (S.reviewShow) { S.reviewShow = null; return true; }
   if (S.fbStarEd) { S.fbStarEd = null; return true; }
   if (S.faqOpen) { S.faqOpen = false; return true; }
   if (S.histEd) { if (S.histEd.busy) return true; S.histEd = null; S.datePick = null; }
@@ -1273,7 +1288,7 @@ function adminEnter(t) {
   adminAct(a, t);
   return true;
 }
-async function adminAct(a, el = {}) {
+async function adminAct(a, el = {}, e) {
   if (a === 'qlOpen') { qlStart(); render(); return true; }
   if (a === 'qlClose') { if (S.ql && !S.ql.busy) { S.ql = null; render(); } return true; }
   if (a === 'qlPhotoClear') { S.ql.photo = null; render(); return true; }
@@ -1340,16 +1355,20 @@ async function adminAct(a, el = {}) {
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
     case 'mrReload': S.mrErr = ''; loadModuleReviews(); return true;
     case 'mrMod': e && e.preventDefault(); S.mrOpen = S.mrOpen === d.k ? null : d.k; render(); return true;
-    case 'fbStar': S.fbStarEd = { key: d.k, text: d.text, src: d.src }; render(); return true;
+    case 'fbStar': S.fbStarEd = { key: d.k, text: d.text, src: d.src }; S.drafts['star-title'] = String(d.text || '').replace(/\s+/g, ' ').trim(); render();
+      setTimeout(() => { const x = document.getElementById('star-title'); if (x) { x.focus(); x.select(); } }, 0); return true;
     case 'fbStarClose': S.fbStarEd = null; render(); return true;
+    case 'reviewShow': S.reviewShow = { text: d.text, src: d.src }; render(); return true;
+    case 'reviewClose': S.reviewShow = null; render(); return true;
     case 'fbStarTo': {
       const x = S.fbStarEd; if (!x) return true;
-      const text = x.text.replace(/\s+/g, ' ').trim();
-      S.fbStarEd = null; render();
-      if (d.to === 'todo') await Store.add('adminTodos', { text, note: 'From ' + x.src, due: '', repeat: null, who: 'both', links: [], snooze: '', done: false, created: Date.now() });
+      const text = String(S.drafts['star-title'] || '').replace(/\s+/g, ' ').trim() || x.text.replace(/\s+/g, ' ').trim();
+      const review = { text: x.text, src: x.src }; // (the whole review: 💬 on the item)
+      S.fbStarEd = null; delete S.drafts['star-title']; render();
+      if (d.to === 'todo') await Store.add('adminTodos', { text, note: '', review, due: '', repeat: null, who: 'both', links: [], snooze: '', done: false, created: Date.now() });
       else if (d.to === 'next') { const src = changesHome().src; if (!src) { toast('No cohort to put it on yet.'); return true; }
-        await Store.add('cohorts/' + src + '/todos', { text: text + ' (' + x.src + ')', done: false, day: SETUP, kind: 'next', order: Date.now(), created: Date.now() }); }
-      else await Store.add('updates', { text: text + ' (' + x.src + ')', done: false, created: Date.now(), from: '' });
+        await Store.add('cohorts/' + src + '/todos', { text, review, done: false, day: SETUP, kind: 'next', order: Date.now(), created: Date.now() }); }
+      else await Store.add('updates', { text, review, done: false, created: Date.now(), from: '' });
       await Store.set('meta/feedbackStars', { stars: { [x.key]: { to: d.to, at: Date.now() } } });
       toast('Added to ' + STAR_TO[d.to] + '.'); return true;
     }
