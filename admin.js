@@ -981,16 +981,20 @@ function fbAdminModal() {
 /* ---------- Module Reviews (the "Module Evaluation" Google Form, read by the Admin script) ----------
    No ratings on that form: which module, the weakest and strongest presentation, and comments, all typed. Grouped by
    cohort (by the date it was sent) and module. Blank / "n/a" / "no" answers are left out. */
-const MR_SKIP = /^(n\/?a|na|no|nope|none|nothing|no comments?|not really|nah|-+|\.+)$/i;
+const MR_SKIP = /^(n\/?a|na|no|nope|none|nothing|no comments?|not really|nah|-+|\.+|(no(ne|thing)?,? )?not (at )?(this|the) (time|moment)|nothing (at )?(this|the) (time|moment))$/i;
 const mrKeep = t => { const x = String(t || '').trim().replace(/[!.:)\s]+$/, ''); return x && !MR_SKIP.test(x); };
+// The last copy (kept on this computer) shows right away; a fresh read replaces it in the background, once per visit.
+let mrFresh = false;
 async function loadModuleReviews() {
   if (S.mrLoading) return;
   S.mrLoading = true; S.mrErr = ''; render();
-  try { S.mr = await Sheets.moduleReviews(); } catch (e) { S.mrErr = /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message; }
+  try { S.mr = await Sheets.moduleReviews(); mrFresh = true; keepCopy('modrev', S.mr); }
+  catch (e) { if (!S.mr) S.mrErr = /unknown request/i.test(e.message) ? 'The Admin Apps Script needs its new version deployed.' : e.message; }
   S.mrLoading = false; render();
 }
 function moduleReviewsBody() {
-  if (!S.mr && !S.mrLoading && !S.mrErr) setTimeout(loadModuleReviews, 0);
+  if (!S.mr) S.mr = keepCopy('modrev');
+  if (!mrFresh && !S.mrLoading && !S.mrErr) setTimeout(loadModuleReviews, 0);
   if (S.mrErr) return `<div class="alert">${esc(S.mrErr)} <button class="btn small" data-act="mrReload">Try again</button></div>`;
   if (!S.mr) return '<p class="loading">Reading the Module Evaluation responses…</p>';
   const rows = S.mr.rows.filter(r => r.cohort), cohorts = [...new Set(rows.map(r => r.cohort))].reverse(); // (newest first)
@@ -999,7 +1003,7 @@ function moduleReviewsBody() {
   const mods = [...new Set(mine.map(r => r.module).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   const when = at => parseIso(at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const list = (h, m, f) => { const items = mine.filter(r => r.module === m && mrKeep(r[f])).sort((a, b) => b.at.localeCompare(a.at));
-    return `<div class="mr-col"><p class="cf-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(r =>
+    return `<div class="mr-col"><p class="cf-h mr-h">${h} <span class="muted small">${items.length}</span></p>${items.length ? `<ul class="cf-said">${items.map(r =>
       `<li>${starBtn('mr:' + r.at + ':' + f, r[f], m + ' review · ' + key + (f === 'weakest' ? ' (weakest)' : f === 'strongest' ? ' (strongest)' : ''))}${esc(r[f])} <span class="muted small">· ${when(r.at)}</span></li>`).join('')}</ul>` : '<p class="muted small">None.</p>'}</div>`; };
   return `<div class="mr-top"><label class="mr-pick">Cohort <select data-mr="cohort" aria-label="Cohort">${cohorts.map(c => `<option ${c === key ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
       <span class="muted small">${mine.length} response${mine.length === 1 ? '' : 's'}</span>
@@ -1334,7 +1338,7 @@ async function adminAct(a, el = {}) {
       S.inqSaving = false; render(); return true;
     }
     case 'adminPanelClose': S.adminPanel = null; render(); return true;
-    case 'mrReload': S.mr = null; loadModuleReviews(); return true;
+    case 'mrReload': S.mrErr = ''; loadModuleReviews(); return true;
     case 'mrMod': e && e.preventDefault(); S.mrOpen = S.mrOpen === d.k ? null : d.k; render(); return true;
     case 'fbStar': S.fbStarEd = { key: d.k, text: d.text, src: d.src }; render(); return true;
     case 'fbStarClose': S.fbStarEd = null; render(); return true;

@@ -2005,4 +2005,5 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .mr-mod summary::-webkit-details-marker { display: none; }
 .mr-mod summary::before { content: '▸'; color: var(--taupe-dark); font-size: 12px; transition: transform .15s; }
 .mr-mod[open] summary::before { transform: rotate(90deg); }
+.mr-h { color: var(--taupe-dark); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; } /* (Weakest / Strongest / Comments: set apart from the module above) */
 .mr-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 22px; margin-top: 6px; }
