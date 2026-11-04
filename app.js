@@ -2828,6 +2828,8 @@ document.addEventListener('keydown', e => {
   else act('addItem', t);
 });
 
+let downOn = null; // (where the last mouse press started: see the backdrop check below)
+document.addEventListener('pointerdown', e => { downOn = e.target; }, true);
 document.addEventListener('click', e => {
   if (S.menuOpen && !e.target.closest('.menu-wrap')) { S.menuOpen = false; render(); }
   if (S.schMenu && !e.target.closest('.sched-more')) { S.schMenu = false; render(); }
@@ -2836,8 +2838,9 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
   if (el.closest('.sched-more .menu')) { S.schMenu = false; render(); } // picking something closes the ⋯ menu
-  // Only the backdrop itself closes a pop-up, and the +/− box doesn't open the student.
-  if (el.classList.contains('overlay') && e.target !== el) return;
+  // Only the backdrop itself closes a pop-up, and the +/− box doesn't open the student. A drag that started inside the
+  // pop-up (selecting text) and was let go on the backdrop doesn't count as a click on it.
+  if (el.classList.contains('overlay') && (e.target !== el || downOn !== el)) return;
   if (el.tagName === 'TR') { const stop = e.target.closest('[data-stop]'); if (stop && el.contains(stop)) return; } // (a pop-up around the table doesn't count)
   if (el.classList.contains('st-click') && e.target.closest('a')) return; // (a Staff list row opens their edit window, but its phone link just calls)
   act(el.dataset.act, el, e);
