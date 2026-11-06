@@ -311,7 +311,12 @@ function emHtml(text, opts = {}) {
     let html = '', para = [], list = [];
     const flushP = () => { if (para.length) html += `<p style="margin:0 0 12px">${para.map(l => emInline(l, opts)).join('<br>')}</p>`; para = []; };
     const flushL = () => { if (list.length) html += `<ul style="margin:0 0 12px;padding-left:26px">${list.map(l => `<li style="margin:0 0 3px">${emInline(l, opts)}</li>`).join('')}</ul>`; list = []; };
-    block.split('\n').forEach(l => { const m = l.match(/^\s*[-•]\s+(.*)$/); if (m) { flushP(); list.push(m[1]); } else { flushL(); para.push(l); } });
+    block.split('\n').forEach(l => {
+      // A line that's only bold (**Orientation**) is a section header: a bit bigger, a little space above.
+      const h = l.match(/^\s*\*\*([^*]+)\*\*\s*$/);
+      if (h) { flushP(); flushL(); html += `<h3 style="font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:bold;line-height:1.3;color:#222;margin:18px 0 6px">${emInline(h[1], opts)}</h3>`; return; }
+      const m = l.match(/^\s*[-•]\s+(.*)$/); if (m) { flushP(); list.push(m[1]); } else { flushL(); para.push(l); }
+    });
     flushP(); flushL();
     return html;
   }).join('');
