@@ -1796,11 +1796,11 @@ html:has(.ql-wrap), html:has(.calls-wrap) { touch-action: pan-x pan-y; }
 /* Writing the check */
 .check-overlay { z-index: 55; }
 .check-face { border: 1px solid var(--line); border-radius: 10px; background: linear-gradient(180deg, #fbf8f4, #f4efe9); padding: 14px 16px 16px; display: grid; gap: 14px; }
-.cf-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
-.cf-top b { color: var(--ink); font-weight: 500; }
-.cf-top label { display: flex; align-items: center; gap: 6px; }
-.cf-top input { width: 140px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 15px; letter-spacing: .04em; }
-.cf-row { display: flex; align-items: flex-end; gap: 10px; }
+.check-face .cf-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+.check-face .cf-top b { color: var(--ink); font-weight: 500; }
+.check-face .cf-top label { display: flex; align-items: center; gap: 6px; }
+.check-face .cf-top input { width: 140px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 15px; letter-spacing: .04em; }
+.check-face .cf-row { display: flex; align-items: flex-end; gap: 10px; }
 .cf-label { font-size: 12px; color: var(--muted); white-space: nowrap; padding-bottom: 3px; }
 .cf-line { flex: 1; border-bottom: 1px solid var(--taupe); padding: 0 4px 2px; font-weight: 500; min-width: 0; }
 .cf-words { font-size: 15px; }
@@ -2032,3 +2032,23 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 /* Make Upcoming / Active / Former pop-up */
 .status-ask { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; }
 .status-ask .warn-text { color: var(--rose); font-weight: 500; }
+/* v372: New Cohort + Edit Course Details: one label column so every box lines up, ⓘ by the title, divider */
+.modal.small-modal.cf-modal { width: min(600px, 100%); }
+.cf-modal .cf-row { grid-template-columns: 172px minmax(0, 1fr); }
+.cf-modal .cf-row > span { white-space: nowrap; }
+.cf-modal .cf-date-time { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cf-modal .cf-date-time .date-btn { min-width: 0; }
+.cf-modal .cf-row input, .cf-modal .course-fields .date-btn { height: 40px; box-sizing: border-box; }
+.cf-modal .rev-dates .date-btn { width: auto; }
+.cf-title { display: flex; align-items: center; gap: 10px; }
+.i-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--taupe); background: none; color: var(--taupe-dark); font: italic 600 13px/1 var(--serif); cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+.i-btn:hover, .i-btn.on { background: var(--taupe-dark); border-color: var(--taupe-dark); color: #fff; }
+.cf-info-pop { background: var(--blush-soft); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; font-size: 13px; color: var(--ink); line-height: 1.45; }
+.cf-info-pop p { margin: 0; }
+.cf-info-pop p + p { margin-top: 6px; }
+.small-modal .mini-head.cf-divider { border-top: 1px solid var(--line-soft); padding-top: 14px; margin-top: 16px; }
+@media (max-width: 560px) {
+  .cf-modal .cf-row { grid-template-columns: 1fr; gap: 4px; }
+  .cf-modal .cf-row.cf-top > span { padding-top: 0; }
+  .cf-modal .cf-row > span { white-space: normal; }
+}

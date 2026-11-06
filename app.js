@@ -1848,13 +1848,15 @@ function binderListModal() {
 // + New cohort (cohort menu): added to the config sheet, and the Student Hub makes its folder and sheets.
 function newCohortModal() {
   const nc = S.newCohort;
-  return `<div class="overlay" data-act="newCohortClose"><div class="modal small-modal" data-stop>
-    <div class="modal-head"><h2>New Cohort</h2>${nc.busy ? '' : '<button class="x big" data-act="newCohortClose" aria-label="Close">×</button>'}</div>
+  return `<div class="overlay" data-act="newCohortClose"><div class="modal small-modal cf-modal" data-stop>
+    <div class="modal-head"><h2 class="cf-title">New Cohort<button class="i-btn${nc.info ? ' on' : ''}" data-act="newCohortInfo" aria-label="About new cohorts" aria-expanded="${nc.info ? 'true' : 'false'}">i</button></h2>${nc.busy ? '' : '<button class="x big" data-act="newCohortClose" aria-label="Close">×</button>'}</div>
     <div class="modal-body pad-top" data-keep-scroll="newCohort">
       <label class="field">Type it the way you would in the config sheet
         <input id="newCohortIn" data-draft="newCohort" data-add="newcohort" placeholder="e.g. Spring 2026" value="${esc(S.drafts.newCohort || '')}" ${nc.busy ? 'disabled' : ''} autocomplete="off"></label>
-      <p class="muted small">This adds it to the config sheet, and the Student Hub makes its folder, Ride Along Agreements, Clinical Tracking and Student Roster sheets, the same as typing it into the sheet yourself (which still works too). It starts as <b>Upcoming</b>, so students can’t log in until you make it Active.</p>
-      <p class="mini-head">Course details <span class="count">optional · go into its sheet</span></p>
+      ${nc.info ? `<div class="cf-info-pop">
+        <p>This adds it to the config sheet, and the Student Hub makes its folder, Ride Along Agreements, Clinical Tracking and Student Roster sheets, the same as typing it into the sheet yourself (which still works too). It starts as <b>Upcoming</b>, so students can’t log in until you make it Active.</p>
+        <p>Course details are optional. They go into the new cohort’s sheet, and you can fill them in later on the Course page.</p></div>` : ''}
+      <p class="mini-head cf-divider">Course details</p>
       ${courseFields('nc-', nc)}
       ${nc.err ? `<div class="alert">${esc(nc.err)}</div>` : ''}
     </div>
@@ -1879,7 +1881,7 @@ function courseFields(prefix, form) {
   const field = ([k, label, type]) => `<div class="cf-row"><span>${label}</span>${type === 'date' && timeFor[k]
       ? `<div class="cf-date-time">${datePicker(prefix + k, { optional: true, title: label })}${tIn(k)}</div>`
       : type === 'date'
-      ? datePicker(prefix + k, { optional: true, title: label })
+      ? `<div class="cf-date-time">${datePicker(prefix + k, { optional: true, title: label })}</div>`
       : `<input id="${prefix + k}" data-draft="${prefix + k}" value="${esc(S.drafts[prefix + k] || '')}" placeholder="${k === 'meet' ? 'meet.google.com/…' : k === 'courseNos' ? 'e.g. 242999 (late one: 242999 / 8375636)' : ''}" autocomplete="off" ${dis}>`}</div>`;
   // Same order as the Course Details box: dates (with times), the Academy Week location (+ instructions, edit-only), then the rest.
   const one = k => field(COURSE_FIELDS.find(([x]) => x === k));
@@ -1889,8 +1891,8 @@ function courseFields(prefix, form) {
     <div class="cf-row cf-top"><span>Academy Week instructions</span><textarea id="${prefix}awInfo" class="cf-info" data-draft="${prefix}awInfo" rows="2" placeholder="How to get in on the first morning" ${dis}>${esc(S.drafts[prefix + 'awInfo'] || '')}</textarea></div>
     ${['jbl', 'meet'].map(one).join('')}
     <div class="cf-row cf-top"><span>Review sessions</span><div class="rev-dates">
-      ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}
-      ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}</div></div>
+      ${datePicker(prefix + 'rev-new', { optional: true, empty: '+ add a date' })}
+      ${form.reviews.map(iso => `<span class="name-chip">${shortDate(iso)}<button class="x" data-act="revDel" data-f="${prefix}" data-iso="${iso}" aria-label="Remove">×</button></span>`).join('')}</div></div>
     ${one('courseNos')}
   </div>`;
 }
@@ -1910,7 +1912,7 @@ const extraValues = prefix => Object.fromEntries(EXTRA_KEYS.map(k => [k, String(
 
 function infoEditModal() {
   const f = S.infoEdit;
-  return `<div class="overlay" data-act="infoEditClose"><div class="modal small-modal" data-stop>
+  return `<div class="overlay" data-act="infoEditClose"><div class="modal small-modal cf-modal" data-stop>
     <div class="modal-head"><h2>Edit Course Details</h2>${f.busy ? '' : '<button class="x big" data-act="infoEditClose" aria-label="Close">×</button>'}</div>
     <div class="modal-body pad-top" data-keep-scroll="infoEdit">
       <p class="muted small">Saving writes these into ${esc(S.cohortKey)}’s cohort sheet (the settings box on the Student Roster tab), the same as typing them there. Students see the new dates in the Student Hub right away. Leave one blank to show TBD.</p>
@@ -2974,6 +2976,7 @@ async function act(a, el = {}, e) {
         S.menuOpen = false; S.newCohort = { busy: false, err: '', reviews: [] }; clearCourseDrafts('nc-'); fillExtraDrafts('nc-', null); render();
         setTimeout(() => { const el = document.getElementById('newCohortIn'); if (el) el.focus(); }, 0); break;
       case 'newCohortClose': if (S.newCohort && S.newCohort.busy) return; S.newCohort = null; render(); break;
+      case 'newCohortInfo': if (S.newCohort) { S.newCohort.info = !S.newCohort.info; render(); } break;
       case 'newCohortCreate': {
         const key = String(S.drafts.newCohort || '').replace(/\s+/g, ' ').trim();
         if (!key || !S.newCohort || S.newCohort.busy) { if (!key) toast('Type the cohort’s name first.'); return; }
@@ -2986,7 +2989,12 @@ async function act(a, el = {}, e) {
         let res;
         try {
           res = await Sheets.createCohort(key, info);
-        } catch (err) { S.newCohort.busy = false; S.newCohort.err = err.message; render(); return; }
+        } catch (err) {
+          S.newCohort.busy = false;
+          // (the Student Hub script doesn't have the New Cohort piece yet: parked till December)
+          S.newCohort.err = /Unknown submission type/i.test(err.message) ? 'The Student Hub isn’t set up for this button yet. Add the cohort in the config sheet for now.' : err.message;
+          render(); return;
+        }
         // The details didn't come back saved with the new cohort: try once more on their own.
         let infoErr = '';
         if (Object.keys(info).length && !(res && res.info)) {
