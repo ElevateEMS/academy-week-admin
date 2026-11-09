@@ -253,9 +253,9 @@ function linksEdModal() {
     <div class="modal-foot"><button class="btn primary" data-act="lkSave">Save</button></div>
   </div></div>`;
 }
-// Every link that would open a new Chrome tab (Docs, Sheets, the instructor link…) opens in this panel
+// Every link that would open a new Chrome tab (Docs, Sheets, the instructor link, to-do links…) opens in this panel
 // instead, with "Open in Chrome ↗" there. Google Meet (it needs the camera), Drive folders (Google won't
-// show them in a panel: "you need access") and links marked data-chrome still go straight to Chrome,
+// show them in a panel: "you need access"), Google Ads and links marked data-chrome still go straight to Chrome,
 // and so does ⌘/Ctrl-click.
 document.addEventListener('click', e => {
   const a = e.target.closest && e.target.closest('a[target="_blank"][href]');
@@ -270,9 +270,10 @@ function openPanel(name, url) { // a Drive folder or Meet goes to Chrome instead
   if (inChrome(url)) { window.open(url, '_blank', 'noopener'); return; }
   S.adminPanel = { name, url }; render();
 }
-// Sites that won't show inside the panel: Meet, Drive folders, the Squarespace website (it says "same site only"),
+// Sites that won't show inside the panel: Meet, Drive folders, Google Ads (it only allows itself), the Squarespace website (it says "same site only"),
 // JB Learning and the VAOEMS portal (both need their own sign-in in Chrome). The Student Portal and Docs/Sheets are fine in the panel.
 const inChrome = url => /\/\/meet\.google\.com\//i.test(url) || /\/\/drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\//i.test(url)
+  || /\/\/ads\.google\.com(\/|$|\?)/i.test(url)
   || /\/\/(www\.)?elevateemsacademy\.com(\/|$)/i.test(url)
   || /\/\/([a-z0-9-]+\.)*jblearning\.com(\/|$)/i.test(url) || /\/\/vdhems\.vdh\.virginia\.gov(\/|$)/i.test(url);
 // The panel lives outside #app, drawn only when it opens or changes: the page redraws a lot (the Staff page several
@@ -340,7 +341,8 @@ function tdChip(t) {
 function tdLine(t) {
   const w = tdWhen(t), who = tdWho(t);
   const cls = t.done ? 'done' : w && w < todayIso() ? 'td-late' : w === todayIso() ? 'td-today' : '';
-  const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-chrome>${esc(l.name || 'Link')} ↗</a>`).join('');
+  // (not data-chrome: they open in the app's panel like other links; Google Ads, Meet, Drive folders… still go to Chrome, see inChrome)
+  const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-name="${esc(l.name || 'Link')}">${esc(l.name || 'Link')} ↗</a>`).join('');
   return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
     <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
