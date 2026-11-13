@@ -63,6 +63,8 @@ const FAQ = [
       'New inquiries are checked every hour. <b>Make reply draft</b> writes a reply into your Gmail Drafts (gbrown@), where you review and send it yourself.'],
   ]],
   ['Course & Academy Week', [
+    ['What do I do when someone enrolls?',
+      'Add them to the cohort’s Student Roster: their name as <b>Last, First (Nickname)</b>, their email, and their phone number. The rest is automatic within the hour: they show up in the app, their payments get ticked on the roster, their <b>Welcome email</b> shows up in the Emails box to draft, and so on.<br><br><b>Joining after the cohort’s orientation?</b> Set their own orientation date in the Emails box → <b>Student Emails</b>, so their payment dates and emails follow it.'],
     ['What puts the bag check on a day’s To Do?',
       '<b>Settings → Templates → Every day</b>: everything on that list goes on Day 1–5’s To Do (not Prep or Finalize), and “Bag check” is one of them. Any to-do with “bag check”, “check bags”, “verify bags” or “put together bags” in it opens the bag pop-up, and checks itself off once every bag in use that day is checked. To have it only on some days, move it from Every day to those days’ lists.'],
     ['Where’s the Reset test cohort button?',
