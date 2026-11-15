@@ -814,6 +814,7 @@ function shell() {
   ${S.roster ? rosterModal() : ''}
   ${S.resetAsk ? resetModal() : ''}
   ${S.dropAsk ? dropModal() : ''}
+  ${S.renameAsk ? renameModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
@@ -2245,11 +2246,32 @@ function drawer() {
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
         <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? 'Unpause portal' : 'Pause portal'}</button>
+        <button class="btn small" data-act="renameAsk" data-sid="${s.sid}">Change name or email</button>
         <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
       </section>`}
     </div>
   </aside></div>`;
 }
+
+// Change name or email (from a student's pop-up): the Admin Apps Script changes the roster and moves everything
+// that goes by their name or email (changeStudent_), so nothing is lost the way it is when only the sheet changes.
+function renameModal() {
+  const s = studentBySid(S.renameAsk);
+  if (!s) return '';
+  if (S.renameBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>Updating ${esc(s.name)}…</h2></div>
+    <div class="modal-body"><p class="muted">Changing the roster, the Student Hub’s records and their history here. This takes a few seconds.</p></div></div></div>`;
+  const name = S.drafts['rn-name'] ?? s.name, email = S.drafts['rn-email'] ?? (s.email || '');
+  return `<div class="overlay" data-act="renameCancel"><div class="modal confirm rename-modal" data-stop>
+    <div class="modal-head"><h2>Change name or email</h2><button class="x big" data-act="renameCancel" aria-label="Close">×</button></div>
+    <div class="modal-body">
+      <label class="field">Name <span class="muted small">(Last, First (Nickname), like the roster)</span><input id="rn-name" data-draft="rn-name" value="${esc(name)}" autocomplete="off"></label>
+      <label class="field">Email<input id="rn-email" data-draft="rn-email" value="${esc(email)}" autocomplete="off" inputmode="email"></label>
+      <p class="muted small">Changes the roster and keeps everything that goes with them: their Student Hub assignments, review session sign-ups and uploads, and their emails, book code, notes and to-dos here.</p>
+    </div>
+    <div class="modal-foot"><button class="btn" data-act="renameCancel">Cancel</button><button class="btn primary" data-act="renameGo">Save</button></div>
+  </div></div>`;
+}
+function renameClose() { S.renameAsk = null; delete S.drafts['rn-name']; delete S.drafts['rn-email']; render(); }
 
 // Drop / Withdraw (from a student's pop-up). Nothing happens until "Yes": the Admin Apps Script does it all (dropStudent_).
 function dropModal() {
@@ -2801,6 +2823,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
+    if (S.renameAsk) { if (!S.renameBusy) renameClose(); return; }
     if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
@@ -2904,6 +2927,26 @@ async function act(a, el = {}, e) {
           toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
         }
         S.portalBusy = null; render(); break;
+      }
+      case 'renameAsk': S.renameAsk = d.sid; delete S.drafts['rn-name']; delete S.drafts['rn-email']; render(); break;
+      case 'renameCancel': if (!S.renameBusy) renameClose(); break;
+      case 'renameGo': {
+        const s = studentBySid(S.renameAsk), key = S.cohortKey;
+        if (!s || S.renameBusy) return;
+        const name = String(S.drafts['rn-name'] ?? s.name).replace(/\s+/g, ' ').trim(), email = String(S.drafts['rn-email'] ?? s.email ?? '').trim().toLowerCase();
+        if (!name) { toast('Type their name.'); return; }
+        if (name === s.name && email === String(s.email || '').trim().toLowerCase()) { renameClose(); return; }
+        S.renameBusy = true; render();
+        try {
+          const res = await Sheets.changeStudent(key, s, { name, email });
+          S.renameBusy = false; renameClose(); S.open = null; S.openPart = null;
+          toast(`Updated to ${res.name || name}.` + (res.warnings && res.warnings.length ? ' ' + res.warnings.join(' ') : ''));
+          if (key === S.cohortKey) loadSheet();
+        } catch (err) {
+          S.renameBusy = false; render();
+          toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+        }
+        break;
       }
       case 'dropCancel': if (!S.dropBusy) dropClose(); break;
       case 'dropGo': {
