@@ -2052,3 +2052,9 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
   .cf-modal .cf-row.cf-top > span { padding-top: 0; }
   .cf-modal .cf-row > span { white-space: normal; }
 }
+/* v377: a student's name at the top of their pop-up opens Change name or email (faint pencil, darker on hover) */
+.drawer-head h2 .name-edit { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font: inherit; color: inherit; }
+.name-edit .name-pencil { display: inline-flex; opacity: .28; transition: opacity .15s; }
+.name-edit .name-pencil svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.name-edit:hover .name-pencil, .name-edit:focus-visible .name-pencil { opacity: .7; }
+.name-edit:focus-visible { outline: 2px solid var(--taupe); outline-offset: 3px; border-radius: 4px; }

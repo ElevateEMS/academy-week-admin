@@ -2185,7 +2185,7 @@ function drawer() {
   const note = S.drafts[dk('note')] ?? s.note;
   const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer" data-stop>
-    <div class="drawer-head"><h2>${esc(s.name)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
+    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name or email">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button></h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
 
       ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
@@ -2246,7 +2246,6 @@ function drawer() {
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
         <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? 'Unpause portal' : 'Pause portal'}</button>
-        <button class="btn small" data-act="renameAsk" data-sid="${s.sid}">Change name or email</button>
         <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
       </section>`}
     </div>
@@ -2264,9 +2263,9 @@ function renameModal() {
   return `<div class="overlay" data-act="renameCancel"><div class="modal confirm rename-modal" data-stop>
     <div class="modal-head"><h2>Change name or email</h2><button class="x big" data-act="renameCancel" aria-label="Close">×</button></div>
     <div class="modal-body">
-      <label class="field">Name <span class="muted small">(Last, First (Nickname), like the roster)</span><input id="rn-name" data-draft="rn-name" value="${esc(name)}" autocomplete="off"></label>
+      <label class="field">Name <span class="muted small">Last, First (Nickname), like the roster</span><input id="rn-name" data-draft="rn-name" value="${esc(name)}" autocomplete="off"></label>
       <label class="field">Email<input id="rn-email" data-draft="rn-email" value="${esc(email)}" autocomplete="off" inputmode="email"></label>
-      <p class="muted small">Changes the roster and keeps everything that goes with them: their Student Hub assignments, review session sign-ups and uploads, and their emails, book code, notes and to-dos here.</p>
+      <p class="muted small">Updates the roster and keeps all of their records together, so nothing is lost or duplicated.</p>
     </div>
     <div class="modal-foot"><button class="btn" data-act="renameCancel">Cancel</button><button class="btn primary" data-act="renameGo">Save</button></div>
   </div></div>`;
