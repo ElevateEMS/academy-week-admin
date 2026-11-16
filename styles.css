@@ -1102,6 +1102,11 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .link-add-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 2px; }
 .modal.pdf.admin-panel { width: 100%; height: calc(100vh - 40px); } /* nearly the whole window */
 .admin-panel .panel-actions { display: flex; align-items: center; gap: 10px; }
+/* Cohort Sheets: its header icon stands out from the plain link icons; the cohort chips sit beside the panel title */
+.icon-btn.cs-btn { background: var(--sage-soft); border-color: var(--sage); color: #4f6a4b; box-shadow: 0 2px 8px rgba(79, 106, 75, .25); }
+.icon-btn.cs-btn:hover { background: #d6e1d1; }
+.admin-panel .cs-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; margin: 0 14px; }
+.admin-panel .cs-chips .chip { font-size: 13.5px; padding: 4px 12px; }
 .panel-note { margin: 0; padding: 6px 22px; font-size: 12.5px; color: var(--muted); background: var(--blush-soft); }
 .kd-add { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; flex-shrink: 0; }
 .kd-form { flex-shrink: 0; margin: 0 0 8px; }

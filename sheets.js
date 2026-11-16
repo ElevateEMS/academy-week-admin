@@ -255,7 +255,7 @@ function sampleSheets() {
     : { jbl: '6B37F3', firstDay: iso(orient), cpr: '', academyStart: iso(start), meet: 'meet.google.com/abc-defg-hij', reviews });
 
   return {
-    listCohorts: () => wait(cohorts.map(c => ({ ...c }))),
+    listCohorts: () => wait(cohorts.map(c => ({ ...c, sheetUrl: 'https://docs.google.com/spreadsheets/' }))),
     async createCohort(key, info) {
       if (cohorts.some(c => c.key === key)) throw new Error(key + ' is already in the config sheet.');
       cohorts.push({ key, status: 'Upcoming' });

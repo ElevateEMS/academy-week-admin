@@ -1,4 +1,5 @@
-/* New cohort documents: "<cohort> Hybrid EMT Syllabus" (dates filled in), "<cohort> Suggested Schedule",
+/* New cohort documents: "<cohort> Hybrid EMT Syllabus" (dates filled in), "<cohort> Suggested Schedule" (its weekly
+   Meet dates counted from orientation, plus the syllabus's due-by and Academy Week dates),
    and an "Admin - <cohort>" folder with "<cohort> Dropped Students Record", made in the cohort's Drive
    folder by the Admin Apps Script (makeCohortDocs). Made right after "+ New cohort"; for any other
    cohort, the Setup Checklist's Syllabus / Suggested schedule items have a Make button (then Open ↗).
@@ -52,10 +53,12 @@ async function makeCohortDocs({ quiet = false } = {}) {
   if (!key || !S.sheet || S.docsBusy === key) return;
   S.docsBusy = key; render();
   try {
-    const res = await Sheets.makeCohortDocs(key, syllabusFills());
+    // (+ the two dates the schedule counts its weeks from: orientation and Academy Week's first day)
+    const res = await Sheets.makeCohortDocs(key, { ...syllabusFills(), orientIso: emCohortPerson().orient, awIso: (S.sheet && S.sheet.academyStart) || '' });
     await Store.set('cohorts/' + key, { docs: res.docs });
     const tbd = Object.entries(syllabusFills()).filter(([, v]) => !v).map(([k]) => k);
-    if (!quiet || tbd.length) toast(`${res.made.length ? 'Made ' + res.made.join(', ') : 'They were already there'}.${tbd.length ? ' Some dates say TBD in the syllabus (' + tbd.join(', ') + ').' : ''}`);
+    const note = res.scheduleNote ? ' ' + res.scheduleNote : '';
+    if (!quiet || tbd.length || note) toast(`${res.made.length ? 'Made ' + res.made.join(', ') : 'They were already there'}.${tbd.length ? ' Some dates say TBD in the syllabus (' + tbd.join(', ') + ').' : ''}${note}`);
   } catch (e) {
     alert(`Couldn’t make ${key}’s syllabus and schedule:\n\n${e.message}`);
   } finally { if (S.docsBusy === key) S.docsBusy = null; render(); }
