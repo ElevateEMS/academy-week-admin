@@ -142,8 +142,8 @@ const DEFAULT_LINK_ICON = { certkeeper: 'shield', finances: 'dollar', payroll: '
 const linkIcon = l => LINK_ICONS[l.icon || DEFAULT_LINK_ICON[l.id]] || `<span class="ql-letter">${esc((l.name || '?').trim().charAt(0).toUpperCase())}</span>`;
 function adminHeaderLinks() {
   return `<button class="icon-btn" data-act="qlOpen" title="Quick Log: add an expense or income" aria-label="Quick Log: add an expense or income">${RECEIPT_ICON}</button>`
-    + (csCohorts().length ? `<button class="icon-btn cs-btn" data-act="csOpen" title="Cohort sheets" aria-label="Cohort sheets">${GSHEET_ICON}</button>` : '')
     + adminLinks().map(l => `<button class="icon-btn ql-icon" data-act="adminOpen" data-id="${esc(l.id)}" title="${esc(l.name)}" aria-label="${esc(l.name)}">${linkIcon(l)}</button>`).join('')
+    + (csCohorts().length ? `<button class="icon-btn cs-btn" data-act="csOpen" title="Cohort sheets" aria-label="Cohort sheets">${GSHEET_ICON}</button>` : '') // (last, by the divider)
     + '<span class="head-div ql-div" aria-hidden="true"></span>';
 }
 
