@@ -2254,23 +2254,48 @@ function drawer() {
 
 // Change name or email (from a student's pop-up): the Admin Apps Script changes the roster and moves everything
 // that goes by their name or email (changeStudent_), so nothing is lost the way it is when only the sheet changes.
+// Cohort: move them to another Active/Upcoming cohort (moveStudent_), after an "Are you sure?" listing what moves.
+const moveCohorts = () => S.cohorts.filter(c => c.key === S.cohortKey || (/active|upcoming/i.test(c.status || '') && (!isTestCohort(c.key) || isTestCohort(S.cohortKey))));
 function renameModal() {
   const s = studentBySid(S.renameAsk);
   if (!s) return '';
-  if (S.renameBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>Updating ${esc(s.name)}…</h2></div>
-    <div class="modal-body"><p class="muted">Changing the roster, the Student Hub’s records and their history here. This takes a few seconds.</p></div></div></div>`;
+  const toKey = S.drafts['rn-cohort'] || S.cohortKey, moving = toKey !== S.cohortKey;
+  if (S.renameBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>${moving ? `Moving ${esc(s.name)} to ${esc(toKey)}…` : `Updating ${esc(s.name)}…`}</h2></div>
+    <div class="modal-body"><p class="muted">${moving ? 'Moving their roster row and their history here.' : 'Changing the roster, the Student Hub’s records and their history here.'} This takes a few seconds.</p></div></div></div>`;
   const name = S.drafts['rn-name'] ?? s.name, email = S.drafts['rn-email'] ?? (s.email || '');
+  if (S.renameConfirm) return `<div class="overlay" data-act="renameBack"><div class="modal confirm rename-modal" data-stop>
+    <div class="modal-head"><h2>Move to ${esc(toKey)}?</h2><button class="x big" data-act="renameBack" aria-label="Back">×</button></div>
+    <div class="modal-body">
+      <p>Are you sure you want to move <b>${esc(String(name).trim() || s.name)}</b> from ${esc(S.cohortKey)} to <b>${esc(toKey)}</b>?</p>
+      <p class="muted small move-head">Moves with them</p>
+      <ul class="move-list">
+        <li>Their roster row: name, email, Textbook and payment ticks, everything else on it, and cell notes. It goes in ${esc(toKey)}’s first empty row.</li>
+        <li>Their history here: emails already sent (so the Welcome isn’t sent again), their book code, and notes.</li>
+      </ul>
+      <p class="muted small move-head">Changes</p>
+      <ul class="move-list">
+        <li>They come off the ${esc(S.cohortKey)} roster. It isn’t a drop: nothing goes on the Dropped Students Record.</li>
+        <li>Custom orientation and payment dates are cleared. ${esc(toKey)}’s own dates apply (set new ones in Student Emails if they still need them).</li>
+        <li>${esc(S.cohortKey)}’s overdue-payment and orientation to-dos for them are deleted.</li>
+      </ul>
+      <p class="muted small move-head">Stays with ${esc(S.cohortKey)}</p>
+      <ul class="move-list"><li>Anything already in the Student Hub (Assignment Log, review sign-ups, submissions folder). A student only moves mid-course with a start-over enrollment, as a new row.</li></ul>
+    </div>
+    <div class="modal-foot"><button class="btn" data-act="renameBack">Go back</button><button class="btn primary" data-act="renameMove">Yes, move them</button></div>
+  </div></div>`;
+  const opts = moveCohorts().map(c => `<option value="${esc(c.key)}" ${c.key === toKey ? 'selected' : ''}>${esc(c.key)}${c.key === S.cohortKey ? ' (now)' : ''}</option>`).join('');
   return `<div class="overlay" data-act="renameCancel"><div class="modal confirm rename-modal" data-stop>
-    <div class="modal-head"><h2>Change name or email</h2><button class="x big" data-act="renameCancel" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Change name, email or cohort</h2><button class="x big" data-act="renameCancel" aria-label="Close">×</button></div>
     <div class="modal-body">
       <label class="field">Name <span class="muted small">Last, First (Nickname), like the roster</span><input id="rn-name" data-draft="rn-name" value="${esc(name)}" autocomplete="off"></label>
       <label class="field">Email<input id="rn-email" data-draft="rn-email" value="${esc(email)}" autocomplete="off" inputmode="email"></label>
+      <label class="field">Cohort <span class="muted small">to move them to another class</span><select id="rn-cohort" data-change="rnCohort">${opts}</select></label>
       <p class="muted small">Updates the roster and keeps all of their records together, so nothing is lost or duplicated.</p>
     </div>
-    <div class="modal-foot"><button class="btn" data-act="renameCancel">Cancel</button><button class="btn primary" data-act="renameGo">Save</button></div>
+    <div class="modal-foot"><button class="btn" data-act="renameCancel">Cancel</button><button class="btn primary" data-act="renameGo">${moving ? 'Next' : 'Save'}</button></div>
   </div></div>`;
 }
-function renameClose() { S.renameAsk = null; delete S.drafts['rn-name']; delete S.drafts['rn-email']; render(); }
+function renameClose() { S.renameAsk = null; S.renameConfirm = false; delete S.drafts['rn-name']; delete S.drafts['rn-email']; delete S.drafts['rn-cohort']; render(); }
 
 // Drop / Withdraw (from a student's pop-up). Nothing happens until "Yes": the Admin Apps Script does it all (dropStudent_).
 function dropModal() {
@@ -2803,6 +2828,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.bagname != null || t.dataset.bagitem != null) { try { await bagRename(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.add === 'bagitem') { bagAddItem(Number(t.dataset.p)).catch(err => toast(err.message)); return; }
   if (t.dataset.add === 'bagpocket') { bagAddPocket().catch(err => toast(err.message)); return; }
+  if (t.dataset.change === 'rnCohort') { S.drafts['rn-cohort'] = t.value; render(); return; }
   if (t.dataset.change === 'squadCount') { act('squadCount', t); return; }
   if (t.dataset.change === 'squadAdd') { act('squadAdd', t); return; }
   // A priority line saves when you click or tab away, not only on Enter.
@@ -2822,7 +2848,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
-    if (S.renameAsk) { if (!S.renameBusy) renameClose(); return; }
+    if (S.renameAsk) { if (!S.renameBusy) { if (S.renameConfirm) { S.renameConfirm = false; render(); } else renameClose(); } return; }
     if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
     else if (S.datePick) S.datePick = null;
@@ -2927,23 +2953,30 @@ async function act(a, el = {}, e) {
         }
         S.portalBusy = null; render(); break;
       }
-      case 'renameAsk': S.renameAsk = d.sid; delete S.drafts['rn-name']; delete S.drafts['rn-email']; render(); break;
+      case 'renameAsk': S.renameAsk = d.sid; S.renameConfirm = false; delete S.drafts['rn-name']; delete S.drafts['rn-email']; delete S.drafts['rn-cohort']; render(); break;
       case 'renameCancel': if (!S.renameBusy) renameClose(); break;
-      case 'renameGo': {
+      case 'renameBack': if (!S.renameBusy) { S.renameConfirm = false; render(); } break;
+      case 'renameGo': case 'renameMove': {
         const s = studentBySid(S.renameAsk), key = S.cohortKey;
         if (!s || S.renameBusy) return;
         const name = String(S.drafts['rn-name'] ?? s.name).replace(/\s+/g, ' ').trim(), email = String(S.drafts['rn-email'] ?? s.email ?? '').trim().toLowerCase();
+        const toKey = S.drafts['rn-cohort'] || key, moving = toKey !== key, changed = name !== s.name || email !== String(s.email || '').trim().toLowerCase();
         if (!name) { toast('Type their name.'); return; }
-        if (name === s.name && email === String(s.email || '').trim().toLowerCase()) { renameClose(); return; }
+        if (!moving && !changed) { renameClose(); return; }
+        if (moving && a === 'renameGo') { S.renameConfirm = true; render(); return; } // "Are you sure?" first
         S.renameBusy = true; render();
+        const notes = [];
         try {
-          const res = await Sheets.changeStudent(key, s, { name, email });
+          let now = s.name;
+          if (changed) { const res = await Sheets.changeStudent(key, s, { name, email }); now = res.name || name; notes.push(...(res.warnings || [])); }
+          if (moving) { const res = await Sheets.moveStudent(key, now, toKey); notes.push(...(res.warnings || [])); }
           S.renameBusy = false; renameClose(); S.open = null; S.openPart = null;
-          toast(`Updated to ${res.name || name}.` + (res.warnings && res.warnings.length ? ' ' + res.warnings.join(' ') : ''));
+          toast((moving ? `Moved ${now} to ${toKey}.` : `Updated to ${now}.`) + (notes.length ? ' ' + notes.join(' ') : ''));
           if (key === S.cohortKey) loadSheet();
         } catch (err) {
-          S.renameBusy = false; render();
+          S.renameBusy = false; S.renameConfirm = false; render();
           toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+          if (changed && key === S.cohortKey) loadSheet(); // (the name change may have gone through before the move failed)
         }
         break;
       }

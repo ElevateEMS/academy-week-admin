@@ -8,6 +8,7 @@
                                     the to-do remembers the pause so paying unpauses them
      changeStudent(key, s, ch)   -> a new name and/or email ({ name, email }): the roster, the Student Hub's Assignment Log,
                                     Review Session Sign-Ups and submissions folder, and their history here (see changeStudent_)
+     moveStudent(key, name, to)  -> to another Active/Upcoming cohort: roster row + history here (see moveStudent_)
      dropStudent(key, s, drop)   -> Drop / Withdraw ({ kind, date, note }): off the main roster (the rows under them move
                                     up), onto the dropped list under it as Blocked, a row in the Dropped Students Record,
                                     and two Course To-Dos (JBL report then access, VAOEMS disposition)
@@ -162,6 +163,7 @@ const Sheets = (() => {
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
     dropStudent: (key, student, drop) => call('dropStudent', { cohort: key, name: student.name, email: student.email, ...drop }), // { line, docUrl, warnings }
     changeStudent: (key, student, ch) => call('changeStudent', { cohort: key, name: student.name, newName: ch.name, newEmail: ch.email }), // { name, email, warnings }
+    moveStudent: (key, name, to) => call('moveStudent', { cohort: key, name, to }), // { name, cohort, row, warnings }
     listScenarios: () => call('listScenarios').then(o => o.scenarios),
     createCohort: (key, info) => call('createCohort', { cohort: key, info }),
     setStatus: (key, status) => call('setStatus', { cohort: key, status }),
@@ -327,6 +329,7 @@ function sampleSheets() {
     async setPortalStatus(key, student, status) { return wait({ status }); },
     async dropStudent(key, student, drop) { console.log('Sample mode:', student.name, 'would be', drop); return wait({ line: 37, docUrl: 'https://drive.google.com/', warnings: [] }); },
     async changeStudent(key, student, ch) { console.log('Sample mode:', student.name, 'would become', ch); return wait({ name: ch.name, email: ch.email, warnings: [] }); },
+    async moveStudent(key, name, to) { console.log('Sample mode:', name, 'would move from', key, 'to', to); return wait({ name, cohort: to, row: 5, warnings: [] }); },
     async financeInfo(date, kind) { return wait(kind === 'Income' ? { tab: '2026 Income', categories: ['Spring', 'Summer', 'Fall', 'Textbook'] } : { tab: '2026 Expenses', categories: ['Advertising', 'Business supplies', 'Subscriptions', 'Textbooks'] }); },
     async logExpense(item) { console.log('Sample mode: expense', item); return wait({ tab: '2026 Expenses', row: 40, receipt: '' }); },
     async moduleReviews() { return wait({ url: 'https://docs.google.com/', rows: [
