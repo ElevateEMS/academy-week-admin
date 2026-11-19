@@ -1066,6 +1066,11 @@ mark.em-fill { background: #f1dca6; border-radius: 3px; padding: 0 2px; color: i
 .cell-link.info-go:hover { background: none; }
 .em-due-note { margin: 12px 0 2px; font-size: 14px; }
 .em-ext-fields { display: grid; grid-template-columns: auto auto 1fr; gap: 10px 12px; align-items: center; margin: 12px 0 4px; font-size: 14px; }
+.mini-head.disc-head { margin-top: 18px; }
+.disc-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; font-size: 14px; }
+.disc-row .disc-in { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--paper); font: inherit; }
+.field.disc-note { margin: 10px 0 0; }
+.em-table .cell-link .em-amt { display: block; font-size: 12px; color: var(--muted); }
 .small-modal .modal-foot .link { margin-right: auto; }
 
 /* ---------- Header: logo + Admin | Course / Academy Week ---------- */
