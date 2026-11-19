@@ -69,14 +69,17 @@ const emDueNow = r => !r.date || r.date < todayIso() || (r.date === todayIso() &
 // Blocked (in the sheet) and not attending (in the app) are left out; Paused stay in.
 // late: their own orientation date and time (late enrollees, and make-up orientations). payDates: an extension.
 const validEmail = e => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
+// The Next and Final installments: $500 each for classes before Summer 2027, $625 from Summer 2027 on ($500 deposit +
+// $625 + $625 = $1,750). Test / custom cohorts use the new amount. The email templates say $500; drafts swap in the right one.
+const NEW_PRICE_FROM = 'Summer 2027', TUITION_DEFAULT = 1750, DEPOSIT = 500;
+const installmentFor = key => { const r = cohortRank(key || S.cohortKey); return r != null && r < cohortRank(NEW_PRICE_FROM) ? 500 : 625; };
 // Discount (students/{sid}.discount { kind: 'amount' | 'pct', value, tuition, note }): from the Next and Final installments
 // only, never the deposit. amount: $ off each installment. pct: % of tuition, half off each installment (10% of $1,750 =
 // $87.50 off each). Their own emails show their amounts, and their payment reminders are their own drafts.
-const INSTALLMENT = 500, TUITION_DEFAULT = 1750, DEPOSIT = 750;
 function discOff(dc) {
   if (!dc || !(Number(dc.value) > 0)) return 0;
   const off = dc.kind === 'pct' ? (Number(dc.tuition) || TUITION_DEFAULT) * Number(dc.value) / 100 / 2 : Number(dc.value);
-  return Math.min(INSTALLMENT, Math.round(off * 100) / 100);
+  return Math.min(installmentFor(), Math.round(off * 100) / 100);
 }
 const usd = n => '$' + (Number.isInteger(n) ? n.toLocaleString('en-US') : n.toFixed(2));
 function emPerson(s) {
@@ -95,7 +98,7 @@ function emPerson(s) {
     final: isIsoDate(pd.final) ? pd.final : payFrom ? addDays(payFrom, payLate ? 28 : 29) : '',
     ext: { next: isIsoDate(pd.next), final: isIsoDate(pd.final) },
     sent, bookCode: doc.bookCode || '', cprTold: !!doc.cprTold,
-    disc: discOff(doc.discount), discNote: (doc.discount && doc.discount.note) || '', payAmt: INSTALLMENT - discOff(doc.discount),
+    disc: discOff(doc.discount), discNote: (doc.discount && doc.discount.note) || '', payAmt: installmentFor() - discOff(doc.discount),
     // Enrolled after the cohort's orientation and their own date isn't in yet.
     needsLate: !late && !sent.welcome && pastOrientation(),
     // First class assignments not ticked in the sheet yet (null until the Admin Apps Script sends those columns).
@@ -352,8 +355,10 @@ function emBuild(ed) {
   const one = (t.send === 'each' || ed.custom || people.length === 1);
   const make = (key, group, list) => {
     let f = emFill(t, group ? null : list[0], group);
-    // A discounted student's own email: their installment amount wherever it says $500.
-    if (!group && list[0] && list[0].disc > 0) { const swap = x => String(x || '').replace(/\$500(?![\d,.])/g, usd(list[0].payAmt)); f = { ...f, subject: swap(f.subject), body: swap(f.body) }; }
+    // The installment amount wherever the template says $500: the cohort's ($625 from Summer 2027 on), or a discounted
+    // student's own amount on their email.
+    const amt = !group && list[0] ? list[0].payAmt : installmentFor();
+    if (amt !== 500) { const swap = x => String(x || '').replace(/\$500(?![\d,.])/g, usd(amt)); f = { ...f, subject: swap(f.subject), body: swap(f.body) }; }
     const edit = (ed.edits || {})[key] || {};
     const emails = list.filter(p => validEmail(p.email)).map(p => p.email);
     // Under 18: their parent/guardian is copied (CC on the student's own email, BCC on the group one so no one sees it).
@@ -365,7 +370,7 @@ function emBuild(ed) {
     };
   };
   if (one) return people.map(p => make(p.sid, false, [p]));
-  // A group email says $500: anyone with a discount gets their own draft with their amount instead.
+  // A group email has the cohort's amount: anyone with a discount gets their own draft with their amount instead.
   const disc = people.filter(p => p.disc > 0), rest = people.filter(p => !(p.disc > 0));
   return [...(rest.length > 1 ? [make('group', true, rest)] : rest.map(p => make(p.sid, false, [p]))), ...disc.map(p => make(p.sid, false, [p]))];
 }
@@ -528,7 +533,8 @@ function emDiscDraft(sid) {
 function emDiscPreview(sid) {
   const dc = emDiscDraft(sid), off = discOff(dc);
   if (!off) return 'Type the discount to see what they’ll pay.';
-  return `Deposit <b>${usd(DEPOSIT)}</b> · Next <b>${usd(INSTALLMENT - off)}</b> · Final <b>${usd(INSTALLMENT - off)}</b> <span class="muted">(${usd(off)} off each)</span>`;
+  const inst = installmentFor();
+  return `Deposit <b>${usd(DEPOSIT)}</b> · Next <b>${usd(inst - off)}</b> · Final <b>${usd(inst - off)}</b> <span class="muted">(${usd(off)} off each)</span>`;
 }
 // Saves a student's late/extension change; a payment reminder already drafted for a date that
 // just moved comes back for the new date.
@@ -797,7 +803,7 @@ async function emailAct(a, el, e) {
       const dc = emDiscDraft(d.sid);
       if (dc && !discOff(dc)) { toast('Type the discount amount (or pick None).'); return true; }
       await emSaveStudent(d.sid, { payDates: { next: isIsoDate(next) && next !== due.next ? next : null, final: isIsoDate(fin) && fin !== due.final ? fin : null }, discount: dc });
-      emStuDone(d.sid); toast(dc ? `Saved. Their installments are ${usd(INSTALLMENT - discOff(dc))} each.` : 'Saved.'); render(); return true;
+      emStuDone(d.sid); toast(dc ? `Saved. Their installments are ${usd(installmentFor() - discOff(dc))} each.` : 'Saved.'); render(); return true;
     }
     case 'emDiscKind': { // switching kind starts the amount fresh (or back to what's saved for that kind)
       const dc = (S.studentsDoc[d.sid] || {}).discount;
