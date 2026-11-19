@@ -343,9 +343,11 @@ function emBuild(ed) {
     const f = emFill(t, group ? null : list[0], group);
     const edit = (ed.edits || {})[key] || {};
     const emails = list.filter(p => validEmail(p.email)).map(p => p.email);
+    // Under 18: their parent/guardian is copied (CC on the student's own email, BCC on the group one so no one sees it).
+    const parents = list.map(p => { const d = S.studentsDoc[p.sid] || {}; return d.minor && d.guardian && validEmail(d.guardian.email) ? d.guardian.email.trim() : ''; }).filter(Boolean);
     return {
       key, group, people: list, noEmail: list.filter(p => !validEmail(p.email)),
-      to: group ? EM_NICK() : emails.join(', '), cc: !group && t.ccNick ? EM_NICK() : '', bcc: group ? emails.join(', ') : '',
+      to: group ? EM_NICK() : emails.join(', '), cc: group ? '' : [t.ccNick ? EM_NICK() : '', ...parents].filter(Boolean).join(', '), bcc: group ? [...emails, ...parents].join(', ') : '',
       subject: edit.subject ?? f.subject, body: edit.body ?? f.body, auto: f, missing: f.missing, edited: !!(edit.subject != null || edit.body != null),
     };
   };

@@ -409,7 +409,7 @@ function students() {
       const doc = S.studentsDoc[sid] || {};
       return {
         ...s, sid, out: !!notAttending[sid], droppedDay: typeof notAttending[sid] === 'number' ? notAttending[sid] : null,
-        skill: doc.skill || 'on', behind: doc.behind || [], note: doc.note || '',
+        skill: doc.skill || 'on', behind: doc.behind || [], note: doc.note || '', minor: !!doc.minor,
         fixes: S.contacts.filter(c => c.sid === sid && !c.fixed).length,
         warns: S.warnings.filter(w => w.sid === sid).length,
       };
@@ -815,6 +815,7 @@ function shell() {
   ${S.resetAsk ? resetModal() : ''}
   ${S.dropAsk ? dropModal() : ''}
   ${S.renameAsk ? renameModal() : ''}
+  ${S.guardianAsk ? guardianModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
@@ -2118,7 +2119,7 @@ function studentsView() {
         : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
+        <td><b>${esc(s.name)}</b>${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
         ${pre ? (p => `<td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
         <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
@@ -2185,7 +2186,7 @@ function drawer() {
   const note = S.drafts[dk('note')] ?? s.note;
   const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer" data-stop>
-    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name or email">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button></h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
+    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
 
       ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
@@ -2283,6 +2284,7 @@ function renameModal() {
     </div>
     <div class="modal-foot"><button class="btn" data-act="renameBack">Go back</button><button class="btn primary" data-act="renameMove">Yes, move them</button></div>
   </div></div>`;
+  const doc = S.studentsDoc[s.sid] || {}, minor = S.drafts['rn-minor'] ?? !!doc.minor, g = doc.guardian || {};
   const opts = moveCohorts().map(c => `<option value="${esc(c.key)}" ${c.key === toKey ? 'selected' : ''}>${esc(c.key)}${c.key === S.cohortKey ? ' (now)' : ''}</option>`).join('');
   return `<div class="overlay" data-act="renameCancel"><div class="modal confirm rename-modal" data-stop>
     <div class="modal-head"><h2>Change name, email or cohort</h2><button class="x big" data-act="renameCancel" aria-label="Close">×</button></div>
@@ -2290,12 +2292,44 @@ function renameModal() {
       <label class="field">Name <span class="muted small">Last, First (Nickname), like the roster</span><input id="rn-name" data-draft="rn-name" value="${esc(name)}" autocomplete="off"></label>
       <label class="field">Email<input id="rn-email" data-draft="rn-email" value="${esc(email)}" autocomplete="off" inputmode="email"></label>
       <label class="field">Cohort <span class="muted small">to move them to another class</span><select id="rn-cohort" data-change="rnCohort">${opts}</select></label>
+      <label class="rn-minor">${circle(minor, 'data-act="rnMinor"')} Under 18 <span class="muted small">(shows <span class="minor-tag static">&lt;18</span> by their name; their parent/guardian is copied on their emails)</span></label>
+      ${minor ? `<p class="muted small move-head">Parent/Guardian</p>${guardianFields('rn-g', g)}` : ''}
       <p class="muted small">Updates the roster and keeps all of their records together, so nothing is lost or duplicated.</p>
     </div>
     <div class="modal-foot"><button class="btn" data-act="renameCancel">Cancel</button><button class="btn primary" data-act="renameGo">${moving ? 'Next' : 'Save'}</button></div>
   </div></div>`;
 }
-function renameClose() { S.renameAsk = null; S.renameConfirm = false; delete S.drafts['rn-name']; delete S.drafts['rn-email']; delete S.drafts['rn-cohort']; render(); }
+function renameClose() { S.renameAsk = null; S.renameConfirm = false; Object.keys(S.drafts).filter(k => /^rn-/.test(k)).forEach(k => delete S.drafts[k]); render(); }
+
+/* ---------- Under 18: the <18 tag and their parent/guardian ----------
+   students/{sid}.minor (true) and .guardian { name, relation, email, phone }: from the Tally enrollment form (Tally Sync),
+   or ticked + typed in Change name, email or cohort. The guardian's email is CC'd on that student's own email drafts and
+   BCC'd on the cohort's group ones (emails.js emBuild). */
+const minorTag = s => s.minor ? ` <button class="minor-tag" data-act="guardianOpen" data-sid="${s.sid}" title="Under 18: parent/guardian contact">&lt;18</button>` : '';
+const G_FIELDS = [['name', 'Name'], ['relation', 'Relation', 'Parent, grandparent, aunt/uncle…'], ['email', 'Email'], ['phone', 'Phone']];
+function guardianFields(pre, g) {
+  return `<div class="g-fields">${G_FIELDS.map(([k, l, ph]) => `<label class="field">${l}<input id="${pre}-${k}" data-draft="${pre}-${k}" value="${esc(S.drafts[pre + '-' + k] ?? g[k] ?? '')}" autocomplete="off"${ph ? ` placeholder="${ph}"` : ''}${k === 'email' ? ' inputmode="email"' : k === 'phone' ? ' inputmode="tel"' : ''}></label>`).join('')}</div>`;
+}
+const guardianFrom = (pre, g) => Object.fromEntries(G_FIELDS.map(([k]) => [k, String(S.drafts[pre + '-' + k] ?? g[k] ?? '').trim()]));
+const telHref = p => 'tel:' + String(p).replace(/[^\d+]/g, '');
+function guardianModal() {
+  const s = studentBySid(S.guardianAsk);
+  if (!s) return '';
+  const g = (S.studentsDoc[s.sid] || {}).guardian || {}, editing = S.guardianEdit || !Object.values(g).some(Boolean);
+  const body = editing ? guardianFields('gd', g)
+    : `<dl class="g-info">
+        <dt>Name</dt><dd>${esc(g.name || '–')}${g.relation ? ` <span class="muted">· ${esc(g.relation)}</span>` : ''}</dd>
+        <dt>Email</dt><dd>${g.email ? `<a href="mailto:${esc(g.email)}" data-chrome>${esc(g.email)}</a>` : '–'}</dd>
+        <dt>Phone</dt><dd>${g.phone ? `<a href="${esc(telHref(g.phone))}" data-chrome>${esc(g.phone)}</a>` : '–'}</dd>
+      </dl><p class="muted small">Copied on ${esc(firstName(s.name))}’s emails (CC on their own, BCC on the cohort’s group ones).</p>`;
+  return `<div class="overlay" data-act="guardianClose"><div class="modal confirm guardian-modal" data-stop>
+    <div class="modal-head"><h2>Parent/Guardian <span class="muted small">${esc(s.name)}</span></h2>
+      <span class="panel-actions">${editing ? '' : `<button class="eye" data-act="guardianEdit" title="Edit" aria-label="Edit">${ICONS.pencil}</button>`}<button class="x big" data-act="guardianClose" aria-label="Close">×</button></span></div>
+    <div class="modal-body">${body}</div>
+    ${editing ? `<div class="modal-foot"><button class="btn" data-act="guardianClose">Cancel</button><button class="btn primary" data-act="guardianSave">Save</button></div>` : ''}
+  </div></div>`;
+}
+function guardianClose() { S.guardianAsk = null; S.guardianEdit = false; Object.keys(S.drafts).filter(k => /^gd-/.test(k)).forEach(k => delete S.drafts[k]); render(); }
 
 // Drop / Withdraw (from a student's pop-up). Nothing happens until "Yes": the Admin Apps Script does it all (dropStudent_).
 function dropModal() {
@@ -2848,6 +2882,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
+    if (S.guardianAsk) { guardianClose(); return; }
     if (S.renameAsk) { if (!S.renameBusy) { if (S.renameConfirm) { S.renameConfirm = false; render(); } else renameClose(); } return; }
     if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
@@ -2956,14 +2991,29 @@ async function act(a, el = {}, e) {
       case 'renameAsk': S.renameAsk = d.sid; S.renameConfirm = false; delete S.drafts['rn-name']; delete S.drafts['rn-email']; delete S.drafts['rn-cohort']; render(); break;
       case 'renameCancel': if (!S.renameBusy) renameClose(); break;
       case 'renameBack': if (!S.renameBusy) { S.renameConfirm = false; render(); } break;
+      case 'rnMinor': { const s = studentBySid(S.renameAsk); S.drafts['rn-minor'] = !(S.drafts['rn-minor'] ?? !!(s && (S.studentsDoc[s.sid] || {}).minor)); render(); break; }
+      case 'guardianOpen': S.guardianAsk = d.sid; S.guardianEdit = false; render(); break;
+      case 'guardianClose': guardianClose(); break;
+      case 'guardianEdit': S.guardianEdit = true; render(); break;
+      case 'guardianSave': {
+        const sid = S.guardianAsk, g = guardianFrom('gd', (S.studentsDoc[sid] || {}).guardian || {});
+        if (g.email && !validEmail(g.email)) { toast('That email doesn’t look right.'); return; }
+        await Store.set(P('students/' + sid), { minor: true, guardian: g });
+        guardianClose(); toast('Saved.'); break;
+      }
       case 'renameGo': case 'renameMove': {
         const s = studentBySid(S.renameAsk), key = S.cohortKey;
         if (!s || S.renameBusy) return;
         const name = String(S.drafts['rn-name'] ?? s.name).replace(/\s+/g, ' ').trim(), email = String(S.drafts['rn-email'] ?? s.email ?? '').trim().toLowerCase();
         const toKey = S.drafts['rn-cohort'] || key, moving = toKey !== key, changed = name !== s.name || email !== String(s.email || '').trim().toLowerCase();
         if (!name) { toast('Type their name.'); return; }
-        if (!moving && !changed) { renameClose(); return; }
-        if (moving && a === 'renameGo') { S.renameConfirm = true; render(); return; } // "Are you sure?" first
+        // Under 18 + parent/guardian: saved here first (a name change or move then carries it along).
+        const doc = S.studentsDoc[s.sid] || {}, minor = S.drafts['rn-minor'] ?? !!doc.minor, g = guardianFrom('rn-g', doc.guardian || {});
+        const minorChanged = minor !== !!doc.minor || (minor && JSON.stringify(g) !== JSON.stringify(guardianFrom('', doc.guardian || {})));
+        if (minor && g.email && !validEmail(g.email)) { toast('The parent/guardian email doesn’t look right.'); return; }
+        if (!moving && !changed) { if (minorChanged) { await Store.set(P('students/' + s.sid), minor ? { minor: true, guardian: g } : { minor: false }); toast('Saved.'); } renameClose(); return; }
+        if (moving && a === 'renameGo') { if (minorChanged) await Store.set(P('students/' + s.sid), minor ? { minor: true, guardian: g } : { minor: false }); S.renameConfirm = true; render(); return; }
+        if (minorChanged && a !== 'renameMove') await Store.set(P('students/' + s.sid), minor ? { minor: true, guardian: g } : { minor: false });
         S.renameBusy = true; render();
         const notes = [];
         try {

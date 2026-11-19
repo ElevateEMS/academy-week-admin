@@ -2062,6 +2062,18 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .drawer-head h2 .name-edit { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font: inherit; color: inherit; }
 .name-edit .name-pencil { display: inline-flex; opacity: .28; transition: opacity .15s; }
 .name-edit .name-pencil svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* Under 18: the soft <18 tag (opens the parent/guardian pop-up) */
+.minor-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--blush-soft); color: var(--taupe-dark); font: 600 11.5px/1.6 Jost, system-ui, sans-serif; letter-spacing: .02em; vertical-align: 2px; cursor: pointer; }
+.minor-tag:hover { background: var(--blush); }
+.minor-tag.static { cursor: default; margin-left: 0; }
+.drawer-head h2 .minor-tag { vertical-align: 4px; }
+.rename-modal .rn-minor { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+.g-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin: 4px 0 0; }
+@media (max-width: 560px) { .g-fields { grid-template-columns: 1fr; } }
+.guardian-modal .modal-head h2 .muted { font-family: Jost, system-ui, sans-serif; font-weight: 400; margin-left: 6px; }
+.g-info { display: grid; grid-template-columns: 70px 1fr; gap: 8px 12px; margin: 0 0 10px; }
+.g-info dt { color: var(--muted); font-size: 13px; }
+.g-info dd { margin: 0; }
 /* Move to another cohort: the "Are you sure?" lists */
 .rename-modal .move-head { margin: 12px 0 4px; text-transform: uppercase; letter-spacing: .04em; font-size: 11.5px; }
 .rename-modal .move-list { margin: 0; padding-left: 18px; font-size: 13.5px; }
