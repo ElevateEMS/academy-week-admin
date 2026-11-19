@@ -517,6 +517,7 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); S.emailTplsLoaded = true; render(); }));
   unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
+  unwatchGlobal.push(Store.watch('inquiryReplies', list => { S.inqTpls = Object.fromEntries(list.map(d => [d.id, d])); render(); }));
   unwatchGlobal.push(...adminWatch());
   render();
   if (Sheets.flushOutbox) setTimeout(() => Sheets.flushOutbox(), 1500); // anything saved while offline last time

@@ -569,14 +569,52 @@ const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
   <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {overdue payment} {overdue date} (the payment they’re late on: “next tuition installment” / “final tuition payment”, and when it was due) {sign link} (their orientation roster signing link)</p>
   <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), before orientation (their Next payment is due before their orientation), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
+/* ---------- Inquiry replies (in the same editor) ----------
+   The reply drafts the Admin Apps Script makes for website inquiries, voicemails and calls (inquiryReply_ in Code.gs):
+   "Upcoming class" for the soonest upcoming cohort, "Late enrollment" while the current cohort still takes late starts.
+   Saved as inquiryReplies/{regular|late}; nothing saved = DEFAULTS.inquiryReplies. The preview fills in example values. */
+const INQ_KINDS = { regular: 'Upcoming class', late: 'Late enrollment' };
+const inqKind = sel => String(sel || '').startsWith('inq:') ? String(sel).slice(4) : null;
+const inqTpl = kind => { const t = (S.inqTpls || {})[kind] || {}, d = DEFAULTS.inquiryReplies[kind]; return { subject: t.subject || d.subject, body: t.body || d.body }; };
+function inqExample(kind) {
+  const st = (S.inq && S.inq.settings) || {}, up = (S.cohorts || []).find(c => /upcoming/i.test(c.status || '') && !isTestCohort(c.key));
+  const f = { 'first name': 'Jordan', tuition: st.tuition || '$1,500', textbook: st.textbook || '$250', 'late fee': st.lateFee || '$100' };
+  if (kind === 'regular') return { fills: { ...f, cohort: up ? up.key : 'Spring 2027', season: (up ? up.key : 'Spring').split(' ')[0], 'orientation date': 'January 9th', 'orientation time': '11:00 AM', 'academy week dates': 'May 22-26th' }, conds: {} };
+  return { fills: { ...f, cohort: 'Fall 2026', season: 'Fall', 'orientation date': 'August 15th', 'orientation time': '11:00 AM', 'academy week dates': 'December 12th-16th',
+    'next cohort': 'Spring 2027', 'next orientation': 'on **January 9th**', 'next academy week': 'on **May 22nd-26th**', 'next academy week dates': 'May 22nd-26th', 'next academy week month': 'May' },
+    conds: { 'next dates': true, 'next cohort': true } };
+}
+function inqFill(text, kind) {
+  const ex = inqExample(kind);
+  return String(text || '').replace(/\{if ([^}]+)\}([\s\S]*?)(?:\{else\}([\s\S]*?))?\{end\}/g, (m, k, a, b) => ex.conds[k.trim().toLowerCase()] ? a : (b || ''))
+    .replace(/\{([a-z ]+)\}/gi, (m, k) => { const v = ex.fills[k.trim().toLowerCase()]; return v == null ? m : String(v); });
+}
+const inqPreviewHtml = (d, kind) => `<p class="em-prev-subj">${esc(inqFill(d.subject, kind).replace(/\*\*/g, ''))}</p>${emHtml(inqFill(d.body, kind), { marks: true })}`;
+const INQ_HELP = `<details class="em-help"><summary>Fill-ins and formatting</summary>
+  <p><b>Fill-ins:</b> {first name} {cohort} {season} {orientation date} {orientation time} {academy week dates} {tuition} {textbook} {late fee} (the last three are in Reply settings, the pencil on the Inquiries box). <b>Late enrollment</b> also has the next class: {next cohort} {next orientation} {next academy week} (“on <b>January 9th</b>”, or “in <b>January</b>” before its dates are in), {next academy week dates} {next academy week month}.</p>
+  <p><b>Only sometimes:</b> {if next dates}…{else}…{end} (the next cohort’s Academy Week date is in).</p>
+  <p><b>Formatting:</b> **bold**, [words](https://link), a blank line starts a new paragraph. The preview uses example dates.</p></details>`;
+function inqForm(d, kind) {
+  return `<div class="em-tpl-form">
+      <button class="link em-back" data-act="emtBack">‹ All templates</button>
+      <p class="muted small em-inq-note">The reply draft made for a new inquiry${kind === 'regular' ? ' about the soonest upcoming class' : ' while the current class still takes late starts (with the next class as the other option)'}. It goes in your Gmail Drafts to the person who asked.</p>
+      <label class="field">Subject<input id="emt-subject" data-emtpl="subject" value="${esc(d.subject)}"></label>
+      <div class="em-panes">
+        <label class="field">Email text<textarea id="emt-body" data-emtpl="body" rows="22">${esc(d.body)}</textarea></label>
+        <div class="field">Preview <span class="muted small">(example dates)</span>
+          <div class="em-preview"><div id="emtPreview">${inqPreviewHtml(d, kind)}</div>${EM_SIG}</div></div>
+      </div>
+      ${INQ_HELP}
+    </div>`;
+}
 function emailTplModal() {
   const ed = S.emailTplEd, list = emailTemplates({ all: true });
-  const d = ed.draft;
+  const d = ed.draft, ik = inqKind(ed.sel);
   const sample = ed.as === 'group' ? null : emPersonBySid(ed.as) || emPeople()[0] || null;
-  const prev = d ? emFill(d, sample, !sample) : null;
+  const prev = d && !ik ? emFill(d, sample, !sample) : null;
   const opt = (map, v) => Object.entries(map).map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('');
-  const days = d ? Number(d.when.days) || 0 : 0;
-  const form = d ? `<div class="em-tpl-form">
+  const days = d && d.when ? Number(d.when.days) || 0 : 0;
+  const form = d && ik ? inqForm(d, ik) : d ? `<div class="em-tpl-form">
       <button class="link em-back" data-act="emtBack">‹ All templates</button>
       <div class="em-tpl-row"><label class="field">Name<input id="emt-name" data-emtpl="name" value="${esc(d.name)}"></label>
         <label class="em-on">${circle(!d.off, 'data-emtpl="on" id="emt-on"')} Shows up in the Emails box</label></div>
@@ -605,10 +643,12 @@ function emailTplModal() {
     <div class="modal-head"><h2>Email Templates</h2><button class="x big" data-act="emtClose" aria-label="Close">×</button></div>
     <div class="em-tpl-grid">
       <div class="em-tpl-list">${list.map(t => `<button class="em-pick ${ed.sel === t.id ? 'on' : ''} ${t.off ? 'off' : ''}" data-act="emtSel" data-id="${t.id}"><b>${esc(t.name)}</b><span>${esc(whenFull(t.when))}</span></button>`).join('')}
-        <button class="link em-new" data-act="emtNew">+ New template</button></div>
+        <button class="link em-new" data-act="emtNew">+ New template</button>
+        <p class="mini-head em-inq-head">Inquiry replies</p>
+        ${Object.entries(INQ_KINDS).map(([k, l]) => `<button class="em-pick ${ed.sel === 'inq:' + k ? 'on' : ''}" data-act="emtSel" data-id="inq:${k}"><b>${l}</b><span>reply draft${(S.inqTpls || {})[k] ? ' · edited' : ''}</span></button>`).join('')}</div>
       <div class="modal-body" data-keep-scroll="emTpl">${form}</div>
     </div>
-    <div class="modal-foot">${d && tplById(ed.sel) && tplById(ed.sel).isDefault && S.emailTpls[ed.sel] ? '<button class="link" data-act="emtReset">Back to the original</button>' : ''}
+    <div class="modal-foot">${d && ((tplById(ed.sel) && tplById(ed.sel).isDefault && S.emailTpls[ed.sel]) || (ik && (S.inqTpls || {})[ik])) ? '<button class="link" data-act="emtReset">Back to the original</button>' : ''}
       ${d && tplById(ed.sel) && !tplById(ed.sel).isDefault ? '<button class="link" data-act="emtDel">Delete this template</button>' : ''}
       <span class="muted small">${ed.dirty ? 'Not saved yet.' : 'Changes apply to drafts made from now on.'}</span>
       <button class="btn primary" data-act="emtSave" ${ed.dirty ? '' : 'disabled'}>Save</button></div>
@@ -799,6 +839,7 @@ async function emailAct(a, el, e) {
     case 'emtSel': {
       const ed = S.emailTplEd;
       if (ed.dirty && ed.sel !== d.id && !confirm('Switch templates without saving your changes?')) return true;
+      if (inqKind(d.id)) { Object.assign(ed, { sel: d.id, draft: { ...inqTpl(inqKind(d.id)) }, dirty: false, view: 'edit' }); render(); return true; }
       const t = tplById(d.id);
       Object.assign(ed, { sel: d.id, draft: emtCopy(t), dirty: false, view: 'edit', as: t.send === 'bcc' ? 'group' : (emPeople()[0] || {}).sid || 'group' });
       render(); return true;
@@ -815,6 +856,11 @@ async function emailAct(a, el, e) {
     }
     case 'emtSave': {
       const ed = S.emailTplEd, dr = ed.draft;
+      if (inqKind(ed.sel)) { // an inquiry reply: the Admin Apps Script reads it for the next draft
+        if (!String(dr.body || '').trim()) { toast('The email text is empty.'); return true; }
+        await Store.set('inquiryReplies/' + inqKind(ed.sel), { subject: String(dr.subject || '').trim(), body: dr.body }, false);
+        ed.dirty = false; toast('Saved. New inquiry replies use it.'); render(); return true;
+      }
       if (!dr.name.trim()) { toast('Give it a name.'); return true; }
       await Store.set('emailTemplates/' + ed.sel, { ...dr, name: dr.name.trim(), when: { ...dr.when, from: dr.when.from, days: Number(dr.when.days) || 0 } }, false); // (keeps a time of day)
       ed.dirty = false; toast('Template saved.'); render(); return true;
@@ -822,6 +868,7 @@ async function emailAct(a, el, e) {
     case 'emtReset': {
       const ed = S.emailTplEd;
       if (!confirm('Put this template back the way it started? Your changes to it will be gone.')) return true;
+      if (inqKind(ed.sel)) { await Store.del('inquiryReplies/' + inqKind(ed.sel)); Object.assign(ed, { draft: { ...DEFAULTS.inquiryReplies[inqKind(ed.sel)] }, dirty: false }); render(); return true; }
       await Store.del('emailTemplates/' + ed.sel);
       const t = DEFAULTS.emailTemplates.find(x => x.id === ed.sel);
       Object.assign(ed, { draft: emtCopy({ ...t, when: { ...t.when } }), dirty: false });
@@ -898,7 +945,10 @@ function emailInput(t) {
       dr.when.days = dir < 0 ? -n : dir > 0 ? n : 0;
     } else dr[f] = t.value;
     ed.dirty = true;
-    if (f === 'body' || f === 'subject') {
+    if ((f === 'body' || f === 'subject') && inqKind(ed.sel)) {
+      const box = document.getElementById('emtPreview'); if (box) box.innerHTML = inqPreviewHtml(dr, inqKind(ed.sel));
+      const foot = document.querySelector('.em-tpl .modal-foot .btn.primary'); if (foot) foot.disabled = false;
+    } else if (f === 'body' || f === 'subject') {
       const sample = ed.as === 'group' ? null : emPersonBySid(ed.as) || emPeople()[0] || null;
       const p = emFill(dr, sample, !sample), box = document.getElementById('emtPreview');
       if (box) box.innerHTML = `<p class="em-prev-subj">${esc(p.subject)}</p>${emHtml(p.body, { marks: true })}`;
