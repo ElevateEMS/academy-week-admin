@@ -193,7 +193,14 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .checks:not(.ch-list) > li > label { flex: 0 1 auto; min-width: 0; }
 .checks:not(.ch-list) > li > label:has(.txt-edit) { flex: 1 1 auto; } /* (editing the words: the box runs right up to the button) */
 .checks:not(.ch-list) > li > :not(label) { flex-shrink: 0; }
-.checks:not(.ch-list) > li > .due-chip { margin-left: auto; }
+.checks:not(.ch-list) > li > label + .due-chip { margin-left: auto; }
+/* A to-do's buttons (Open ↗, Staffing, JB Learning ↗, Email / Pause…) sit at the right with its due date, not right after the
+   words; the row's extras line up with the first line of the words when they wrap. */
+.checks:not(.ch-list) > li { align-items: flex-start; }
+.checks:not(.ch-list) > li > label + :not(.x):not(.due-chip) { margin-left: auto; }
+.checks:not(.ch-list) > li > :not(label):not(.x) { margin-top: 1px; }
+.checks:not(.ch-list) > li > .due-chip { margin-top: 2px; }
+.checks:not(.ch-list) > li:has(> .x.due-add) > label + :not(.x) { margin-right: 50px; } /* (room for the hover calendar and ×) */
 .checks:not(.ch-list) > li > .due-chip + .x:last-child { margin-left: -4px; }
 .checks:not(.ch-list) > li > .x.due-add, .checks:not(.ch-list) > li > .x:last-child:not(.due-chip + .x) { position: absolute; top: 50%; transform: translateY(-50%);
   background: var(--paper); box-shadow: -10px 0 8px var(--paper); }
