@@ -1051,6 +1051,8 @@ document.addEventListener('click', e => {
   // On those items only the circle checks it off (not the rest of the row).
   if (e.target.closest && e.target.closest('.ro-label') && !e.target.matches('input')) { e.preventDefault(); return; }
   if (e.target.closest && e.target.closest('.rev-btn, .howto-btn')) { e.preventDefault(); return; } // (💬 / the steps icon: opens its pop-up, doesn't tick or edit the item)
+  // A to-do's buttons / due date / × (inside its label, floated right): they work as themselves; the gaps between them do nothing.
+  if (e.target.closest && e.target.closest('.td-right')) { if (!e.target.closest('button, a')) e.preventDefault(); return; }
   const lab = e.target.closest && e.target.closest('label');
   const own = lab && lab.querySelector('.txt[data-hl], .txt-edit');
   if (own && !e.target.matches('input') && EDITABLE.includes((own.dataset.hl || own.dataset.edit).split(':')[0])) { e.preventDefault(); e.stopPropagation(); }
@@ -1109,11 +1111,11 @@ function itemList(n, kind, { compact = false, more = false } = {}) {
         const inUse = bagsInUse(), ok = inUse.filter(b => bagDone(t.day ?? 1, b)).length;
         open = `<button class="btn tiny" data-act="openBag" data-d="${t.day ?? 1}">${compact ? ok + '/' + inUse.length : 'Open · ' + ok + '/' + inUse.length + ' bags'}</button>`;
       }
-      // Every row the same way: the words on the left (wrapping), its buttons then the due date together at the top right.
-      const twoRow = false;
-      return `<li class="${done ? 'done' : ''} ${twoRow ? 'two-row' : ''}" draggable="true" data-drag="item" data-id="${t.id}">
-      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl) + howtoBtn(t.text)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
-      ${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}
+      // Every row the same way: its buttons, due date and × float at the top right, and the words flow around them
+      // (beside them on the first line, the full width under them).
+      const right = `<span class="td-right">${open}${kind === 'todo' || kind === 'ctodo' ? (compact && !dueOf(kind, t) ? '' : dueBits(kind, t, done)) : ''}${compact ? '' : `<button class="x" data-act="delTodo" data-id="${t.id}" aria-label="Delete">×</button>`}</span>`;
+      return `<li class="${done ? 'done' : ''} td-row" draggable="true" data-drag="item" data-id="${t.id}">
+      <label>${circle(done, `data-act="todo" data-id="${t.id}"`)}<span>${right}${t.roster ? rosterLabel(t) : hlTxt('todo', t.id, t.text, t.hl) + howtoBtn(t.text)}${t.rolledFrom ? ` <em class="tag-soft">unfinished · Day ${t.rolledFrom}</em>` : ''}</span></label>
     </li>`;
     }).join('') || empty}
   </ul>`;

@@ -1053,6 +1053,11 @@ const HOWTO = [
     <h4>Module exams</h4><ul>
     <li>“Module __ Exam”</li><li>Listed with the last chapter of the module</li><li>Timing: course dates</li><li>Time limit: 2 hours, enabled</li>
     <li>Category: exams</li><li>Grade to pass: 0</li><li>Attempts: 1</li><li>70 questions</li></ul>`],
+  // The Drop / Withdraw to-do "Download JBL report and then remove JBL access" (do these before removing them: it deletes their records).
+  [/download jbl report/i, 'JB Learning reports', `<p class="muted small">Do these before you remove their access (removing them deletes their records).</p>
+    <p class="howto-step"><b>Grades:</b><br>Grades → User Report → their name → Cmd+P (Save as PDF)</p>
+    <p class="howto-step"><b>Daily Activity Layout:</b><br>Participants → their name → Reports → All logs</p>
+    <p class="howto-step"><b>All logs (students with academic dishonesty):</b><br>Reports → Logs → their name → Get these logs → scroll all the way to the bottom to download</p>`],
 ];
 const howtoOf = text => HOWTO.find(([re]) => re.test(String(text || '')));
 const LIST_ICON = '<svg viewBox="0 0 24 24"><path d="M9 6.5h10.5M9 12h10.5M9 17.5h10.5"/><circle cx="5" cy="6.5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17.5" r="1"/></svg>';
