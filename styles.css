@@ -201,6 +201,9 @@ body.resizing { cursor: ns-resize; user-select: none; }
 .td-row label > span { display: block; flex: 1 1 auto; min-width: 0; } /* (the whole row wide, so the floated buttons reach the right edge on short items too) */
 .td-right { float: right; display: inline-flex; align-items: center; gap: 6px; margin: -1px 0 -6px 12px; } /* (the negative bottom: the buttons are a hair taller than a line, and the 2nd line should get the full width) */
 .td-right .x { opacity: 0; padding: 0 4px; }
+.td-icons { display: inline-flex; vertical-align: middle; margin-left: 6px; }
+.td-icons .ship-btns { display: inline-flex; gap: 2px; }
+.checks li.td-row:has(.txt-edit) .td-icons { display: none; }
 .howto-modal .howto-step { margin: 0 0 14px; line-height: 1.55; }
 .td-row:hover .td-right .x, .td-right .x:focus { opacity: 1; }
 .td-right .due-chip + .x { margin-left: -4px; }
