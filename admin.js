@@ -353,13 +353,11 @@ function tdLine(t) {
   const cls = t.done ? 'done' : w && w < todayIso() ? 'td-late' : w === todayIso() ? 'td-today' : '';
   // (not data-chrome: they open in the app's panel like other links; Google Ads, Meet, Drive folders… still go to Chrome, see inChrome)
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-name="${esc(l.name || 'Link')}">${esc(l.name || 'Link')} ↗</a>`).join('');
-  return `<li class="td-line ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
+  // Like the Course To-Do: links, repeat and due date (and × once done) float at the top right; the words flow around them.
+  const right = `<span class="td-right">${links}${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}${t.done ? '' : tdChip(t)}${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</span>`;
+  return `<li class="td-line td-row ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
-    <div class="td-main"><button class="td-txt" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</button>
-      ${links || t.repeat || (!t.done && w) ? `<div class="td-meta">${links}
-        ${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}
-        ${t.done ? '' : tdChip(t)}</div>` : ''}</div>
-    ${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</li>`;
+    <div class="td-main">${right}<span class="td-txt" role="button" tabindex="0" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</span></div></li>`;
 }
 function adminTodoCard() {
   const soon = addDays(todayIso(), TD_SOON), open = S.adminTodos.filter(t => !t.done);
@@ -514,14 +512,12 @@ function adminChangesBox() {
     <p class="mini-head with-plus">Do before next cohort ${home.src ? plus('anext', 'Add a change') : ''}</p>
     <p class="muted small changes-foot">${home.src ? `Shows up on ${where} Setup Checklist.` : 'Add a cohort first.'}</p>
     ${S.changesAdd === 'anext' ? `<div class="add-row"><input id="${k}" data-draft="${k}" data-add="adminNext" data-chadd="anext" placeholder="Type a change, then Enter" value="${esc(S.drafts[k] || '')}"></div>` : ''}
-    <ul class="checks ch-list" data-chlist="anext">${nxt.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span>${hlTxt('anext', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label>${dueBits('anext', x, x.done)}
-      <button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+    <ul class="checks ch-list" data-chlist="anext">${nxt.map(x => `<li class="${x.done ? 'done' : ''} td-row" data-chid="${x.id}">${grip}
+      <label>${circle(x.done, `data-act="adminNextDone" data-id="${x.id}"`)}<span><span class="td-right">${dueBits('anext', x, x.done)}<button class="x" data-act="adminNextDel" data-id="${x.id}" aria-label="Delete">×</button></span>${hlTxt('anext', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
     <hr class="box-sep"><p class="mini-head with-plus">Future updates ${plus('upd', 'Add an update')}</p>
     ${S.changesAdd === 'upd' ? `<div class="add-row"><input id="updIn" data-draft="upd" data-add="upd" data-chadd="upd" placeholder="Type an update, then Enter" value="${esc(S.drafts.upd || '')}"></div>` : ''}
-    <ul class="checks ch-list" data-chlist="upd">${upd.map(x => `<li class="${x.done ? 'done' : ''}" data-chid="${x.id}">${grip}
-      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span>${hlTxt('upd', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label>${dueBits('upd', x, x.done)}
-      <button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+    <ul class="checks ch-list" data-chlist="upd">${upd.map(x => `<li class="${x.done ? 'done' : ''} td-row" data-chid="${x.id}">${grip}
+      <label>${circle(x.done, `data-act="updDone" data-id="${x.id}"`)}<span><span class="td-right">${dueBits('upd', x, x.done)}<button class="x" data-act="delUpd" data-id="${x.id}" aria-label="Delete">×</button></span>${hlTxt('upd', x.id, x.text, x.hl)}${reviewBtn(x)}</span></label></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
   </section>`;
 }
 
