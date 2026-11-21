@@ -199,7 +199,8 @@ body.resizing { cursor: ns-resize; user-select: none; }
    (add a date) and × only show on hover. */
 .checks > li.td-row > label { flex: 1 1 0; min-width: 0; }
 .ch-list li.td-row { flex-wrap: nowrap; } /* (one line: long words wrap inside their box, not under the drag handle) */
-.td-main .td-txt { display: inline; width: auto; } /* (Bulletin To Do: inline so the words flow around the floated links / date) */
+.td-main .td-txt { display: inline; width: auto; }
+.td-links-row { clear: right; margin-top: 4px; } /* (the Bulletin to-do's links, under its words) */ /* (Bulletin To Do: inline so the words flow around the floated links / date) */
 .td-main .td-right .td-link, .td-main .td-right .td-rep { line-height: 1.6; }
 .td-right .x.due-add { opacity: 0; }
 .td-row:hover .td-right .x.due-add { opacity: 1; }

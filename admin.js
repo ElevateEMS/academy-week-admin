@@ -353,11 +353,12 @@ function tdLine(t) {
   const cls = t.done ? 'done' : w && w < todayIso() ? 'td-late' : w === todayIso() ? 'td-today' : '';
   // (not data-chrome: they open in the app's panel like other links; Google Ads, Meet, Drive folders… still go to Chrome, see inChrome)
   const links = (t.links || []).filter(l => l && l.url).map(l => `<a class="td-link" href="${esc(tdUrl(l.url))}" target="_blank" rel="noopener" data-name="${esc(l.name || 'Link')}">${esc(l.name || 'Link')} ↗</a>`).join('');
-  // Like the Course To-Do: links, repeat and due date (and × once done) float at the top right; the words flow around them.
-  const right = `<span class="td-right">${links}${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}${t.done ? '' : tdChip(t)}${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</span>`;
+  // Like the Course To-Do: the repeat and due date (and × once done) float at the top right and the words flow around
+  // them; the links get their own small row under the words (several of them don't fit beside the date).
+  const right = `<span class="td-right">${t.repeat ? `<span class="td-rep" title="Repeats ${esc(repLabel(t.repeat, t.due))}">↻ ${repShort(t.repeat)}</span>` : ''}${t.done ? '' : tdChip(t)}${t.done ? `<button class="x" data-act="adminTodoDel" data-id="${t.id}" aria-label="Delete">×</button>` : ''}</span>`;
   return `<li class="td-line td-row ${cls}" ${t.done ? '' : `draggable="true" data-drag="item" data-id="${t.id}"`}>
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
-    <div class="td-main">${right}<span class="td-txt" role="button" tabindex="0" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</span></div></li>`;
+    <div class="td-main">${right}<span class="td-txt" role="button" tabindex="0" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</span>${links ? `<div class="td-meta td-links-row">${links}</div>` : ''}</div></li>`;
 }
 function adminTodoCard() {
   const soon = addDays(todayIso(), TD_SOON), open = S.adminTodos.filter(t => !t.done);
