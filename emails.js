@@ -208,7 +208,8 @@ function emailsBox() {
   const due = rows.filter(emDueNow), later = rows.filter(r => !emDueNow(r));
   const row = r => `<li class="em-row ${r.date && r.date < t ? 'overdue' : ''}">
       <span class="em-main"><span class="em-name">${esc(r.tpl.name)}</span><span class="em-sub">${emSoon(r.date, r.hour)} · ${rowWho(r)}</span></span>
-      ${EM_SKIPPABLE.includes(r.tpl.id) ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed for this cohort" aria-label="Not needed for this cohort">×</button>` : ''}
+      ${EM_SKIPPABLE.includes(r.tpl.id) ? `<button class="x em-skip" data-act="emSkip" data-row="${esc(r.key)}" title="Not needed for this cohort" aria-label="Not needed for this cohort">×</button>`
+        : !r.pick && r.sids.length === 1 ? `<button class="x em-skip" data-act="emSkipOne" data-row="${esc(r.key)}" title="Not needed for this student" aria-label="Not needed for this student">×</button>` : ''}
       <button class="btn tiny" data-act="emDraft" data-row="${esc(r.key)}">Draft</button></li>`;
   const notes = [];
   if (rows.undated.has('orientation') || rows.undated.has('next') || rows.undated.has('final')) notes.push('Add the orientation date in Course Details to schedule the orientation and payment emails.');
@@ -440,7 +441,7 @@ function emailPickModal() {
     const all = people.length && people.every(p => pk.sids.includes(p.sid));
     body = `<div class="em-pick-tools"><p class="muted small">${t.send === 'bcc' ? 'One email To: Nick with everyone you check in BCC (just one person gets it addressed to them).' : 'One email per student you check.'}</p>
       <button class="link" data-act="emPickAll" data-v="${all ? 0 : 1}">${all ? 'Uncheck all' : 'Check all'}</button></div>
-      <div class="binder-list">${people.map(p => `<label>${circle(pk.sids.includes(p.sid), `data-act="emPickSid" data-sid="${p.sid}"`)}<span>${esc(p.name)}${p.sent[t.id] ? ` <em class="tag-soft">drafted ${p.sent[t.id] === 'before' ? 'before the app' : monthDay(p.sent[t.id])}</em>` : ''}</span></label>`).join('')}</div>`;
+      <div class="binder-list">${people.map(p => `<label>${circle(pk.sids.includes(p.sid), `data-act="emPickSid" data-sid="${p.sid}"`)}<span>${esc(p.name)}${p.sent[t.id] ? ` <em class="tag-soft">${p.sent[t.id] === 'skipped' ? 'not needed' : 'drafted ' + (p.sent[t.id] === 'before' ? 'before the app' : monthDay(p.sent[t.id]))}</em>` : ''}</span></label>`).join('')}</div>`;
   }
   return `<div class="overlay" data-act="emPickClose"><div class="modal small-modal" data-stop>
     <div class="modal-head"><h2>${t ? esc(t.name) : 'Draft an Email'}</h2><button class="x big" data-act="emPickClose" aria-label="Close">×</button></div>
@@ -457,7 +458,7 @@ function emailStudentsModal() {
   const people = emPeople();
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
   const rows = people.map(p => {
-    const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before'), sentN = drafted.length;
+    const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before' && p.sent[k] !== 'skipped'), sentN = drafted.length;
     const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');
     return `<tr>
       <td><b>${esc(p.name)}</b>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
@@ -728,6 +729,11 @@ async function emailAct(a, el, e) {
       const r = emailRows().find(x => x.key === d.row);
       if (!r || !confirm(`${r.tpl.name}${r.date ? ' (' + monthDay(r.date) + ')' : ''} isn't needed for ${S.cohortKey}?\n\nIt comes off the Emails box and won't come back for this cohort.`)) return true;
       await Store.set('cohorts/' + S.cohortKey, { emailSkip: { [d.row]: true } }); return true;
+    }
+    case 'emSkipOne': { // one student's email (e.g. you sent them your own combined one): marked as handled for them only
+      const r = emailRows().find(x => x.key === d.row), p = r && emPersonBySid(r.sids[0]);
+      if (!r || !p || !confirm(`${r.tpl.name} isn't needed for ${p.name}?\n\nIt comes off the Emails box for them (only them).`)) return true;
+      await Store.set(P('students/' + p.sid), { sent: { [r.tpl.id]: 'skipped' } }); render(); return true;
     }
     case 'emailDoneToggle': e && e.preventDefault(); S.emailDoneOpen = !S.emailDoneOpen; render(); return true;
     case 'emDraft': {
