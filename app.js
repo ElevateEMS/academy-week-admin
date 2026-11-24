@@ -676,7 +676,8 @@ function render() {
       .map(el => [el.dataset.boxId || el.className, el.scrollTop]);
     // A sticky note you're typing in is kept as it is (not redrawn), so the cursor and formatting stay put.
     const liveNote = a && a.matches && a.matches('.sticky-ed[data-anote]') ? a : null;
-    const liveRange = liveNote && getSelection().rangeCount ? getSelection().getRangeAt(0).cloneRange() : null;
+    // Its cursor as plain node + offset (a Range object would be moved out of the note when the page around it is replaced).
+    const liveRange = liveNote && getSelection().rangeCount ? (r => ({ sc: r.startContainer, so: r.startOffset, ec: r.endContainer, eo: r.endOffset }))(getSelection().getRangeAt(0)) : null;
     S.rendering = true; // (so the edit box being redrawn doesn't count as clicking away)
     $('#app').innerHTML = S.user ? (window.CALLS_ONLY ? callsShell() : window.QUICKLOG_ONLY ? qlShell() : shell()) : S.authKnown ? signInView() : bootShell();
     S.rendering = false;
@@ -685,13 +686,18 @@ function render() {
     // which a redraw would cancel.
     document.querySelectorAll('header.top [title]').forEach(el => { el.dataset.tip = el.title; el.removeAttribute('title'); });
     scrolls.forEach(([k, top]) => { const el = document.querySelector(`[data-keep-scroll="${k}"]`); if (el) el.scrollTop = top; });
-    if (id) {
+    if (id && !liveNote) { // (a sticky note goes straight back below: focusing its fresh copy first would save that older copy)
       const el = document.getElementById(id);
       if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(...sel); } catch {} }
     }
     if (liveNote) {
       const fresh = document.getElementById(liveNote.id);
-      if (fresh) { fresh.replaceWith(liveNote); liveNote.focus({ preventScroll: true }); if (liveRange) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(liveRange); } }
+      if (fresh) {
+        fresh.replaceWith(liveNote); liveNote.focus({ preventScroll: true });
+        if (liveRange && liveNote.contains(liveRange.sc) && liveNote.contains(liveRange.ec)) {
+          try { const r = document.createRange(); r.setStart(liveRange.sc, liveRange.so); r.setEnd(liveRange.ec, liveRange.eo); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } catch {}
+        }
+      }
     }
     // (after the cursor is put back: focusing a text box scrolls it to the top)
     tScrolls.forEach(([id, top]) => { const el = document.getElementById(id); if (el) el.scrollTop = top; });
