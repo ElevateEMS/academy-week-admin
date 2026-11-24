@@ -19,7 +19,7 @@
    The students' signatures are in cohorts/{key}/rosters/{date}/sigs, read and written only through the Apps Script.
    Making a cohort Former clears the signatures and lists out (the finished PDFs in Drive stay). */
 
-const SIGNING_LIVE = false; // December: true (and the same in the Admin Apps Script), once the Student Hub has the card
+const SIGNING_LIVE = true; // (on early, Nov 24 2026, for a late enrollee; was going to be December with the Student Hub card) — the same in the Admin Apps Script and Morning Email
 const signingOn = (key = S.cohortKey) => SIGNING_LIVE || isTestCohort(key || '');
 const INSTRUCTORS = [
   { key: 'nick', name: 'Nicholas Brown', cert: 'F201600733' },
