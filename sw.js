@@ -6,7 +6,7 @@
 const CACHE = 'aw-offline-v1'; // (a new name here clears the old copy)
 const PAGES = ['./', 'index.html', 'calls.html', 'quicklog.html'];
 // Files the app loads by itself (not listed in the pages): the logos and the PDFs for the print packets.
-const EXTRA = ['logo.png', 'logo-full.png', 'logo-laptop.png', 'skills-tracking.pdf', 'clinical-training-record.pdf', 'patient-contact-form.pdf',
+const EXTRA = ['logo.png', 'logo-light.png', 'logo-full.png', 'logo-laptop.png', 'skills-tracking.pdf', 'clinical-training-record.pdf', 'patient-contact-form.pdf',
   'skills-assessment.pdf', 'skills-airway.pdf', 'skills-bleeding.pdf', 'skills-spinal.pdf', 'skills-splinting.pdf', 'skills-traction.pdf',
   'skills-scenario-eval.pdf', 'vitals-academy-week.pdf', 'orientation-roster-1.pdf', 'orientation-roster-2.pdf'];
 const CDN = /^https:\/\/(www\.gstatic\.com|fonts\.googleapis\.com|fonts\.gstatic\.com|cdnjs\.cloudflare\.com)\//;

@@ -143,7 +143,6 @@ const linkIcon = l => LINK_ICONS[l.icon || DEFAULT_LINK_ICON[l.id]] || `<span cl
 function adminHeaderLinks() {
   return `<button class="icon-btn" data-act="qlOpen" title="Quick Log: add an expense or income" aria-label="Quick Log: add an expense or income">${RECEIPT_ICON}</button>`
     + adminLinks().map(l => `<button class="icon-btn ql-icon" data-act="adminOpen" data-id="${esc(l.id)}" title="${esc(l.name)}" aria-label="${esc(l.name)}">${linkIcon(l)}</button>`).join('')
-    + (csCohorts().length ? `<button class="icon-btn cs-btn" data-act="csOpen" title="Cohort sheets" aria-label="Cohort sheets">${GSHEET_ICON}</button>` : '') // (last, by the divider)
     + '<span class="head-div ql-div" aria-hidden="true"></span>';
 }
 
@@ -286,19 +285,10 @@ function syncAdminPanel() {
   if (root.dataset.key === key) return;
   root.dataset.key = key; root.innerHTML = p ? adminPanel() : '';
 }
-// Cohort Sheets (the highlighted sheet icon in the Admin header): each Active + Upcoming cohort's sheet in the panel,
-// with a chip per cohort across the top to switch between them (Test/QA ones left out). Soonest cohort first.
-const csCohorts = () => (S.cohorts || []).filter(c => c.sheetUrl && /active|upcoming/i.test(c.status || '') && !isTestCohort(c.key))
-  .sort((a, b) => (cohortRank(a.key) ?? 1e9) - (cohortRank(b.key) ?? 1e9));
-function csShow(key) {
-  const list = csCohorts(), c = list.find(x => x.key === key) || list.find(x => /active/i.test(x.status)) || list[0];
-  if (c) { S.adminPanel = { name: c.key + ' Sheet', url: c.sheetUrl, cs: c.key }; render(); }
-}
 function adminPanel() {
   const p = S.adminPanel;
-  const chips = p.cs ? `<div class="cs-chips">${csCohorts().map(c => `<button class="chip ${c.key === p.cs ? 'on' : ''}" data-act="csShow" data-k="${esc(c.key)}">${esc(c.key)}</button>`).join('')}</div>` : '';
   return `<div class="overlay" data-act="adminPanelClose"><div class="modal pdf admin-panel" data-stop>
-    <div class="modal-head"><h2>${esc(p.name)}</h2>${chips}<span class="panel-actions">
+    <div class="modal-head"><h2>${esc(p.name)}</h2><span class="panel-actions">
       <a class="btn small" href="${esc(p.chrome || p.url)}" target="_blank" rel="noopener" data-chrome data-act="adminPanelClose">Open in Chrome ↗</a>
       <button class="x big" data-act="adminPanelClose" aria-label="Close">×</button></span></div>
     <iframe src="${esc(p.url)}" title="${esc(p.name)}" allow="clipboard-read; clipboard-write"></iframe>
@@ -1356,8 +1346,6 @@ async function adminAct(a, el = {}, e) {
   switch (a) {
     case 'adminOpen': { const l = adminLinks().find(x => x.id === d.id); if (l) openPanel(l.name, fullUrl(l.url)); return true; }
     case 'adminOpenUrl': openPanel(d.name, d.url); return true;
-    case 'csOpen': csShow(); return true;
-    case 'csShow': csShow(d.k); return true;
     case 'inqCallsOnly': S.inqCallsOnly = d.v === '1'; pref('inqCallsOnly', d.v === '1' ? '1' : '0'); render(); return true; // remembered on this device
     case 'adminNextAdd': {
       const k = 'add-anext-' + SETUP, text = String(S.drafts[k] || '').trim(), src = changesHome().src;

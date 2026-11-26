@@ -16,6 +16,22 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const slug = s => String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem('aw-' + k); localStorage.setItem('aw-' + k, v); } catch { return null; } };
 
+// Look (Settings → Preferences): each person's own, saved in meta/settings.themes by email so it follows them to
+// every device; Navy header until they pick another. The last one used is kept on this device too, so index.html
+// can put it on before anything draws (no flash of the wrong colors).
+const THEMES = [['navy', 'Navy header'], ['warm', 'Warm work'], ['calm', 'Calm']];
+const myTheme = () => {
+  const t = S.settings && S.settings.themes && S.user && S.settings.themes[S.user.email];
+  return THEMES.some(([k]) => k === t) ? t : 'navy';
+};
+function applyTheme(t = myTheme()) {
+  const root = document.documentElement;
+  if (root.dataset.theme === t) return;
+  root.dataset.theme = t; pref('theme', t);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = t === 'navy' ? '#0c2a43' : getComputedStyle(root).getPropertyValue('--bg').trim();
+}
+
 const VIEWS = ['admin', 'staff', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
 const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
 const S = {
@@ -511,7 +527,7 @@ Store.onUser(async user => {
   watchAdminNext(null);
   S.cohortsLoaded = false;
   if (!user) { clearSheetCopies(); render(); return; }
-  unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; render(); }));
+  unwatchGlobal.push(Store.watch('meta/settings', d => { S.settings = d; applyTheme(); render(); }));
   unwatchGlobal.push(Store.watch('shopping', list => { S.shopping = list; render(); }));
   unwatchGlobal.push(Store.watch('updates', list => { S.updates = list; render(); }));
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
@@ -721,6 +737,7 @@ function render() {
 const ICONS = {
   day: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/><circle cx="12" cy="15" r="1.6" fill="currentColor" stroke="none"/></svg>',
   week: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M9 10v10M15 10v10"/></svg>',
+  staff: '<svg viewBox="0 0 24 24"><circle cx="12" cy="7.6" r="3.4"/><path d="M5.2 20c.8-3.9 3.5-6.2 6.8-6.2s6 2.3 6.8 6.2"/><path d="M10.4 16.6l1.6 1.6 1.6-1.6"/></svg>',
   students: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.8 14.2c2.2.2 4 1.7 4.6 4.8"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   schedule: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 9h6M9 13h6M9 17h4"/></svg>',
@@ -769,17 +786,16 @@ function shell() {
   <header class="top">
     <div class="head-left">
       <button class="brand ${S.view === 'admin' ? 'on' : ''}" data-act="view" data-v="admin" title="Admin"><img src="logo.png" alt=""><b>Admin</b></button>
-      <button class="head-staff ${S.view === 'staff' ? 'on' : ''}" data-act="view" data-v="staff" title="Staff: pay, timesheets, the staff list">Staff</button>
       <span class="head-div" aria-hidden="true"></span>
       ${sideSwitch()}
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') + (S.sheet && S.sheet.sheetUrl
-        ? `<a class="icon-btn" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet" title="${esc(S.cohortKey)} sheet" aria-label="${esc(S.cohortKey)} sheet">${GSHEET_ICON}</a>` : '') : '')
+      ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''))
         // Students page: Find a student sits up here, left of the Students icon.
         + (S.view === 'students' && S.sheet ? `<input id="searchIn" class="search head-search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">` : '')
-        + (S.view === 'settings' ? '' : icon('students', 'Students')) /* (Settings: no page icons; you may have come from Staff) */}
+        // Admin and Staff pages: the Staff icon; a cohort's pages: the Students icon. (Settings: neither.)
+        + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? icon('staff', 'Staff: pay, timesheets, the staff list') : icon('students', 'Students'))}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -830,9 +846,7 @@ function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
   if (S.view === 'staff') return staffTitle();
   if (S.view === 'course') {
-    const f = cohortInfo().firstDay, n = S.sheet ? attending().length : 0; // (enrolled: dropped / not attending aren't counted)
-    const when = isIsoDate(f) ? (f > todayIso() ? 'Orientation ' : 'Started ') + parseIso(f).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'Orientation date TBD';
-    return `<h1>${esc(S.cohortKey || 'Course')}</h1><p>${S.sheet ? when + ' · ' + n + ' student' + (n === 1 ? '' : 's') + ' enrolled' : ''}</p>`;
+    return cohortTitle();
   }
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
   if (S.view === 'students') {
@@ -855,6 +869,21 @@ function pageTitle() {
   const d = weekDays().find(x => x.n === n) || {};
   const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
   return `<h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>${nice ? `<p>${nice}${n === currentWeekDay() ? ' · today' : ''}</p>` : ''}`;
+}
+
+// The cohort's name with ‹ › either side: steps through the cohorts the menu lists, oldest to newest
+// (Test / Custom ones, which have no season, after those). Just the name: its dates and count are in Course Details.
+function cohortSteps() {
+  const list = S.cohorts.filter(c => !isOldCohort(c) || c.key === S.cohortKey)
+    .sort((a, b) => (cohortRank(a.key) ?? 1e9) - (cohortRank(b.key) ?? 1e9));
+  const i = list.findIndex(c => c.key === S.cohortKey);
+  return { prev: i > 0 ? list[i - 1].key : null, next: i >= 0 && i < list.length - 1 ? list[i + 1].key : null };
+}
+function cohortTitle() {
+  const { prev, next } = cohortSteps();
+  const step = (k, dir) => k ? `<button class="cohort-step" data-act="cohortStep" data-k="${esc(k)}" title="${esc(k)}" aria-label="${dir}: ${esc(k)}">${dir === 'Previous' ? '‹' : '›'}</button>`
+    : '<span class="cohort-step" aria-hidden="true"></span>';
+  return `<h1 class="cohort-title">${step(prev, 'Previous')}<span>${esc(S.cohortKey || 'Course')}</span>${step(next, 'Next')}</h1>`;
 }
 
 // The cohort menu lists Active and Upcoming cohorts; Former and Test/QA ones only after
@@ -1154,7 +1183,6 @@ const HIDE_KEYS = ['todo', 'shop', 'pack', 'docs', 'setup', 'next', 'upd', 'ctod
 const hidden = k => { const v = pref('hide-' + k); return v != null ? v === '1' : !!(S.settings && S.settings.hideCheckedDefault); };
 const BOOK = '<svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5c-.8 0-1.5.7-1.5 1.5zM20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/><path d="M4 20.5V5.5M20 20.5V5.5"/></svg>';
 const RESET = '<svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.8h3.8"/></svg>';
-const GSHEET_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 9h16M4 14.5h16M10 9v11.5"/></svg>'; // the cohort's Google Sheet
 const SHEET = '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 12.5l2 2 4-4.5"/></svg>';
 const EYE = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
@@ -2392,6 +2420,8 @@ function settingsView() {
       tile('Bag Contents', 'What goes in each jump bag pocket, for the daily bag check.', open('bagEdOpen', 'Edit')),
     ])}
     ${group('Preferences', [
+      tile('Look', 'How the app looks for you. Nick picks his own.',
+        `<div class="seg">${THEMES.map(([k, l]) => `<button class="${myTheme() === k ? 'on' : ''}" data-act="theme" data-v="${k}">${l}</button>`).join('')}</div>`),
       tile('Checked Items', 'Whether lists start out showing what’s checked off.',
         `<div class="seg">${[[false, 'Show'], [true, 'Hide']].map(([v, l]) =>
           `<button class="${!!(S.settings && S.settings.hideCheckedDefault) === v ? 'on' : ''}" data-act="hideDefault" data-v="${v ? 1 : 0}">${l}</button>`).join('')}</div>`),
@@ -2964,6 +2994,7 @@ async function act(a, el = {}, e) {
         if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
       }
+      case 'cohortStep': selectCohort(d.k, { keepView: true }); window.scrollTo(0, 0); break;
       case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
         const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false; noteSide(v); render(); window.scrollTo(0, 0); break;
@@ -3155,6 +3186,10 @@ async function act(a, el = {}, e) {
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
       case 'setupShow': S.setupShow = S.setupShow === S.cohortKey ? null : S.cohortKey; render(); break; // a finished checklist, opened for a look
+      case 'theme':
+        S.settings = { ...(S.settings || {}), themes: { ...((S.settings && S.settings.themes) || {}), [S.user.email]: d.v } };
+        applyTheme(); render();
+        await Store.set('meta/settings', { themes: { [S.user.email]: d.v } }); break;
       case 'hideDefault': // a new default applies to every list again, so forget each eye's own choice
         HIDE_KEYS.forEach(k => { try { localStorage.removeItem('aw-hide-' + k); } catch {} });
         await Store.set('meta/settings', { hideCheckedDefault: d.v === '1' }); break;
