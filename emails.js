@@ -457,7 +457,7 @@ function emailPickModal() {
 // The Students page's Enrollment view (was the Student Emails pop-up): textbook, payments, orientation, due dates, book code, emails.
 function emStudentsTable() {
   const q = S.search.trim().toLowerCase(), people = emPeople().filter(p => !q || p.name.toLowerCase().includes(q));
-  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
+  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="r-no">–</span>';
   const rows = people.map(p => {
     const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before' && p.sent[k] !== 'skipped'), sentN = drafted.length;
     const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');

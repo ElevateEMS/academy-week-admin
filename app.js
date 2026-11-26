@@ -2112,7 +2112,7 @@ function awStudentsView() {
   const skillRows = Object.keys(bySkill).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
   const chip = (k, l) => `<button class="chip ${filter === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
-  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
+  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="r-no">–</span>';
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
   // (Before the flip there's no filter row at all: search is in the header, and the Skills Tracking sheet waits for Academy Week.)
@@ -2244,22 +2244,21 @@ async function saveGrade(sid, g) {
 
 // One roster cell: what it says, and the pop-up it opens.
 function rosterCell(s, k) {
-  const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="muted">–</span>';
+  const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="r-no">–</span>';
   const ed = /^aw[UVW]$/.test(k) ? 'aw' : k; // (the three Academy Week cells share one pop-up)
   const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
   if (k === 'pay') {
-    const p = emPerson(s), t = todayIso();
-    if (p.paidNext && p.paidFinal) return btn(yes + ' Paid');
+    const p = emPerson(s), t = todayIso(), book = bookMark(s, p);
+    if (p.paidNext && p.paidFinal) return btn(yes + ' Paid') + book;
     const [what, when] = !p.paidNext ? ['Next', p.next] : ['Final', p.final];
-    return btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`);
+    return btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`) + book;
   }
-  if (k === 'book') return btn(c.D ? yes : no);
   if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
   if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
     const n = s.contacts || 0, cls = n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return btn(`${c.O ? '<span class="em-yes">✓</span> Attested' : '<span class="muted">Not attested</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
+    return btn(`${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not eligible</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
   }
   if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
@@ -2280,22 +2279,49 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
-const ROSTER_COLS = [['pay', 'Payments'], ['book', 'Textbook'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
+const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', '<span class="th-sub">Academy Week</span>Compliance'], ['grade', 'Course<br>Grade'],
   ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT']];
+// What each heading is for (shown when you point at it).
+const ROSTER_TIPS = {
+  pay: 'Next and final tuition installments. Book icon: bought the textbook through us (with a check once their code is issued)', paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
+  cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
+  assign: 'The Student Hub’s 10 assignments', comp: 'Academy Week Compliance attestation', grade: 'Coursework from JBL, then the course grade with the final exam',
+  awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
+};
+// Payments cell's book: bought the textbook through us (D); with a check once their access code is issued.
+const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h10.5a2 2 0 0 1 2 2V20H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h10.5"/></svg>';
+const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h10.5a2 2 0 0 1 2 2V20H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h10.5"/><path d="M8.5 9.5l2 2 3.5-3.5"/></svg>';
+function bookMark(s, p) {
+  if (!cellsOf(s).D && !p.bookCode) return '';
+  const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
+  const when = code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
+  return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
+}
+// Little marks after a name on the Roster (the words are in their hover text and on their student page).
+function nameMarks(s) {
+  const p = emPerson(s), i = cohortInfo(), out = [];
+  const mark = (svg, tip, act, cls = '') => out.push(`<button class="name-mark ${cls}" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}">${svg}</button>`);
+  if (needsOrientDate(p)) mark(LATE_ICON, 'Needs their own orientation date', 'emLateOpen', 'warn');
+  else if (p.late && !p.makeup) mark(LATE_ICON, `Late enrollee · orientation ${monthDay(p.orient)}${i.lateCourseNo ? ' · VAOEMS course #' + i.lateCourseNo : ''}`, 'emLateOpen');
+  else if (p.late && p.makeup) mark(LATE_ICON, `Make-up orientation ${monthDay(p.orient)}`, 'emLateOpen', 'soft');
+  return out.join('');
+}
+const LATE_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M12 13v5M9.5 15.5h5"/></svg>';
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
       <thead><tr><th rowspan="2">#</th><th rowspan="2">Student</th>${ROSTER_COLS.map(([k, l, grp], i) => grp
-        ? (ROSTER_COLS[i - 1][2] === grp ? '' : `<th class="c th-group" colspan="${ROSTER_COLS.filter(x => x[2] === grp).length}">Academy Week</th>`)
-        : `<th class="c" rowspan="2">${l}</th>`).join('')}</tr>
-        <tr>${ROSTER_COLS.filter(x => x[2]).map(([, l]) => `<th class="c th-sub-row">${l}</th>`).join('')}</tr></thead>
+        ? (ROSTER_COLS[i - 1][2] === grp ? '' : `<th class="c th-group aw-col aw-first" colspan="${ROSTER_COLS.filter(x => x[2] === grp).length}" title="${ROSTER_TIPS[grp]}">Academy Week</th>`)
+        : `<th class="c col-${k}" rowspan="2" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr>
+        <tr>${ROSTER_COLS.filter(x => x[2]).map(([k, l], i) => `<th class="c th-sub-row aw-col col-${k} ${i === 0 ? 'aw-first' : ''}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td class="r-name"><button class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
-        ${ROSTER_COLS.map(([k]) => `<td class="c">${rosterCell(s, k)}</td>`).join('')}
+        <td class="r-name"><button class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : nameMarks(s)}</td>
+        ${ROSTER_COLS.map(([k, , grp], i) => `<td class="c col-${k}${grp ? ' aw-col' + (ROSTER_COLS[i - 1][2] === grp ? '' : ' aw-first') : ''}">${rosterCell(s, k)}</td>`).join('')}
       </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>
@@ -2307,7 +2333,7 @@ function droppedList() {
   if (!list.length) return '';
   return `<details class="box dropped-box" ${S.droppedOpen ? 'open' : ''}><summary data-act="droppedToggle"><span>Dropped &amp; withdrawn</span><span class="muted small">${list.length}</span></summary>
     <ul class="dropped-list">${list.map(l => { const [name, ...rest] = l.split(' - '); return `<li><b>${esc(name)}</b>${rest.length ? ` <span class="muted">${esc(rest.join(' - '))}</span>` : ''}</li>`; }).join('')}</ul>
-    <p class="muted small">From the list under the roster in the cohort sheet.</p></details>`;
+  </details>`;
 }
 function studentsView() {
   if (!S.sheet) return loadingView();
@@ -2377,6 +2403,7 @@ function studentPageTop(s) {
       <dl class="sp-kv">
         <dt>Due</dt><dd><button class="cell-link" data-act="emExtOpen" data-sid="${s.sid}">Next ${p.next ? monthDay(p.next) : 'TBD'} · Final ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? ` · $${p.disc} off` : ''}</button>${p.ext.next || p.ext.final ? ' <span class="tag-soft">extension</span>' : ''}</dd>
         <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
+        <dt>VAOEMS course #</dt><dd>${(cn => cn ? esc(cn) : '<span class="muted">–</span>')(p.late && !p.makeup && cohortInfo().lateCourseNo ? cohortInfo().lateCourseNo : cohortInfo().courseNo)}${p.late && !p.makeup && cohortInfo().lateCourseNo ? ' <span class="muted small">(the late enrollment course)</span>' : ''}</dd>
         <dt>Book code</dt><dd>${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</dd>
       </dl></section>
     <section id="sp-emails"><h3>Emails</h3>

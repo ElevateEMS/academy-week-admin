@@ -2270,3 +2270,21 @@ span.cohort-step { cursor: default; }
 .dropped-list { margin: 0; padding: 0 18px 4px 36px; }
 .dropped-list li { padding: 3px 0; }
 .dropped-box > p { padding: 0 18px 12px; margin: 4px 0 0; }
+/* Academy Week's three columns: a soft tint and a line before them, set apart from the rest; even widths. */
+.roster-main .aw-col { background: rgba(var(--accent-rgb), .06); }
+.roster-main th.aw-col { background: var(--blush); box-shadow: inset 0 -200px 0 rgba(var(--accent-rgb), .06); }
+.roster-main .aw-first { border-left: 1px solid var(--blush-line); }
+.roster-main .col-awU, .roster-main .col-awV, .roster-main .col-awW { width: 88px; min-width: 88px; }
+.roster-main .col-grade { width: 96px; min-width: 96px; }
+.roster-main .col-dispo { border-left: 1px solid var(--blush-line); }
+.roster-main th[title] { cursor: help; }
+/* The little mark after a name (late enrollee, make-up orientation, needs an orientation date). */
+.name-mark { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; vertical-align: -5px; border-radius: 6px; color: var(--taupe-dark); }
+.name-mark:hover { background: var(--blush-soft); }
+.name-mark svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.name-mark.warn { color: var(--rose); }
+.name-mark.soft { color: var(--muted); }
+/* Not done yet: fainter than a check. */
+.r-no { color: var(--muted); opacity: .55; }
+.roster-main .book-mark { margin-left: 0; vertical-align: -6px; }
+.roster-main td.col-pay { white-space: nowrap; }
