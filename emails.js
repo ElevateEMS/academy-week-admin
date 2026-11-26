@@ -513,7 +513,7 @@ function emStuEditModal() {
         <span class="muted small">usually ${due.next ? monthDay(due.next) : 'TBD'}</span>
         <span>Final installment</span>${datePicker(k('final'), { optional: true, empty: 'TBD', title: 'Final installment due' })}
         <span class="muted small">usually ${due.final ? monthDay(due.final) : 'TBD'}</span></div>
-      <p class="mini-head disc-head">Discount <span class="muted small">(from their Tally code; never the deposit)</span></p>
+      <p class="mini-head disc-head">Discount</p>
       <div class="chips">${chip('none', 'None')}${chip('amount', '$ off each installment')}${chip('pct', '% off tuition')}</div>
       ${dk === 'amount' ? `<div class="disc-row">$ ${inp('dval', '75', 80)} <span class="muted small">off the Next and the Final</span></div>`
         : dk === 'pct' ? `<div class="disc-row">${inp('dval', '10', 64)} % of ${inp('dtui', String(TUITION_DEFAULT), 90).replace('class="disc-in"', 'class="disc-in" title="Tuition"')} <span class="muted small">tuition, half off each installment</span></div>` : ''}

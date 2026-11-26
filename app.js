@@ -2292,10 +2292,14 @@ const ROSTER_TIPS = {
 // The Enrollment view's textbook: a book = bought it through us (D); with a check once their access code is issued.
 const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/></svg>';
 const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/><path d="M11 10.3l1.8 1.8 3.4-3.6"/></svg>';
+// When their book code was given out ('' if it's not in the codes list).
+function bookIssued(s, p) {
+  const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
+  return code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+}
 function bookMark(s, p) {
   if (!cellsOf(s).D && !p.bookCode) return '';
-  const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
-  const when = code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const when = bookIssued(s, p);
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
@@ -2412,7 +2416,7 @@ function studentPageTop(s) {
         <dt>Due</dt><dd><button class="cell-link" data-act="emExtOpen" data-sid="${s.sid}">Next ${p.next ? monthDay(p.next) : 'TBD'} · Final ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? ` · $${p.disc} off` : ''}</button>${p.ext.next || p.ext.final ? ' <span class="tag-soft">extension</span>' : ''}</dd>
         <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
         <dt>VAOEMS course #</dt><dd>${(cn => cn ? esc(cn) : '<span class="muted">–</span>')(p.late && !p.makeup && cohortInfo().lateCourseNo ? cohortInfo().lateCourseNo : cohortInfo().courseNo)}${p.late && !p.makeup && cohortInfo().lateCourseNo ? ' <span class="muted small">(the late enrollment course)</span>' : ''}</dd>
-        <dt>Book code</dt><dd>${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</dd>
+        <dt>Book code</dt><dd>${p.bookCode ? copyLine(p.bookCode, 'Book code') + (bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : '') : '<span class="muted">–</span>'}</dd>
       </dl></section>`;
   sec.emails = `<section id="sp-emails"><h3>Emails</h3>
       ${drafted.length ? `<ul class="sp-emails">${drafted.map(k => `<li>${esc((tplById(k) || { name: k }).name)} <span class="muted small">${p.sent[k] === 'skipped' ? 'skipped' : isIsoDate(String(p.sent[k]).slice(0, 10)) ? 'drafted ' + monthDay(String(p.sent[k]).slice(0, 10)) : ''}</span></li>`).join('')}</ul>` : '<p class="empty">No emails drafted for them yet.</p>'}
@@ -2429,6 +2433,11 @@ function cellEdModal() {
   const [title, rows] = CELL_EDITS[ed.k], c = cellsOf(s), dk = x => 'ce-' + x + '-' + s.sid;
   let body = rows.map(r => ceLine(s, r)).join('');
   if (ed.k === 'pay') body += `<button class="link ce-more" data-act="emExtOpen" data-sid="${s.sid}">Due dates and discount…</button>`;
+  if (ed.k === 'book') { // their code (to copy) and when it was given out, above the tick
+    const p = emPerson(s), when = bookIssued(s, p);
+    body = `<dl class="sp-kv"><dt>Code</dt><dd>${p.bookCode ? copyLine(p.bookCode, 'Book code') : '<span class="muted">No code issued yet</span>'}</dd>
+      ${p.bookCode ? `<dt>Issued</dt><dd>${when || '<span class="muted">–</span>'}</dd>` : ''}</dl>` + body;
+  }
   if (ed.k === 'cpr') body += `<label class="ce-row"><span>CPR class sign-up</span><input id="${dk('J')}" data-draft="${dk('J')}" value="${esc(S.drafts[dk('J')] ?? c.J ?? '')}" placeholder="e.g. 9/13/2026"></label>
     <div class="ce-save"><button class="btn small primary" data-act="cellText" data-sid="${s.sid}" data-l="J">Save sign-up</button></div>`;
   if (ed.k === 'grade') {
