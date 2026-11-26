@@ -57,6 +57,13 @@
   --blush-rgb: 205, 216, 226;
 }
 :root[data-theme="navy"] {
+  /* Shaded boxes in warm cream (a pale tint of the logo's gold), on a brighter page. (Soft sky instead, if wanted
+     later: --blush #e8f0f8, --blush-soft #f1f6fb, --blush-line #c9dbec, --blush-rgb 200, 219, 236.) */
+  --bg: #f6f7f9;
+  --blush: #fbf3e2;
+  --blush-soft: #fdf8ee;
+  --blush-line: #efdcb4;
+  --blush-rgb: 239, 220, 180;
   --head-bg: #0c2a43;
   --head-ink: #ffffff;
   --head-muted: #a9bccb;
