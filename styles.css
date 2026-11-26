@@ -2256,10 +2256,20 @@ span.cohort-step { cursor: default; }
 .sp-kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin: 4px 0 8px; font-size: 14px; }
 .sp-kv dt { color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; padding-top: 2px; }
 .sp-kv dd { margin: 0; }
-.sp-note-label { display: block; font-size: 13px; margin: 8px 0 4px; }
-.sp-emails { margin: 0; padding-left: 18px; font-size: 14px; }
-.sp-emails li { padding: 2px 0; }
-.sp-aw-head { border-bottom: 0 !important; }
+/* Student page cards: two side by side (one column when narrow), and full-width ones under them. */
+.sp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+@media (max-width: 700px) { .sp-cards { grid-template-columns: 1fr; } }
+.drawer section.sp-card { border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 14px; background: var(--paper); }
+.sp-cards > .sp-card:last-child { background: var(--blush-soft); border-color: var(--blush-line); }
+.sp-card.sp-wide { margin: 0 0 14px; }
+.sp-card textarea { width: 100%; }
+.sp-card .sp-kv { grid-template-columns: 110px 1fr; }
+/* Academy Week tab: several boxes on one row. */
+.sp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; padding: 4px 0; }
+.sp-row-title { min-width: 110px; color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; }
+.sp-row .ce-row { padding: 4px 0; }
+.sp-row .ce-row > span:first-child { min-width: 0; }
+.sp-row .ce-row select { min-width: 110px; }
 
 /* Roster headings: Academy Week over its three columns; small lead-in words above a heading. */
 .roster-main th.th-group { padding-bottom: 0; color: var(--ink); }

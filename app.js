@@ -2384,51 +2384,55 @@ function ceLine(s, [L, label, kind]) {
 }
 // The top of a student's page (their pop-up, opened from any name): everything but Academy Week, which follows.
 // One tab at a time (S.spTab); opening a student from an Academy Week cell goes straight to that part.
-const SP_SECTIONS = [['overview', 'Overview'], ['grades', 'Grades'], ['assign', 'Assignments'], ['enroll', 'Enrollment & payments'], ['emails', 'Emails'], ['aw', 'Academy Week']];
+const SP_SECTIONS = [['overview', 'Overview'], ['course', 'Coursework'], ['aw', 'Academy Week']];
 const spTab = () => SP_SECTIONS.some(([k]) => k === S.spTab) ? S.spTab : 'overview';
 function studentPageTop(s) {
   const p = emPerson(s), c = cellsOf(s), doc = S.studentsDoc[s.sid] || {}, g = doc.guardian || {}, gr = gradeOf(s);
   const edit = (k, label = 'Edit') => `<button class="btn tiny" data-act="cellEd" data-sid="${s.sid}" data-k="${k}">${label}</button>`;
-  const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before').sort((a, b) => String(p.sent[a]).localeCompare(String(p.sent[b])));
-  const dk = 'sp-AC-' + s.sid;
-  const tab = spTab(), sec = {};
-  sec.overview = `<section id="sp-overview"><h3>Overview</h3>
-      <dl class="sp-kv">
-        <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
-        <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
-        <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span> <span class="muted small">Pause / Unpause at the bottom</span>` : esc(s.status || 'Active')}</dd>
-        <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
-      </dl>
-      <label class="sp-note-label">Notes <span class="muted small">(the cohort sheet’s Notes column)</span></label>
-      <textarea id="${dk}" data-draft="${dk}" rows="4" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk] ?? c.AC ?? '')}</textarea>
+  const dk = 'sp-AC-' + s.sid, tab = spTab(), info = cohortInfo(), lateNo = p.late && !p.makeup && info.lateCourseNo;
+  const tabs = `<nav class="sp-tabs" role="tablist">${SP_SECTIONS.map(([id, l]) => `<button class="${tab === id ? 'on' : ''}" role="tab" data-act="spTab" data-id="${id}">${l}</button>`).join('')}</nav>`;
+  if (tab === 'overview') return tabs + `<div class="sp-cards">
+      <section class="sp-card"><h3>Contact</h3>
+        <dl class="sp-kv">
+          <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
+          <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
+          <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span>` : esc(s.status || 'Active')}</dd>
+          <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
+        </dl></section>
+      <section class="sp-card"><h3>Enrollment &amp; payments</h3>
+        <dl class="sp-kv">
+          <dt>Textbook</dt><dd>${p.bookCode ? copyLine(p.bookCode, 'Book code') + (bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : '') : c.D ? 'Bought · <span class="muted">no code yet</span>' : '<span class="muted">Not through us</span>'} ${edit('book', 'Change')}</dd>
+          <dt>Payments</dt><dd>${payChips(p)}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <span class="tag-soft">$ extension</span>' : ''}</dd>
+          <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
+          <dt>VAOEMS course #</dt><dd>${(lateNo || info.courseNo) ? esc(lateNo || info.courseNo) : '<span class="muted">–</span>'}${lateNo ? ' <span class="muted small">(late enrollment course)</span>' : ''}</dd>
+        </dl></section>
+    </div>
+    <section class="sp-card sp-wide"><h3>Notes <span class="muted small">the cohort sheet’s Notes column</span></h3>
+      <textarea id="${dk}" data-draft="${dk}" rows="5" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk] ?? c.AC ?? '')}</textarea>
       <div class="ce-save"><button class="btn small" data-act="spNoteSave" data-sid="${s.sid}">Save note</button></div>
     </section>`;
-  sec.grades = `<section id="sp-grades"><h3>Grades ${edit('grade')}</h3>
-      <dl class="sp-kv">
-        <dt>Coursework</dt><dd>${gradeNum(gr.coursework)}</dd>
-        <dt>Final exam</dt><dd class="${gr.counted != null && gr.counted < PASS_MARK ? 'low' : ''}">${gradeNum(gr.counted)}${gr.retake != null ? ` <span class="muted small">(first ${gradeNum(gr.final)}, retake ${gradeNum(gr.retake)})</span>` : ''}</dd>
-        <dt>Course grade</dt><dd><b class="${gr.shown != null && gr.shown < PASS_MARK ? 'low' : ''}">${gradeNum(gr.shown)}</b>${gr.override != null ? ' <span class="muted small">typed from JBL</span>' : ''}</dd>
-      </dl></section>`;
-  sec.assign = `<section id="sp-assign"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
-      ${PORTAL_ASSIGNMENTS.map(r => ceLine(s, r)).join('')}
-      <p class="muted small">CPR class: ${c.J ? esc(c.J) : 'not signed up'} · ${edit('cpr', 'Change')}</p>
-    </section>`;
-  sec.enroll = `<section id="sp-enroll"><h3>Enrollment &amp; payments</h3>
-      ${ceLine(s, ['D', 'Bought the textbook through us'])}${ceLine(s, ['E', 'Next installment paid'])}${ceLine(s, ['F', 'Final installment paid'])}
-      <dl class="sp-kv">
-        <dt>Due</dt><dd><button class="cell-link" data-act="emExtOpen" data-sid="${s.sid}">Next ${p.next ? monthDay(p.next) : 'TBD'} · Final ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? ` · $${p.disc} off` : ''}</button>${p.ext.next || p.ext.final ? ' <span class="tag-soft">extension</span>' : ''}</dd>
-        <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
-        <dt>VAOEMS course #</dt><dd>${(cn => cn ? esc(cn) : '<span class="muted">–</span>')(p.late && !p.makeup && cohortInfo().lateCourseNo ? cohortInfo().lateCourseNo : cohortInfo().courseNo)}${p.late && !p.makeup && cohortInfo().lateCourseNo ? ' <span class="muted small">(the late enrollment course)</span>' : ''}</dd>
-        <dt>Book code</dt><dd>${p.bookCode ? copyLine(p.bookCode, 'Book code') + (bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : '') : '<span class="muted">–</span>'}</dd>
-      </dl></section>`;
-  sec.emails = `<section id="sp-emails"><h3>Emails</h3>
-      ${drafted.length ? `<ul class="sp-emails">${drafted.map(k => `<li>${esc((tplById(k) || { name: k }).name)} <span class="muted small">${p.sent[k] === 'skipped' ? 'skipped' : isIsoDate(String(p.sent[k]).slice(0, 10)) ? 'drafted ' + monthDay(String(p.sent[k]).slice(0, 10)) : ''}</span></li>`).join('')}</ul>` : '<p class="empty">No emails drafted for them yet.</p>'}
-    </section>`;
-  sec.aw = `<section id="sp-aw" class="sp-aw-head"><h3>Academy Week</h3>
-      ${CELL_EDITS.aw[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.dispo[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.nremt[1].map(r => ceLine(s, r)).join('')}
-    </section>`;
-  return `<nav class="sp-tabs" role="tablist">${SP_SECTIONS.map(([id, l]) => `<button class="${tab === id ? 'on' : ''}" role="tab" data-act="spTab" data-id="${id}">${l}</button>`).join('')}</nav>
-    ${sec[tab]}`;
+  if (tab === 'course') return tabs + `<div class="sp-cards">
+      <section class="sp-card"><h3>Grades ${edit('grade')}</h3>
+        <dl class="sp-kv">
+          <dt>Coursework</dt><dd>${gradeNum(gr.coursework)}</dd>
+          <dt>Final exam</dt><dd class="${gr.counted != null && gr.counted < PASS_MARK ? 'low' : ''}">${gradeNum(gr.counted)}${gr.retake != null ? ` <span class="muted small">(first ${gradeNum(gr.final)}, retake ${gradeNum(gr.retake)})</span>` : ''}</dd>
+          <dt>Course grade</dt><dd><b class="${gr.shown != null && gr.shown < PASS_MARK ? 'low' : ''}">${gradeNum(gr.shown)}</b>${gr.override != null ? ' <span class="muted small">typed from JBL</span>' : ''}</dd>
+        </dl></section>
+      <section class="sp-card"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
+        ${PORTAL_ASSIGNMENTS.map(r => ceLine(s, r)).join('')}
+        <p class="muted small">CPR class: ${c.J ? esc(c.J) : 'not signed up'} · ${edit('cpr', 'Change')}</p>
+      </section>
+    </div>`;
+  return tabs; // (Academy Week: its sections follow, in drawer())
+}
+// Academy Week tab: psychomotor and final sigs, the dispositions, and the NREMT attempts, one row each.
+function spAwRows(s) {
+  const row = (title, cells) => `<div class="sp-row"><span class="sp-row-title">${title}</span>${cells.map(r => ceLine(s, r)).join('')}</div>`;
+  return `<section><h3>Exams &amp; disposition</h3>
+    ${row('Psychomotor', [['V', 'Exam', 'select'], ['W', 'Final Sigs']])}
+    ${row('Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
+    ${row('NREMT exam', [['Z', '1st', 'select'], ['AA', '2nd', 'select'], ['AB', '3rd', 'select']])}
+  </section>`;
 }
 function cellEdModal() {
   const ed = S.cellEd, s = ed && studentBySid(ed.sid);
@@ -2480,7 +2484,9 @@ async function changePc(sid, by) {
 function drawer() {
   const s = studentBySid(S.open);
   if (!s) return '';
-  const part = S.openPart, awOn = !!part || spTab() === 'aw', show = p => awOn && (!part || part === p || (p === 'contacts' && part === 'fix'));
+  // Conduct: on Overview (or opened on its own); the rest: the Academy Week tab (or one part opened from its view).
+  const part = S.openPart, awOn = !!part || spTab() === 'aw';
+  const show = p => p === 'attendance' ? (part ? part === p : spTab() === 'overview') : awOn && (!part || part === p || (p === 'contacts' && part === 'fix'));
   // From "To fix": notes still waiting on a fix go first.
   const contacts = S.contacts.filter(c => c.sid === s.sid)
     .sort((a, b) => (part === 'fix' ? (!!(a.fixed || !a.fix) - !!(b.fixed || !b.fix)) : 0) || b.created - a.created);
@@ -2524,6 +2530,8 @@ function drawer() {
             `<button class="chip small ${s.behind.includes(k) ? 'on warn' : ''}" data-act="behind" data-sid="${s.sid}" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div></div>`).join('')}` : ''}
         <textarea id="${dk('note')}" data-draft="${dk('note')}" data-change="note" data-sid="${s.sid}" rows="2" placeholder="Skills note (optional)">${esc(note)}</textarea>
       </section>` : ''}
+
+      ${!part && awOn ? spAwRows(s) : ''}
 
       ${show('peers') && peerStats()[s.name] ? (st => `<section>
         <h3>Peer Evaluations</h3>
@@ -3596,7 +3604,11 @@ async function act(a, el = {}, e) {
       case 'openAll': S.openPart = null; S.spTab = 'aw'; render(); break; // (from one Academy Week part: that tab, all of it)
       case 'closeStudent': S.open = null; S.openPart = null; render(); break;
       case 'pc': await changePc(d.sid, Number(d.by)); break;
-      case 'skill': await Store.set(P('students/' + d.sid), { skill: d.v }); break;
+      case 'skill': { // Done also ticks All skills (U) in the sheet; anything else unticks it
+        await Store.set(P('students/' + d.sid), { skill: d.v });
+        const st = studentBySid(d.sid); if (st && !!cellsOf(st).U !== (d.v === 'done')) await setCells(d.sid, { U: d.v === 'done' });
+        break;
+      }
       case 'behind': {
         const s = studentBySid(d.sid);
         const next = s.behind.includes(d.k) ? s.behind.filter(x => x !== d.k) : [...s.behind, d.k];
