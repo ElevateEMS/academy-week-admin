@@ -2271,8 +2271,8 @@ span.cohort-step { cursor: default; }
 .dropped-list li { padding: 3px 0; }
 .dropped-box > p { padding: 0 18px 12px; margin: 4px 0 0; }
 /* Academy Week's three columns: a soft tint and a line before them, set apart from the rest; even widths. */
-.roster-main .aw-col { background: rgba(var(--accent-rgb), .06); }
-.roster-main th.aw-col { background: var(--blush); box-shadow: inset 0 -200px 0 rgba(var(--accent-rgb), .06); }
+.roster-main .aw-col { background: #fffbf3; }
+.roster-main th.aw-col { background: #f7ecd6; }
 .roster-main .aw-first { border-left: 1px solid var(--blush-line); }
 .roster-main .col-awU, .roster-main .col-awV, .roster-main .col-awW { width: 88px; min-width: 88px; }
 .roster-main .col-grade { width: 96px; min-width: 96px; }
@@ -2286,5 +2286,14 @@ span.cohort-step { cursor: default; }
 .name-mark.soft { color: var(--muted); }
 /* Not done yet: fainter than a check. */
 .r-no { color: var(--muted); opacity: .55; }
-.roster-main .book-mark { margin-left: 0; vertical-align: -6px; }
+/* Payments: the words in a set-width spot and the book after them, so every row lines up. */
+.pay-wrap { display: inline-grid; grid-template-columns: 104px 22px; align-items: center; justify-items: start; }
+.pay-wrap .book-slot { width: 22px; }
+.roster-main .book-mark { margin-left: 0; vertical-align: middle; }
 .roster-main td.col-pay { white-space: nowrap; }
+/* The dot after a late enrollee's name. */
+.name-dot { all: unset; cursor: pointer; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f2c14e; margin: 0 0 1px 7px; vertical-align: middle; box-shadow: 0 0 0 3px transparent; }
+.name-dot:hover { box-shadow: 0 0 0 3px rgba(242, 193, 78, .3); }
+.name-dot.soft { background: #b9c3cc; }
+.name-dot.warn { background: var(--rose); }
+.pc-chip:not(.pc-done):not(.pc-mid):not(.pc-low) { color: var(--ink); padding: 0 2px; } /* (no color until 2 weeks before Academy Week) */

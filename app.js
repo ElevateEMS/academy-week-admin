@@ -2202,6 +2202,12 @@ const PORTAL_ASSIGNMENTS = [['G', 'First Class Paperwork'], ['H', 'Orientation R
   ['L', 'Ride Along Agreement'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness'], ['P', 'Ride Along Paperwork & Patient Contacts'],
   ['Q', 'Academy Week Compliance'], ['R', 'Test Prep Practice Quiz']];
 const CONTACTS_DONE = 10, CONTACTS_MIN = 5; // 10 = the assignment's done; at least 5 to attend Academy Week
+// The patient contact counts only turn colors (red under 5, yellow 5–9, green 10) from 2 weeks before Academy Week.
+const CONTACTS_COLOR_DAYS = 14;
+function contactsCrunch() {
+  const start = S.sheet && S.sheet.academyStart;
+  return isIsoDate(start) && todayIso() >= addDays(start, -CONTACTS_COLOR_DAYS);
+}
 const cellsOf = s => s.cells || {};
 const assignDone = (s, L) => L === 'P' ? (s.contacts || 0) >= CONTACTS_DONE : !!cellsOf(s)[L];
 const numOrNull = v => { const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, '')); return isFinite(n) ? n : null; };
@@ -2249,16 +2255,16 @@ function rosterCell(s, k) {
   const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
   if (k === 'pay') {
     const p = emPerson(s), t = todayIso(), book = bookMark(s, p);
-    if (p.paidNext && p.paidFinal) return btn(yes + ' Paid') + book;
+    if (p.paidNext && p.paidFinal) return `<span class="pay-wrap">${btn(yes + ' Paid')}${book}</span>`;
     const [what, when] = !p.paidNext ? ['Next', p.next] : ['Final', p.final];
-    return btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`) + book;
+    return `<span class="pay-wrap">${btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`)}${book}</span>`;
   }
   if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
   if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
-    const n = s.contacts || 0, cls = n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return btn(`${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not eligible</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
+    const n = s.contacts || 0, cls = !contactsCrunch() ? '' : n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
+    return btn(`${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
   }
   if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
@@ -2281,7 +2287,7 @@ function rosterCell(s, k) {
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
 const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', '<span class="th-sub">Academy Week</span>Compliance'], ['grade', 'Course<br>Grade'],
-  ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT']];
+  ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   pay: 'Next and final tuition installments. Book icon: bought the textbook through us (with a check once their code is issued)', paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
@@ -2290,25 +2296,25 @@ const ROSTER_TIPS = {
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
 // Payments cell's book: bought the textbook through us (D); with a check once their access code is issued.
-const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h10.5a2 2 0 0 1 2 2V20H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h10.5"/></svg>';
-const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h10.5a2 2 0 0 1 2 2V20H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h10.5"/><path d="M8.5 9.5l2 2 3.5-3.5"/></svg>';
+const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/></svg>';
+const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/><path d="M11 10.3l1.8 1.8 3.4-3.6"/></svg>';
 function bookMark(s, p) {
-  if (!cellsOf(s).D && !p.bookCode) return '';
+  if (!cellsOf(s).D && !p.bookCode) return '<span class="book-slot"></span>'; // (keeps every row's text in line)
   const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
   const when = code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
-// Little marks after a name on the Roster (the words are in their hover text and on their student page).
+// A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
   const p = emPerson(s), i = cohortInfo(), out = [];
-  const mark = (svg, tip, act, cls = '') => out.push(`<button class="name-mark ${cls}" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}">${svg}</button>`);
-  if (needsOrientDate(p)) mark(LATE_ICON, 'Needs their own orientation date', 'emLateOpen', 'warn');
-  else if (p.late && !p.makeup) mark(LATE_ICON, `Late enrollee · orientation ${monthDay(p.orient)}${i.lateCourseNo ? ' · VAOEMS course #' + i.lateCourseNo : ''}`, 'emLateOpen');
-  else if (p.late && p.makeup) mark(LATE_ICON, `Make-up orientation ${monthDay(p.orient)}`, 'emLateOpen', 'soft');
+  // A small dot: yellow = late enrollee, gray = make-up orientation, rose = needs their own orientation date.
+  const mark = (tip, act, cls = '') => out.push(`<button class="name-dot ${cls}" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}" aria-label="${esc(tip)}"></button>`);
+  if (needsOrientDate(p)) mark('Needs their own orientation date', 'emLateOpen', 'warn');
+  else if (p.late && !p.makeup) mark(`Late enrollee · orientation ${monthDay(p.orient)}${i.lateCourseNo ? ' · VAOEMS course #' + i.lateCourseNo : ''}`, 'emLateOpen');
+  else if (p.late && p.makeup) mark(`Make-up orientation ${monthDay(p.orient)}`, 'emLateOpen', 'soft');
   return out.join('');
 }
-const LATE_ICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M12 13v5M9.5 15.5h5"/></svg>';
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
