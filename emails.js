@@ -454,24 +454,24 @@ function emailPickModal() {
 /* ---------- Student Emails (people icon on the Emails box) ---------- */
 // Click a student's Orientation date: late enrollee (their own orientation; payments follow it).
 // Click their due dates: Payments: an extension (only for alternative deadlines) and a discount.
-// The Students page's Enrollment view (was the Student Emails pop-up): textbook, payments, orientation, due dates, book code, emails.
+// The Students page's Enrollment view (was the Student Emails pop-up): email (copy), textbook, payments, orientation, due dates.
+// The textbook's book icon shows their code and when it was issued; which emails went out is on their student page.
 function emStudentsTable() {
   const q = S.search.trim().toLowerCase(), people = emPeople().filter(p => !q || p.name.toLowerCase().includes(q));
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="r-no">–</span>';
   const rows = people.map(p => {
-    const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before' && p.sent[k] !== 'skipped'), sentN = drafted.length;
-    const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');
+    const s = studentBySid(p.sid), book = s && (p.textbook || p.bookCode) ? bookMark(s, p) : '<span class="r-no">–</span>';
     return `<tr>
       <td><button class="name-link" data-act="openStudent" data-sid="${p.sid}">${esc(p.name)}</button>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
-        <div class="muted small">${validEmail(p.email) ? esc(p.email) : '<span class="tbd">no email in the sheet</span>'}</div></td>
-      <td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
+</td>
+      <td>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</td>
+      <td class="c">${book}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
       <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Payments: deadlines and discount">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? `<span class="em-amt">${usd(p.payAmt)} each</span>` : ''}</button></td>
-      <td class="c">${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</td>
-      <td class="c" title="${esc(sentTip)}">${sentN || '<span class="muted">–</span>'}</td></tr>`;
+</tr>`;
   }).join('');
-  return `<table class="roster em-table"><thead><tr><th>Student</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th><th class="c">Book code</th><th class="c">Drafted</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="empty">No students match.</td></tr>'}</tbody></table>`;
+  return `<table class="roster em-table"><thead><tr><th>Student</th><th>Email</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="empty">No students match.</td></tr>'}</tbody></table>`;
 }
 // Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,
 // otherwise the day before and 29 days after the cohort's.

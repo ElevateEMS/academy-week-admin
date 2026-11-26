@@ -2253,12 +2253,6 @@ function rosterCell(s, k) {
   const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="r-no">–</span>';
   const ed = /^aw[UVW]$/.test(k) ? 'aw' : k; // (the three Academy Week cells share one pop-up)
   const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
-  if (k === 'pay') {
-    const p = emPerson(s), t = todayIso(), book = bookMark(s, p);
-    if (p.paidNext && p.paidFinal) return `<span class="pay-wrap">${btn(yes + ' Paid')}${book}</span>`;
-    const [what, when] = !p.paidNext ? ['Next', p.next] : ['Final', p.final];
-    return `<span class="pay-wrap">${btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`)}${book}</span>`;
-  }
   if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
   if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
   if (k === 'fp') return btn(c.K ? yes : no);
@@ -2285,21 +2279,21 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
-const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
+const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
-  pay: 'Next and final tuition installments. Book icon: bought the textbook through us (with a check once their code is issued)', paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
+  paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
   cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'Background check: FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
   assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Compliance attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
-// Payments cell's book: bought the textbook through us (D); with a check once their access code is issued.
+// The Enrollment view's textbook: a book = bought it through us (D); with a check once their access code is issued.
 const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/></svg>';
 const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/><path d="M11 10.3l1.8 1.8 3.4-3.6"/></svg>';
 function bookMark(s, p) {
-  if (!cellsOf(s).D && !p.bookCode) return '<span class="book-slot"></span>'; // (keeps every row's text in line)
+  if (!cellsOf(s).D && !p.bookCode) return '';
   const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
   const when = code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
@@ -2367,6 +2361,9 @@ const CELL_EDITS = {
   nremt: ['NREMT exam', [['Z', '1st attempt', 'select'], ['AA', '2nd attempt', 'select'], ['AB', '3rd attempt', 'select']]],
   grade: ['Course grade', []],
 };
+// Text with a small copy button after it (an email or phone, to paste somewhere else).
+const COPY_ICON = '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>';
+const copyLine = (text, what = '') => `<span class="copy-line"><span>${esc(text)}</span><button class="copy-btn" data-act="copyText" data-text="${esc(text)}" data-what="${esc(what)}" title="Copy${what ? ' ' + what.toLowerCase() : ''}" aria-label="Copy${what ? ' ' + what.toLowerCase() : ''}">${COPY_ICON}</button></span>`;
 // One roster box as a line you can change: a tick, a dropdown (the sheet's own choices), or the patient contact count.
 function ceLine(s, [L, label, kind]) {
   const c = cellsOf(s);
@@ -2379,47 +2376,52 @@ function ceLine(s, [L, label, kind]) {
   return `<label class="ce-row ce-tick">${circle(!!c[L], `data-act="cellTick" data-sid="${s.sid}" data-l="${L}"`)}<span>${esc(label)}</span></label>`;
 }
 // The top of a student's page (their pop-up, opened from any name): everything but Academy Week, which follows.
-const SP_SECTIONS = [['overview', 'Overview'], ['grades', 'Grades'], ['assign', 'Assignments'], ['enroll', 'Enrollment and payments'], ['emails', 'Emails'], ['aw', 'Academy Week']];
+// One tab at a time (S.spTab); opening a student from an Academy Week cell goes straight to that part.
+const SP_SECTIONS = [['overview', 'Overview'], ['grades', 'Grades'], ['assign', 'Assignments'], ['enroll', 'Enrollment & payments'], ['emails', 'Emails'], ['aw', 'Academy Week']];
+const spTab = () => SP_SECTIONS.some(([k]) => k === S.spTab) ? S.spTab : 'overview';
 function studentPageTop(s) {
   const p = emPerson(s), c = cellsOf(s), doc = S.studentsDoc[s.sid] || {}, g = doc.guardian || {}, gr = gradeOf(s);
   const edit = (k, label = 'Edit') => `<button class="btn tiny" data-act="cellEd" data-sid="${s.sid}" data-k="${k}">${label}</button>`;
   const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before').sort((a, b) => String(p.sent[a]).localeCompare(String(p.sent[b])));
   const dk = 'sp-AC-' + s.sid;
-  return `<nav class="sp-nav">${SP_SECTIONS.map(([id, l]) => `<button class="chip small" data-act="spJump" data-id="${id}">${l}</button>`).join('')}</nav>
-    <section id="sp-overview"><h3>Overview</h3>
+  const tab = spTab(), sec = {};
+  sec.overview = `<section id="sp-overview"><h3>Overview</h3>
       <dl class="sp-kv">
-        <dt>Email</dt><dd>${validEmail(p.email) ? `<a href="mailto:${esc(p.email)}" data-chrome>${esc(p.email)}</a>` : '<span class="tbd">no email in the sheet</span>'}</dd>
+        <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
+        <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
         <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span> <span class="muted small">Pause / Unpause at the bottom</span>` : esc(s.status || 'Active')}</dd>
         <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
       </dl>
       <label class="sp-note-label">Notes <span class="muted small">(the cohort sheet’s Notes column)</span></label>
       <textarea id="${dk}" data-draft="${dk}" rows="4" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk] ?? c.AC ?? '')}</textarea>
       <div class="ce-save"><button class="btn small" data-act="spNoteSave" data-sid="${s.sid}">Save note</button></div>
-    </section>
-    <section id="sp-grades"><h3>Grades ${edit('grade')}</h3>
+    </section>`;
+  sec.grades = `<section id="sp-grades"><h3>Grades ${edit('grade')}</h3>
       <dl class="sp-kv">
         <dt>Coursework</dt><dd>${gradeNum(gr.coursework)}</dd>
         <dt>Final exam</dt><dd class="${gr.counted != null && gr.counted < PASS_MARK ? 'low' : ''}">${gradeNum(gr.counted)}${gr.retake != null ? ` <span class="muted small">(first ${gradeNum(gr.final)}, retake ${gradeNum(gr.retake)})</span>` : ''}</dd>
         <dt>Course grade</dt><dd><b class="${gr.shown != null && gr.shown < PASS_MARK ? 'low' : ''}">${gradeNum(gr.shown)}</b>${gr.override != null ? ' <span class="muted small">typed from JBL</span>' : ''}</dd>
-      </dl></section>
-    <section id="sp-assign"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
+      </dl></section>`;
+  sec.assign = `<section id="sp-assign"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
       ${PORTAL_ASSIGNMENTS.map(r => ceLine(s, r)).join('')}
       <p class="muted small">CPR class: ${c.J ? esc(c.J) : 'not signed up'} · ${edit('cpr', 'Change')}</p>
-    </section>
-    <section id="sp-enroll"><h3>Enrollment and payments</h3>
+    </section>`;
+  sec.enroll = `<section id="sp-enroll"><h3>Enrollment &amp; payments</h3>
       ${ceLine(s, ['D', 'Bought the textbook through us'])}${ceLine(s, ['E', 'Next installment paid'])}${ceLine(s, ['F', 'Final installment paid'])}
       <dl class="sp-kv">
         <dt>Due</dt><dd><button class="cell-link" data-act="emExtOpen" data-sid="${s.sid}">Next ${p.next ? monthDay(p.next) : 'TBD'} · Final ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? ` · $${p.disc} off` : ''}</button>${p.ext.next || p.ext.final ? ' <span class="tag-soft">extension</span>' : ''}</dd>
         <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
         <dt>VAOEMS course #</dt><dd>${(cn => cn ? esc(cn) : '<span class="muted">–</span>')(p.late && !p.makeup && cohortInfo().lateCourseNo ? cohortInfo().lateCourseNo : cohortInfo().courseNo)}${p.late && !p.makeup && cohortInfo().lateCourseNo ? ' <span class="muted small">(the late enrollment course)</span>' : ''}</dd>
         <dt>Book code</dt><dd>${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</dd>
-      </dl></section>
-    <section id="sp-emails"><h3>Emails</h3>
+      </dl></section>`;
+  sec.emails = `<section id="sp-emails"><h3>Emails</h3>
       ${drafted.length ? `<ul class="sp-emails">${drafted.map(k => `<li>${esc((tplById(k) || { name: k }).name)} <span class="muted small">${p.sent[k] === 'skipped' ? 'skipped' : isIsoDate(String(p.sent[k]).slice(0, 10)) ? 'drafted ' + monthDay(String(p.sent[k]).slice(0, 10)) : ''}</span></li>`).join('')}</ul>` : '<p class="empty">No emails drafted for them yet.</p>'}
-    </section>
-    <section id="sp-aw" class="sp-aw-head"><h3>Academy Week</h3>
+    </section>`;
+  sec.aw = `<section id="sp-aw" class="sp-aw-head"><h3>Academy Week</h3>
       ${CELL_EDITS.aw[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.dispo[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.nremt[1].map(r => ceLine(s, r)).join('')}
     </section>`;
+  return `<nav class="sp-tabs" role="tablist">${SP_SECTIONS.map(([id, l]) => `<button class="${tab === id ? 'on' : ''}" role="tab" data-act="spTab" data-id="${id}">${l}</button>`).join('')}</nav>
+    ${sec[tab]}`;
 }
 function cellEdModal() {
   const ed = S.cellEd, s = ed && studentBySid(ed.sid);
@@ -2466,7 +2468,7 @@ async function changePc(sid, by) {
 function drawer() {
   const s = studentBySid(S.open);
   if (!s) return '';
-  const part = S.openPart, show = p => !part || part === p || (p === 'contacts' && part === 'fix');
+  const part = S.openPart, awOn = !!part || spTab() === 'aw', show = p => awOn && (!part || part === p || (p === 'contacts' && part === 'fix'));
   // From "To fix": notes still waiting on a fix go first.
   const contacts = S.contacts.filter(c => c.sid === s.sid)
     .sort((a, b) => (part === 'fix' ? (!!(a.fixed || !a.fix) - !!(b.fixed || !b.fix)) : 0) || b.created - a.created);
@@ -2479,7 +2481,7 @@ function drawer() {
     <div class="drawer-body" data-keep-scroll="drawer">
       ${part ? '' : studentPageTop(s)}
 
-      ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
+      ${part || !awOn ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
         ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>`}
 
       ${show('contacts') ? `<section>
@@ -3256,7 +3258,8 @@ async function act(a, el = {}, e) {
       case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;
-      case 'spJump': { const el = document.getElementById('sp-' + d.id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
+      case 'copyText': try { await navigator.clipboard.writeText(d.text); toast((d.what || 'Text') + ' copied.'); } catch { toast('Couldn’t copy it. Select it and copy instead.'); } break;
+      case 'spTab': S.spTab = d.id; render(); { const b = document.querySelector('.drawer-body'); if (b) b.scrollTop = 0; } break;
       case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }
       case 'cellTick': { const s = studentBySid(d.sid); if (s) await setCells(d.sid, { [d.l]: !cellsOf(s)[d.l] }); break; }
       case 'cellText': { // CPR sign-up (J)
@@ -3576,9 +3579,9 @@ async function act(a, el = {}, e) {
       case 'openStudent': {
         // Clicking Skills / the contact number / To fix / Attendance opens just that part.
         const cell = e && e.target.closest && e.target.closest('[data-part]');
-        S.open = d.sid; S.openPart = d.part || (cell && cell.dataset.part) || null; render(); break;
+        S.open = d.sid; S.openPart = d.part || (cell && cell.dataset.part) || null; S.spTab = 'overview'; render(); break;
       }
-      case 'openAll': S.openPart = null; render(); break;
+      case 'openAll': S.openPart = null; S.spTab = 'aw'; render(); break; // (from one Academy Week part: that tab, all of it)
       case 'closeStudent': S.open = null; S.openPart = null; render(); break;
       case 'pc': await changePc(d.sid, Number(d.by)); break;
       case 'skill': await Store.set(P('students/' + d.sid), { skill: d.v }); break;

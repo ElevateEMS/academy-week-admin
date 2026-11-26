@@ -299,7 +299,7 @@ function sampleSheets() {
       academyStart: info.academyStart,
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5),
         email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0,
-        fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2, cells: sampleCells(name, i) })),
+        fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2, cells: sampleCells(name, i), phone: i === 6 ? '' : '(804) 555-01' + String(10 + i) })),
       choices: { V: ['Pass', 'Fail', 'Retest'], X: ['Pending', 'Submitted', 'Complete'], Y: ['Pending', 'Submitted', 'Complete'],
         Z: ['Pass', 'Fail', 'Scheduled'], AA: ['Pass', 'Fail', 'Scheduled'], AB: ['Pass', 'Fail', 'Scheduled'] },
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),

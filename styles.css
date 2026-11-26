@@ -2247,7 +2247,11 @@ span.cohort-step { cursor: default; }
 
 /* A student's page (the wide pop-up from any name). */
 .drawer.wide { width: min(760px, 100vw); }
-.sp-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 4px; position: sticky; top: 0; background: var(--paper); z-index: 2; }
+/* The student page's tabs: one section at a time. */
+.sp-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 -22px 6px; padding: 0 22px; border-bottom: 1px solid var(--line-soft); position: sticky; top: 0; background: var(--paper); z-index: 2; }
+.sp-tabs button { border: 0; background: transparent; padding: 11px 10px 9px; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.sp-tabs button:hover { color: var(--ink); }
+.sp-tabs button.on { color: var(--ink); font-weight: 500; border-bottom-color: var(--taupe-dark); }
 .drawer.wide section h3 { display: flex; align-items: center; gap: 10px; }
 .sp-kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin: 4px 0 8px; font-size: 14px; }
 .sp-kv dt { color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; padding-top: 2px; }
@@ -2274,9 +2278,9 @@ span.cohort-step { cursor: default; }
 .roster-main .aw-col { background: #fffbf3; }
 .roster-main th.aw-col { background: #f7ecd6; }
 .roster-main .aw-first { border-left: 1px solid var(--blush-line); }
-.roster-main .col-awU, .roster-main .col-awV, .roster-main .col-awW { width: 88px; min-width: 88px; }
-/* The single-value columns all the same width, so the gaps between them are even. */
-.roster-main .col-paper, .roster-main .col-cpr, .roster-main .col-fp, .roster-main .col-assign, .roster-main .col-comp, .roster-main .col-grade { width: 96px; min-width: 96px; }
+
+/* Columns only as wide as they need, with the same space on each side, so the gaps between them are even. */
+.roster.roster-main td.c, .roster.roster-main th.c { padding-left: 5px; padding-right: 5px; }
 .roster-main .col-dispo { border-left: 1px solid var(--blush-line); }
 .roster-main th[title] { cursor: help; }
 /* The little mark after a name (late enrollee, make-up orientation, needs an orientation date). */
@@ -2287,13 +2291,8 @@ span.cohort-step { cursor: default; }
 .name-mark.soft { color: var(--muted); }
 /* Not done yet: fainter than a check. */
 .r-no { color: var(--muted); opacity: .55; }
-/* Payments: the words in a set-width spot and the book after them, so every row lines up. */
-/* Payments: left-aligned so every row starts in the same spot, with the book right after the words. */
-.pay-wrap { display: inline-flex; align-items: center; gap: 0; width: 118px; text-align: left; } /* (a set width, centered under its heading) */
-.pay-wrap .book-slot { display: none; }
-.roster-main .book-mark { width: 18px; margin-left: -3px; }
-.roster-main .book-mark { margin-left: 0; vertical-align: middle; }
-.roster-main td.col-pay { white-space: nowrap; }
+/* The Enrollment view's textbook book. */
+.book-mark { vertical-align: middle; margin-left: 0; }
 /* The dot after a late enrollee's name. */
 .name-dot { all: unset; cursor: pointer; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f2c14e; margin: 0 0 1px 7px; vertical-align: middle; box-shadow: 0 0 0 3px transparent; }
 .name-dot:hover { box-shadow: 0 0 0 3px rgba(242, 193, 78, .3); }
@@ -2301,3 +2300,9 @@ span.cohort-step { cursor: default; }
 .name-dot.warn { background: var(--rose); }
 .pc-chip:not(.pc-done):not(.pc-mid):not(.pc-low) { color: var(--ink); padding: 0 2px; } /* (no color until 2 weeks before Academy Week) */
 .name-link .nowrap { white-space: nowrap; }
+/* An email or phone with its copy button. */
+.copy-line { display: inline-flex; align-items: center; gap: 4px; }
+.copy-btn { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
+.copy-btn:hover { background: var(--blush-soft); color: var(--ink); }
+.copy-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.em-table td .copy-line { font-size: 14px; }
