@@ -780,6 +780,7 @@ function sideSwitch() {
 
 function shell() {
   const icon = (v, label) => `<button class="icon-btn ${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}" title="${label}" aria-label="${label}">${ICONS[v]}</button>`;
+  const named = (v, word, tip) => `<button class="icon-btn named ${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}" title="${tip}">${ICONS[v]}<span>${word}</span></button>`; // icon + its word
   const aw = ['day', 'week', 'schedule'].includes(S.view);
   return `
   ${Store.configured ? '' : '<div class="sample-bar">Sample mode: pretend students and staff, saved in this browser only.</div>'}
@@ -795,7 +796,7 @@ function shell() {
         // Students page: Find a student sits up here, left of the Students icon.
         + (S.view === 'students' && S.sheet ? `<input id="searchIn" class="search head-search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">` : '')
         // Admin and Staff pages: the Staff icon; a cohort's pages: the Students icon. (Settings: neither.)
-        + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? icon('staff', 'Staff: pay, timesheets, the staff list') : icon('students', 'Students'))}
+        + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : named('students', 'Students', 'Students'))}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -843,7 +844,7 @@ function shell() {
 }
 
 function pageTitle() {
-  if (S.view === 'admin') return '<h1>Elevate EMS</h1><p>Admin</p>';
+  if (S.view === 'admin') return '<h1>Elevate EMS Admin</h1>'; // (one line: keeps the header short)
   if (S.view === 'staff') return staffTitle();
   if (S.view === 'course') {
     return cohortTitle();
