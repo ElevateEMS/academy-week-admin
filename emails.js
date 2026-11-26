@@ -476,7 +476,7 @@ function emStudentsTable() {
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
 </tr>`;
   }).join('');
-  return `<table class="roster em-table"><thead><tr><th>Student</th><th>Email</th><th>Phone</th><th class="c">Textbook</th><th class="c">Payments</th><th class="c">Orientation</th></tr></thead>
+  return `<table class="roster em-table"><colgroup><col style="width:22%"><col style="width:25%"><col style="width:13%"><col style="width:8%"><col style="width:18%"><col style="width:14%"></colgroup><thead><tr><th>Student</th><th>Email</th><th>Phone</th><th class="c">Textbook</th><th class="c">Payments</th><th class="c">Orientation</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="6" class="empty">No students match.</td></tr>'}</tbody></table>`;
 }
 // Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,

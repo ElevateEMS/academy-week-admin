@@ -2312,3 +2312,11 @@ span.cohort-step { cursor: default; }
 .pay-chip:hover { border-color: var(--taupe); }
 .pay-chip.paid { color: #3f5c3b; background: var(--sage-soft); border-color: transparent; }
 .pay-chip.late { color: #8d4f48; background: var(--rose-soft); border-color: transparent; font-weight: 500; }
+/* Set column widths, so the columns sit in the same places for every cohort (long text wraps instead of pushing). */
+.roster.roster-main, .roster.em-table, .roster.aw-table { table-layout: fixed; }
+.roster.roster-main { min-width: 1300px; }
+.roster.em-table td { overflow-wrap: anywhere; }
+.roster.em-table .copy-line { display: inline; }
+.roster.em-table .copy-btn { vertical-align: middle; }
+.roster.aw-table th:first-child { width: 5%; }
+.roster.aw-table th:nth-child(2) { width: 30%; }

@@ -2143,7 +2143,7 @@ function awStudentsView() {
     ${fbPdfRow()}
   </section>` : ''}
   <section class="box table-box">
-    <table class="roster ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
+    <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
         : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
@@ -2279,6 +2279,8 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
+// Each column's share of the table (%, after # 3 and Student 13), so every cohort's columns sit in the same places.
+const ROSTER_W = { paper: 6.5, cpr: 8, fp: 6.5, ride: 10, assign: 6.5, comp: 6.5, grade: 7.5, awU: 5, awV: 6.5, awW: 5.5, dispo: 7, nremt: 8.5 };
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
@@ -2320,6 +2322,7 @@ function rosterStudentsView() {
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
+      <colgroup><col style="width:3%"><col style="width:13%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
       <thead><tr><th rowspan="2">#</th><th rowspan="2">Student</th>${ROSTER_COLS.map(([k, l, grp], i) => grp
         ? (ROSTER_COLS[i - 1][2] === grp ? '' : `<th class="c th-group aw-col aw-first" colspan="${ROSTER_COLS.filter(x => x[2] === grp).length}" title="${ROSTER_TIPS[grp]}">Academy Week</th>`)
         : `<th class="c col-${k}" rowspan="2" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr>
