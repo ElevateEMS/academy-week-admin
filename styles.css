@@ -2275,7 +2275,8 @@ span.cohort-step { cursor: default; }
 .roster-main th.aw-col { background: #f7ecd6; }
 .roster-main .aw-first { border-left: 1px solid var(--blush-line); }
 .roster-main .col-awU, .roster-main .col-awV, .roster-main .col-awW { width: 88px; min-width: 88px; }
-.roster-main .col-grade { width: 96px; min-width: 96px; }
+/* The single-value columns all the same width, so the gaps between them are even. */
+.roster-main .col-paper, .roster-main .col-cpr, .roster-main .col-fp, .roster-main .col-assign, .roster-main .col-comp, .roster-main .col-grade { width: 96px; min-width: 96px; }
 .roster-main .col-dispo { border-left: 1px solid var(--blush-line); }
 .roster-main th[title] { cursor: help; }
 /* The little mark after a name (late enrollee, make-up orientation, needs an orientation date). */
@@ -2288,9 +2289,8 @@ span.cohort-step { cursor: default; }
 .r-no { color: var(--muted); opacity: .55; }
 /* Payments: the words in a set-width spot and the book after them, so every row lines up. */
 /* Payments: left-aligned so every row starts in the same spot, with the book right after the words. */
-.pay-wrap { display: inline-flex; align-items: center; gap: 0; }
+.pay-wrap { display: inline-flex; align-items: center; gap: 0; width: 118px; text-align: left; } /* (a set width, centered under its heading) */
 .pay-wrap .book-slot { display: none; }
-.roster-main td.col-pay, .roster-main th.col-pay { text-align: left; padding-left: 10px; }
 .roster-main .book-mark { width: 18px; margin-left: -3px; }
 .roster-main .book-mark { margin-left: 0; vertical-align: middle; }
 .roster-main td.col-pay { white-space: nowrap; }

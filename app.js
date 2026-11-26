@@ -2285,13 +2285,13 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
-const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
+const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   pay: 'Next and final tuition installments. Book icon: bought the textbook through us (with a check once their code is issued)', paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
-  cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
+  cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'Background check: FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
   assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Compliance attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
