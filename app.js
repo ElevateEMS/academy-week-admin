@@ -2286,13 +2286,13 @@ function rosterCell(s, k) {
 // Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
 // Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
 const ROSTER_COLS = [['pay', 'Payments'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
-  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', '<span class="th-sub">Academy Week</span>Compliance'], ['grade', 'Course<br>Grade'],
+  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   pay: 'Next and final tuition installments. Book icon: bought the textbook through us (with a check once their code is issued)', paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
   cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
-  assign: 'The Student Hub’s 10 assignments', comp: 'Academy Week Compliance attestation', grade: 'Coursework from JBL, then the course grade with the final exam',
+  assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Compliance attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
 // Payments cell's book: bought the textbook through us (D); with a check once their access code is issued.
@@ -2305,11 +2305,13 @@ function bookMark(s, p) {
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
+// "Thompson, Matthew (Matt)" → ["Thompson, Matthew ", "(Matt)"], so a dot after the name never wraps onto a line by itself.
+const splitLastWord = name => { const m = String(name).match(/^(.*\s)?(\S+)$/); return m ? [m[1] || '', m[2]] : ['', String(name)]; };
 // A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
   const p = emPerson(s), i = cohortInfo(), out = [];
   // A small dot: yellow = late enrollee, gray = make-up orientation, rose = needs their own orientation date.
-  const mark = (tip, act, cls = '') => out.push(`<button class="name-dot ${cls}" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}" aria-label="${esc(tip)}"></button>`);
+  const mark = (tip, act, cls = '') => out.push(`<span class="name-dot ${cls}" role="button" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}" aria-label="${esc(tip)}"></span>`);
   if (needsOrientDate(p)) mark('Needs their own orientation date', 'emLateOpen', 'warn');
   else if (p.late && !p.makeup) mark(`Late enrollee · orientation ${monthDay(p.orient)}${i.lateCourseNo ? ' · VAOEMS course #' + i.lateCourseNo : ''}`, 'emLateOpen');
   else if (p.late && p.makeup) mark(`Make-up orientation ${monthDay(p.orient)}`, 'emLateOpen', 'soft');
@@ -2326,7 +2328,7 @@ function rosterStudentsView() {
         <tr>${ROSTER_COLS.filter(x => x[2]).map(([k, l], i) => `<th class="c th-sub-row aw-col col-${k} ${i === 0 ? 'aw-first' : ''}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td class="r-name"><button class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : nameMarks(s)}</td>
+        <td class="r-name"><span class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${(([first, last]) => `${esc(first)}<span class="nowrap">${esc(last)}${s.out ? '' : nameMarks(s)}</span>`)(splitLastWord(s.name))}</span>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
         ${ROSTER_COLS.map(([k, , grp], i) => `<td class="c col-${k}${grp ? ' aw-col' + (ROSTER_COLS[i - 1][2] === grp ? '' : ' aw-first') : ''}">${rosterCell(s, k)}</td>`).join('')}
       </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
