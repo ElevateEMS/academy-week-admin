@@ -2198,4 +2198,4 @@ span.cohort-step { cursor: default; }
 /* Staff / Students in the header: the icon with its word. */
 .icon-btn.named { width: auto; border-radius: 999px; padding: 0 14px 0 10px; display: inline-flex; gap: 6px; font-size: 14px; letter-spacing: .02em; }
 /* Navy header: the Bulletin keeps the soft blue, so its yellow sticky notes stand out against it. */
-:root[data-theme="navy"] .box.admin-notes { background: #e4eaf0; border-color: #cdd8e2; }
+:root[data-theme="navy"] .box.admin-notes, :root[data-theme="navy"] .box.admin-changes { background: #e4eaf0; border-color: #cdd8e2; } /* (Changes for Future Classes too) */
