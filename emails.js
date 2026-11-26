@@ -454,24 +454,30 @@ function emailPickModal() {
 /* ---------- Student Emails (people icon on the Emails box) ---------- */
 // Click a student's Orientation date: late enrollee (their own orientation; payments follow it).
 // Click their due dates: Payments: an extension (only for alternative deadlines) and a discount.
-// The Students page's Enrollment view (was the Student Emails pop-up): email (copy), textbook, payments, orientation, due dates.
+// One chip per installment: ✓ once it's paid, otherwise its due date (red once it's passed). Either opens the Payments pop-up.
+function payChips(p) {
+  const t = todayIso();
+  const chip = (label, paid, due) => `<button class="pay-chip ${paid ? 'paid' : due && due < t ? 'late' : ''}" data-act="emExtOpen" data-sid="${p.sid}" title="${label} installment${paid ? ' paid' : due ? ' due ' + monthDay(due) : ''}">${label} ${paid ? '✓' : due ? monthDay(due) : 'TBD'}</button>`;
+  return `<span class="pay-chips">${chip('Next', p.paidNext, p.next)}${chip('Final', p.paidFinal, p.final)}</span>${p.disc ? `<span class="em-amt">${usd(p.payAmt)} each</span>` : ''}`;
+}
+// The Students page's Enrollment view (was the Student Emails pop-up): email and phone (copy), textbook, payments, orientation.
 // The textbook's book icon shows their code and when it was issued; which emails went out is on their student page.
 function emStudentsTable() {
   const q = S.search.trim().toLowerCase(), people = emPeople().filter(p => !q || p.name.toLowerCase().includes(q));
-  const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="r-no">–</span>';
   const rows = people.map(p => {
     const s = studentBySid(p.sid), book = s && (p.textbook || p.bookCode) ? bookMark(s, p) : '<span class="r-no">–</span>';
     return `<tr>
-      <td><button class="name-link" data-act="openStudent" data-sid="${p.sid}">${esc(p.name)}</button>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
+      <td><button class="name-link" data-act="openStudent" data-sid="${p.sid}">${esc(p.name)}</button>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <em class="tag-soft">$ extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
 </td>
       <td>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</td>
-      <td class="c">${book}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
+      <td>${s && s.phone ? copyLine(s.phone, 'Phone') : '<span class="r-no">–</span>'}</td>
+      <td class="c">${book}</td>
+      <td class="c">${payChips(p)}</td>
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
-      <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Payments: deadlines and discount">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? `<span class="em-amt">${usd(p.payAmt)} each</span>` : ''}</button></td>
 </tr>`;
   }).join('');
-  return `<table class="roster em-table"><thead><tr><th>Student</th><th>Email</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="empty">No students match.</td></tr>'}</tbody></table>`;
+  return `<table class="roster em-table"><thead><tr><th>Student</th><th>Email</th><th>Phone</th><th class="c">Textbook</th><th class="c">Payments</th><th class="c">Orientation</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="empty">No students match.</td></tr>'}</tbody></table>`;
 }
 // Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,
 // otherwise the day before and 29 days after the cohort's.
@@ -501,7 +507,8 @@ function emStuEditModal() {
     title = 'Payments';
     const dk = S.drafts[k('dkind')] || 'none', inp = (x, ph, w) => `<input id="${k(x)}" data-draft="${k(x)}" data-disc="${p.sid}" class="disc-in" style="width:${w}px" inputmode="decimal" placeholder="${ph}" value="${esc(S.drafts[k(x)] ?? '')}" autocomplete="off">`;
     const chip = (v, l) => `<button class="chip ${dk === v ? 'on' : ''}" data-act="emDiscKind" data-sid="${p.sid}" data-v="${v}">${l}</button>`;
-    body = `<p class="mini-head">Due dates</p><p class="muted small">${esc(p.name)}’s payment deadlines. Change only the one you’re extending; their reminders move to the new date.</p>
+    body = `<p class="mini-head">Paid</p>${(st => st ? ceLine(st, ['E', 'Next installment paid']) + ceLine(st, ['F', 'Final installment paid']) : '')(studentBySid(p.sid))}
+      <p class="mini-head">Due dates</p><p class="muted small">${esc(p.name)}’s payment deadlines. Change only the one you’re extending; their reminders move to the new date.</p>
       <div class="em-ext-fields"><span>Next installment</span>${datePicker(k('next'), { optional: true, empty: 'TBD', title: 'Next installment due' })}
         <span class="muted small">usually ${due.next ? monthDay(due.next) : 'TBD'}</span>
         <span>Final installment</span>${datePicker(k('final'), { optional: true, empty: 'TBD', title: 'Final installment due' })}
