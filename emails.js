@@ -454,14 +454,15 @@ function emailPickModal() {
 /* ---------- Student Emails (people icon on the Emails box) ---------- */
 // Click a student's Orientation date: late enrollee (their own orientation; payments follow it).
 // Click their due dates: Payments: an extension (only for alternative deadlines) and a discount.
-function emailStudentsModal() {
-  const people = emPeople();
+// The Students page's Enrollment view (was the Student Emails pop-up): textbook, payments, orientation, due dates, book code, emails.
+function emStudentsTable() {
+  const q = S.search.trim().toLowerCase(), people = emPeople().filter(p => !q || p.name.toLowerCase().includes(q));
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="muted">–</span>';
   const rows = people.map(p => {
     const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before' && p.sent[k] !== 'skipped'), sentN = drafted.length;
     const sentTip = drafted.map(k => (tplById(k) || { name: k }).name + ' · ' + monthDay(p.sent[k])).join('\n');
     return `<tr>
-      <td><b>${esc(p.name)}</b>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
+      <td><button class="name-link" data-act="openStudent" data-sid="${p.sid}">${esc(p.name)}</button>${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${p.ext.next || p.ext.final ? ' <em class="tag-soft">extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
         <div class="muted small">${validEmail(p.email) ? esc(p.email) : '<span class="tbd">no email in the sheet</span>'}</div></td>
       <td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
@@ -469,13 +470,8 @@ function emailStudentsModal() {
       <td class="c">${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</td>
       <td class="c" title="${esc(sentTip)}">${sentN || '<span class="muted">–</span>'}</td></tr>`;
   }).join('');
-  return `<div class="overlay" data-act="emStuClose"><div class="modal em-stu" data-stop>
-    <div class="modal-head"><h2>Student Emails</h2><button class="x big" data-act="emStuClose" aria-label="Close">×</button></div>
-    <div class="modal-body pad-top" data-keep-scroll="emStu">
-      <table class="roster em-table"><thead><tr><th>Student</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th><th class="c">Book code</th><th class="c">Drafted</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="empty">No students yet.</td></tr>'}</tbody></table>
-    </div>
-  </div></div>`;
+  return `<table class="roster em-table"><thead><tr><th>Student</th><th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th><th class="c">Book code</th><th class="c">Drafted</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="8" class="empty">No students match.</td></tr>'}</tbody></table>`;
 }
 // Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,
 // otherwise the day before and 29 days after the cohort's.
@@ -773,8 +769,7 @@ async function emailAct(a, el, e) {
       S.emailPick = null; emLateDrafts(); render(); emSignLinks(); return true;
     }
 
-    case 'emStuOpen': S.emailStuOpen = true; S.emailStu = null; render(); return true;
-    case 'emStuClose': S.emailStuOpen = false; S.emailStu = null; render(); return true;
+    case 'emStuOpen': S.view = 'students'; pref('view', 'students'); S.stuMode = 'enroll'; pref('stuMode', 'enroll'); S.emailStu = null; render(); window.scrollTo(0, 0); return true; // (the Students page's Enrollment view)
     case 'emLateOpen': case 'emExtOpen': {
       const p = emPersonBySid(d.sid), late = (S.studentsDoc[d.sid] || {}).late || {};
       S.drafts['ems-date-' + d.sid] = isIsoDate(late.date) ? late.date : '';
@@ -982,10 +977,9 @@ function emailEscape() {
   if (S.emailTplEd) { if (!S.emailTplEd.dirty || confirm('Close without saving your changes?')) S.emailTplEd = null; return true; }
   if (S.bookCodesOpen) { S.bookCodesOpen = false; return true; }
   if (S.emailStu) { emStuDone(S.emailStu.sid); return true; }
-  if (S.emailStuOpen) { S.emailStuOpen = false; return true; }
   return false;
 }
 function emailModals() {
-  return (S.emailStuOpen ? emailStudentsModal() : '') + (S.emailStu ? emStuEditModal() : '') + (S.emailPick ? emailPickModal() : '') + (S.emailDraft ? emailDraftModal() : '')
+  return (S.emailStu ? emStuEditModal() : '') + (S.emailPick ? emailPickModal() : '') + (S.emailDraft ? emailDraftModal() : '')
     + (S.emailTplEd ? emailTplModal() : '') + (S.bookCodesOpen ? bookCodesModal() : '');
 }

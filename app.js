@@ -590,26 +590,18 @@ function sideByDate() {
   return todayIso() >= isoOf(from) ? 'aw' : 'course';
 }
 let sidePickedFor = null;
-// Opening a cohort: back to the side you were last on for it (Course, or the Academy Week page you used last).
-// The first time it's within AW_LEAD_DAYS of Academy Week, it moves over to Academy Week once; after that it
-// remembers again. A cohort you haven't opened yet goes by the date.
+// Opening a cohort: its Students page (Course and Academy Week are a tap away in the header).
 function pickSide(key) {
   if (sidePickedFor === key) return;
   sidePickedFor = key;
-  if (!['course', 'day', 'week', 'schedule'].includes(S.view)) return;
-  const goAw = () => { if (S.view === 'course') S.view = ['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day'; };
-  const byDate = sideByDate();
-  if (byDate === 'aw' && !pref('awAuto-' + key)) { pref('awAuto-' + key, '1'); pref('side-' + key, 'aw'); goAw(); return; }
-  if ((pref('side-' + key) || byDate) === 'course') S.view = 'course'; else goAw();
+  if (['course', 'day', 'week', 'schedule', 'students'].includes(S.view)) S.view = 'students'; // a cohort opens on Students
 }
-// Remembers which side you're on, for each cohort.
-const noteSide = v => { if (S.cohortKey && ['course', 'day', 'week', 'schedule'].includes(v)) pref('side-' + S.cohortKey, v === 'course' ? 'course' : 'aw'); };
 
 async function selectCohort(key, { keepView = false } = {}) {
   S.cohortKey = key; pref('cohort', key);
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
-    evals: [], emailLog: [], emailDraft: null, emailPick: null, emailStuOpen: false, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
+    evals: [], emailLog: [], emailDraft: null, emailPick: null, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
     studentsLoaded: false, rostersLoaded: false });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
@@ -840,6 +832,7 @@ function shell() {
   ${S.dropAsk ? dropModal() : ''}
   ${S.renameAsk ? renameModal() : ''}
   ${S.guardianAsk ? guardianModal() : ''}
+  ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
@@ -850,10 +843,7 @@ function pageTitle() {
     return cohortTitle();
   }
   if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
-  if (S.view === 'students') {
-    const out = students().filter(s => s.out).length;
-    return `<h1>Students</h1><p>${S.sheet ? attending().length + ' students' + (out ? ` · ${out} not attending` : '') : ''}</p>`;
-  }
+  if (S.view === 'students') return cohortTitle();
   if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
   if (S.view === 'schedule') {
     const d = weekDays().find(x => x.n === schedDay()) || {};
@@ -2095,8 +2085,7 @@ function fbPdfRow() {
   return `<div class="fb-pdf-row"><span class="muted small">${f ? `Saved ${when}${f.by === 'auto' ? ' (on its own)' : ''}${links ? ' · ' + links : ''}` : 'PDFs save to the Admin folder on their own at 7 PM the day answers come in.'}</span>
     <button class="btn tiny" data-act="fbPdfSave" ${S.fbPdfBusy ? 'disabled' : ''}>${S.fbPdfBusy ? 'Saving…' : f ? 'Save PDFs again' : 'Save PDFs'}</button></div>`;
 }
-function studentsView() {
-  if (!S.sheet) return loadingView();
+function awStudentsView() {
   const everyone = students();
   const all = everyone.filter(s => !s.out); // counts and "behind" leave out students not attending
   const counts = {
@@ -2104,9 +2093,8 @@ function studentsView() {
     behind: all.filter(s => s.skill === 'behind').length,
     fixes: all.filter(s => s.fixes).length,
   };
-  // Until a month before Academy Week (sideByDate): enrollment columns (Textbook, payments, Orientation, due dates, as in
-  // the Emails box's student list) in place of Patient contacts and Skills, and no skills/contacts filters or Behind card.
-  const pre = sideByDate() !== 'aw', filter = pre ? 'all' : S.filter;
+  // (pre: the enrollment columns this view used to show before Academy Week; they're the Enrollment view now.)
+  const pre = false, filter = S.filter;
   // Peer evaluation results (once any are in): a column, a pop-up section, and the suggestions card.
   const peers = peerStats(), peerEvals = (S.evals || []).filter(e => e.kind === 'peer'), hasPeer = peerEvals.length > 0;
   const suggestions = peerEvals.filter(e => String(e.suggestions || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
@@ -2202,6 +2190,220 @@ function pcStepper(s, { row = false } = {}) {
     <button data-act="pc" data-sid="${s.sid}" data-by="1" aria-label="One more">+</button></span>`;
 }
 
+/* ---------- Students page: Roster / Enrollment / Academy Week ----------
+   A cohort opens here. Roster: one row per student, a column per stage of the course, each from the cohort sheet's
+   roster (s.cells, by column letter). Clicking a cell opens a small pop-up to change it; changes go straight to the
+   sheet (Sheets.setCells), so the sheet stays the full backup. Enrollment: the Student Emails table. Academy Week:
+   patient contacts, skills, conduct, peer evals. Clicking a name opens their student page (drawer()). */
+const STU_MODES = [['roster', 'Roster'], ['enroll', 'Enrollment'], ['aw', 'Academy Week']];
+const stuMode = () => STU_MODES.some(([k]) => k === S.stuMode) ? S.stuMode : STU_MODES.some(([k]) => k === pref('stuMode')) ? pref('stuMode') : 'roster';
+// The Student Hub's assignments (the ones that count), by the roster column each one ticks. P is a number: done at 10.
+const PORTAL_ASSIGNMENTS = [['G', 'First Class Paperwork'], ['H', 'Orientation Roster'], ['I', 'CPR Card'], ['K', 'Fingerprinting'],
+  ['L', 'Ride Along Agreement'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness'], ['P', 'Ride Along Paperwork & Patient Contacts'],
+  ['Q', 'Academy Week Compliance'], ['R', 'Test Prep Practice Quiz']];
+const CONTACTS_DONE = 10, CONTACTS_MIN = 5; // 10 = the assignment's done; at least 5 to attend Academy Week
+const cellsOf = s => s.cells || {};
+const assignDone = (s, L) => L === 'P' ? (s.contacts || 0) >= CONTACTS_DONE : !!cellsOf(s)[L];
+const numOrNull = v => { const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, '')); return isFinite(n) ? n : null; };
+// The roster's old field names follow their columns, so the rest of the app (emails, to-dos) sees a change at once.
+const CELL_FIELDS = { D: 'textbook', E: 'paidNext', F: 'paidFinal', G: 'fcp', H: 'orientRoster', L: 'rideAgreement' };
+async function setCells(sid, cells) {
+  const raw = S.sheet && S.sheet.students.find(x => slug(x.name) === sid);
+  if (!raw) return;
+  const before = { cells: { ...(raw.cells || {}) }, ...Object.fromEntries(Object.values(CELL_FIELDS).map(f => [f, raw[f]])) };
+  raw.cells = { ...(raw.cells || {}), ...cells };
+  Object.entries(cells).forEach(([L, v]) => { if (CELL_FIELDS[L]) raw[CELL_FIELDS[L]] = v === true; });
+  render();
+  try { await Sheets.setCells(S.cohortKey, raw, cells); }
+  catch (e) { Object.assign(raw, before); toast(e.message); render(); }
+}
+
+/* Course grade: coursework (typed in from JBL) 70% + the final exam 30%, the better of the final and its retake.
+   students/{sid}.grade = { coursework, final, retake, override } (override: the total typed in from JBL instead).
+   The sheet keeps S = the final score that counts and T = the course grade so far (coursework until there's a final). */
+const FINAL_WEIGHT = 0.3, PASS_MARK = 80;
+function gradeOf(s) {
+  const g = (S.studentsDoc[s.sid] || {}).grade || {}, c = cellsOf(s);
+  const final = g.final ?? (g.retake == null ? numOrNull(c.S) : null), retake = g.retake ?? null;
+  const coursework = g.coursework ?? (final == null && retake == null ? numOrNull(c.T) : null);
+  const best = [final, retake].filter(x => x != null).reduce((a, b) => Math.max(a, b), -1);
+  const counted = best >= 0 ? best : null;
+  const calc = coursework != null && counted != null ? Math.round((coursework * (1 - FINAL_WEIGHT) + counted * FINAL_WEIGHT) * 10) / 10 : null;
+  const total = g.override ?? calc;
+  return { coursework, final, retake, counted, calc, override: g.override ?? null, total, shown: counted != null ? total ?? numOrNull(c.T) : coursework ?? numOrNull(c.T) };
+}
+const gradeNum = n => n == null ? '–' : String(Math.round(n * 10) / 10);
+async function saveGrade(sid, g) {
+  const s = studentBySid(sid); if (!s) return;
+  const clean = Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v === '' || v == null ? null : numOrNull(v)]));
+  await Store.set(P('students/' + sid), { grade: clean });
+  S.studentsDoc[sid] = { ...(S.studentsDoc[sid] || {}), grade: clean };
+  const now = gradeOf(s);
+  await setCells(sid, { S: now.counted ?? '', T: now.shown ?? '' });
+}
+
+// One roster cell: what it says, and the pop-up it opens.
+function rosterCell(s, k) {
+  const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="muted">–</span>';
+  const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${k}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
+  if (k === 'pay') {
+    const p = emPerson(s), t = todayIso();
+    if (p.paidNext && p.paidFinal) return btn(yes + ' Paid');
+    const [what, when] = !p.paidNext ? ['Next', p.next] : ['Final', p.final];
+    return btn(`${what} ${when ? monthDay(when) : 'unpaid'}`, when && when < t ? 'warn' : '', `${what} installment due${when ? ' ' + monthDay(when) : ''}`);
+  }
+  if (k === 'book') return btn(c.D ? yes : no);
+  if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
+  if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
+  if (k === 'fp') return btn(c.K ? yes : no);
+  if (k === 'ride') {
+    const n = s.contacts || 0, cls = n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
+    return btn(`${c.O ? '<span class="em-yes">✓</span> Ready' : '<span class="muted">Not ready</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`);
+  }
+  if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
+  if (k === 'comp') return btn(c.Q ? yes : no);
+  if (k === 'grade') {
+    const g = gradeOf(s), low = n => n != null && n < PASS_MARK;
+    return btn(g.shown == null ? no : `<b class="${low(g.shown) ? 'low' : ''}">${gradeNum(g.shown)}</b>${g.counted != null ? ` <span class="muted small ${low(g.counted) ? 'low' : ''}">final ${gradeNum(g.counted)}</span>` : ''}`);
+  }
+  if (k === 'aw') return btn(`<span class="aw-marks"><span title="All skills">${c.U ? '✓' : '–'}</span><span title="Psychomotor exam">${c.V ? esc(c.V) : '–'}</span><span title="Last class signatures">${c.W ? '✓' : '–'}</span></span>`);
+  if (k === 'dispo') return btn(c.X || c.Y ? `<span class="aw-marks"><span title="VAOEMS">${esc(c.X || '–')}</span><span title="NREMT">${esc(c.Y || '–')}</span></span>` : no);
+  if (k === 'nremt') {
+    const tries = ['Z', 'AA', 'AB'].map(L => c[L]), pass = tries.findIndex(v => /pass/i.test(v || ''));
+    const last = tries.map((v, i) => [v, i]).filter(([v]) => v).pop();
+    return btn(pass >= 0 ? `<span class="em-yes">✓</span> Passed · ${['1st', '2nd', '3rd'][pass]}` : last ? `Attempt ${last[1] + 1}: ${esc(last[0])}` : no);
+  }
+  if (k === 'notes') return btn(c.AC ? `<span class="note-snip">${esc(c.AC)}</span>` : `<span class="muted">${ICONS.pencil}</span>`, 'note-cell', c.AC || 'Add a note');
+  return '';
+}
+const ROSTER_COLS = [['pay', 'Payments'], ['book', 'Textbook'], ['paper', 'Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
+  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Academy Week Compliance'], ['grade', 'Course grade'],
+  ['aw', 'Academy Week <span class="th-sub">Skills · Psych · Sigs</span>'], ['dispo', 'Disposition <span class="th-sub">VAOEMS · NREMT</span>'],
+  ['nremt', 'NREMT'], ['notes', 'Notes']];
+function rosterStudentsView() {
+  const everyone = students(), q = S.search.trim().toLowerCase();
+  const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
+  return `<section class="box table-box roster-box">
+    <table class="roster roster-main">
+      <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([, l]) => `<th class="c">${l}</th>`).join('')}<th class="c">Status</th></tr></thead>
+      <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
+        <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
+        <td class="r-name"><button class="name-link" data-act="openStudent" data-sid="${s.sid}">${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
+        ${ROSTER_COLS.map(([k]) => `<td class="c">${rosterCell(s, k)}</td>`).join('')}
+        <td class="c"><span class="r-status ${/active/i.test(s.status) ? '' : 'off'}">${esc(s.status || 'Active')}</span></td>
+      </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 3}" class="empty">No students match.</td></tr>`}</tbody>
+    </table>
+  </section>`;
+}
+function studentsView() {
+  if (!S.sheet) return loadingView();
+  const mode = stuMode();
+  return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
+      `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
+    <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></div>
+  ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
+}
+
+// The pop-up for one roster cell (S.cellEd = { sid, k }). Ticks and dropdowns save as you change them.
+const CELL_EDITS = {
+  pay: ['Payments', [['E', 'Next installment paid'], ['F', 'Final installment paid']]],
+  book: ['Textbook', [['D', 'Bought the textbook through us']]],
+  paper: ['Paperwork', [['G', 'First Class Paperwork'], ['H', 'Orientation Roster'], ['L', 'Ride Along Agreement']]],
+  cpr: ['CPR', [['I', 'CPR card uploaded']]],
+  fp: ['Fingerprinting', [['K', 'FieldPrint scheduled']]],
+  ride: ['Ride-alongs', [['M', 'Ride alongs requested'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness (attestation)']]],
+  assign: ['Assignments', PORTAL_ASSIGNMENTS],
+  comp: ['Academy Week Compliance', [['Q', 'Academy Week Compliance (attestation)']]],
+  aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last class signatures']]],
+  dispo: ['Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']]],
+  nremt: ['NREMT exam', [['Z', '1st attempt', 'select'], ['AA', '2nd attempt', 'select'], ['AB', '3rd attempt', 'select']]],
+  notes: ['Notes', []], grade: ['Course grade', []],
+};
+// One roster box as a line you can change: a tick, a dropdown (the sheet's own choices), or the patient contact count.
+function ceLine(s, [L, label, kind]) {
+  const c = cellsOf(s);
+  if (L === 'P') return `<div class="ce-row"><span>${esc(label)}</span>${pcStepper(s)}<span class="muted small">${s.contacts || 0} of ${CONTACTS_DONE} · at least ${CONTACTS_MIN} to attend Academy Week</span></div>`;
+  if (kind === 'select') {
+    const opts = [...new Set(['', ...(((S.sheet && S.sheet.choices) || {})[L] || []), c[L] || ''])];
+    return `<label class="ce-row"><span>${esc(label)}</span><select data-change="cellSel" data-sid="${s.sid}" data-l="${L}">${opts.map(o =>
+      `<option value="${esc(o)}" ${o === (c[L] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select></label>`;
+  }
+  return `<label class="ce-row ce-tick">${circle(!!c[L], `data-act="cellTick" data-sid="${s.sid}" data-l="${L}"`)}<span>${esc(label)}</span></label>`;
+}
+// The top of a student's page (their pop-up, opened from any name): everything but Academy Week, which follows.
+const SP_SECTIONS = [['overview', 'Overview'], ['grades', 'Grades'], ['assign', 'Assignments'], ['enroll', 'Enrollment and payments'], ['emails', 'Emails'], ['aw', 'Academy Week']];
+function studentPageTop(s) {
+  const p = emPerson(s), c = cellsOf(s), doc = S.studentsDoc[s.sid] || {}, g = doc.guardian || {}, gr = gradeOf(s);
+  const edit = (k, label = 'Edit') => `<button class="btn tiny" data-act="cellEd" data-sid="${s.sid}" data-k="${k}">${label}</button>`;
+  const drafted = Object.keys(p.sent).filter(k => p.sent[k] && p.sent[k] !== 'before').sort((a, b) => String(p.sent[a]).localeCompare(String(p.sent[b])));
+  const dk = 'sp-AC-' + s.sid;
+  return `<nav class="sp-nav">${SP_SECTIONS.map(([id, l]) => `<button class="chip small" data-act="spJump" data-id="${id}">${l}</button>`).join('')}</nav>
+    <section id="sp-overview"><h3>Overview</h3>
+      <dl class="sp-kv">
+        <dt>Email</dt><dd>${validEmail(p.email) ? `<a href="mailto:${esc(p.email)}" data-chrome>${esc(p.email)}</a>` : '<span class="tbd">no email in the sheet</span>'}</dd>
+        <dt>Portal</dt><dd>${esc(s.status || 'Active')}</dd>
+        <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
+      </dl>
+      <label class="sp-note-label">Notes <span class="muted small">(the cohort sheet’s Notes column)</span></label>
+      <textarea id="${dk}" data-draft="${dk}" rows="4" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk] ?? c.AC ?? '')}</textarea>
+      <div class="ce-save"><button class="btn small" data-act="spNoteSave" data-sid="${s.sid}">Save note</button></div>
+    </section>
+    <section id="sp-grades"><h3>Grades ${edit('grade')}</h3>
+      <dl class="sp-kv">
+        <dt>Coursework</dt><dd>${gradeNum(gr.coursework)}</dd>
+        <dt>Final exam</dt><dd class="${gr.counted != null && gr.counted < PASS_MARK ? 'low' : ''}">${gradeNum(gr.counted)}${gr.retake != null ? ` <span class="muted small">(first ${gradeNum(gr.final)}, retake ${gradeNum(gr.retake)})</span>` : ''}</dd>
+        <dt>Course grade</dt><dd><b class="${gr.shown != null && gr.shown < PASS_MARK ? 'low' : ''}">${gradeNum(gr.shown)}</b>${gr.override != null ? ' <span class="muted small">typed from JBL</span>' : ''}</dd>
+      </dl></section>
+    <section id="sp-assign"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
+      ${PORTAL_ASSIGNMENTS.map(r => ceLine(s, r)).join('')}
+      <p class="muted small">CPR class: ${c.J ? esc(c.J) : 'not signed up'} · ${edit('cpr', 'Change')}</p>
+    </section>
+    <section id="sp-enroll"><h3>Enrollment and payments</h3>
+      ${ceLine(s, ['D', 'Bought the textbook through us'])}${ceLine(s, ['E', 'Next installment paid'])}${ceLine(s, ['F', 'Final installment paid'])}
+      <dl class="sp-kv">
+        <dt>Due</dt><dd><button class="cell-link" data-act="emExtOpen" data-sid="${s.sid}">Next ${p.next ? monthDay(p.next) : 'TBD'} · Final ${p.final ? monthDay(p.final) : 'TBD'}${p.disc ? ` · $${p.disc} off` : ''}</button>${p.ext.next || p.ext.final ? ' <span class="tag-soft">extension</span>' : ''}</dd>
+        <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
+        <dt>Book code</dt><dd>${p.bookCode ? esc(p.bookCode) : '<span class="muted">–</span>'}</dd>
+      </dl></section>
+    <section id="sp-emails"><h3>Emails</h3>
+      ${drafted.length ? `<ul class="sp-emails">${drafted.map(k => `<li>${esc((tplById(k) || { name: k }).name)} <span class="muted small">${p.sent[k] === 'skipped' ? 'skipped' : isIsoDate(String(p.sent[k]).slice(0, 10)) ? 'drafted ' + monthDay(String(p.sent[k]).slice(0, 10)) : ''}</span></li>`).join('')}</ul>` : '<p class="empty">No emails drafted for them yet.</p>'}
+    </section>
+    <section id="sp-aw" class="sp-aw-head"><h3>Academy Week</h3>
+      ${CELL_EDITS.aw[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.dispo[1].map(r => ceLine(s, r)).join('')}${CELL_EDITS.nremt[1].map(r => ceLine(s, r)).join('')}
+    </section>`;
+}
+function cellEdModal() {
+  const ed = S.cellEd, s = ed && studentBySid(ed.sid);
+  if (!s || !CELL_EDITS[ed.k]) return '';
+  const [title, rows] = CELL_EDITS[ed.k], c = cellsOf(s), dk = x => 'ce-' + x + '-' + s.sid;
+  let body = rows.map(r => ceLine(s, r)).join('');
+  if (ed.k === 'pay') body += `<button class="link ce-more" data-act="emExtOpen" data-sid="${s.sid}">Due dates and discount…</button>`;
+  if (ed.k === 'cpr') body += `<label class="ce-row"><span>CPR class sign-up</span><input id="${dk('J')}" data-draft="${dk('J')}" value="${esc(S.drafts[dk('J')] ?? c.J ?? '')}" placeholder="e.g. 9/13/2026"></label>
+    <div class="ce-save"><button class="btn small primary" data-act="cellText" data-sid="${s.sid}" data-l="J">Save sign-up</button></div>`;
+  if (ed.k === 'notes') body = `<textarea id="${dk('AC')}" data-draft="${dk('AC')}" class="ce-note" rows="10" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk('AC')] ?? c.AC ?? '')}</textarea>
+    <p class="muted small">Saved in the cohort sheet’s Notes column (AC).</p>
+    <div class="ce-save"><button class="btn primary" data-act="cellText" data-sid="${s.sid}" data-l="AC">Save note</button></div>`;
+  if (ed.k === 'grade') {
+    const g = gradeOf(s), v = (f, cur) => esc(S.drafts[dk(f)] ?? (cur == null ? '' : gradeNum(cur)));
+    const inp = (f, label, cur, note = '') => `<label class="ce-row"><span>${label}</span><input id="${dk(f)}" data-draft="${dk(f)}" data-grade="${s.sid}" inputmode="decimal" value="${v(f, cur)}" placeholder="–">${note ? `<span class="muted small">${note}</span>` : ''}</label>`;
+    const typed = f => S.drafts[dk(f)] !== undefined ? numOrNull(S.drafts[dk(f)]) : null;
+    const live = { ...g, coursework: S.drafts[dk('cw')] !== undefined ? typed('cw') : g.coursework, final: S.drafts[dk('fin')] !== undefined ? typed('fin') : g.final,
+      retake: S.drafts[dk('re')] !== undefined ? typed('re') : g.retake };
+    const best = [live.final, live.retake].filter(x => x != null), counted = best.length ? Math.max(...best) : null;
+    const calc = live.coursework != null && counted != null ? Math.round((live.coursework * (1 - FINAL_WEIGHT) + counted * FINAL_WEIGHT) * 10) / 10 : null;
+    body = inp('cw', 'Coursework (from JBL)', g.coursework, '70%')
+      + inp('fin', 'Final exam', g.final, '30%') + inp('re', 'Retake', g.retake, 'the higher score counts')
+      + `<div class="ce-total"><span>Course grade</span><b class="${calc != null && calc < PASS_MARK ? 'low' : ''}" id="ceCalc">${calc == null ? '–' : gradeNum(calc)}</b><span class="muted small">calculated</span></div>`
+      + inp('ov', 'Or type the total', g.override, 'from JBL, if it differs')
+      + `<p class="muted small">Both the final exam and the course grade need ${PASS_MARK} or higher to pass.</p>
+      <div class="ce-save"><button class="btn primary" data-act="gradeSave" data-sid="${s.sid}">Save</button></div>`;
+  }
+  return `<div class="overlay" data-act="cellEdClose"><div class="modal confirm cell-ed" data-stop>
+    <div class="modal-head"><h2>${esc(title)} <span class="muted small">${esc(s.name)}</span></h2><button class="x big" data-act="cellEdClose" aria-label="Close">×</button></div>
+    <div class="modal-body">${body}</div></div></div>`;
+}
+function cellEdClose() { S.cellEd = null; Object.keys(S.drafts).filter(k => /^ce-/.test(k)).forEach(k => delete S.drafts[k]); render(); }
+
 async function changePc(sid, by) {
   const s = S.sheet.students.find(x => slug(x.name) === sid);
   if (!s || S.pcBusy[sid] || (by < 0 && s.contacts <= 0)) return;
@@ -2226,9 +2428,10 @@ function drawer() {
   const dk = k => k + '-' + s.sid;
   const note = S.drafts[dk('note')] ?? s.note;
   const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
-  return `<div class="overlay side" data-act="closeStudent"><aside class="drawer" data-stop>
+  return `<div class="overlay side" data-act="closeStudent"><aside class="drawer ${part ? '' : 'wide'}" data-stop>
     <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
+      ${part ? '' : studentPageTop(s)}
 
       ${part ? '' : `<label class="attend-line">${circle(!s.out, `data-act="attend" data-sid="${s.sid}"`)} Attending academy week
         ${s.out ? `<span class="muted small">(${outLabel(s)}: left off binder covers, squads and counts)</span>` : ''}</label>`}
@@ -2317,7 +2520,7 @@ function renameModal() {
       <p class="muted small move-head">Changes</p>
       <ul class="move-list">
         <li>They come off the ${esc(S.cohortKey)} roster. It isn’t a drop: nothing goes on the Dropped Students Record.</li>
-        <li>Custom orientation and payment dates are cleared. ${esc(toKey)}’s own dates apply (set new ones in Student Emails if they still need them).</li>
+        <li>Custom orientation and payment dates are cleared. ${esc(toKey)}’s own dates apply (set new ones on their student page if they still need them).</li>
         <li>${esc(S.cohortKey)}’s overdue-payment and orientation to-dos for them are deleted.</li>
       </ul>
       <p class="muted small move-head">Stays with ${esc(S.cohortKey)}</p>
@@ -2864,6 +3067,14 @@ document.addEventListener('input', e => {
   // Scenario Library: add-on names and requirement numbers wait for Save.
   if (t.dataset.addon != null && S.addonDraft) { S.addonDraft[Number(t.dataset.addon)].text = t.value; return; }
   if (t.dataset.req != null && S.reqDraft) { S.reqDraft[t.dataset.req] = Math.max(0, Number(t.value) || 0); return; }
+  if (t.dataset.grade) { // Course grade pop-up: the calculated grade follows what's typed
+    S.drafts[k] = t.value;
+    const sid = t.dataset.grade, s = studentBySid(sid), g = s ? gradeOf(s) : {}, dv = (f, cur) => S.drafts['ce-' + f + '-' + sid] !== undefined ? numOrNull(S.drafts['ce-' + f + '-' + sid]) : cur;
+    const best = [dv('fin', g.final), dv('re', g.retake)].filter(x => x != null), cw = dv('cw', g.coursework);
+    const calc = cw != null && best.length ? Math.round((cw * (1 - FINAL_WEIGHT) + Math.max(...best) * FINAL_WEIGHT) * 10) / 10 : null;
+    const el = document.getElementById('ceCalc'); if (el) { el.textContent = calc == null ? '–' : gradeNum(calc); el.classList.toggle('low', calc != null && calc < PASS_MARK); }
+    return;
+  }
   if (emailInput(t)) return; // the email draft pop-up and the template editor
   if (staffInput(t)) return; // the Pay window (staffpay.js)
   if (adminInput(t)) return; // Admin page sticky notes
@@ -2900,6 +3111,7 @@ document.addEventListener('focusout', e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
+  if (t.dataset.change === 'cellSel') { setCells(t.dataset.sid, { [t.dataset.l]: t.value }); return; } // a roster dropdown (Students page)
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
   if (t.dataset.bagname != null || t.dataset.bagitem != null) { try { await bagRename(t); } catch (err) { toast(err.message); } return; }
@@ -2926,6 +3138,7 @@ document.addEventListener('keydown', e => {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
     if (S.guardianAsk) { guardianClose(); return; }
+    if (S.cellEd && !S.emailStu) { cellEdClose(); return; }
     if (S.renameAsk) { if (!S.renameBusy) { if (S.renameConfirm) { S.renameConfirm = false; render(); } else renameClose(); } return; }
     if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
     if (S.adminPanel) S.adminPanel = null; // (the link panel sits on top of whatever opened it)
@@ -2987,22 +3200,40 @@ async function act(a, el = {}, e) {
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
       case 'view': {
         // The Students icon again: back to the page you came from (Course, or the Academy Week page you were on).
-        const back = ['course', 'day', 'week', 'schedule'];
-        let v = d.v;
-        if (v === 'students' && S.view === 'students') v = back.includes(pref('studentsFrom')) ? pref('studentsFrom') : 'course';
-        else if (v === 'students' && back.includes(S.view)) pref('studentsFrom', S.view);
-        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; noteSide(v);
+        const v = d.v; // (Students is a cohort's home page: its button always goes there)
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
         if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
       }
       case 'cohortStep': selectCohort(d.k, { keepView: true }); window.scrollTo(0, 0); break;
-      case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last)
-        const v = d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
-        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; noteSide(v); render(); window.scrollTo(0, 0); break;
+      case 'stuMode': S.stuMode = d.v; pref('stuMode', d.v); render(); break;
+      case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
+      case 'cellEdClose': cellEdClose(); break;
+      case 'spJump': { const el = document.getElementById('sp-' + d.id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
+      case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }
+      case 'cellTick': { const s = studentBySid(d.sid); if (s) await setCells(d.sid, { [d.l]: !cellsOf(s)[d.l] }); break; }
+      case 'cellText': { // CPR sign-up (J) or Notes (AC)
+        const key = 'ce-' + d.l + '-' + d.sid, s = studentBySid(d.sid);
+        if (s && S.drafts[key] !== undefined) await setCells(d.sid, { [d.l]: String(S.drafts[key]).trim() });
+        delete S.drafts[key]; if (d.l === 'AC' && S.cellEd) cellEdClose(); else render(); toast('Saved to the cohort sheet.'); break;
+      }
+      case 'gradeSave': {
+        const s = studentBySid(d.sid); if (!s) break;
+        const g = gradeOf(s), dv = (f, cur) => S.drafts['ce-' + f + '-' + d.sid] !== undefined ? S.drafts['ce-' + f + '-' + d.sid] : cur;
+        const bad = ['cw', 'fin', 're', 'ov'].find(f => { const v = S.drafts['ce-' + f + '-' + d.sid]; return v !== undefined && String(v).trim() && numOrNull(v) == null; });
+        if (bad) { toast('Grades need to be numbers.'); break; }
+        try { await saveGrade(d.sid, { coursework: dv('cw', g.coursework), final: dv('fin', g.final), retake: dv('re', g.retake), override: dv('ov', g.override) }); cellEdClose(); toast('Course grade saved.'); }
+        catch (e) { toast(e.message); }
+        break;
+      }
+      case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last); the lit one again: back to Students
+        const lit = d.s === 'course' ? S.view === 'course' : ['day', 'week', 'schedule'].includes(S.view);
+        const v = lit ? 'students' : d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
       }
       case 'day':
         S.day = Number(d.n); pref('day-' + S.cohortKey, d.n);
-        if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); noteSide('day'); window.scrollTo(0, 0); }
+        if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
         render(); break;
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
       case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;

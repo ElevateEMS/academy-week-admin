@@ -3,6 +3,7 @@
      loadCohort(key)             -> that cohort's Student Roster tab (names, column P, Academy Week Start)
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
+     setCells(key, s, cells)     -> changes their roster boxes, { letter: value } (Students page; outbox when offline)
      evalLinks(key)              -> the cohort's Peer Evaluation / Student Feedback form link codes (eval.html, QR codes)
      setPortalStatus(key, s, status, todo) -> Active / Paused in their AD (Portal Status); from an overdue payment to-do,
                                     the to-do remembers the pause so paying unpauses them
@@ -39,6 +40,8 @@
    Each student comes with their email (C), Textbook (D), Next (E) and Final (F) installment checkboxes, and
    their first class assignments: First Class Paperwork (G) as fcp, Orientation Roster (H) as orientRoster,
    Ride Along Agreement (L) as rideAgreement.
+   Each student also has cells: every roster column the Students page shows, by letter (D–AC; checkboxes true/false),
+   and loadCohort sends choices: { V, X, Y, Z, AA, AB } (the sheet's own dropdown options).
    loadCohort also brings the cohort's settings box (AF/AG: JBL code, dates, Meet link,
    review dates, and the VAOEMS course # in AF4 / late course # in AG4) as `info`, plus its status and links
    to its sheet and folder.
@@ -159,6 +162,10 @@ const Sheets = (() => {
     loadCohort: key => call('loadCohort', { cohort: key }),
     changeContacts: (key, student, by) =>
       call('changeContacts', { cohort: key, row: student.row, name: student.name, by }).then(o => o.count),
+    setCells: async (key, student, cells) => { // (shown right away; with no internet it waits in the outbox)
+      const r = await viaOutbox('setRosterCells', { cohort: key, row: student.row, name: student.name, cells }, () => ({ queued: true }));
+      return r.live || r.queued;
+    },
     evalLinks: key => call('evalLinks', { cohort: key }).then(o => o.links), // { peer, feedback }: the eval.html link codes
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
     dropStudent: (key, student, drop) => call('dropStudent', { cohort: key, name: student.name, email: student.email, ...drop }), // { line, docUrl, warnings }
@@ -226,6 +233,16 @@ function sampleSheets() {
   const KEY = 'academy-week-sample-pc';
   const sampleSigs = {}; // sample mode: no student signs (Copy signing link opens nothing real)
   const counts = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+  // Pretend roster boxes (D–AC) for the Students page, plus whatever's been changed here.
+  const sampleCellStore = (() => { try { return JSON.parse(localStorage.getItem(KEY + '-cells')) || {}; } catch { return {}; } })();
+  const sampleCells = (name, i) => ({
+    D: i % 3 === 0, E: i % 4 !== 1, F: i % 5 === 0, G: i % 3 !== 1, H: i % 6 !== 2, I: i % 2 === 0, J: i % 2 ? '9/13/2026' : '', K: i % 5 !== 3,
+    L: i % 4 !== 2, M: i % 3 === 0, N: i % 2 === 0, O: i % 3 !== 2, P: String(counts[name] ?? [10, 7, 3, 10, 5, 0, 12, 9][i % 8]), Q: i % 4 === 0,
+    R: i % 3 === 0, S: i % 5 === 0 ? '84' : '', T: ['91', '86', '76', '', '88', '94', '79', ''][i % 8], U: i % 4 === 0, V: i % 4 === 0 ? 'Pass' : '',
+    W: false, X: i % 7 === 0 ? 'Submitted' : '', Y: '', Z: i % 9 === 0 ? 'Pass' : '', AA: '', AB: '',
+    AC: i === 3 ? 'Paid for alternative orientation' : i === 5 ? 'With a rescue squad, getting their own CPR' : '',
+    ...(sampleCellStore[name] || {}),
+  });
   const start = new Date(); start.setDate(start.getDate() - 1); // "today" is Day 2 in sample mode
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const wait = v => new Promise(r => setTimeout(() => r(v), 150));
@@ -282,7 +299,9 @@ function sampleSheets() {
       academyStart: info.academyStart,
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5),
         email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0,
-        fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2 })),
+        fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2, cells: sampleCells(name, i) })),
+      choices: { V: ['Pass', 'Fail', 'Retest'], X: ['Pending', 'Submitted', 'Complete'], Y: ['Pending', 'Submitted', 'Complete'],
+        Z: ['Pass', 'Fail', 'Scheduled'], AA: ['Pass', 'Fail', 'Scheduled'], AB: ['Pass', 'Fail', 'Scheduled'] },
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
       staff,
     }); },
@@ -342,6 +361,8 @@ function sampleSheets() {
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
+    async setCells(key, student, cells) { const c = sampleCellStore[student.name] = { ...(sampleCellStore[student.name] || {}), ...cells };
+      try { localStorage.setItem(KEY + '-cells', JSON.stringify(sampleCellStore)); } catch {} return wait({ cells: c }); },
     async changeContacts(key, student, by) {
       const now = Math.max(0, (counts[student.name] ?? student.contacts ?? 0) + by);
       counts[student.name] = now;

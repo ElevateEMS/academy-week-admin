@@ -2187,7 +2187,8 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .name-edit:focus-visible { outline: 2px solid var(--taupe); outline-offset: 3px; border-radius: 4px; }
 
 /* The cohort's name in the header, with ‹ › to step to the cohort before or after it. */
-.cohort-title { display: inline-flex; align-items: center; gap: 10px; }
+.cohort-title { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+@media (max-width: 1150px) { .icons .head-search { width: 170px; } }
 .cohort-step { width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--head-muted); font-family: Jost, system-ui, sans-serif;
   font-size: 26px; line-height: 1; padding: 0 0 3px; cursor: pointer; display: inline-grid; place-items: center; flex: none; }
 .cohort-step:hover { background: var(--head-hover); color: var(--head-ink); }
@@ -2199,3 +2200,64 @@ span.cohort-step { cursor: default; }
 .icon-btn.named { width: auto; border-radius: 999px; padding: 0 14px 0 10px; display: inline-flex; gap: 6px; font-size: 14px; letter-spacing: .02em; }
 /* Navy header: the Bulletin keeps the soft blue, so its yellow sticky notes stand out against it. */
 :root[data-theme="navy"] .box.admin-notes, :root[data-theme="navy"] .box.admin-changes { background: #e4eaf0; border-color: #cdd8e2; } /* (Changes for Future Classes too) */
+
+/* ---------- Students page: Roster / Enrollment / Academy Week ---------- */
+.stu-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
+.stu-seg button { padding: 6px 16px; font-size: 14px; }
+.roster-box { margin-bottom: 30px; }
+.roster.roster-main th { font-family: Jost, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--muted); padding: 9px 8px; line-height: 1.25; vertical-align: bottom; }
+.roster.roster-main th.c { width: auto; }
+.roster.roster-main td { padding: 5px 4px; font-size: 14px; }
+/* Wider than the window: it scrolls sideways inside its box, with # and the names staying put. */
+.roster-main th:nth-child(2), .roster-main td:nth-child(2) { position: sticky; left: 0; z-index: 1; background: var(--paper); box-shadow: 1px 0 0 var(--line-soft); }
+.roster-main th:nth-child(2) { background: var(--blush); z-index: 3; }
+.roster-main tbody tr:hover td:nth-child(2) { background: var(--blush-soft); }
+.roster-main th:first-child, .roster-main td:first-child { padding-left: 12px; }
+.roster.roster-main tbody tr { cursor: default; }
+.roster-main .th-sub { display: block; font-size: 10.5px; color: var(--muted); opacity: .85; }
+.roster-main .r-name { min-width: 170px; max-width: 230px; }
+.name-link { all: unset; cursor: pointer; font-weight: 500; }
+.name-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.r-cell { border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 3px 6px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.r-cell:hover { border-color: var(--line); background: var(--paper); }
+.r-cell.soft { color: var(--muted); }
+.r-cell.warn { color: var(--rose); font-weight: 500; }
+.r-cell .low, .low { color: #b9542a; }
+.r-cell .em-yes { margin-right: 2px; }
+.pc-chip { display: inline-block; border-radius: 999px; padding: 0 7px; font-size: 12px; margin-left: 4px; }
+.pc-chip.pc-done { background: var(--sage-soft); color: #3f5c3b; }
+.pc-chip.pc-mid { background: var(--honey-soft); color: #8a6a35; }
+.pc-chip.pc-low { background: var(--rose-soft); color: #8d4f48; }
+.aw-marks { display: inline-flex; gap: 6px; }
+.aw-marks span + span::before { content: '·'; margin-right: 6px; color: var(--muted); }
+.note-cell { max-width: 180px; }
+.note-snip { display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12.5px; }
+.note-cell svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; vertical-align: -3px; }
+.r-status { font-size: 12px; color: var(--muted); }
+.r-status.off { color: #8a6a35; font-weight: 500; }
+
+/* A roster cell's pop-up (and the same lines on a student's page). */
+.cell-ed { width: min(460px, 94vw); }
+.ce-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; flex-wrap: wrap; }
+.ce-row > span:first-child { min-width: 150px; }
+.ce-tick > span:first-child { min-width: 0; }
+.ce-row select, .ce-row input:not([type=checkbox]) { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--paper); min-width: 120px; }
+.ce-row input:not([type=checkbox]) { width: 110px; min-width: 0; }
+.ce-more { display: inline-block; margin-top: 8px; }
+.ce-save { display: flex; justify-content: flex-end; margin-top: 10px; }
+.ce-note { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); font: inherit; line-height: 1.5; }
+.ce-total { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; margin: 4px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.ce-total > span:first-child { min-width: 150px; }
+.ce-total b { font-size: 22px; font-weight: 600; font-family: var(--serif); }
+
+/* A student's page (the wide pop-up from any name). */
+.drawer.wide { width: min(760px, 100vw); }
+.sp-nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 4px; position: sticky; top: 0; background: var(--paper); z-index: 2; }
+.drawer.wide section h3 { display: flex; align-items: center; gap: 10px; }
+.sp-kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin: 4px 0 8px; font-size: 14px; }
+.sp-kv dt { color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; padding-top: 2px; }
+.sp-kv dd { margin: 0; }
+.sp-note-label { display: block; font-size: 13px; margin: 8px 0 4px; }
+.sp-emails { margin: 0; padding-left: 18px; font-size: 14px; }
+.sp-emails li { padding: 2px 0; }
+.sp-aw-head { border-bottom: 0 !important; }
