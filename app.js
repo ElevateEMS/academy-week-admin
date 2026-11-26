@@ -2372,9 +2372,9 @@ const CELL_EDITS = {
 const COPY_ICON = '<svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>';
 const copyLine = (text, what = '') => `<span class="copy-line"><span>${esc(text)}</span><button class="copy-btn" data-act="copyText" data-text="${esc(text)}" data-what="${esc(what)}" title="Copy${what ? ' ' + what.toLowerCase() : ''}" aria-label="Copy${what ? ' ' + what.toLowerCase() : ''}">${COPY_ICON}</button></span>`;
 // One roster box as a line you can change: a tick, a dropdown (the sheet's own choices), or the patient contact count.
-function ceLine(s, [L, label, kind]) {
+function ceLine(s, [L, label, kind], { bare = false } = {}) {
   const c = cellsOf(s);
-  if (L === 'P') return `<div class="ce-row"><span>${esc(label)}</span>${pcStepper(s)}<span class="muted small">${s.contacts || 0} of ${CONTACTS_DONE} · at least ${CONTACTS_MIN} to attend Academy Week</span></div>`;
+  if (L === 'P') return `<div class="ce-row"><span>${esc(label)}</span>${pcStepper(s)}${bare ? '' : `<span class="muted small">${s.contacts || 0} of ${CONTACTS_DONE} · at least ${CONTACTS_MIN} to attend Academy Week</span>`}</div>`;
   if (kind === 'select') {
     const opts = [...new Set(['', ...(((S.sheet && S.sheet.choices) || {})[L] || []), c[L] || ''])];
     return `<label class="ce-row"><span>${esc(label)}</span><select data-change="cellSel" data-sid="${s.sid}" data-l="${L}">${opts.map(o =>
@@ -2397,14 +2397,14 @@ function studentPageTop(s) {
           <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
           <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
           <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span>` : esc(s.status || 'Active')}</dd>
-          <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
+          ${s.minor ? `<dt>Parent/Guardian</dt><dd><button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button></dd>` : ''}
         </dl></section>
       <section class="sp-card"><h3>Enrollment &amp; payments</h3>
         <dl class="sp-kv">
-          <dt>Textbook</dt><dd>${p.bookCode ? copyLine(p.bookCode, 'Book code') + (bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : '') : c.D ? 'Bought · <span class="muted">no code yet</span>' : '<span class="muted">Not through us</span>'} ${edit('book', 'Change')}</dd>
+          <dt>Textbook</dt><dd><button class="cell-link" data-act="cellEd" data-sid="${s.sid}" data-k="book">${p.bookCode ? esc(p.bookCode) : c.D ? 'Bought · no code yet' : 'Not through us'}</button>${p.bookCode ? `<button class="copy-btn" data-act="copyText" data-text="${esc(p.bookCode)}" data-what="Book code" title="Copy book code" aria-label="Copy book code">${COPY_ICON}</button>${bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : ''}` : ''}</dd>
           <dt>Payments</dt><dd>${payChips(p)}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <span class="tag-soft">$ extension</span>' : ''}</dd>
           <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
-          <dt>VAOEMS course #</dt><dd>${(lateNo || info.courseNo) ? esc(lateNo || info.courseNo) : '<span class="muted">–</span>'}${lateNo ? ' <span class="muted small">(late enrollment course)</span>' : ''}</dd>
+          <dt>VAOEMS #</dt><dd>${(lateNo || info.courseNo) ? esc(lateNo || info.courseNo) : '<span class="muted">–</span>'}${lateNo ? ' <span class="muted small">(late enrollment course)</span>' : ''}</dd>
         </dl></section>
     </div>
     <section class="sp-card sp-wide"><h3>Notes <span class="muted small">the cohort sheet’s Notes column</span></h3>
@@ -2419,8 +2419,9 @@ function studentPageTop(s) {
           <dt>Course grade</dt><dd><b class="${gr.shown != null && gr.shown < PASS_MARK ? 'low' : ''}">${gradeNum(gr.shown)}</b>${gr.override != null ? ' <span class="muted small">typed from JBL</span>' : ''}</dd>
         </dl></section>
       <section class="sp-card"><h3>Assignments <span class="muted small">${PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length} of ${PORTAL_ASSIGNMENTS.length}</span></h3>
-        ${PORTAL_ASSIGNMENTS.map(r => ceLine(s, r)).join('')}
-        <p class="muted small">CPR class: ${c.J ? esc(c.J) : 'not signed up'} · ${edit('cpr', 'Change')}</p>
+        ${PORTAL_ASSIGNMENTS.map(r => r[0] === 'P' ? ceLine(s, r, { bare: true })
+          : r[0] === 'I' ? ceLine(s, r).replace('</label>', ` <button class="cell-link ce-aside" data-act="cellEd" data-sid="${s.sid}" data-k="cpr" title="CPR class sign-up">${c.J ? 'Class ' + esc(c.J) : 'no class yet'}</button></label>`)
+          : ceLine(s, r)).join('')}
       </section>
     </div>`;
   return tabs; // (Academy Week: its sections follow, in drawer())
@@ -2429,8 +2430,8 @@ function studentPageTop(s) {
 function spAwRows(s) {
   const row = (title, cells) => `<div class="sp-row"><span class="sp-row-title">${title}</span>${cells.map(r => ceLine(s, r)).join('')}</div>`;
   return `<section><h3>Exams &amp; disposition</h3>
-    ${row('Psychomotor', [['V', 'Exam', 'select'], ['W', 'Final Sigs']])}
-    ${row('Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
+    ${row('Psychomotor', [['V', 'Exam', 'select']])}
+    ${row('Disposition', [['W', 'Final Sigs'], ['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
     ${row('NREMT exam', [['Z', '1st', 'select'], ['AA', '2nd', 'select'], ['AB', '3rd', 'select']])}
   </section>`;
 }

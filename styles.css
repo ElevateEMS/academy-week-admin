@@ -2263,7 +2263,10 @@ span.cohort-step { cursor: default; }
 .sp-cards > .sp-card:last-child { background: var(--blush-soft); border-color: var(--blush-line); }
 .sp-card.sp-wide { margin: 0 0 14px; }
 .sp-card textarea { width: 100%; }
-.sp-card .sp-kv { grid-template-columns: 110px 1fr; }
+.sp-card .sp-kv { grid-template-columns: 96px 1fr; }
+.sp-kv dt { white-space: nowrap; }
+.sp-kv .cell-link + .copy-btn { margin-left: 2px; vertical-align: middle; }
+.ce-aside { margin-left: 6px; font-size: 13px; }
 /* Academy Week tab: several boxes on one row. */
 .sp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; padding: 4px 0; }
 .sp-row-title { min-width: 110px; color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; }
@@ -2330,3 +2333,5 @@ span.cohort-step { cursor: default; }
 .roster.em-table .copy-btn { vertical-align: middle; }
 .roster.aw-table th:first-child { width: 5%; }
 .roster.aw-table th:nth-child(2) { width: 30%; }
+/* The lit Students / Staff button: orange like the lit Course / Academy Week (gold in Warm work; Calm as before). */
+:root[data-theme="navy"] .top .icon-btn.named.on, :root[data-theme="warm"] .top .icon-btn.named.on { background: var(--switch-on-bg); color: var(--switch-on-ink); border-color: transparent; box-shadow: none; }
