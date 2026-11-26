@@ -2230,11 +2230,6 @@ span.cohort-step { cursor: default; }
 .pc-chip.pc-low { background: var(--rose-soft); color: #8d4f48; }
 .aw-marks { display: inline-flex; gap: 6px; }
 .aw-marks span + span::before { content: '·'; margin-right: 6px; color: var(--muted); }
-.note-cell { max-width: 180px; }
-.note-snip { display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12.5px; }
-.note-cell svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; vertical-align: -3px; }
-.r-status { font-size: 12px; color: var(--muted); }
-.r-status.off { color: #8a6a35; font-weight: 500; }
 
 /* A roster cell's pop-up (and the same lines on a student's page). */
 .cell-ed { width: min(460px, 94vw); }
@@ -2261,3 +2256,17 @@ span.cohort-step { cursor: default; }
 .sp-emails { margin: 0; padding-left: 18px; font-size: 14px; }
 .sp-emails li { padding: 2px 0; }
 .sp-aw-head { border-bottom: 0 !important; }
+
+/* Roster headings: Academy Week over its three columns; small lead-in words above a heading. */
+.roster-main th.th-group { padding-bottom: 2px; border-bottom: 1px solid var(--blush-line); color: var(--ink); }
+.roster-main th.th-sub-row { padding-top: 3px; font-size: 11.5px; white-space: nowrap; }
+.roster-main th .th-sub { display: block; font-size: 10.5px; letter-spacing: .03em; }
+/* Paused / Limited portal access: the name is highlighted. */
+.name-link.limited { background: var(--honey-soft); color: #8a6a35; border-radius: 6px; padding: 1px 6px; margin-left: -6px; }
+.limited-pill { background: var(--honey-soft); color: #8a6a35; border-radius: 999px; padding: 1px 9px; font-size: 13px; font-weight: 500; }
+/* Dropped & withdrawn (under the roster). */
+.dropped-box { margin: -14px 0 30px; padding: 0; }
+.dropped-box summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; cursor: pointer; font-family: var(--serif); font-size: 19px; font-weight: 600; }
+.dropped-list { margin: 0; padding: 0 18px 4px 36px; }
+.dropped-list li { padding: 3px 0; }
+.dropped-box > p { padding: 0 18px 12px; margin: 4px 0 0; }

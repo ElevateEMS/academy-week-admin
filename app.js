@@ -2245,7 +2245,8 @@ async function saveGrade(sid, g) {
 // One roster cell: what it says, and the pop-up it opens.
 function rosterCell(s, k) {
   const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="muted">–</span>';
-  const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${k}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
+  const ed = /^aw[UVW]$/.test(k) ? 'aw' : k; // (the three Academy Week cells share one pop-up)
+  const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
   if (k === 'pay') {
     const p = emPerson(s), t = todayIso();
     if (p.paidNext && p.paidFinal) return btn(yes + ' Paid');
@@ -2258,7 +2259,7 @@ function rosterCell(s, k) {
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
     const n = s.contacts || 0, cls = n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return btn(`${c.O ? '<span class="em-yes">✓</span> Ready' : '<span class="muted">Not ready</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`);
+    return btn(`${c.O ? '<span class="em-yes">✓</span> Attested' : '<span class="muted">Not attested</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
   }
   if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
@@ -2266,34 +2267,47 @@ function rosterCell(s, k) {
     const g = gradeOf(s), low = n => n != null && n < PASS_MARK;
     return btn(g.shown == null ? no : `<b class="${low(g.shown) ? 'low' : ''}">${gradeNum(g.shown)}</b>${g.counted != null ? ` <span class="muted small ${low(g.counted) ? 'low' : ''}">final ${gradeNum(g.counted)}</span>` : ''}`);
   }
-  if (k === 'aw') return btn(`<span class="aw-marks"><span title="All skills">${c.U ? '✓' : '–'}</span><span title="Psychomotor exam">${c.V ? esc(c.V) : '–'}</span><span title="Last class signatures">${c.W ? '✓' : '–'}</span></span>`);
+  if (k === 'awU') return btn(c.U ? yes : no, '', 'All skills');
+  if (k === 'awV') return btn(c.V ? esc(c.V) : no, '', 'Psychomotor exam');
+  if (k === 'awW') return btn(c.W ? yes : no, '', 'Last class signatures');
   if (k === 'dispo') return btn(c.X || c.Y ? `<span class="aw-marks"><span title="VAOEMS">${esc(c.X || '–')}</span><span title="NREMT">${esc(c.Y || '–')}</span></span>` : no);
   if (k === 'nremt') {
     const tries = ['Z', 'AA', 'AB'].map(L => c[L]), pass = tries.findIndex(v => /pass/i.test(v || ''));
     const last = tries.map((v, i) => [v, i]).filter(([v]) => v).pop();
     return btn(pass >= 0 ? `<span class="em-yes">✓</span> Passed · ${['1st', '2nd', '3rd'][pass]}` : last ? `Attempt ${last[1] + 1}: ${esc(last[0])}` : no);
   }
-  if (k === 'notes') return btn(c.AC ? `<span class="note-snip">${esc(c.AC)}</span>` : `<span class="muted">${ICONS.pencil}</span>`, 'note-cell', c.AC || 'Add a note');
   return '';
 }
-const ROSTER_COLS = [['pay', 'Payments'], ['book', 'Textbook'], ['paper', 'Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
-  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Academy Week Compliance'], ['grade', 'Course grade'],
-  ['aw', 'Academy Week <span class="th-sub">Skills · Psych · Sigs</span>'], ['dispo', 'Disposition <span class="th-sub">VAOEMS · NREMT</span>'],
-  ['nremt', 'NREMT'], ['notes', 'Notes']];
+// Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
+// Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
+const ROSTER_COLS = [['pay', 'Payments'], ['book', 'Textbook'], ['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Fingerprinting'],
+  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', '<span class="th-sub">Academy Week</span>Compliance'], ['grade', 'Course<br>Grade'],
+  ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT']];
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
-      <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([, l]) => `<th class="c">${l}</th>`).join('')}<th class="c">Status</th></tr></thead>
+      <thead><tr><th rowspan="2">#</th><th rowspan="2">Student</th>${ROSTER_COLS.map(([k, l, grp], i) => grp
+        ? (ROSTER_COLS[i - 1][2] === grp ? '' : `<th class="c th-group" colspan="${ROSTER_COLS.filter(x => x[2] === grp).length}">Academy Week</th>`)
+        : `<th class="c" rowspan="2">${l}</th>`).join('')}</tr>
+        <tr>${ROSTER_COLS.filter(x => x[2]).map(([, l]) => `<th class="c th-sub-row">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td class="r-name"><button class="name-link" data-act="openStudent" data-sid="${s.sid}">${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
+        <td class="r-name"><button class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${esc(s.name)}</button>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s)}</td>
         ${ROSTER_COLS.map(([k]) => `<td class="c">${rosterCell(s, k)}</td>`).join('')}
-        <td class="c"><span class="r-status ${/active/i.test(s.status) ? '' : 'off'}">${esc(s.status || 'Active')}</span></td>
-      </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 3}" class="empty">No students match.</td></tr>`}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
-  </section>`;
+  </section>
+  ${droppedList()}`;
+}
+// Dropped / withdrawn students: the list under the roster in the cohort sheet (B37 down, "Last, First - Withdrawn 10/31/2026").
+function droppedList() {
+  const list = (S.sheet && S.sheet.dropped) || [];
+  if (!list.length) return '';
+  return `<details class="box dropped-box" ${S.droppedOpen ? 'open' : ''}><summary data-act="droppedToggle"><span>Dropped &amp; withdrawn</span><span class="muted small">${list.length}</span></summary>
+    <ul class="dropped-list">${list.map(l => { const [name, ...rest] = l.split(' - '); return `<li><b>${esc(name)}</b>${rest.length ? ` <span class="muted">${esc(rest.join(' - '))}</span>` : ''}</li>`; }).join('')}</ul>
+    <p class="muted small">From the list under the roster in the cohort sheet.</p></details>`;
 }
 function studentsView() {
   if (!S.sheet) return loadingView();
@@ -2317,7 +2331,7 @@ const CELL_EDITS = {
   aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last class signatures']]],
   dispo: ['Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']]],
   nremt: ['NREMT exam', [['Z', '1st attempt', 'select'], ['AA', '2nd attempt', 'select'], ['AB', '3rd attempt', 'select']]],
-  notes: ['Notes', []], grade: ['Course grade', []],
+  grade: ['Course grade', []],
 };
 // One roster box as a line you can change: a tick, a dropdown (the sheet's own choices), or the patient contact count.
 function ceLine(s, [L, label, kind]) {
@@ -2341,7 +2355,7 @@ function studentPageTop(s) {
     <section id="sp-overview"><h3>Overview</h3>
       <dl class="sp-kv">
         <dt>Email</dt><dd>${validEmail(p.email) ? `<a href="mailto:${esc(p.email)}" data-chrome>${esc(p.email)}</a>` : '<span class="tbd">no email in the sheet</span>'}</dd>
-        <dt>Portal</dt><dd>${esc(s.status || 'Active')}</dd>
+        <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span> <span class="muted small">Pause / Unpause at the bottom</span>` : esc(s.status || 'Active')}</dd>
         <dt>Parent/Guardian</dt><dd>${s.minor ? `<button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button>` : '<span class="muted">18 or older</span>'}</dd>
       </dl>
       <label class="sp-note-label">Notes <span class="muted small">(the cohort sheet’s Notes column)</span></label>
@@ -2380,9 +2394,6 @@ function cellEdModal() {
   if (ed.k === 'pay') body += `<button class="link ce-more" data-act="emExtOpen" data-sid="${s.sid}">Due dates and discount…</button>`;
   if (ed.k === 'cpr') body += `<label class="ce-row"><span>CPR class sign-up</span><input id="${dk('J')}" data-draft="${dk('J')}" value="${esc(S.drafts[dk('J')] ?? c.J ?? '')}" placeholder="e.g. 9/13/2026"></label>
     <div class="ce-save"><button class="btn small primary" data-act="cellText" data-sid="${s.sid}" data-l="J">Save sign-up</button></div>`;
-  if (ed.k === 'notes') body = `<textarea id="${dk('AC')}" data-draft="${dk('AC')}" class="ce-note" rows="10" placeholder="Anything about ${esc(firstName(s.name))}">${esc(S.drafts[dk('AC')] ?? c.AC ?? '')}</textarea>
-    <p class="muted small">Saved in the cohort sheet’s Notes column (AC).</p>
-    <div class="ce-save"><button class="btn primary" data-act="cellText" data-sid="${s.sid}" data-l="AC">Save note</button></div>`;
   if (ed.k === 'grade') {
     const g = gradeOf(s), v = (f, cur) => esc(S.drafts[dk(f)] ?? (cur == null ? '' : gradeNum(cur)));
     const inp = (f, label, cur, note = '') => `<label class="ce-row"><span>${label}</span><input id="${dk(f)}" data-draft="${dk(f)}" data-grade="${s.sid}" inputmode="decimal" value="${v(f, cur)}" placeholder="–">${note ? `<span class="muted small">${note}</span>` : ''}</label>`;
@@ -3207,15 +3218,16 @@ async function act(a, el = {}, e) {
       }
       case 'cohortStep': selectCohort(d.k, { keepView: true }); window.scrollTo(0, 0); break;
       case 'stuMode': S.stuMode = d.v; pref('stuMode', d.v); render(); break;
+      case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;
       case 'spJump': { const el = document.getElementById('sp-' + d.id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
       case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }
       case 'cellTick': { const s = studentBySid(d.sid); if (s) await setCells(d.sid, { [d.l]: !cellsOf(s)[d.l] }); break; }
-      case 'cellText': { // CPR sign-up (J) or Notes (AC)
+      case 'cellText': { // CPR sign-up (J)
         const key = 'ce-' + d.l + '-' + d.sid, s = studentBySid(d.sid);
         if (s && S.drafts[key] !== undefined) await setCells(d.sid, { [d.l]: String(S.drafts[key]).trim() });
-        delete S.drafts[key]; if (d.l === 'AC' && S.cellEd) cellEdClose(); else render(); toast('Saved to the cohort sheet.'); break;
+        delete S.drafts[key]; render(); toast('Saved to the cohort sheet.'); break;
       }
       case 'gradeSave': {
         const s = studentBySid(d.sid); if (!s) break;
