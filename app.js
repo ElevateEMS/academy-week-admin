@@ -602,7 +602,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
     evals: [], emailLog: [], emailDraft: null, emailPick: null, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
-    studentsLoaded: false, rostersLoaded: false });
+    studentsLoaded: false, rostersLoaded: false, psychCands: {} });
   sidePickedFor = keepView ? key : null; // keepView: stay on the page you're on (a cohort you just made opens on Course)
   watchPrev();
   const base = 'cohorts/' + key;
@@ -618,6 +618,7 @@ async function selectCohort(key, { keepView = false } = {}) {
   w(base + '/packing', list => { S.packing = list; });
   w(base + '/schedule', list => { S.schedule = Object.fromEntries(list.map(d => [d.id, d])); });
   w(base + '/emailLog', list => { S.emailLog = list; });
+  w(base + '/psychCands', list => { S.psychCands = Object.fromEntries(list.map(d => [d.id, d])); }); // Additional Psychomotor Exam Candidates
   w(base + '/rosters', list => { S.rosterDocs = Object.fromEntries(list.map(d => [d.id, d])); S.rostersLoaded = true; });
   await loadSheet();
 }
@@ -2133,6 +2134,7 @@ async function setPsych(row, cells, station) {
     await Store.set('cohorts/' + S.cohortKey, { [stationKey(st)]: { [row]: station ?? free[0] } });
   }
   for (const [st, n] of Object.entries(retest)) await Store.set('cohorts/' + S.cohortKey, { psychRetests: { [row]: { [st]: n } } });
+  Object.entries(cells).forEach(([k, v]) => { if (/^(med|trauma)(Re)?$/.test(k)) recordAttempt(r, k, v); }); // (candidates: each attempt kept)
   const before = { ...r };
   Object.assign(r, cells); render();
   try { await Sheets.setPsych(S.cohortKey, row, r.name, cells); }
@@ -2184,7 +2186,7 @@ function psychExtras() {
   const open = S.peOpen ?? (todayIso() === psychDayIso());
   return `<section class="box psych-extras ${open ? 'open' : ''}"><div class="pe-head"><button class="pe-toggle" data-act="peToggle" aria-expanded="${open}"><h3>Additional Psychomotor Exam Candidates</h3><span class="muted small">${extras.length}</span></button><button class="pe-plus" data-act="peAddToggle" title="Add a candidate" aria-label="Add a candidate">+</button></div>
     ${S.peAddOpen ? `<div class="pe-add"><input id="pe-add" data-draft="pe-add" placeholder="Last, First" value="${esc(S.drafts['pe-add'] || '')}" autocomplete="off"><button class="btn small primary" data-act="psychAdd">Add</button><button class="link" data-act="peAddToggle">Cancel</button></div>` : ''}
-    ${!open ? '' : extras.length ? `<table class="pe-table"><thead><tr><th>Name</th><th>Medical</th><th>Retest</th><th>Trauma</th><th>Retest</th><th>Notes</th></tr></thead><tbody>${extras.map(r => `<tr>
+    ${!open ? '' : extras.length ? `<table class="pe-table"><colgroup><col style="width:22%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col></colgroup><thead><tr><th>Name</th><th>Medical</th><th>Retest</th><th>Trauma</th><th>Retest</th><th>Notes</th></tr></thead><tbody>${extras.map(r => `<tr>
       <td><button class="name-link" data-act="psychOpen" data-row="${r.row}">${esc(r.name)}</button></td>${['med', 'medRe', 'trauma', 'traumaRe'].map(k => `<td>${sel(r, k)}</td>`).join('')}
       <td>${note(r)}</td></tr>`).join('')}</tbody></table>` : `<p class="muted small pe-none">None yet.</p>`}</section>`;
 }
@@ -2197,6 +2199,67 @@ function stationPicker(r, st) {
     const there = others.find(x => stationOf(x, st) === n);
     return `<option value="${n}" ${n === mine ? 'selected' : ''} ${there ? 'disabled' : ''}>${PSY_LABEL[st]} ${n}${there ? ' (' + esc(shortName(there.name)) + ')' : ''}</option>`; }).join('')}</select>`;
 }
+/* ---------- Additional Psychomotor Exam Candidates: their info (cohorts/{key}/psychCands/{slug(name)}) ----------
+   { email, phone, reason, vaoems, testDate, letter: { id, url, name }, scen: { med, trauma, files: [{ id, url, name }] },
+     attempts: { med: { 1: { result, date, evaluator }, 2: …, 3: … }, trauma: … }, folderUrl, export: { at, pdfUrl, folderUrl } }
+   Files go to "Admin - <cohort>/Psychomotor Exam - <Name>" (Sheets.psychFile). Attempt 1 = the first try; 2 and 3 = the
+   retests (their result is the Retest box, which a later retest writes over, so each result is kept here as it's set). */
+const candPath = r => 'cohorts/' + S.cohortKey + '/psychCands/' + slug(r.name);
+const candOf = r => (S.psychCands || {})[slug(r.name)] || {};
+const evaluatorNames = () => {
+  if (staffReady() && !S.staffAll) loadStaffAll();
+  const list = ((S.staffAll && S.staffAll.people) || []).filter(p => p.role !== 'Patient').map(p => p.name);
+  return [...new Set(['Nick Brown', 'Bella Brown', ...list])];
+};
+// When a candidate's result is set: keep it (and today's date) with its attempt number.
+function recordAttempt(r, k, v) {
+  if (students().some(x => psychRowOf(x) === r) || !/^(pass|fail)$/i.test(v)) return;
+  const st = k.startsWith('med') ? 'med' : 'trauma', n = k.endsWith('Re') ? retestsOf(r, st) + 1 : 1;
+  Store.set(candPath(r), { attempts: { [st]: { [n]: { result: v, date: todayIso() } } } });
+}
+function candSections(r) {
+  const c = candOf(r), sc = c.scen || {}, field = (k, label, ph = '', type = 'text') => `<label class="cand-f"><span>${label}</span>
+ <input id="cand-${k}-${r.row}" type="${type}" data-change="candField" data-k="${k}" data-row="${r.row}" value="${esc(c[k] || '')}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+  const copy = (v, what) => v ? `<button class="copy-btn" data-act="copyText" data-text="${esc(v)}" data-what="${what}" title="Copy ${what.toLowerCase()}" aria-label="Copy">${COPY_ICON}</button>` : '';
+  const up = (kind, label) => `<label class="btn tiny cand-up">${S.candBusy === kind + r.row ? 'Uploading…' : label}<input type="file" class="cand-file" data-kind="${kind}" data-row="${r.row}" accept="application/pdf,image/*,.doc,.docx" hidden></label>`;
+  const names = evaluatorNames();
+  const tries = st => { const n = Math.max(1, retestsOf(r, st) + 1, ...Object.keys((c.attempts || {})[st] || {}).map(Number));
+    return Array.from({ length: Math.min(3, n) }, (_, i) => { const a = (((c.attempts || {})[st] || {})[i + 1]) || {};
+      const shown = a.result || (i === 0 ? r[st] : i === retestsOf(r, st) ? r[st + 'Re'] : '') || '';
+      return `<tr><td>${PSY_LABEL[st]}</td><td>${i + 1}</td><td>${shown ? psychMark(shown) : '<span class="r-no">–</span>'}</td>
+        <td><input id="cand-eval-${st}-${i + 1}-${r.row}" list="cand-evals" class="cand-eval" data-change="candEval" data-row="${r.row}" data-st="${st}" data-n="${i + 1}" value="${esc(a.evaluator || '')}" placeholder="Evaluator"></td>
+        <td class="muted small">${a.date ? esc(monthDay(a.date)) : ''}</td></tr>`; }).join(''); };
+  return `<div class="cand-card"><h3>Candidate</h3>
+      <div class="cand-grid">${field('email', 'Email', 'name@example.com', 'email')}${field('phone', 'Phone', '(555) 555-5555', 'tel')}
+        ${field('vaoems', 'VAOEMS #', 'or “NREMT 1234567”')}${field('testDate', 'Test date', '', 'date')}${field('reason', 'Reason', 'Why they’re testing')}</div>
+      <p class="cand-copies">${c.email ? `${esc(c.email)} ${copy(c.email, 'Email')}` : ''}${c.phone ? ` · ${esc(c.phone)} ${copy(c.phone, 'Phone')}` : ''}</p></div>
+    <div class="cand-card"><h3>Eligibility letter</h3>
+      <p>${c.letter ? `<a href="${esc(c.letter.url)}" target="_blank" rel="noopener" data-chrome>Open letter ↗</a> <span class="muted small">${esc(c.letter.name)}</span>` : '<span class="muted">Not in yet.</span>'} ${up('letter', c.letter ? 'Replace' : 'Upload')}</p></div>
+    <div class="cand-card"><h3>VAOEMS scenarios</h3>
+      <div class="cand-grid">${['med', 'trauma'].map(st => `<label class="cand-f"><span>${PSY_LABEL[st]}</span><input id="cand-scen-${st}-${r.row}" data-change="candScen" data-k="${st}" data-row="${r.row}" value="${esc(sc[st] || '')}" placeholder="Scenario name or number" autocomplete="off"></label>`).join('')}</div>
+      <ul class="cand-files">${(sc.files || []).map((f, i) => `<li><a href="${esc(f.url)}" target="_blank" rel="noopener" data-chrome>${esc(f.name)} ↗</a> <button class="x" data-act="candFileX" data-row="${r.row}" data-i="${i}" aria-label="Remove from the list">×</button></li>`).join('')}</ul>
+      ${up('scenario', '+ Attach a scenario file')}</div>`
+    + `<datalist id="cand-evals">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`
+    + `<!--results-->`
+    + `<div class="cand-card"><h3>Attempts <span class="muted small">for VAOEMS</span></h3><table class="cand-tries"><thead><tr><th>Station</th><th>Attempt</th><th>Result</th><th>Evaluator</th><th>Date</th></tr></thead><tbody>${tries('med')}${tries('trauma')}</tbody></table></div>
+    <div class="cand-export"><button class="btn primary small" data-act="candExport" data-row="${r.row}" ${S.candBusy === 'export' + r.row ? 'disabled' : ''}>${S.candBusy === 'export' + r.row ? 'Making the PDF…' : 'Export for VAOEMS'}</button>
+      ${c.export ? `<span class="muted small">Made ${esc(monthDay(c.export.at))} · <a href="${esc(c.export.pdfUrl)}" target="_blank" rel="noopener" data-chrome>Results PDF ↗</a> · <a href="${esc(c.export.folderUrl)}" target="_blank" rel="noopener" data-chrome>Their folder ↗</a></span>` : '<span class="muted small">Saves the results PDF in their Drive folder, next to their letter and scenarios.</span>'}</div>`;
+}
+// A file picked in a candidate's pop-up: their eligibility letter, or a VAOEMS scenario (into their Drive folder).
+async function candUpload(input) {
+  const r = psychRows().find(x => x.row === Number(input.dataset.row)), kind = input.dataset.kind, f = input.files[0]; input.value = '';
+  if (!r || !f) return;
+  if (f.size > 10 * 1024 * 1024) { toast('That file is over 10 MB.'); return; }
+  S.candBusy = kind + r.row; render();
+  try {
+    const data = await new Promise((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = () => bad(fr.error); fr.readAsDataURL(f); });
+    const out = await Sheets.psychFile(S.cohortKey, r.name, kind, { name: f.name, type: f.type, data });
+    const c = candOf(r);
+    await Store.set(candPath(r), kind === 'letter' ? { letter: out.file, folderUrl: out.folderUrl } : { scen: { files: [...((c.scen || {}).files || []), out.file] }, folderUrl: out.folderUrl });
+    toast(kind === 'letter' ? 'Eligibility letter saved.' : 'Scenario file saved.');
+  } catch (e) { toast(e.message); }
+  S.candBusy = null; render();
+}
 function psychEdModal() {
   const ed = S.psychEd; if (!ed) return '';
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
@@ -2206,11 +2269,12 @@ function psychEdModal() {
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
-    : `<div class="psy-grid">${sel('med', 'Medical')}${sel('medRe', 'Retest')}${sel('trauma', 'Trauma')}${sel('traumaRe', 'Retest')}</div>
-      <label class="sp-note-label">Notes</label><textarea id="${dk}" data-draft="${dk}" rows="3" class="ce-note">${esc(S.drafts[dk] ?? r.notes ?? '')}</textarea>
+    : (cand => (cand ? candSections(r).split('<!--results-->')[0] : '') + `<div class="${cand ? 'cand-card' : ''}">${cand ? '<h3>Results</h3>' : ''}<div class="psy-grid">${sel('med', 'Medical')}${sel('medRe', 'Retest')}${sel('trauma', 'Trauma')}${sel('traumaRe', 'Retest')}</div></div>`
+      + (cand ? candSections(r).split('<!--results-->')[1] : ''))(!s) + `
+      <label class="sp-note-label">Notes <span class="muted small">just for you</span></label><textarea id="${dk}" data-draft="${dk}" rows="3" class="ce-note">${esc(S.drafts[dk] ?? r.notes ?? '')}</textarea>
       <div class="ce-save"><button class="btn small" data-act="psychNoteSave" data-row="${r.row}">Save note</button></div>
       ${s ? `<div class="psy-result">${ceLine(s, ['V', 'Psychomotor Exam (roster)', 'select'])}<p class="muted small">Sets itself to Pass once both stations pass. Change it here if needed.</p></div>` : ''}`;
-  return `<div class="overlay" data-act="psychClose"><div class="modal confirm cell-ed" data-stop>
+  return `<div class="overlay" data-act="psychClose"><div class="modal confirm cell-ed ${!s && r ? 'cand-modal' : ''}" data-stop>
     <div class="modal-head"><h2>Psychomotor exam <span class="muted small">${esc(name)}</span></h2><button class="x big" data-act="psychClose" aria-label="Close">×</button></div>
     <div class="modal-body">${body}</div></div></div>`;
 }
@@ -3403,6 +3467,13 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
   if (t.dataset.change === 'cellSel') { setCells(t.dataset.sid, { [t.dataset.l]: t.value }); return; } // a roster dropdown (Students page)
+  if (['candField', 'candScen', 'candEval'].includes(t.dataset.change)) { // an Additional Psychomotor Exam Candidate's info
+    const r = psychRows().find(x => x.row === Number(t.dataset.row)); if (!r) return;
+    const v = String(t.value || '').trim(), d = t.dataset;
+    Store.set(candPath(r), d.change === 'candField' ? { [d.k]: v } : d.change === 'candScen' ? { scen: { [d.k]: v } } : { attempts: { [d.st]: { [d.n]: { evaluator: v } } } });
+    return;
+  }
+  if (t.classList && t.classList.contains('cand-file') && t.files && t.files[0]) { candUpload(t); return; }
   if (t.dataset.change === 'psyStation') { Store.set('cohorts/' + S.cohortKey, { [stationKey(t.dataset.st)]: { [t.dataset.row]: Number(t.value) } }).then(render); return; }
   if (t.dataset.change === 'psychSel') { setPsych(Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
@@ -3523,6 +3594,23 @@ async function act(a, el = {}, e) {
       case 'peAddToggle': S.peAddOpen = !S.peAddOpen; if (!S.peAddOpen) delete S.drafts['pe-add']; render(); if (S.peAddOpen) setTimeout(() => { const i = document.getElementById('pe-add'); if (i) i.focus(); }); break;
       case 'peNoteEd': S.peNoteEd = Number(d.row); render(); setTimeout(() => { const i = document.getElementById('psy-notes-' + d.row); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }); break;
       case 'peNoteSave': { const k = 'psy-notes-' + d.row; S.peNoteEd = null; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); break; }
+      case 'candFileX': { const r = psychRows().find(x => x.row === Number(d.row)); if (!r) break; const files = ((candOf(r).scen || {}).files || []).filter((_, i) => i !== Number(d.i));
+        await Store.set(candPath(r), { scen: { files } }); toast('Taken off the list (the file stays in their Drive folder).'); break; }
+      case 'candExport': {
+        const r = psychRows().find(x => x.row === Number(d.row)); if (!r) break;
+        const c = candOf(r), sc = c.scen || {}, att = [];
+        ['med', 'trauma'].forEach(st => { const n = Math.max(1, retestsOf(r, st) + 1); for (let i = 1; i <= Math.min(3, n); i++) {
+          const a = ((c.attempts || {})[st] || {})[i] || {}, res = a.result || (i === 1 ? r[st] : i === retestsOf(r, st) + 1 ? r[st + 'Re'] : '');
+          if (/^(pass|fail)$/i.test(res || '')) att.push({ station: PSY_LABEL[st], attempt: i, result: res, evaluator: a.evaluator || '', date: a.date ? monthDay(a.date) + ', ' + a.date.slice(0, 4) : '' }); } });
+        S.candBusy = 'export' + r.row; render();
+        try {
+          const out = await Sheets.psychExport(S.cohortKey, r.name, { name: r.name, email: c.email || '', phone: c.phone || '', vaoems: c.vaoems || '', reason: c.reason || '',
+            testDate: c.testDate ? monthDay(c.testDate) + ', ' + c.testDate.slice(0, 4) : '', cohort: S.cohortKey, scenarios: { med: sc.med || '', trauma: sc.trauma || '', files: (sc.files || []).map(f => f.name) }, attempts: att });
+          await Store.set(candPath(r), { export: { at: todayIso(), pdfUrl: out.pdfUrl, folderUrl: out.folderUrl }, folderUrl: out.folderUrl });
+          toast('Results PDF saved in their Drive folder.');
+        } catch (e) { toast(e.message); }
+        S.candBusy = null; render(); break;
+      }
       case 'psyRetestDown': { const r = psychRows().find(x => x.row === Number(d.row)); if (r) await Store.set('cohorts/' + S.cohortKey, { psychRetests: { [r.row]: { [d.st]: Math.max(1, retestsOf(r, d.st) - 1) } } }); render(); break; }
       case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
       case 'stationsOpen': S.stationsEd = { med: stationCount('med'), trauma: stationCount('trauma') }; render(); break;
