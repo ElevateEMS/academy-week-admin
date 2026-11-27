@@ -2212,14 +2212,6 @@ function psychExtras() {
       <td>${note(r)}</td></tr>`).join('')}</tbody></table>` : `<p class="muted small pe-none">None yet.</p>`}</section>`;
 }
 // The pop-up: Medical, Retest, Trauma, Retest, Notes (S.psychEd = { row } or { sid }).
-// While someone's Testing and 2+ stations of that kind are running: which one they're at (one taken by
-// someone else can't be picked; it shows who's there).
-function stationPicker(r, st) {
-  const mine = stationSet(r, st), others = psychRows().filter(x => x.row !== r.row && isTesting(x, st));
-  return `<select class="psy-station ${mine ? '' : 'unset'}" data-change="psyStation" data-row="${r.row}" data-st="${st}" title="Which ${PSY_LABEL[st].toLowerCase()} station (pick it ahead of time, or when they start)">${mine ? '' : '<option value="" selected disabled>Station…</option>'}${[1, 2, 3].slice(0, stationCount(st)).map(n => {
-    const there = others.find(x => stationOf(x, st) === n);
-    return `<option value="${n}" ${n === mine ? 'selected' : ''} ${there ? 'disabled' : ''}>${PSY_LABEL[st]} ${n}${there ? ' (' + esc(shortName(there.name)) + ')' : ''}</option>`; }).join('')}</select>`;
-}
 /* ---------- Additional Psychomotor Exam Candidates: their info (cohorts/{key}/psychCands/{slug(name)}) ----------
    { email, phone, reason, vaoems, testDate, letter: { id, url, name }, scen: { med, trauma, files: [{ id, url, name }] },
      attempts: { med: { 1: { result, date, evaluator }, 2: …, 3: … }, trauma: … }, folderUrl, export: { at, pdfUrl, folderUrl } }
@@ -2338,12 +2330,26 @@ function psychEdModal() {
   const ed = S.psychEd; if (!ed) return '';
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : candRow(ed.row);
   const name = s ? s.name : r ? r.name : '';
-  const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet && S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => !r.priv && !k.endsWith('Re') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
+  // One row per station (Medical, Trauma 1, Trauma 2… from the Stations count): picking a result in a row puts them at
+  // that station. Their results show in their station's row; a station someone else is testing at says who and is locked.
+  const CHOICES = (S.sheet && S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'];
+  const try_ = st => retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '';
+  const pick = (k, label, n, mine, lock) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}" ${n ? `data-n="${n}"` : ''} ${lock ? 'disabled' : ''}>${['', ...CHOICES].map(o =>
+    `<option value="${esc(o)}" ${o === (mine ? r[k] || '' : '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${mine && k.endsWith('Re') ? try_(k.startsWith('med') ? 'med' : 'trauma') : ''}</label>`;
+  const stationRows = st => {
+    const n = r.priv ? 1 : stationCount(st), set = stationSet(r, st), has = !!(r[st] || r[st + 'Re']);
+    if (n === 1) return pick(st, PSY_LABEL[st], 0, true, false) + pick(st + 'Re', 'Retest', 0, true, false);
+    return [1, 2, 3].slice(0, n).map(i => {
+      const mine = set ? set === i : has && i === 1, there = psychRows().find(x => x.row !== r.row && isTesting(x, st) && stationOf(x, st) === i);
+      const lock = !!there && !mine;
+      return pick(st, PSY_LABEL[st] + ' ' + i, i, mine, lock) + pick(st + 'Re', 'Retest', i, mine, lock)
+        + (lock ? `<p class="psy-inuse muted small">in use: ${esc(shortName(there.name))}</p>` : '');
+    }).join('');
+  };
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !(r && r.priv) && !(S.sheet && S.sheet.psych) ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
-    : (cand => (cand ? candSections(r).split('<!--results-->')[0] : '') + `<div class="${cand ? 'cand-card' : ''}">${cand ? '<h3>Results</h3>' : ''}<div class="psy-grid">${sel('med', 'Medical')}${sel('medRe', 'Retest')}${sel('trauma', 'Trauma')}${sel('traumaRe', 'Retest')}</div></div>`
+    : (cand => (cand ? candSections(r).split('<!--results-->')[0] : '') + `<div class="${cand ? 'cand-card' : ''}">${cand ? '<h3>Results</h3>' : ''}<div class="psy-grid">${stationRows('med')}${stationRows('trauma')}</div></div>`
       + (cand ? candSections(r).split('<!--results-->')[1] : ''))(!s) + `
       <label class="sp-note-label">Notes <span class="muted small">just for you</span></label><textarea id="${dk}" data-draft="${dk}" rows="3" class="ce-note">${esc(S.drafts[dk] ?? r.notes ?? '')}</textarea>
       <div class="ce-save"><button class="btn small" data-act="psychNoteSave" data-row="${r.row}">Save note</button></div>
@@ -2425,8 +2431,8 @@ function awStudentsView() {
   <section class="box table-box">
     <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead>${(rs => `<tr><th ${rs}>#</th><th ${rs}>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : `<th class="c" ${rs}>Patient contacts</th><th class="c" ${rs}>Skills</th><th class="c psy-head" colspan="2"><button class="psy-head-btn" data-act="stationsOpen" title="Set stations: how many Medical and Trauma stations are running">Psychomotor Exam</button></th><th class="c" ${rs} title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" ${rs} title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? `<th class="c" ${rs}>Peer evals</th>` : ''}<th class="c" ${rs}>Conduct</th></tr>
-      ${pre ? '' : `<tr class="sub-head"><th class="c">Medical${stationCount('med') > 1 ? ` (${stationCount('med')})` : ''}</th><th class="c">Trauma${stationCount('trauma') > 1 ? ` (${stationCount('trauma')})` : ''}</th></tr>`}`)(pre ? '' : 'rowspan="2"')}</thead>
+        : `<th class="c" ${rs}>Patient contacts</th><th class="c" ${rs}>Skills</th><th class="c psy-head psy-col" colspan="2"><button class="psy-head-btn" data-act="stationsOpen" title="Set stations: how many Medical and Trauma stations are running">Psychomotor Exam</button></th><th class="c" ${rs} title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" ${rs} title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? `<th class="c" ${rs}>Peer evals</th>` : ''}<th class="c" ${rs}>Conduct</th></tr>
+      ${pre ? '' : '<tr class="sub-head"><th class="c psy-col">Medical</th><th class="c psy-col">Trauma</th></tr>'}`)(pre ? '' : 'rowspan="2"')}</thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td>${nameCell(s)}${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
@@ -2435,7 +2441,7 @@ function awStudentsView() {
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
         : `<td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
         <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
-        <td class="c">${rosterCell(s, 'psyMed')}</td><td class="c">${rosterCell(s, 'psyTrauma')}</td><td class="c">${rosterCell(s, 'awW')}</td><td class="c">${rosterCell(s, 'dispo')}</td>`}
+        <td class="c psy-col">${rosterCell(s, 'psyMed')}</td><td class="c psy-col">${rosterCell(s, 'psyTrauma')}</td><td class="c">${rosterCell(s, 'awW')}</td><td class="c">${rosterCell(s, 'dispo')}</td>`}
         ${hasPeer ? `<td class="c" data-part="peers">${peerCell(peers[s.name])}</td>` : ''}
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
       </tr>`).join('') || `<tr><td colspan="${(pre ? 8 : 9) + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
@@ -3547,6 +3553,12 @@ document.addEventListener('change', async e => {
   if (t.classList && t.classList.contains('cand-file') && t.files && t.files[0]) { candUpload(t); return; }
   if (t.dataset.change === 'candMoveSel' && t.value) { candMove(candRow(t.dataset.row), t.value); return; }
   if (t.dataset.change === 'psyStation') { Store.set('cohorts/' + S.cohortKey, { [stationKey(t.dataset.st)]: { [t.dataset.row]: Number(t.value) } }).then(render); return; }
+  if (t.dataset.change === 'psychSel' && t.dataset.n) { // a station's row in the pop-up: that's their station
+    const row = Number(t.dataset.row), st = t.dataset.k.startsWith('med') ? 'med' : 'trauma', n = Number(t.dataset.n);
+    const r = psychRows().find(x => x.row === row);
+    if (r && stationSet(r, st) !== n) await Store.set('cohorts/' + S.cohortKey, { [stationKey(st)]: { [row]: n } });
+    setPsych(row, { [t.dataset.k]: t.value }, n); return;
+  }
   if (t.dataset.change === 'psychSel') { setPsych(/^p:/.test(t.dataset.row) ? t.dataset.row : Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
