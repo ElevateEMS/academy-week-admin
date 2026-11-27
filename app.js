@@ -227,7 +227,7 @@ function missingRepeats(tpl = cfg().checklist) {
 function addRepeats(list) {
   return Promise.all(list.map(({ id, text, n, i }) => {
     const checks = (S.days[n] && S.days[n].checks) || {}; // ticked back when it was the Daily Checklist
-    return Store.set(P('todos/' + id), { text, done: !!checks[slug(text)], day: n, kind: 'todo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false);
+    return Store.quiet.set(P('todos/' + id), { text, done: !!checks[slug(text)], day: n, kind: 'todo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false);
   }));
 }
 // The packing list (Prep page) works the same way: copied once, ids pack-{text}.
@@ -238,7 +238,7 @@ function missingPacking(list = cfg().packing) {
     .filter((x, j, arr) => arr.findIndex(y => y.id === x.id) === j);
 }
 const addPacking = list => Promise.all(list.map(({ id, text, i }) =>
-  Store.set(P('packing/' + id), { text, packed: false, order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
+  Store.quiet.set(P('packing/' + id), { text, packed: false, order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
 
 // The Course page's Setup Checklist (Setup → Templates → Course Setup) is copied the same way.
 // It's kept with the to-dos as kind 'setup' on day SETUP, so checking, dragging, editing and
@@ -255,7 +255,7 @@ function missingSetup(list = cfg().setup) {
 // A cohort that has already had orientation gets the list already checked off.
 function addSetup(list, { done = false } = {}) {
   return Promise.all(list.map(({ id, text, heading, i }) =>
-    Store.set(P('todos/' + id), { text, heading, done: !heading && done, day: SETUP, kind: 'setup', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
+    Store.quiet.set(P('todos/' + id), { text, heading, done: !heading && done, day: SETUP, kind: 'setup', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
 }
 // The Course To-Do (shows once the Setup Checklist is done) starts from Setup → Templates → Course Setup too:
 // kind 'ctodo' on day SETUP, ids ctodo-{text}.
@@ -266,7 +266,7 @@ function missingCtodo(list = cfg().courseTodo) {
     .filter((x, j, arr) => arr.findIndex(y => y.id === x.id) === j);
 }
 const addCtodo = list => Promise.all(list.map(({ id, text, i }) =>
-  Store.set(P('todos/' + id), { text, done: false, day: SETUP, kind: 'ctodo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
+  Store.quiet.set(P('todos/' + id), { text, done: false, day: SETUP, kind: 'ctodo', order: (i + 1) * 1000, created: Date.now(), repeat: true }, false)));
 const pastOrientation = () => { const f = cohortInfo().firstDay; return isIsoDate(f) && f < todayIso(); };
 
 let seeding = false;
@@ -297,7 +297,7 @@ async function seedVaoems() {
       if (await Store.claim('meta/settings', 'vaoemsAdded')) {
         const list = [...st.setupList], at = list.findIndex(l => /odemsa/i.test(l) && !/^#/.test(l));
         list.splice(at >= 0 ? at + 1 : list.length, 0, VAOEMS_ITEM);
-        await Store.set('meta/settings', { setupList: list });
+        await Store.quiet.set('meta/settings', { setupList: list });
       }
     } catch (e) { console.warn('VAOEMS template item not added:', e.message); }
   }
@@ -308,7 +308,7 @@ async function seedVaoems() {
     const id = setupLine(VAOEMS_ITEM).id;
     if (S.todos.some(t => t.kind === 'setup' && /vaoems/i.test(t.text || '')) || (doc.removedRepeats || {})[id]) return;
     const ref = itemsFor(SETUP, 'setup').find(t => !t.heading && /odemsa/i.test(t.text || ''));
-    await Store.set(P('todos/' + id), { text: VAOEMS_ITEM, heading: false, done: pastOrientation(), day: SETUP, kind: 'setup',
+    await Store.quiet.set(P('todos/' + id), { text: VAOEMS_ITEM, heading: false, done: pastOrientation(), day: SETUP, kind: 'setup',
       order: ref ? orderOf(ref) + 1 : 99000, created: Date.now(), repeat: true }, false);
   } catch (e) { console.warn('VAOEMS item not added:', e.message); }
 }
@@ -336,7 +336,7 @@ async function seedBinderPrep() {
         }
         if (st.binderList) patch.binderList = st.binderList.flatMap(l => /^3 backboarding$/i.test(l) ? ['2 Backboarding']
           : /^8 splinting$/i.test(l) ? ['7 Splinting', ...(st.binderList.some(x => /traction/i.test(x)) ? [] : ['2 Traction Splints'])] : [l]);
-        if (Object.keys(patch).length) await Store.set('meta/settings', patch);
+        if (Object.keys(patch).length) await Store.quiet.set('meta/settings', patch);
       }
     } catch (e) { console.warn('Binder template not updated:', e.message); }
   }
@@ -348,10 +348,10 @@ async function seedBinderPrep() {
     const old = S.todos.filter(t => (t.day ?? 1) === PREP && (t.kind || 'todo') === 'todo' && BINDER_OLD.test(String(t.text || '').trim()));
     if (!old.length) return;
     const id = repeatId(PREP, BINDER_ITEM);
-    if (!S.todos.some(t => t.id === id)) await Store.set(P('todos/' + id), { text: BINDER_ITEM, done: old.every(t => t.done), day: PREP, kind: 'todo',
+    if (!S.todos.some(t => t.id === id)) await Store.quiet.set(P('todos/' + id), { text: BINDER_ITEM, done: old.every(t => t.done), day: PREP, kind: 'todo',
       order: Math.min(...old.map(orderOf)), created: Date.now(), repeat: true }, false);
-    await Promise.all(old.map(t => Store.del(P('todos/' + t.id))));
-    await Store.set('cohorts/' + key, { removedRepeats: Object.fromEntries(old.map(t => [t.id, true])) });
+    await Promise.all(old.map(t => Store.quiet.del(P('todos/' + t.id))));
+    await Store.quiet.set('cohorts/' + key, { removedRepeats: Object.fromEntries(old.map(t => [t.id, true])) });
   } catch (e) { console.warn('Binder to-dos not combined:', e.message); }
 }
 
@@ -373,7 +373,7 @@ async function seedEmailExtras() {
     for (const id of ['welcome', 'aw-instructions']) {
       const t = S.emailTpls[id]; if (!t || typeof t.body !== 'string') continue;
       const body = EXTRA_SWAPS.reduce((b, [a, z]) => b.split(a).join(z), t.body);
-      if (body !== t.body) await Store.set('emailTemplates/' + id, { body });
+      if (body !== t.body) await Store.quiet.set('emailTemplates/' + id, { body });
     }
   } catch (e) { console.warn('Email templates not updated:', e.message); }
 }
@@ -412,7 +412,7 @@ async function rollOver() {
   if (!late.length) return;
   rolling = true;
   try {
-    await Promise.all(late.map(x => Store.set(P('todos/' + x.id), { day: t, rolledFrom: x.rolledFrom || x.day || 1 })));
+    await Promise.all(late.map(x => Store.quiet.set(P('todos/' + x.id), { day: t, rolledFrom: x.rolledFrom || x.day || 1 })));
   } finally {
     rolling = false;
     if (rollAgain) { rollAgain = false; rollOver(); }
@@ -1694,8 +1694,8 @@ async function shareHousekeeping() {
   const exp = shareExpires();
   try {
     if (exp && exp < new Date()) {
-      await Store.del('shared/' + S.cohortDoc.shareToken);
-      await Store.set('cohorts/' + key, { shareToken: null });
+      await Store.quiet.del('shared/' + S.cohortDoc.shareToken);
+      await Store.quiet.set('cohorts/' + key, { shareToken: null });
     } else publishSoon();
   } catch (e) { console.warn('Instructor link check:', e.message); }
 }

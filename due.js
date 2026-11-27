@@ -63,7 +63,7 @@ function syncDue() {
     const d = ruleDate(r);
     if (!d || t.due === d) return;
     dueSyncing.add(t.id);
-    Store.set(P('todos/' + t.id), { due: d, dueAuto: true }).catch(() => {}).finally(() => dueSyncing.delete(t.id));
+    Store.quiet.set(P('todos/' + t.id), { due: d, dueAuto: true }).catch(() => {}).finally(() => dueSyncing.delete(t.id));
   });
 }
 

@@ -64,7 +64,11 @@ const Sheets = (() => {
 
   // No internet: an error with .offline set (the outbox below keeps changes; reads fall back to the last copy).
   const offlineErr = () => Object.assign(new Error('You’re offline.'), { offline: true });
+  // Calls that only read (everything else changes something in Google, so ⌘Z can't undo that step: store.js Undo).
+  const AUTO = /^(saveRosterList)$/; // (the app saves roster lists on its own)
+  const READS = /^(cohortDates|docPdf|evalLinks|financeInfo|listCohorts|listInquiries|listScenarios|loadCohort|moduleReviews|rosterPdfFile|rosterSigs|shirtSheet|signLinks)$/;
   async function call(action, params = {}) {
+    if (!READS.test(action) && !AUTO.test(action) && !flushing && typeof Undo !== 'undefined') Undo.sheet(action);
     if (navigator.onLine === false) throw offlineErr();
     let token, res;
     try {
@@ -97,6 +101,7 @@ const Sheets = (() => {
     render();
   }
   async function viaOutbox(action, params, optimistic, extra) {
+    if (typeof Undo !== 'undefined') Undo.sheet(action);
     if (!readBox().length) { // (with something already waiting, this goes after it, in order)
       try { return { live: await call(action, params) }; } catch (e) { if (!e.offline) throw e; }
     }

@@ -106,7 +106,7 @@ function syncRosters() {
   const put = (id, data) => {
     if (rosterSyncing.has(id)) return;
     rosterSyncing.add(id);
-    Store.set(P('todos/' + id), data).catch(() => {}).finally(() => rosterSyncing.delete(id));
+    Store.quiet.set(P('todos/' + id), data).catch(() => {}).finally(() => rosterSyncing.delete(id));
   };
   list.forEach(r => {
     const id = 'oroster-' + r.date, have = S.todos.find(t => t.id === id), text = rosterTodoText(r);
@@ -118,7 +118,7 @@ function syncRosters() {
   S.todos.filter(t => t.roster && !t.done && !want.has(t.id) && !rosterDoc(t.roster).saved).forEach(t => {
     if (rosterSyncing.has(t.id)) return;
     rosterSyncing.add(t.id);
-    Store.del(P('todos/' + t.id)).catch(() => {}).finally(() => rosterSyncing.delete(t.id));
+    Store.quiet.del(P('todos/' + t.id)).catch(() => {}).finally(() => rosterSyncing.delete(t.id));
   });
 }
 // The roster's student list, saved (for the signing page) whenever it changes (rosters/{date}.listKey remembers what was last saved,
@@ -129,7 +129,7 @@ function saveListSoon(r) {
   if (have === key || listSaving.has(id)) return;
   listSaving.add(id);
   Sheets.saveRosterList(S.cohortKey, r.date, list)
-    .then(() => Store.set(rosterPath(r.date), { listKey: key }))
+    .then(() => Store.quiet.set(rosterPath(r.date), { listKey: key }))
     .then(() => listSaving.delete(id))
     .catch(e => { console.warn('Roster list not saved yet:', e.message); setTimeout(() => listSaving.delete(id), 30000); }); // (tries again in a bit)
 }
@@ -153,7 +153,7 @@ function syncOrientTodos() {
   const put = (id, data) => {
     if (orientSyncing.has(id)) return;
     orientSyncing.add(id);
-    Store.set(P('todos/' + id), data).catch(() => {}).finally(() => orientSyncing.delete(id));
+    Store.quiet.set(P('todos/' + id), data).catch(() => {}).finally(() => orientSyncing.delete(id));
   };
   Object.keys(need).forEach(id => {
     const p = need[id];

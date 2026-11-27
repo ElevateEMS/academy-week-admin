@@ -111,6 +111,8 @@ const FAQ = [
       '<b>Finalize → Final Steps → Remove from app</b> (the last line). It only works once the cohort has been <b>exported</b> (a real Export, not a hand tick) and <b>flipped to Former</b>. Type the cohort’s name to confirm. A final backup is saved first, then the app’s data for that cohort is cleared. Its Google Sheets, Drive folder, config row and your zip aren’t touched. If it’s your most recent finished cohort, the pop-up suggests keeping it until the next one finishes, but you can still remove it. There’s no undo.'],
   ]],
   ['General', [
+    ['Can I undo something?',
+      'Yes: <b>⌘Z</b> undoes your last change in the app, and keeps going back (up to 50 steps). <b>⇧⌘Z</b> (or ⌘Y) redoes it. A note at the bottom says what it undid. One click is one step: deleting, adding, ticking or editing a to-do, a shopping, packing or checklist item, a sticky note, a warning and so on. While you’re typing in a box, ⌘Z undoes your typing instead. It can’t undo anything that also went to Google (roster boxes and grades in the cohort sheet, drops, moves, exports, records, Gmail drafts); it says so, and you change those back there. If something changed again since (Nick edited it), it’s left as is. Reloading the app starts fresh.'],
     ['Why doesn’t a change show up right away after an upload?',
       'Reload the app (or close and reopen it). GitHub can take up to 10 minutes to serve the new files. A Home Screen app: swipe it away in the app switcher and open it again.'],
     ['How do I change how the app looks?',

@@ -642,7 +642,7 @@ async function seedStaffingTodo() {
     try {
       if (await Store.claim('meta/settings', 'staffingTodo')) {
         const list = [...(st.courseTodoList || DEFAULTS.courseTodoList)];
-        if (!list.some(l => isStaffingItem(tplText(l)))) { list.push(STAFFING_TPL); await Store.set('meta/settings', { courseTodoList: list }); }
+        if (!list.some(l => isStaffingItem(tplText(l)))) { list.push(STAFFING_TPL); await Store.quiet.set('meta/settings', { courseTodoList: list }); }
       }
     } catch (e) { console.warn('Staffing to-do template not added:', e.message); }
   }
@@ -654,7 +654,7 @@ async function seedStaffingTodo() {
     const id = 'ctodo-' + slug(STAFFING_ITEM);
     if (S.todos.some(t => t.id === id || (t.kind === 'ctodo' && isStaffingItem(t.text))) || (doc.removedRepeats || {})[id]) return;
     const start = S.sheet && S.sheet.academyStart, began = isIsoDate(start) && start <= todayIso();
-    await Store.set(P('todos/' + id), { text: STAFFING_ITEM, done: began, day: SETUP, kind: 'ctodo', order: 99000, created: Date.now(), repeat: true }, false);
+    await Store.quiet.set(P('todos/' + id), { text: STAFFING_ITEM, done: began, day: SETUP, kind: 'ctodo', order: 99000, created: Date.now(), repeat: true }, false);
   } catch (e) { console.warn('Staffing to-do not added:', e.message); }
 }
 function staffingLink() {

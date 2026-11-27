@@ -701,8 +701,8 @@ async function emailInit() {
   if (!S.sheet || (S.cohortDoc && S.cohortDoc.emailsStart)) return;
   try {
     if (!(await Store.claim('cohorts/' + key, 'emailsInit')) || key !== S.cohortKey) return;
-    await Store.set('cohorts/' + key, { emailsStart: todayIso() });
-    await Promise.all(S.sheet.students.map(s => Store.set('cohorts/' + key + '/students/' + slug(s.name), { sent: { welcome: 'before' } })));
+    await Store.quiet.set('cohorts/' + key, { emailsStart: todayIso() });
+    await Promise.all(S.sheet.students.map(s => Store.quiet.set('cohorts/' + key + '/students/' + slug(s.name), { sent: { welcome: 'before' } })));
   } catch (e) { console.warn('Emails not set up yet:', e.message); }
 }
 
