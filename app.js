@@ -2540,7 +2540,7 @@ function studentsView() {
   return `<div class="stu-top"><span></span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" role="tab" aria-selected="${mode === k}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
     <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}${mode === 'aw' ? awTopRight() : ''}
-      <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
+</span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
 
