@@ -1454,7 +1454,7 @@ function box(b, n) {
   } else if (b === 'shopping') {
     const open = S.shopping.filter(x => !x.bought).sort((a, c) => a.created - c.created);
     const bought = S.shopping.filter(x => x.bought).sort((a, c) => c.created - a.created);
-    body = head('Shopping List', (bought.length ? hideToggle('shop') + '<button class="link" data-act="clearBought">Clear bought</button>' : '') + plusBtn('shop', 'shopIn', 'Add something to buy'))
+    body = head('Shopping List', (bought.length ? hideToggle('shop') : '') + plusBtn('shop', 'shopIn', 'Add something to buy'))
       + (S.changesAdd === 'shop' ? `<div class="add-row"><input id="shopIn" data-draft="shop" data-add="shop" data-chadd="shop" placeholder="Type something to buy, then Enter" value="${esc(S.drafts.shop || '')}"></div>` : '')
       + `<ul class="checks">${[...open, ...bought].map(x => `<li class="${x.bought ? 'done' : ''}">
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
@@ -4011,9 +4011,6 @@ async function act(a, el = {}, e) {
         if (x && x.repeat) await Store.set('cohorts/' + S.cohortKey, { removedRepeats: { [x.id]: true } });
         await Store.del(P('packing/' + d.id)); break;
       }
-      case 'clearBought':
-        if (!confirm('Remove everything checked off as bought?')) return;
-        await Promise.all(S.shopping.filter(x => x.bought).map(x => Store.del('shopping/' + x.id))); break;
 
       case 'paid': {
         const cur = !!(S.staff[d.key] && S.staff[d.key].paid);
