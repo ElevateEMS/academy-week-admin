@@ -350,6 +350,16 @@ function tdLine(t) {
     ${circle(t.done, `data-act="adminTodo" data-id="${t.id}" aria-label="Check off"`)}
     <div class="td-main">${right}<span class="td-txt" role="button" tabindex="0" data-act="tdOpen" data-id="${t.id}" title="Open">${who !== 'both' ? `<span class="td-who" title="For ${who === 'bella' ? 'Bella' : 'Nick'}">${who === 'bella' ? 'B' : 'N'}</span>` : ''}<span class="txt">${esc(t.text)}${reviewBtn(t)}</span>${t.note ? `<span class="td-note">${esc(t.note)}</span>` : ''}</span>${links ? `<div class="td-meta td-links-row">${links}</div>` : ''}</div></li>`;
 }
+// Private psychomotor exams (Tally sign-ups whose date isn't a cohort's exam day): a white section under To Do, only
+// while someone's there. Tapping one opens the same pop-up as a cohort's Additional Psychomotor Exam Candidates.
+function privPsychCard() {
+  const list = Object.values(S.privPsych || {}).filter(c => !c.archived).sort((a, b) => String(a.testDate || '9').localeCompare(String(b.testDate || '9')));
+  if (!list.length) return '';
+  const res = c => ['med', 'trauma'].map(st => { const v = c[st + 'Re'] || c[st]; return v ? PSY_LABEL[st] + ' ' + v : ''; }).filter(Boolean).join(' · ');
+  return `<div class="td-card priv-psych"><div class="td-head"><h3>Private Psychomotor Exams</h3></div>
+    <ul class="priv-list">${list.map(c => `<li><button class="name-link" data-act="psychOpen" data-row="p:${esc(c.id)}">${esc(c.name || c.id)}</button>
+      <span class="muted small">${c.testDate ? esc(monthDay(c.testDate)) : 'no date'} · ${c.letter ? 'letter ✓' : '<span class="warn-text">no letter</span>'}${res(c) ? ' · ' + esc(res(c)) : ''}${c.export ? ' · exported ✓' : ''}</span></li>`).join('')}</ul></div>`;
+}
 function adminTodoCard() {
   const soon = addDays(todayIso(), TD_SOON), open = S.adminTodos.filter(t => !t.done);
   const byWhen = (a, b) => tdWhen(a).localeCompare(tdWhen(b)) || (a.created || 0) - (b.created || 0);
@@ -911,6 +921,7 @@ function adminNotesBox() {
   return `<section class="box shaded admin-notes">
     ${adminHead('Bulletin', '<button class="add-plus small-plus" data-act="adminNoteAdd" title="New sticky note" aria-label="New sticky note">+</button>')}
     ${adminTodoCard()}
+    ${privPsychCard()}
     <div class="stickies">${notes.map(n => {
       const id = 'an-' + n.id, due = isIsoDate(n.remind) && n.remind <= todayIso();
       return `<div class="sticky c-${NOTE_COLORS.includes(n.color) ? n.color : 'yellow'}${due ? ' remind-due' : ''}" data-nid="${n.id}">

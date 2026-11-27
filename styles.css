@@ -2510,3 +2510,12 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .pe-table td { overflow: hidden; }
 .pe-note-in { min-width: 0; width: 100%; }
 .pe-note { min-width: 0; width: 100%; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Bulletin: Private Psychomotor Exams (white, under To Do; only while someone's there). */
+.priv-psych .priv-list { list-style: none; margin: 4px 0 6px; padding: 0; }
+.priv-psych .priv-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 5px 0; border-top: 1px dotted var(--line); }
+.priv-psych .priv-list li:first-child { border-top: 0; }
+.warn-text { color: #b54708; }
+.cand-where p { margin: 2px 0 8px; }
+.cand-hint { background: var(--honey-soft); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; }
+.cand-move { max-width: 340px; margin-bottom: 6px; }
+.cand-move select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--paper); font: inherit; font-size: 14px; }

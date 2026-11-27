@@ -9,6 +9,7 @@
      psychFile(key, person, kind, file) -> an Additional Psychomotor Exam Candidate's eligibility letter ("letter") or a
                                     VAOEMS scenario ("scenario") into "Admin - <cohort>/Psychomotor Exam - <Name>" ({ file, folderUrl })
      psychExport(key, person, info) -> their results PDF for VAOEMS, saved in that folder ({ pdfUrl, folderUrl })
+     psychMove(from, to, person) -> a tester between a cohort's exam and a private one ("" = private): Drive folder + Psychomotor Exam tab row ({ folderUrl, row })
      setPhone(key, s, phone)     -> their phone, as the note on their name (B) on the roster
      evalLinks(key)              -> the cohort's Peer Evaluation / Student Feedback form link codes (eval.html, QR codes)
      setPortalStatus(key, s, status, todo) -> Active / Paused in their AD (Portal Status); from an overdue payment to-do,
@@ -176,6 +177,7 @@ const Sheets = (() => {
     addPsychTester: (key, name) => call('addPsychTester', { cohort: key, name }),
     psychFile: (key, person, kind, f) => call('psychFile', { cohort: key, person, kind, fileName: f.name, mime: f.type, data: f.data }),
     psychExport: (key, person, info) => call('psychExport', { cohort: key, person, info }),
+    psychMove: (from, to, person) => call('psychMove', { from, to, person }),
     setPhone: (key, student, phone) => call('setPhone', { cohort: key, row: student.row, name: student.name, phone }), // the note on their name
     evalLinks: key => call('evalLinks', { cohort: key }).then(o => o.links), // { peer, feedback }: the eval.html link codes
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
@@ -379,6 +381,7 @@ function sampleSheets() {
     async setPsych(key, row, name, cells) { samplePsych[row] = { ...(samplePsych[row] || {}), ...cells }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row }); },
     async setPhone(key, student, phone) { console.log('Sample mode: phone for', student.name, 'would be', phone); return wait({ phone }); },
     async psychFile(key, person, kind, f) { return wait({ file: { id: 'sample-' + Date.now(), url: 'https://drive.google.com/', name: (kind === 'letter' ? 'Eligibility letter - ' : 'Scenario - ') + f.name }, folderUrl: 'https://drive.google.com/' }); },
+    async psychMove(from, to, person) { const r = to ? await this.addPsychTester(to, person) : { row: 0 }; return wait({ folderUrl: 'https://drive.google.com/', row: r.row }); },
     async psychExport(key, person, info) { console.log('Sample mode: the results PDF would be made with', info); return wait({ pdfUrl: 'https://drive.google.com/', folderUrl: 'https://drive.google.com/' }); },
     async addPsychTester(key, name) { const row = 24 + Object.keys(samplePsych).filter(r => Number(r) > 23).length; samplePsych[row] = { name }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row, name }); },
     async setCells(key, student, cells) { const c = sampleCellStore[student.name] = { ...(sampleCellStore[student.name] || {}), ...cells };

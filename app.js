@@ -533,6 +533,7 @@ Store.onUser(async user => {
   unwatchGlobal.push(Store.watch('scenarios', list => { S.scenDocs = Object.fromEntries(list.map(d => [d.id, d])); S.scenDocsAt = Date.now(); render(); }));
   unwatchGlobal.push(Store.watch('emailTemplates', list => { S.emailTpls = Object.fromEntries(list.map(d => [d.id, d])); S.emailTplsLoaded = true; render(); }));
   unwatchGlobal.push(Store.watch('bookCodes', list => { S.bookCodes = list; render(); }));
+  unwatchGlobal.push(Store.watch('privatePsych', list => { S.privPsych = Object.fromEntries(list.map(d => [d.id, d])); render(); })); // private psychomotor exams (Bulletin)
   unwatchGlobal.push(Store.watch('inquiryReplies', list => { S.inqTpls = Object.fromEntries(list.map(d => [d.id, d])); render(); }));
   unwatchGlobal.push(...adminWatch());
   render();
@@ -850,7 +851,7 @@ function shell() {
   ${S.renameAsk ? renameModal() : ''}
   ${S.guardianAsk ? guardianModal() : ''}
   ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
-  ${S.psychEd && S.sheet ? psychEdModal() : ''}
+  ${S.psychEd && (S.sheet || /^p:/.test(String(S.psychEd.row))) ? psychEdModal() : ''}
   ${S.stationAsk && S.sheet ? stationAskModal() : ''}
   ${S.stationsEd ? stationsModal() : ''}
   ${S.watchAsk && S.sheet ? watchAskModal() : ''}
@@ -2104,7 +2105,11 @@ const stationKey = st => st === 'med' ? 'psychMedStations' : 'psychStations';
 const stationOf = (r, st = 'trauma') => { const n = Number(((S.cohortDoc || {})[stationKey(st)] || {})[r.row]); return n >= 1 && n <= stationCount(st) ? n : 1; };
 const isTesting = (r, k) => /^testing$/i.test(r[k] || '') || /^testing$/i.test(r[k + 'Re'] || '');
 const PSY_RETESTS = 2; // 3 attempts in all
-const retestsOf = (r, st) => Math.min(PSY_RETESTS, Math.max(Number((((S.cohortDoc || {}).psychRetests || {})[r.row] || {})[st]) || 0, r[st + 'Re'] ? 1 : 0));
+const retestsOf = (r, st) => Math.min(PSY_RETESTS, Math.max(Number((r.priv ? (candOf(r).retests || {}) : (((S.cohortDoc || {}).psychRetests || {})[r.row] || {}))[st]) || 0, r[st + 'Re'] ? 1 : 0));
+// Private psychomotor exams (privatePsych/{id}, no cohort): a row-like object whose results live in that document.
+const privRow = id => { const c = (S.privPsych || {})[id]; return c ? { priv: true, id, row: 'p:' + id, name: c.name || id, med: c.med || '', medRe: c.medRe || '', trauma: c.trauma || '', traumaRe: c.traumaRe || '', notes: c.notes || '' } : null; };
+// A pop-up's row from data-row: a number (the cohort's Psychomotor Exam tab) or "p:<id>" (a private exam).
+const candRow = v => /^p:/.test(String(v)) ? privRow(String(v).slice(2)) : psychRows().find(x => x.row === Number(v));
 // One station's result for the Academy Week view: Testing / Retesting / Retesting (final), Pass / Fail with which retest under it.
 function psyLabel(r, st, { inline = false } = {}) {
   const v = psychNow(r, st), n = retestsOf(r, st);
@@ -2117,6 +2122,7 @@ function psyLabel(r, st, { inline = false } = {}) {
 }
 const shortName = n => { const [last, first = ''] = String(n).split(','); return (first.trim().split(/\s+/)[0] || '') + (first ? ' ' : '') + last.trim(); };
 async function setPsych(row, cells, station) {
+  if (/^p:/.test(String(row))) return setPrivPsych(candRow(row), cells);
   const r = psychRows().find(x => x.row === row); if (!r) return;
   const retest = {}; // a retest starting: { med | trauma: its number }
   for (const [k, v] of Object.entries(cells)) {
@@ -2204,13 +2210,29 @@ function stationPicker(r, st) {
      attempts: { med: { 1: { result, date, evaluator }, 2: …, 3: … }, trauma: … }, folderUrl, export: { at, pdfUrl, folderUrl } }
    Files go to "Admin - <cohort>/Psychomotor Exam - <Name>" (Sheets.psychFile). Attempt 1 = the first try; 2 and 3 = the
    retests (their result is the Retest box, which a later retest writes over, so each result is kept here as it's set). */
-const candPath = r => 'cohorts/' + S.cohortKey + '/psychCands/' + slug(r.name);
-const candOf = r => (S.psychCands || {})[slug(r.name)] || {};
+const candPath = r => r.priv ? 'privatePsych/' + r.id : 'cohorts/' + S.cohortKey + '/psychCands/' + slug(r.name);
+const candOf = r => (r.priv ? (S.privPsych || {})[r.id] : (S.psychCands || {})[slug(r.name)]) || {};
 const evaluatorNames = () => {
   if (staffReady() && !S.staffAll) loadStaffAll();
   const list = ((S.staffAll && S.staffAll.people) || []).filter(p => p.role !== 'Patient').map(p => p.name);
   return [...new Set(['Nick Brown', 'Bella Brown', ...list])];
 };
+// A private tester's results (no sheet, no stations): saved on their document, with the same 3-attempt rule.
+async function setPrivPsych(r, cells) {
+  if (!r) return;
+  const patch = { ...cells }, retests = { ...(candOf(r).retests || {}) };
+  for (const [k, v] of Object.entries(cells)) {
+    if (!/^testing$/i.test(v) || !k.endsWith('Re')) continue;
+    const st = k.startsWith('med') ? 'med' : 'trauma';
+    if (/^fail$/i.test(psychNow(r, st))) { // (a retest starts after a Fail)
+      const n = (r[k] ? retestsOf(r, st) : 0) + 1;
+      if (n > PSY_RETESTS) { toast(`${shortName(r.name)} has used all 3 ${PSY_LABEL[st]} attempts (syllabus limit).`); render(); return; }
+      retests[st] = n; patch.retests = retests;
+    }
+  }
+  Object.entries(cells).forEach(([k, v]) => { if (/^(med|trauma)(Re)?$/.test(k)) recordAttempt(r, k, v); });
+  await Store.set(candPath(r), patch);
+}
 // When a candidate's result is set: keep it (and today's date) with its attempt number.
 function recordAttempt(r, k, v) {
   if (students().some(x => psychRowOf(x) === r) || !/^(pass|fail)$/i.test(v)) return;
@@ -2229,7 +2251,19 @@ function candSections(r) {
       return `<tr><td>${PSY_LABEL[st]}</td><td>${i + 1}</td><td>${shown ? psychMark(shown) : '<span class="r-no">–</span>'}</td>
         <td><input id="cand-eval-${st}-${i + 1}-${r.row}" list="cand-evals" class="cand-eval" data-change="candEval" data-row="${r.row}" data-st="${st}" data-n="${i + 1}" value="${esc(a.evaluator || '')}" placeholder="Evaluator"></td>
         <td class="muted small">${a.date ? esc(monthDay(a.date)) : ''}</td></tr>`; }).join(''); };
-  return `<div class="cand-card"><h3>Candidate</h3>
+  // Where they test: this cohort's Academy Week exam, or a private exam; Move fixes a typo'd date (or a change of plans).
+  if (!S.kdCohorts && !S.kdBusy) setTimeout(() => loadCohortDates(), 0);
+  const examDay = k => { const x = (S.kdCohorts || []).find(y => y.key === k); return x && isIsoDate(x.academyStart) ? addDays(x.academyStart, 4) : ''; };
+  const days = (S.kdCohorts || []).filter(x => !isTestCohort(x.key) && isIsoDate(x.academyStart)).map(x => ({ key: x.key, day: examDay(x.key) })).filter(x => x.day >= todayIso() || x.key === S.cohortKey);
+  const typed = c.typedDate, closest = typed && r.priv ? days.slice().sort((a, b) => Math.abs(parseIso(a.day) - parseIso(typed)) - Math.abs(parseIso(b.day) - parseIso(typed)))[0] : null;
+  const where = `<div class="cand-card cand-where"><h3>Exam</h3>
+      <p>${r.priv ? '<b>Private exam</b>' : `<b>${esc(S.cohortKey)} Academy Week</b>${examDay(S.cohortKey) ? ' · ' + esc(monthDay(examDay(S.cohortKey))) : ''}`}${typed ? ` <span class="muted small">· they typed ${esc(monthDay(typed))}${c.examType ? ' (' + esc(c.examType) + ')' : ''}</span>` : ''}</p>
+      ${closest && /academy/i.test(c.examType || '') ? `<p class="cand-hint">Closest Academy Week exam: <b>${esc(closest.key)} · ${esc(monthDay(closest.day))}</b> <button class="btn tiny" data-act="candMove" data-row="${r.row}" data-to="${esc(closest.key)}">Move there</button></p>` : ''}
+      <label class="cand-f cand-move"><span>Move to</span><select data-change="candMoveSel" data-row="${r.row}"><option value="">Pick…</option>
+        ${days.filter(x => r.priv || x.key !== S.cohortKey).map(x => `<option value="${esc(x.key)}">${esc(x.key)} Academy Week · ${esc(monthDay(x.day))}</option>`).join('')}
+        ${r.priv ? '' : '<option value="__private">A private exam</option>'}</select></label>
+      ${r.priv && c.export ? `<button class="link small" data-act="candArchive" data-row="${r.row}">Done: take them off the Bulletin</button>` : ''}</div>`;
+  return where + `<div class="cand-card"><h3>Candidate</h3>
       <div class="cand-grid">${field('email', 'Email', 'name@example.com', 'email')}${field('phone', 'Phone', '(555) 555-5555', 'tel')}
         ${field('vaoems', 'VAOEMS #', 'or “NREMT 1234567”')}${field('testDate', 'Test date', '', 'date')}${field('reason', 'Reason', 'Why they’re testing')}</div>
       <p class="cand-copies">${c.email ? `${esc(c.email)} ${copy(c.email, 'Email')}` : ''}${c.phone ? ` · ${esc(c.phone)} ${copy(c.phone, 'Phone')}` : ''}</p></div>
@@ -2245,15 +2279,40 @@ function candSections(r) {
     <div class="cand-export"><button class="btn primary small" data-act="candExport" data-row="${r.row}" ${S.candBusy === 'export' + r.row ? 'disabled' : ''}>${S.candBusy === 'export' + r.row ? 'Making the PDF…' : 'Export for VAOEMS'}</button>
       ${c.export ? `<span class="muted small">Made ${esc(monthDay(c.export.at))} · <a href="${esc(c.export.pdfUrl)}" target="_blank" rel="noopener" data-chrome>Results PDF ↗</a> · <a href="${esc(c.export.folderUrl)}" target="_blank" rel="noopener" data-chrome>Their folder ↗</a></span>` : '<span class="muted small">Saves the results PDF in their Drive folder, next to their letter and scenarios.</span>'}</div>`;
 }
+// Move a tester: to another cohort's exam (key) or a private exam ("__private"). Their Drive folder and sheet row move
+// (Admin script psychMove_); their info and results move with them in the app.
+async function candMove(r, to) {
+  if (!r || !to) return;
+  const toKey = to === '__private' ? '' : to, from = r.priv ? '' : S.cohortKey;
+  if (!confirm(`Move ${shortName(r.name)} to ${toKey ? toKey + '’s Academy Week exam' : 'a private exam'}?`)) { render(); return; }
+  const c = candOf(r), res = { med: r.med || '', medRe: r.medRe || '', trauma: r.trauma || '', traumaRe: r.traumaRe || '', notes: r.notes || '' };
+  const retests = r.priv ? (c.retests || {}) : (((S.cohortDoc || {}).psychRetests || {})[r.row] || {});
+  S.candBusy = 'move'; render();
+  try {
+    const out = await Sheets.psychMove(from, toKey, r.name);
+    const keep = Object.fromEntries(Object.entries(c).filter(([k]) => !['id', 'med', 'medRe', 'trauma', 'traumaRe', 'notes', 'retests', 'archived'].includes(k)));
+    if (toKey) {
+      await Store.set('cohorts/' + toKey + '/psychCands/' + slug(r.name), { ...keep, name: r.name, folderUrl: out.folderUrl });
+      if (out.row && Object.values(res).some(Boolean)) {
+        await Sheets.setPsych(toKey, out.row, r.name, res);
+        if (Object.keys(retests).length) await Store.set('cohorts/' + toKey, { psychRetests: { [out.row]: retests } });
+      }
+    } else await Store.set('privatePsych/' + slug(r.name), { ...keep, ...res, retests, name: r.name, folderUrl: out.folderUrl, archived: false });
+    await Store.del(candPath(r));
+    S.psychEd = null; toast(`${shortName(r.name)} moved to ${toKey ? toKey + '’s exam' : 'a private exam (Admin → Bulletin)'}.`);
+    if (!r.priv || toKey === S.cohortKey) await loadSheet();
+  } catch (e) { toast(e.message); }
+  S.candBusy = null; render();
+}
 // A file picked in a candidate's pop-up: their eligibility letter, or a VAOEMS scenario (into their Drive folder).
 async function candUpload(input) {
-  const r = psychRows().find(x => x.row === Number(input.dataset.row)), kind = input.dataset.kind, f = input.files[0]; input.value = '';
+  const r = candRow(input.dataset.row), kind = input.dataset.kind, f = input.files[0]; input.value = '';
   if (!r || !f) return;
   if (f.size > 10 * 1024 * 1024) { toast('That file is over 10 MB.'); return; }
   S.candBusy = kind + r.row; render();
   try {
     const data = await new Promise((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1]); fr.onerror = () => bad(fr.error); fr.readAsDataURL(f); });
-    const out = await Sheets.psychFile(S.cohortKey, r.name, kind, { name: f.name, type: f.type, data });
+    const out = await Sheets.psychFile(r.priv ? '' : S.cohortKey, r.name, kind, { name: f.name, type: f.type, data });
     const c = candOf(r);
     await Store.set(candPath(r), kind === 'letter' ? { letter: out.file, folderUrl: out.folderUrl } : { scen: { files: [...((c.scen || {}).files || []), out.file] }, folderUrl: out.folderUrl });
     toast(kind === 'letter' ? 'Eligibility letter saved.' : 'Scenario file saved.');
@@ -2262,12 +2321,12 @@ async function candUpload(input) {
 }
 function psychEdModal() {
   const ed = S.psychEd; if (!ed) return '';
-  const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
+  const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : candRow(ed.row);
   const name = s ? s.name : r ? r.name : '';
-  const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
+  const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet && S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => !r.priv && /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
   const dk = 'psy-notes-' + (r ? r.row : 0);
-  const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
+  const body = !(r && r.priv) && !(S.sheet && S.sheet.psych) ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
     : (cand => (cand ? candSections(r).split('<!--results-->')[0] : '') + `<div class="${cand ? 'cand-card' : ''}">${cand ? '<h3>Results</h3>' : ''}<div class="psy-grid">${sel('med', 'Medical')}${sel('medRe', 'Retest')}${sel('trauma', 'Trauma')}${sel('traumaRe', 'Retest')}</div></div>`
       + (cand ? candSections(r).split('<!--results-->')[1] : ''))(!s) + `
@@ -3468,14 +3527,15 @@ document.addEventListener('change', async e => {
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
   if (t.dataset.change === 'cellSel') { setCells(t.dataset.sid, { [t.dataset.l]: t.value }); return; } // a roster dropdown (Students page)
   if (['candField', 'candScen', 'candEval'].includes(t.dataset.change)) { // an Additional Psychomotor Exam Candidate's info
-    const r = psychRows().find(x => x.row === Number(t.dataset.row)); if (!r) return;
+    const r = candRow(t.dataset.row); if (!r) return;
     const v = String(t.value || '').trim(), d = t.dataset;
     Store.set(candPath(r), d.change === 'candField' ? { [d.k]: v } : d.change === 'candScen' ? { scen: { [d.k]: v } } : { attempts: { [d.st]: { [d.n]: { evaluator: v } } } });
     return;
   }
   if (t.classList && t.classList.contains('cand-file') && t.files && t.files[0]) { candUpload(t); return; }
+  if (t.dataset.change === 'candMoveSel' && t.value) { candMove(candRow(t.dataset.row), t.value); return; }
   if (t.dataset.change === 'psyStation') { Store.set('cohorts/' + S.cohortKey, { [stationKey(t.dataset.st)]: { [t.dataset.row]: Number(t.value) } }).then(render); return; }
-  if (t.dataset.change === 'psychSel') { setPsych(Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
+  if (t.dataset.change === 'psychSel') { setPsych(/^p:/.test(t.dataset.row) ? t.dataset.row : Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
   if (t.dataset.bagname != null || t.dataset.bagitem != null) { try { await bagRename(t); } catch (err) { toast(err.message); } return; }
@@ -3588,31 +3648,33 @@ async function act(a, el = {}, e) {
       case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;
-      case 'psychOpen': S.psychEd = d.sid ? { sid: d.sid } : { row: Number(d.row) }; render(); break;
+      case 'psychOpen': S.psychEd = d.sid ? { sid: d.sid } : { row: /^p:/.test(d.row) ? d.row : Number(d.row) }; render(); break;
       case 'psychClose': S.psychEd = null; Object.keys(S.drafts).filter(k => /^psy-notes-/.test(k)).forEach(k => delete S.drafts[k]); render(); break;
       case 'peToggle': S.peOpen = !(S.peOpen ?? (todayIso() === psychDayIso())); render(); break;
       case 'peAddToggle': S.peAddOpen = !S.peAddOpen; if (!S.peAddOpen) delete S.drafts['pe-add']; render(); if (S.peAddOpen) setTimeout(() => { const i = document.getElementById('pe-add'); if (i) i.focus(); }); break;
       case 'peNoteEd': S.peNoteEd = Number(d.row); render(); setTimeout(() => { const i = document.getElementById('psy-notes-' + d.row); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }); break;
       case 'peNoteSave': { const k = 'psy-notes-' + d.row; S.peNoteEd = null; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); break; }
-      case 'candFileX': { const r = psychRows().find(x => x.row === Number(d.row)); if (!r) break; const files = ((candOf(r).scen || {}).files || []).filter((_, i) => i !== Number(d.i));
+      case 'candMove': await candMove(candRow(d.row), d.to); break;
+      case 'candArchive': { const r = candRow(d.row); if (r) { await Store.set(candPath(r), { archived: true }); S.psychEd = null; toast(shortName(r.name) + ' is off the Bulletin (their folder stays in Drive).'); render(); } break; }
+      case 'candFileX': { const r = candRow(d.row); if (!r) break; const files = ((candOf(r).scen || {}).files || []).filter((_, i) => i !== Number(d.i));
         await Store.set(candPath(r), { scen: { files } }); toast('Taken off the list (the file stays in their Drive folder).'); break; }
       case 'candExport': {
-        const r = psychRows().find(x => x.row === Number(d.row)); if (!r) break;
+        const r = candRow(d.row); if (!r) break;
         const c = candOf(r), sc = c.scen || {}, att = [];
         ['med', 'trauma'].forEach(st => { const n = Math.max(1, retestsOf(r, st) + 1); for (let i = 1; i <= Math.min(3, n); i++) {
           const a = ((c.attempts || {})[st] || {})[i] || {}, res = a.result || (i === 1 ? r[st] : i === retestsOf(r, st) + 1 ? r[st + 'Re'] : '');
           if (/^(pass|fail)$/i.test(res || '')) att.push({ station: PSY_LABEL[st], attempt: i, result: res, evaluator: a.evaluator || '', date: a.date ? monthDay(a.date) + ', ' + a.date.slice(0, 4) : '' }); } });
         S.candBusy = 'export' + r.row; render();
         try {
-          const out = await Sheets.psychExport(S.cohortKey, r.name, { name: r.name, email: c.email || '', phone: c.phone || '', vaoems: c.vaoems || '', reason: c.reason || '',
-            testDate: c.testDate ? monthDay(c.testDate) + ', ' + c.testDate.slice(0, 4) : '', cohort: S.cohortKey, scenarios: { med: sc.med || '', trauma: sc.trauma || '', files: (sc.files || []).map(f => f.name) }, attempts: att });
+          const out = await Sheets.psychExport(r.priv ? '' : S.cohortKey, r.name, { name: r.name, email: c.email || '', phone: c.phone || '', vaoems: c.vaoems || '', reason: c.reason || '',
+            testDate: c.testDate ? monthDay(c.testDate) + ', ' + c.testDate.slice(0, 4) : '', cohort: r.priv ? '' : S.cohortKey, scenarios: { med: sc.med || '', trauma: sc.trauma || '', files: (sc.files || []).map(f => f.name) }, attempts: att });
           await Store.set(candPath(r), { export: { at: todayIso(), pdfUrl: out.pdfUrl, folderUrl: out.folderUrl }, folderUrl: out.folderUrl });
           toast('Results PDF saved in their Drive folder.');
         } catch (e) { toast(e.message); }
         S.candBusy = null; render(); break;
       }
-      case 'psyRetestDown': { const r = psychRows().find(x => x.row === Number(d.row)); if (r) await Store.set('cohorts/' + S.cohortKey, { psychRetests: { [r.row]: { [d.st]: Math.max(1, retestsOf(r, d.st) - 1) } } }); render(); break; }
-      case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
+      case 'psyRetestDown': { const r = candRow(d.row); if (r) await Store.set(r.priv ? candPath(r) : 'cohorts/' + S.cohortKey, r.priv ? { retests: { [d.st]: Math.max(1, retestsOf(r, d.st) - 1) } } : { psychRetests: { [r.row]: { [d.st]: Math.max(1, retestsOf(r, d.st) - 1) } } }); render(); break; }
+      case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(/^p:/.test(d.row) ? d.row : Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
       case 'stationsOpen': S.stationsEd = { med: stationCount('med'), trauma: stationCount('trauma') }; render(); break;
       case 'stationsClose': S.stationsEd = null; render(); break;
       case 'stationsStep': { const e = S.stationsEd; if (e) { e[d.st] = Math.min(PSY_MAX, Math.max(1, e[d.st] + Number(d.by))); render(); } break; }
