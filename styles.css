@@ -162,7 +162,7 @@ input.circle:focus-visible { outline: 2px solid var(--taupe); outline-offset: 2p
 /* The bar's color runs edge to edge behind it (not clipped, so the icons' hover labels can hang below the bar). */
 .top::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: var(--head-bg); z-index: -1; pointer-events: none; }
 :root[data-theme="navy"] .top { padding-bottom: 12px; margin-bottom: 14px; }
-.page-title { text-align: center; }
+.page-title { text-align: center; min-height: 62px; display: flex; flex-direction: column; justify-content: center; } /* (room for a 2-line title everywhere, so the header never changes height) */
 .page-title h1 { font-size: 38px; line-height: 1.05; color: var(--head-ink); }
 .page-title h1 span { color: var(--head-muted); font-weight: 500; }
 .page-title p { margin: 2px 0 0; color: var(--head-muted); letter-spacing: .04em; font-size: 14px; }
@@ -2202,8 +2202,14 @@ span.cohort-step { cursor: default; }
 :root[data-theme="navy"] .box.admin-notes, :root[data-theme="navy"] .box.admin-changes { background: #e4eaf0; border-color: #cdd8e2; } /* (Changes for Future Classes too) */
 
 /* ---------- Students page: Roster / Enrollment / Academy Week ---------- */
-.stu-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
-.stu-seg button { padding: 6px 16px; font-size: 14px; }
+.stu-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 0 0 14px; }
+.stu-top .stu-top-right { justify-self: end; }
+/* Roster · Enrollment · Academy Week: plain tabs under the cohort name (an orange line under the one you're on). */
+.stu-tabs { display: flex; gap: 26px; justify-content: center; }
+.stu-tabs button { all: unset; cursor: pointer; font-size: 15px; color: var(--muted); padding: 4px 2px 6px; border-bottom: 2px solid transparent; }
+.stu-tabs button:hover { color: var(--ink); }
+.stu-tabs button.on { color: var(--ink); font-weight: 500; border-bottom-color: #e0702a; }
+@media (max-width: 720px) { .stu-top { grid-template-columns: 1fr auto; } .stu-top > span:first-child { display: none; } }
 .roster-box { margin-bottom: 30px; }
 .roster.roster-main th, .roster.aw-table th { font-family: Jost, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--muted); padding: 9px 8px; line-height: 1.25; vertical-align: bottom; }
 .roster.roster-main th.c { width: auto; }
@@ -2330,8 +2336,10 @@ span.cohort-step { cursor: default; }
 .roster.aw-table tr:first-child > th:first-child { width: 5%; }
 .roster.aw-table tr:first-child > th:nth-child(2) { width: 22%; }
 .roster.aw-table th.c { width: auto; }
-/* The lit Students / Staff button: orange like the lit Course / Academy Week (gold in Warm work; Calm as before). */
-:root[data-theme="navy"] .top .icon-btn.named.on, :root[data-theme="warm"] .top .icon-btn.named.on { background: var(--switch-on-bg); color: var(--switch-on-ink); border-color: transparent; box-shadow: none; }
+/* The lit Students / Staff button: its own color, not the Course / Academy Week one: navy on the light headers,
+   white on the Navy header. */
+.top .icon-btn.named.on { background: #0c2a43; color: #fff; border-color: #0c2a43; box-shadow: none; }
+:root[data-theme="navy"] .top .icon-btn.named.on { background: #fff; color: #0c2a43; border-color: #fff; }
 
 /* ---------- Psychomotor exam ---------- */
 .psy-pair { white-space: nowrap; }

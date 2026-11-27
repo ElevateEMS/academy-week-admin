@@ -2537,8 +2537,8 @@ function awTopRight() {
 function studentsView() {
   if (!S.sheet) return loadingView();
   const mode = stuMode();
-  return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
-      `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
+  return `<div class="stu-top"><span></span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
+      `<button class="${mode === k ? 'on' : ''}" role="tab" aria-selected="${mode === k}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
     <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}${mode === 'aw' ? awTopRight() : ''}
       <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
@@ -3472,8 +3472,10 @@ async function act(a, el = {}, e) {
       case 'schMenu': S.schMenu = !S.schMenu; render(); break;
       case 'refresh': S.menuOpen = false; await loadSheet(); break;
       case 'view': {
-        // The Students icon again: back to the page you came from (Course, or the Academy Week page you were on).
-        const v = d.v; // (Students is a cohort's home page: its button always goes there)
+        // The lit Students / Staff button again: back to the page you came from (Course or Academy Week; Admin).
+        let v = d.v;
+        if (v === S.view && (v === 'students' || v === 'staff')) v = S.prevView && S.prevView !== v ? S.prevView : v === 'staff' ? 'admin' : 'course';
+        if (v !== S.view) S.prevView = S.view;
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
         if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
