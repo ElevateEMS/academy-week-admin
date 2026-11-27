@@ -2230,7 +2230,7 @@ function awStudentsView() {
   <section class="box table-box">
     <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : `<th class="c">Patient contacts</th><th class="c">Skills</th><th class="c" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" title="${ROSTER_TIPS.awW}">Final Sigs</th><th class="c" title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
+        : `<th class="c">Patient contacts</th><th class="c">Skills</th><th class="c" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td>${nameCell(s)}${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
@@ -2392,7 +2392,7 @@ function rosterCell(s, k) {
 const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 11, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
-  ['awW', 'Final<br>Sigs'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
+  ['awW', 'Last Class<br>Paperwork'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
@@ -2478,7 +2478,7 @@ const CELL_EDITS = {
   ride: ['Ride-alongs', [['M', 'Ride alongs requested'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness (attestation)']]],
   assign: ['Assignments', PORTAL_ASSIGNMENTS],
   comp: ['Academy Week Compliance', [['Q', 'Academy Week Compliance (attestation)']]],
-  aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last class signatures']]],
+  aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last Class Paperwork']]],
   dispo: ['Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']]],
   nremt: ['NREMT exam', [['Z', '1st attempt', 'select'], ['AA', '2nd attempt', 'select'], ['AB', '3rd attempt', 'select']]],
   grade: ['Course grade', []],
@@ -2512,7 +2512,10 @@ function studentPageTop(s) {
           ${watchOf(s) ? `<input id="wy-${s.sid}" data-draft="wy-${s.sid}" placeholder="Why? (shows when you point at their ⚑)" value="${esc(S.drafts['wy-' + s.sid] ?? watchOf(s).why ?? '')}" autocomplete="off"><button class="btn tiny" data-act="watchSave" data-sid="${s.sid}">Save</button>` : ''}</div>
         <dl class="sp-kv">
           <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
-          <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
+          <dt>Phone</dt><dd>${S.phoneEd === s.sid
+            ? `<span class="phone-ed"><input id="ph-${s.sid}" data-draft="ph-${s.sid}" value="${esc(S.drafts['ph-' + s.sid] ?? s.phone ?? '')}" placeholder="804-555-0123" autocomplete="off"><button class="btn tiny primary" data-act="phoneSave" data-sid="${s.sid}">Save</button><button class="link" data-act="phoneCancel" data-sid="${s.sid}">Cancel</button></span>`
+            : s.phone ? `${copyLine(s.phone, 'Phone')}<button class="copy-btn" data-act="phoneEdit" data-sid="${s.sid}" title="Change their phone" aria-label="Change their phone">${ICONS.pencil}</button>`
+            : `<button class="link" data-act="phoneEdit" data-sid="${s.sid}">Add phone</button>`}</dd>
           <dt>Portal</dt><dd>${/^(paused|limited)$/i.test(s.status) ? `<span class="limited-pill">${esc(s.status)}</span>` : esc(s.status || 'Active')}</dd>
           ${s.minor ? `<dt>Parent/Guardian</dt><dd><button class="link" data-act="guardianOpen" data-sid="${s.sid}">${g.name ? esc(g.name) + (g.relation ? ' · ' + esc(g.relation) : '') : 'Add their info'}</button></dd>` : ''}
         </dl></section>
@@ -2548,7 +2551,7 @@ function spAwRows(s) {
   const row = (title, cells) => `<div class="sp-row"><span class="sp-row-title">${title}</span>${cells.map(r => ceLine(s, r)).join('')}</div>`;
   return `<section><h3>Exams &amp; disposition</h3>
     <div class="sp-row"><span class="sp-row-title">Psychomotor</span>${rosterCell(s, 'awV')}${ceLine(s, ['V', 'Result', 'select'])}</div>
-    ${row('Disposition', [['W', 'Final Sigs'], ['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
+    ${row('Disposition', [['W', 'Last Class Paperwork'], ['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
     ${row('NREMT exam', [['Z', '1st', 'select'], ['AA', '2nd', 'select'], ['AB', '3rd', 'select']])}
   </section>`;
 }
@@ -3419,6 +3422,15 @@ async function act(a, el = {}, e) {
       case 'watchToggle': { const st = studentBySid(d.sid), on = !(st && watchOf(st));
         await Store.set(P('students/' + d.sid), { watch: { on, why: on ? '' : ((st && watchOf(st)) || {}).why || '' } }); delete S.drafts['wy-' + d.sid]; break; }
       case 'watchSave': await Store.set(P('students/' + d.sid), { watch: { on: true, why: String(S.drafts['wy-' + d.sid] ?? '').trim() } }); delete S.drafts['wy-' + d.sid]; toast('Saved.'); break;
+      case 'phoneEdit': S.phoneEd = d.sid; render(); { const el = document.getElementById('ph-' + d.sid); if (el) el.focus(); } break;
+      case 'phoneCancel': S.phoneEd = null; delete S.drafts['ph-' + d.sid]; render(); break;
+      case 'phoneSave': { // into the note on their name in the cohort sheet (where the Tally form puts it)
+        const raw = S.sheet && S.sheet.students.find(x => slug(x.name) === d.sid), phone = String(S.drafts['ph-' + d.sid] ?? '').trim();
+        if (!raw) break;
+        try { await Sheets.setPhone(S.cohortKey, raw, phone); raw.phone = phone; S.phoneEd = null; delete S.drafts['ph-' + d.sid]; render(); toast(phone ? 'Phone saved to the cohort sheet.' : 'Phone removed.'); }
+        catch (e) { toast(e.message); }
+        break;
+      }
       case 'watchOnly': S.watchOnly = !S.watchOnly; render(); break;
       case 'spTab': S.spTab = d.id; render(); { const b = document.querySelector('.drawer-body'); if (b) b.scrollTop = 0; } break;
       case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }

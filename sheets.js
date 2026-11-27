@@ -6,6 +6,7 @@
      setCells(key, s, cells)     -> changes their roster boxes, { letter: value } (Students page; outbox when offline)
      setPsych(key, row, name, cells) -> the Psychomotor Exam tab's row: { med, medRe, trauma, traumaRe, notes } (outbox when offline)
      addPsychTester(key, name)   -> someone outside the class onto that tab ({ row, name })
+     setPhone(key, s, phone)     -> their phone, as the note on their name (B) on the roster
      evalLinks(key)              -> the cohort's Peer Evaluation / Student Feedback form link codes (eval.html, QR codes)
      setPortalStatus(key, s, status, todo) -> Active / Paused in their AD (Portal Status); from an overdue payment to-do,
                                     the to-do remembers the pause so paying unpauses them
@@ -170,6 +171,7 @@ const Sheets = (() => {
     },
     setPsych: async (key, row, name, cells) => { const r = await viaOutbox('setPsychCells', { cohort: key, row, name, cells }, () => ({ queued: true })); return r.live || r.queued; },
     addPsychTester: (key, name) => call('addPsychTester', { cohort: key, name }),
+    setPhone: (key, student, phone) => call('setPhone', { cohort: key, row: student.row, name: student.name, phone }), // the note on their name
     evalLinks: key => call('evalLinks', { cohort: key }).then(o => o.links), // { peer, feedback }: the eval.html link codes
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
     dropStudent: (key, student, drop) => call('dropStudent', { cohort: key, name: student.name, email: student.email, ...drop }), // { line, docUrl, warnings }
@@ -370,6 +372,7 @@ function sampleSheets() {
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
     async setPsych(key, row, name, cells) { samplePsych[row] = { ...(samplePsych[row] || {}), ...cells }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row }); },
+    async setPhone(key, student, phone) { console.log('Sample mode: phone for', student.name, 'would be', phone); return wait({ phone }); },
     async addPsychTester(key, name) { const row = 24 + Object.keys(samplePsych).filter(r => Number(r) > 23).length; samplePsych[row] = { name }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row, name }); },
     async setCells(key, student, cells) { const c = sampleCellStore[student.name] = { ...(sampleCellStore[student.name] || {}), ...cells };
       try { localStorage.setItem(KEY + '-cells', JSON.stringify(sampleCellStore)); } catch {} return wait({ cells: c }); },
