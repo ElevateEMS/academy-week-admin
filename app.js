@@ -2126,8 +2126,15 @@ async function setPsych(row, cells, station) {
   }
 }
 // "Now testing" (Academy Week view): who's at each station, and 1 or 2 trauma stations.
+// The psychomotor exam's day: the Academy Week day whose schedule has a "Psychomotor Exam" block (day 5 if none does).
+function psychDayIso() {
+  const n = (weekDays().find(d => schedFor(d.n).blocks.some(b => /^\s*psychomotor exam\s*$/i.test(b.activity || ''))) || {}).n || 5;
+  return (weekDays().find(d => d.n === n) || {}).iso || dayDate(n);
+}
 function psychStrip() {
   if (!S.sheet || !S.sheet.psych) return '';
+  // Only on exam day (or while anyone is still marked Testing).
+  if (todayIso() !== psychDayIso() && !psychRows().some(r => isTesting(r, 'med') || isTesting(r, 'trauma'))) return '';
   const rows = psychRows(), who = list => list.length ? list.map(r => `<button class="link" data-act="psychOpen" data-row="${r.row}">${esc(shortName(r.name))}</button>`).join(', ') : '<span class="r-no">open</span>';
   const slot = (label, list) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list)}</span>`;
   const slots = st => { const n = stationCount(st), list = rows.filter(r => isTesting(r, st));
@@ -2384,7 +2391,7 @@ function rosterCell(s, k) {
   const late = overdueCells(s)[k];
   const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls} ${late ? 'overdue' : ''}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}" title="${esc((late ? 'Overdue · ' : '') + (tip || ''))}">${inner}</button>`;
   if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
-  if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
+  if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/(20)?\d\d$/, '')) : no, '', c.J && !c.I ? 'CPR class ' + c.J : '');
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
     return btn(c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>', '', 'Ride Along Readiness attestation');
@@ -2397,7 +2404,7 @@ function rosterCell(s, k) {
   if (k === 'comp') return btn(c.Q ? yes : no);
   if (k === 'grade') {
     const g = gradeOf(s), low = n => n != null && n < PASS_MARK;
-    return btn(g.shown == null ? no : `<b class="${low(g.shown) ? 'low' : ''}">${gradeNum(g.shown)}</b>${g.counted != null ? ` <span class="muted small ${low(g.counted) ? 'low' : ''}">final ${gradeNum(g.counted)}</span>` : ''}`);
+    return btn(g.shown == null ? no : `<b class="${low(g.shown) ? 'low' : ''}">${gradeNum(g.shown)}</b>`, '', g.counted != null ? 'Final exam ' + gradeNum(g.counted) : '');
   }
   if (k === 'awU') return btn(c.U ? yes : no, '', 'All skills');
   if (k === 'awV') { // both stations at a glance (from the Psychomotor Exam tab); ✓ Pass once the roster says so
@@ -2416,14 +2423,16 @@ function rosterCell(s, k) {
   if (k === 'nremt') {
     const tries = ['Z', 'AA', 'AB'].map(L => c[L]), pass = tries.findIndex(v => /pass/i.test(v || ''));
     const last = tries.map((v, i) => [v, i]).filter(([v]) => v).pop();
-    return btn(pass >= 0 ? `<span class="em-yes">✓</span> Passed · ${['1st', '2nd', '3rd'][pass]}` : last ? `Attempt ${last[1] + 1}: ${esc(last[0])}` : no);
+    const nth = i => ['1st', '2nd', '3rd'][i];
+    return btn(pass >= 0 ? '<span class="em-yes">✓</span> Passed' : !last ? no : /fail/i.test(last[0]) ? `<span class="low">Failed ${nth(last[1])}</span>` : `${nth(last[1])}: ${esc(last[0])}`,
+      '', pass >= 0 ? 'Passed on the ' + nth(pass) + ' attempt' : '');
   }
   return '';
 }
 // Roster columns, left to right. Notes and Portal status are on each student's page instead (a Paused / Limited
 // student's name is highlighted here; so is one you're keeping an eye on).
-// Each column's share of the table (%, after # 3 and Student 17), so every cohort's columns sit in the same places.
-const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 7.5, pc: 5.5, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
+// All the same width (after # 3 and Student 17), so the columns are evenly spaced.
+const ROSTER_W = Object.fromEntries(['paper', 'cpr', 'fp', 'ride', 'pc', 'assign', 'comp', 'grade', 'awW', 'dispo', 'nremt'].map(k => [k, 80 / 11]));
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Clinical<br>Clearance'], ['pc', 'Patient<br>Contacts'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awW', 'Last Class<br>Paperwork'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
