@@ -2096,7 +2096,7 @@ function fbPdfRow() {
 const psychRows = () => (S.sheet && S.sheet.psych && S.sheet.psych.rows) || [];
 const psychRowOf = s => psychRows().find(r => r.name.trim().toLowerCase() === s.name.trim().toLowerCase()) || psychRows().find(r => slug(r.name) === s.sid);
 const psychNow = (r, k) => (r[k + 'Re'] || r[k] || ''); // the retest once it's filled in, otherwise the first try
-const psychMark = v => /^pass$/i.test(v) ? '<span class="psy pass">✓</span>' : /^fail$/i.test(v) ? '<span class="psy fail">✗</span>' : /^testing$/i.test(v) ? '<span class="psy testing">Testing</span>' : '<span class="r-no">–</span>';
+const psychMark = v => /^pass$/i.test(v) ? '<span class="psy pass">Pass</span>' : /^fail$/i.test(v) ? '<span class="psy fail">Fail</span>' : /^testing$/i.test(v) ? '<span class="psy testing">Testing</span>' : '<span class="r-no">–</span>';
 const PSY_MAX = 3, PSY_LABEL = { med: 'Medical', trauma: 'Trauma' };
 const stationCount = st => { const cd = S.cohortDoc || {}, n = Number((cd.psychCounts || {})[st] || (st === 'trauma' ? cd.psychTrauma : 0) || 1); return Math.min(PSY_MAX, Math.max(1, n)); };
 const stationKey = st => st === 'med' ? 'psychMedStations' : 'psychStations';
@@ -2409,7 +2409,7 @@ function rosterCell(s, k) {
   }
   if (k === 'psyMed' || k === 'psyTrauma') { // the Academy Week view: one station per column
     const r = psychRowOf(s), st = k === 'psyMed' ? 'med' : 'trauma', v = r ? psychNow(r, st) : '';
-    const inner = v ? psychMark(v) : /^pass$/i.test(c.V || '') ? yes : no;
+    const inner = v ? psychMark(v) : /^pass$/i.test(c.V || '') ? psychMark('Pass') : no;
     return `<button class="r-cell" data-act="psychOpen" data-sid="${s.sid}" title="Psychomotor exam: ${st === 'med' ? 'Medical' : 'Trauma'}">${inner}</button>`;
   }
   if (k === 'awW') return btn(c.W ? yes : no, '', 'Last class signatures');

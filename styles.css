@@ -2336,9 +2336,10 @@ span.cohort-step { cursor: default; }
 /* ---------- Psychomotor exam ---------- */
 .psy-pair { white-space: nowrap; }
 .psy { font-weight: 500; }
-.psy.pass { color: #3f5c3b; }
-.psy.fail { color: #a33a2f; }
-.psy.testing { color: #8a6a35; background: var(--honey-soft); border-radius: 999px; padding: 0 6px; font-size: 12px; }
+.psy.pass, .psy.fail, .psy.testing { border-radius: 999px; padding: 0 7px; font-size: 12px; }
+.psy.pass { color: #3f5c3b; background: var(--sage-soft); }
+.psy.fail { color: #8d4f48; background: var(--rose-soft); }
+.psy.testing { color: #8a6a35; background: var(--honey-soft); }
 .psych-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 0 0 14px; }
 .ps-title { font-family: var(--serif); font-size: 18px; font-weight: 600; margin-right: 4px; }
 .ps-slot { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 10px; border-radius: 999px; background: var(--bg); font-size: 14px; }
