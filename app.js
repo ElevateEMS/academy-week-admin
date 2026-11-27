@@ -1455,6 +1455,8 @@ function box(b, n) {
       + `<ul class="checks">${[...open, ...bought].map(x => `<li class="${x.bought ? 'done' : ''}">
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
+  } else if (b === 'notes' && n === PREP) { // Prep: Staffing instead of Notes (who's working each day)
+    body = head('Staffing') + prepStaffingBody();
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
   } else if (b === 'info') {

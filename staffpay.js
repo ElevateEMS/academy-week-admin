@@ -742,10 +742,15 @@ function staffingPage() {
   if (!co) return S.stfErr ? `<div class="alert">Couldn’t load staffing: ${esc(S.stfErr)} <button class="btn small" data-act="stfRefresh">Try again</button></div>` : '<p class="loading">Loading staffing…</p>';
   if (co.missing) return `<section class="box"><p class="empty">${esc(key)}’s sheet doesn’t have a Staffing tab (with a “Role / Slot” row) yet.${co.staffingUrl ? ` <a href="${esc(co.staffingUrl)}" target="_blank" rel="noopener">Open the sheet ↗</a>` : ''}</p></section>`;
   co.plan = co.plan || { stations: {}, draft: {} };
+  return stfAvailBox(co, co.days.filter(d => d.date)) + stfSchedule(co);
+}
+// The Schedule half (day columns + Send to Staffing tab): the Staff page, and the Prep tab's full-schedule pop-up.
+function stfSchedule(co) {
+  co.plan = co.plan || { stations: {}, draft: {} };
   const days = co.days.filter(d => d.date);
   const ch = Object.keys(sheetChanges(co)).length;
   const saving = stfPending ? '<span class="stf-saving">Saving…</span>' : S.stfSaved ? '<span class="stf-saved">Saved ✓</span>' : '';
-  return stfAvailBox(co, days) + `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>${saving}
+  return `<div class="stf-sched-head ${ch ? 'has' : ''}"><h2>Schedule</h2>${saving}
       ${ch ? `<span>${ch} update${ch === 1 ? '' : 's'} to send to the Staffing tab <span class="muted small">(staff don’t see ${ch === 1 ? 'it' : 'them'} yet)</span></span>
         <span class="stf-sched-actions"><button class="btn primary small" data-act="stfApply" ${S.stfBusy ? 'disabled' : ''}>${S.stfBusy ? 'Saving…' : 'Send to Staffing tab'}</button>
         <button class="link" data-act="stfClearDraft" ${S.stfBusy ? 'disabled' : ''}>Clear</button></span>`
@@ -821,6 +826,42 @@ function stfDay(co, d, i, plan) {
       ${os.map(x => `<button class="stf-slot ${x.spare ? 'spare' : 'has'} ${x.draft || (x.added && !x.spare) ? 'draft' : ''}" data-act="stfPick" data-label="${esc(x.label)}" data-day="${i}" data-date="${d.date}" data-other="1" ${x.added ? 'data-added="1"' : ''}>
         ${x.spare ? '<span class="muted small">+ Other · Ex. Admin help</span>' : `<span class="muted small">${esc(x.info.what || 'Other')}</span><span>${esc(x.value)}${x.info.amount ? ` <span class="muted small">· ${money(x.info.amount)}</span>` : ''}</span>`}</button>`).join('')}</div>` : ''; })()}
   </section>`;
+}
+/* ---------- Prep tab: Staffing box (in place of Notes) + the full schedule pop-up ----------
+   One line per day: who's scheduled (the Staffing tab with your draft picks on top) and how many slots are open.
+   "View full schedule" opens the Schedule half of Staff → Scheduling for this cohort, working exactly the same. */
+function prepStaffingBody() {
+  const key = S.cohortKey;
+  if (!staffReady()) return '<p class="muted small">Staffing loads from the Staff script (not in sample mode).</p>';
+  S.stf = S.stf || {};
+  if (!S.stf[key]) { const copy = keepCopy('stf-' + key); if (copy) S.stf[key] = copy; }
+  if (!stfFresh[key] && !stfLoading[key]) setTimeout(() => loadStaffing(key), 0);
+  const co = S.stf[key];
+  if (!co) return stfLoading[key] ? '<p class="muted small">Loading staffing…</p>' : S.stfErr ? `<p class="muted small">Couldn’t load staffing: ${esc(S.stfErr)}</p>` : '';
+  if (co.missing) return '<p class="muted small">This cohort’s sheet doesn’t have a Staffing tab yet.</p>';
+  const days = (co.days || []).filter(d => d.date);
+  const rows = days.map((d, i) => {
+    const plan = dayPlan(co, d);
+    let open = 0;
+    const names = [];
+    ['Instructor', 'Assistant', 'Patient'].forEach(kind => {
+      const need = plan.need[kind] || 0, slots = daySlots(co, i, kind, need);
+      open += Math.max(0, need - slots.filter(x => !x.extra && filled(x.value)).length);
+      slots.filter(x => filled(x.value)).forEach(x => names.push(x.value));
+    });
+    otherSlots(co, i).filter(x => !x.spare && filled(x.value)).forEach(x => names.push((x.info.what ? x.info.what + ': ' : '') + x.value));
+    const uniq = names.filter((v, k) => names.findIndex(w => sameStaff(w, v)) === k);
+    return `<li><b>Day ${d.n} · ${esc(shortMd(d.date))}</b><span>${uniq.map(esc).join(', ') || '<span class="muted">nobody yet</span>'}${open ? ` <span class="stf-short">· ${open} open</span>` : ''}</span></li>`;
+  }).join('');
+  return `<ul class="prep-staff">${rows}</ul><div class="prep-staff-foot"><button class="btn small" data-act="stfSchedOpen">View full schedule</button></div>`;
+}
+function stfSchedModal() {
+  const co = S.stf && S.stf[S.cohortKey];
+  return `<div class="overlay" data-act="stfSchedClose"><div class="modal stf-sched-modal" data-stop>
+    <div class="modal-head"><h2>Staffing <span class="muted small">${esc(S.cohortKey)} Academy Week</span></h2>
+      <span class="head-tools"><button class="btn small" data-act="stfSchedStaff" title="Staff page: directory, availability, pay">Open Staff ↗</button>
+      <button class="x big" data-act="stfSchedClose" aria-label="Close">×</button></span></div>
+    <div class="modal-body">${!co ? '<p class="loading">Loading staffing…</p>' : co.missing ? '<p class="muted">No Staffing tab on this cohort’s sheet yet.</p>' : stfSchedule(co)}</div></div></div>`;
 }
 const ROLE_ORDER = ['EC & Equivalent', 'Non-Certified Instructor', 'Assistant', 'Patient', 'Volunteer'];
 const ROLE_GROUP = ['EC & Equivalent', 'Non-Certified Instructors', 'Assistants', 'Patients', 'Volunteers', 'No role picked'];
@@ -917,7 +958,7 @@ function stfAvModal() {
       <button class="btn primary" data-act="stfAvSave" ${!e.s ? 'disabled' : ''}>Save</button></div>
   </div></div>`;
 }
-function staffingModals() { return (S.stfPick && stfCo() ? stfPickModal() : '') + (S.stfAv && stfCo() ? stfAvModal() : ''); }
+function staffingModals() { return (S.stfSched ? stfSchedModal() : '') + (S.stfPick && stfCo() ? stfPickModal() : '') + (S.stfAv && stfCo() ? stfAvModal() : ''); }
 // Picks, station counts, Nick/Bella: shown right away, saved in the background one after another (the banner says
 // Saving… / Saved ✓). If one doesn't go through, the page reloads what's really saved.
 let stfQueue = Promise.resolve(), stfPending = 0;
@@ -996,6 +1037,10 @@ async function staffingAct(a, el = {}) {
     case 'stfWeek': S.stfKey = d.cohort; pref('stfKey', d.cohort); S.stfErr = null; S.stfWeekMenu = false; stfTouched.clear(); render(); return true;
     case 'stfWeekMenu': S.stfWeekMenu = !S.stfWeekMenu; render(); return true;
     case 'stfHideNo': pref('stfHideNo', pref('stfHideNo') === '1' ? '0' : '1'); stfTouched.clear(); render(); return true;
+    // The Prep tab's full schedule (this cohort's week; the pickers and Send work on it like on the Staff page).
+    case 'stfSchedOpen': S.stfSched = true; S.stfKey = S.cohortKey; if (!stfFresh[S.cohortKey]) loadStaffing(S.cohortKey); render(); return true;
+    case 'stfSchedClose': S.stfSched = false; render(); return true;
+    case 'stfSchedStaff': S.stfSched = false; S.view = 'staff'; pref('view', 'staff'); S.staffTab = 'stf'; pref('staffTab', 'stf'); S.stfKey = S.cohortKey; pref('stfKey', S.stfKey); render(); window.scrollTo(0, 0); return true;
     case 'stfGo': // the Finalize staffing to-do, or a cohort in Staffing by Cohort
       S.view = 'staff'; pref('view', 'staff'); S.staffTab = 'stf'; pref('staffTab', 'stf'); S.stfKey = d.cohort || S.cohortKey; pref('stfKey', S.stfKey);
       S.open = null; S.menuOpen = false; S.stfErr = null; render(); window.scrollTo(0, 0); return true;
@@ -1079,6 +1124,7 @@ async function staffingAct(a, el = {}) {
 function staffingEscape() {
   if (S.stfAv) { S.stfAv = null; return true; }
   if (S.stfPick) { S.stfPick = null; return true; }
+  if (S.stfSched) { S.stfSched = false; return true; }
   return false;
 }
 

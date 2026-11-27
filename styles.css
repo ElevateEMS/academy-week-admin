@@ -2437,3 +2437,12 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster.aw-table thead tr.sub-head th { padding: 0 8px 5px; line-height: 15px; }
 
 .psy-station { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--honey-soft); font-size: 13px; margin-left: 6px; }
+
+/* Prep tab: Staffing box (one line per day) and the full schedule pop-up. */
+.prep-staff { list-style: none; margin: 4px 0 8px; padding: 0; font-size: 14px; }
+.prep-staff li { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px dotted var(--line); }
+.prep-staff li:last-child { border-bottom: 0; }
+.prep-staff b { font-weight: 500; white-space: nowrap; }
+.prep-staff-foot { display: flex; justify-content: flex-end; }
+.stf-sched-modal { width: min(1400px, 96vw); max-height: 92vh; display: flex; flex-direction: column; }
+.stf-sched-modal .modal-body { overflow: auto; }
