@@ -2533,6 +2533,10 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
    own color that joins the page below (Navy: out of the navy bar; Calm / Warm: over a thin line under the header). */
 .page-title:has(.section-switch) { justify-content: flex-end; align-self: stretch; }
 .top .section-switch { background: transparent; border: 0; box-shadow: none; padding: 0; gap: 2px; margin: 0 0 -8px; align-items: flex-end; }
+/* Students in the dead center (over Roster · In-Person): equal side columns, the outer tabs hug it */
+.top .section-switch { display: grid; grid-template-columns: 1fr auto 1fr; }
+.top .section-switch button:first-child { justify-self: end; }
+.top .section-switch button:last-child { justify-self: start; }
 :root[data-theme="navy"] .top .section-switch { margin-bottom: -12px; }
 .top .section-switch button { border-radius: 12px 12px 0 0; padding: 11px 24px 12px; font-size: 15px; letter-spacing: .02em; color: var(--head-muted); background: transparent; position: relative; }
 .top .section-switch button:hover { color: var(--head-ink); }

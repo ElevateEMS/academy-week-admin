@@ -773,13 +773,13 @@ function bootShell() {
 }
 
 // Course / Academy Week switch. Students and Setup belong to neither, so nothing is lit there.
-// A cohort's three sections, in the middle of the header: Course · Students · Academy Week (Students in orange
+// A cohort's three sections, in the middle of the header: Course Details · Students · Academy Week (Students in orange
 // words when you're not on it, so it's easy to find).
 const COHORT_VIEWS = ['students', 'course', 'day', 'week', 'schedule'];
 function sectionSwitch() {
   const side = S.view === 'students' ? 'students' : S.view === 'course' ? 'course' : 'aw';
-  return `<div class="side-switch section-switch" role="group" aria-label="Course, Students or Academy Week">
-    <button class="${side === 'course' ? 'on' : ''}" data-act="side" data-s="course">Course</button>
+  return `<div class="side-switch section-switch" role="group" aria-label="Course Details, Students or Academy Week">
+    <button class="${side === 'course' ? 'on' : ''}" data-act="side" data-s="course">Course Details</button>
     <button class="${side === 'students' ? 'on' : 'stu-pop'}" data-act="side" data-s="students">Students</button>
     <button class="${side === 'aw' ? 'on' : ''}" data-act="side" data-s="aw">Academy Week</button></div>`;
 }
