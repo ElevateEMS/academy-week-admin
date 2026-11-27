@@ -2342,7 +2342,7 @@ function pcStepper(s, { row = false } = {}) {
    roster (s.cells, by column letter). Clicking a cell opens a small pop-up to change it; changes go straight to the
    sheet (Sheets.setCells), so the sheet stays the full backup. Enrollment: the Student Emails table. Academy Week:
    patient contacts, skills, conduct, peer evals. Clicking a name opens their student page (drawer()). */
-const STU_MODES = [['roster', 'Roster'], ['enroll', 'Enrollment'], ['aw', 'Academy Week']];
+const STU_MODES = [['roster', 'Roster'], ['aw', 'In-Person']]; // (In-Person: everything done at Academy Week)
 // Which tab: Roster when a cohort opens and from Course; Academy Week from an Academy Week page (the Students button).
 const stuMode = () => STU_MODES.some(([k]) => k === S.stuMode) ? S.stuMode : 'roster';
 // The Student Hub's assignments (the ones that count), by the roster column each one ticks. P is a number: done at 10.
@@ -2399,6 +2399,7 @@ async function saveGrade(sid, g) {
 // Past its deadline and not done (the Student Hub's deadlines): First Class Paperwork the first day of class (a late
 // enrollee: their own orientation), Background Check a month before Academy Week, Final Compliance 8 AM the day before
 // it, CPR card its last day. Vital Signs, Readiness and Test Prep have no set date.
+// (The Morning Email's "Overdue paperwork & assignments" uses the same rules: keep the two in sync.)
 function overdueCells(s) {
   if (!S.studentsLoaded) return {}; // (a late enrollee's own orientation date isn't in yet)
   const c = cellsOf(s), p = emPerson(s), t = todayIso(), aw = (S.sheet && S.sheet.academyStart) || cohortInfo().academyStart, out = {};
@@ -2462,10 +2463,28 @@ function rosterCell(s, k) {
 // Roster columns, left to right. Notes and Portal status are on each student's page instead (a Paused / Limited
 // student's name is highlighted here; so is one you're keeping an eye on).
 // All the same width (after # 3 and Student 17), so the columns are evenly spaced.
-const ROSTER_W = Object.fromEntries(['paper', 'cpr', 'fp', 'ride', 'pc', 'assign', 'comp', 'grade', 'awW', 'dispo', 'nremt'].map(k => [k, 80 / 11]));
-const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
+const ROSTER_W = Object.fromEntries(['cpr', 'fp', 'ride', 'pc', 'assign', 'comp', 'grade', 'nremt'].map(k => [k, 80 / 8]));
+const ROSTER_COLS = [['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Clinical<br>Clearance'], ['pc', 'Patient<br>Contacts'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
-  ['awW', 'Last Class<br>Paperwork'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
+  ['nremt', 'NREMT<br>Exam']]; // (Last Class Paperwork, Final Disposition, Skills and Psychomotor: the In-Person view)
+// Enrollment (folds open right after Student; the rest slides off to the right): px widths while it's open.
+const ENROLL_COLS = [['email', 'Email', 250], ['book', 'Textbook', 84], ['pay', 'Payments', 170], ['orient', 'Orientation', 140], ['paper', 'First Class<br>Paperwork', 104]];
+const enrollOpen = () => S.enrollOpen ?? !!pref('enrollOpen');
+// Anything in Enrollment overdue: First Class Paperwork past its date, or a payment past due and not ticked.
+const enrollOverdue = s => !!(overdueCells(s).paper || overdueOf(emPerson(s)));
+function enrollToggle() {
+  const open = enrollOpen(), late = students().filter(s => !s.out).some(enrollOverdue);
+  return `<button class="chip enroll-chip ${open ? 'on' : ''}" data-act="enrollToggle" title="${open ? 'Hide' : 'Show'} email, textbook, payments, orientation and first class paperwork${late ? ' · something in it is overdue' : ''}">Enrollment ${open ? '▾' : '▸'}${late ? '<span class="late-dot" aria-label="overdue"></span>' : ''}</button>`;
+}
+function enrollCell(s, k) {
+  const p = emPerson(s), no = '<span class="r-no">–</span>';
+  if (k === 'email') return validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email</span>';
+  if (k === 'book') return p.textbook || p.bookCode ? bookMark(s, p) : no;
+  if (k === 'pay') return payChips(p);
+  if (k === 'orient') return `<button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>`;
+  if (k === 'paper') return rosterCell(s, 'paper');
+  return '';
+}
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
@@ -2511,15 +2530,20 @@ function nameMarks(s) {
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)));
+  const open = enrollOpen(), ec = open ? ENROLL_COLS : [];
+  // Folded: % widths that fill the box. Open: px widths, wider than the box (scroll sideways; # and Student stay put).
+  const cols = open ? `<col style="width:44px"><col style="width:240px">${ec.map(([, , w]) => `<col style="width:${w}px">`).join('')}${ROSTER_COLS.map(() => '<col style="width:112px">').join('')}`
+    : `<col style="width:3%"><col style="width:17%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}`;
   return `<section class="box table-box roster-box">
-    <table class="roster roster-main">
-      <colgroup><col style="width:3%"><col style="width:17%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
-      <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([k, l]) => `<th class="c col-${k}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
+    <table class="roster roster-main ${open ? 'enroll-open' : ''}">
+      <colgroup>${cols}</colgroup>
+      <thead><tr><th>#</th><th>Student</th>${ec.map(([k, l]) => `<th class="${k === 'email' ? '' : 'c'} col-${k} enroll-col">${l}</th>`).join('')}${ROSTER_COLS.map(([k, l]) => `<th class="c col-${k}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td class="r-name">${nameCell(s)}${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : nameMarks(s)}</td>
+        ${ec.map(([k]) => `<td class="${k === 'email' ? '' : 'c'} col-${k} enroll-col">${enrollCell(s, k)}</td>`).join('')}
         ${ROSTER_COLS.map(([k]) => `<td class="c col-${k}">${rosterCell(s, k)}</td>`).join('')}
-      </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + ec.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>
   ${droppedList()}`;
@@ -2545,9 +2569,8 @@ function studentsView() {
   const mode = stuMode();
   return `<div class="stu-top"><span></span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" role="tab" aria-selected="${mode === k}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'aw' ? awTopRight() : ''}
-</span></div>
-  ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
+    <span class="stu-top-right">${mode === 'aw' ? awTopRight() : enrollToggle()}</span></div>
+  ${mode === 'roster' ? rosterStudentsView() : awStudentsView()}`;
 }
 
 // The pop-up for one roster cell (S.cellEd = { sid, k }). Ticks and dropdowns save as you change them.
@@ -3491,6 +3514,7 @@ async function act(a, el = {}, e) {
       }
       case 'cohortStep': selectCohort(d.k, { keepView: true }); window.scrollTo(0, 0); break;
       case 'stuMode': S.stuMode = d.v; render(); break;
+      case 'enrollToggle': S.enrollOpen = !enrollOpen(); pref('enrollOpen', S.enrollOpen ? 1 : ''); render(); break;
       case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;

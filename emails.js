@@ -802,7 +802,7 @@ async function emailAct(a, el, e) {
       S.emailPick = null; emLateDrafts(); render(); emSignLinks(); return true;
     }
 
-    case 'emStuOpen': S.view = 'students'; pref('view', 'students'); S.stuMode = 'enroll'; pref('stuMode', 'enroll'); S.emailStu = null; render(); window.scrollTo(0, 0); return true; // (the Students page's Enrollment view)
+    case 'emStuOpen': S.view = 'students'; pref('view', 'students'); S.stuMode = 'roster'; S.enrollOpen = true; pref('enrollOpen', 1); S.emailStu = null; render(); window.scrollTo(0, 0); return true; // (the Roster with Enrollment open)
     case 'emLateOpen': case 'emExtOpen': {
       const p = emPersonBySid(d.sid), late = (S.studentsDoc[d.sid] || {}).late || {};
       S.drafts['ems-date-' + d.sid] = isIsoDate(late.date) ? late.date : '';
