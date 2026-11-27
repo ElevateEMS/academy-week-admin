@@ -784,7 +784,7 @@ function shell() {
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
-      ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''))
+      ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('schedule', 'Schedule') + icon('day', 'Day') + icon('week', 'The Week') : ''))
         // Admin and Staff pages: the Staff icon; a cohort's pages: the Students icon. (Settings: neither.)
         + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : named('students', 'Students', 'Students'))}
       <div class="menu-wrap">
@@ -1402,7 +1402,7 @@ function dayView() {
   <div class="sched-top">
     <span></span>
     ${dayStrip()}
-    <div class="sched-more"><button class="icon-btn" data-act="view" data-v="week" title="The Week" aria-label="The Week">${ICONS.week}</button></div>
+    <span></span>
   </div>
   ${!S.sheet.academyStart ? '<p class="muted small center">Tip: fill in “Academy Week Start” on the cohort’s Student Roster tab (cell AG8) and the app will open on the right day by itself.</p>' : ''}
   ${behind || fixes ? `<div class="pills">
@@ -1456,7 +1456,7 @@ function box(b, n) {
           <label>${circle(x.bought, `data-act="bought" data-id="${x.id}"`)}<span>${hlTxt('shop', x.id, x.text, x.hl)}${x.auto ? ' <em class="tag-soft">bag check</em>' : ''}</span></label>
           <button class="x" data-act="delShop" data-id="${x.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing to buy.</li>'}</ul>`;
   } else if (b === 'notes' && n === PREP) { // Prep: Staffing instead of Notes (who's working each day)
-    body = head('Staffing') + prepStaffingBody();
+    body = head('Staffing', '<button class="btn tiny" data-act="stfSchedOpen">View full schedule</button>') + prepStaffingBody();
   } else if (b === 'notes') {
     body = head('Notes') + notesArea(n, n === PREP || n === FINAL || n === 'course' ? 'Notes' : 'Notes for today');
   } else if (b === 'info') {

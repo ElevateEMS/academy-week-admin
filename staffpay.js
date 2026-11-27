@@ -851,9 +851,9 @@ function prepStaffingBody() {
     });
     otherSlots(co, i).filter(x => !x.spare && filled(x.value)).forEach(x => names.push((x.info.what ? x.info.what + ': ' : '') + x.value));
     const uniq = names.filter((v, k) => names.findIndex(w => sameStaff(w, v)) === k);
-    return `<li><b>Day ${d.n} · ${esc(shortMd(d.date))}</b><span>${uniq.map(esc).join(', ') || '<span class="muted">nobody yet</span>'}${open ? ` <span class="stf-short">· ${open} open</span>` : ''}</span></li>`;
+    return `<li><b>${esc(shortMd(d.date).replace(',', ''))}</b><span>${uniq.map(esc).join(', ') || '<span class="muted">nobody yet</span>'}${open ? ` <span class="stf-short">· ${open} open</span>` : ''}</span></li>`;
   }).join('');
-  return `<ul class="prep-staff">${rows}</ul><div class="prep-staff-foot"><button class="btn small" data-act="stfSchedOpen">View full schedule</button></div>`;
+  return `<ul class="prep-staff">${rows}</ul>`;
 }
 function stfSchedModal() {
   const co = S.stf && S.stf[S.cohortKey];
