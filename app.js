@@ -2398,9 +2398,10 @@ function rosterCell(s, k) {
   }
   if (k === 'pc') { // patient contacts: opens their contacts on the student page
     const n = s.contacts || 0, cls = !contactsCrunch() ? '' : n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return `<button class="r-cell" data-act="openStudent" data-sid="${s.sid}" data-part="contacts" title="Patient contacts"><span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span></button>`;
+    // None yet: a dash (a rose box in the 2 weeks before Academy Week, like an overdue cell).
+    return `<button class="r-cell ${!n && cls ? 'overdue' : ''}" data-act="openStudent" data-sid="${s.sid}" data-part="contacts" title="Patient contacts${!n && cls ? ': none yet' : ''}">${n ? `<span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>` : no}</button>`;
   }
-  if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
+  if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : !n ? no : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length || !n ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
   if (k === 'grade') {
     const g = gradeOf(s), low = n => n != null && n < PASS_MARK;
