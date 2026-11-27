@@ -2102,7 +2102,9 @@ const psychMark = v => /^pass$/i.test(v) ? '<span class="psy pass">Pass</span>' 
 const PSY_MAX = 3, PSY_LABEL = { med: 'Medical', trauma: 'Trauma' };
 const stationCount = st => { const cd = S.cohortDoc || {}, n = Number((cd.psychCounts || {})[st] || (st === 'trauma' ? cd.psychTrauma : 0) || 1); return Math.min(PSY_MAX, Math.max(1, n)); };
 const stationKey = st => st === 'med' ? 'psychMedStations' : 'psychStations';
-const stationOf = (r, st = 'trauma') => { const n = Number(((S.cohortDoc || {})[stationKey(st)] || {})[r.row]); return n >= 1 && n <= stationCount(st) ? n : 1; };
+// The station picked for them (0: none yet, e.g. not picked ahead of time), and the one they're at (1 if none picked).
+const stationSet = (r, st = 'trauma') => { const n = Number(((S.cohortDoc || {})[stationKey(st)] || {})[r.row]); return n >= 1 && n <= stationCount(st) ? n : 0; };
+const stationOf = (r, st = 'trauma') => stationSet(r, st) || 1;
 const isTesting = (r, k) => /^testing$/i.test(r[k] || '') || /^testing$/i.test(r[k + 'Re'] || '');
 const PSY_RETESTS = 2; // 3 attempts in all
 const retestsOf = (r, st) => Math.min(PSY_RETESTS, Math.max(Number((r.priv ? (candOf(r).retests || {}) : (((S.cohortDoc || {}).psychRetests || {})[r.row] || {}))[st]) || 0, r[st + 'Re'] ? 1 : 0));
@@ -2136,6 +2138,11 @@ async function setPsych(row, cells, station) {
     const others = psychRows().filter(x => x.row !== row && isTesting(x, st));
     const taken = others.map(x => stationOf(x, st)), free = [1, 2, 3].slice(0, stationCount(st)).filter(n => !taken.includes(n));
     if (!free.length) { toast(`${PSY_LABEL[st]} ${free.length || stationCount(st) === 1 ? 'is' : 'stations are all'} in use: ${others.map(x => shortName(x.name)).join(', ')}. Set one to Pass or Fail first.`); render(); return; }
+    const pre = station == null && !isTesting(r, st) ? stationSet(r, st) : 0; // (picked ahead of time in the pop-up)
+    if (pre) {
+      if (!free.includes(pre)) { const there = others.find(x => stationOf(x, st) === pre); toast(`${PSY_LABEL[st]} ${pre} is in use${there ? ': ' + shortName(there.name) : ''}. Set them to Pass or Fail first, or pick another station.`); render(); return; }
+      station = pre;
+    }
     if (station == null && free.length > 1) { S.stationAsk = { row, cells, st, free }; render(); return; } // which station?
     await Store.set('cohorts/' + S.cohortKey, { [stationKey(st)]: { [row]: station ?? free[0] } });
   }
@@ -2200,8 +2207,8 @@ function psychExtras() {
 // While someone's Testing and 2+ stations of that kind are running: which one they're at (one taken by
 // someone else can't be picked; it shows who's there).
 function stationPicker(r, st) {
-  const mine = stationOf(r, st), others = psychRows().filter(x => x.row !== r.row && isTesting(x, st));
-  return `<select class="psy-station" data-change="psyStation" data-row="${r.row}" data-st="${st}" title="Which ${PSY_LABEL[st].toLowerCase()} station">${[1, 2, 3].slice(0, stationCount(st)).map(n => {
+  const mine = stationSet(r, st), others = psychRows().filter(x => x.row !== r.row && isTesting(x, st));
+  return `<select class="psy-station ${mine ? '' : 'unset'}" data-change="psyStation" data-row="${r.row}" data-st="${st}" title="Which ${PSY_LABEL[st].toLowerCase()} station (pick it ahead of time, or when they start)">${mine ? '' : '<option value="" selected disabled>Station…</option>'}${[1, 2, 3].slice(0, stationCount(st)).map(n => {
     const there = others.find(x => stationOf(x, st) === n);
     return `<option value="${n}" ${n === mine ? 'selected' : ''} ${there ? 'disabled' : ''}>${PSY_LABEL[st]} ${n}${there ? ' (' + esc(shortName(there.name)) + ')' : ''}</option>`; }).join('')}</select>`;
 }
@@ -2324,7 +2331,7 @@ function psychEdModal() {
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : candRow(ed.row);
   const name = s ? s.name : r ? r.name : '';
   const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet && S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => !r.priv && /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => !r.priv && !k.endsWith('Re') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !(r && r.priv) && !(S.sheet && S.sheet.psych) ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`

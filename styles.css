@@ -2519,3 +2519,4 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .cand-hint { background: var(--honey-soft); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; }
 .cand-move { max-width: 340px; margin-bottom: 6px; }
 .cand-move select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--paper); font: inherit; font-size: 14px; }
+.psy-station.unset { background: var(--paper); color: var(--muted); }
