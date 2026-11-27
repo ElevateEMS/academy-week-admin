@@ -32,7 +32,7 @@ function applyTheme(t = myTheme()) {
   if (meta) meta.content = t === 'navy' ? '#0c2a43' : getComputedStyle(root).getPropertyValue('--bg').trim();
 }
 
-const VIEWS = ['admin', 'staff', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
+const VIEWS = ['admin', 'staff', 'testbank', 'course', 'day', 'week', 'schedule', 'students', 'settings'];
 const AW_VIEWS = ['day', 'week', 'schedule', 'students']; // the Academy Week side
 const S = {
   user: null, cohorts: [], cohortKey: pref('cohort'), sheet: null, sheetErr: null, loading: false,
@@ -746,6 +746,7 @@ const ICONS = {
   list: '<svg viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="1.1"/><circle cx="4.8" cy="12" r="1.1"/><circle cx="4.8" cy="17.5" r="1.1"/></svg>',
   pencil: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14.5 7.5l3 3"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8c0-.4.4-.8.8-.8h4.4c.4 0 .8.4.8.8V7M6.5 7l.9 12.2c.1.9.8 1.8 1.8 1.8h5.6c1 0 1.7-.9 1.8-1.8L17.5 7M10 11v6M14 11v6"/></svg>',
+  testbank: TB_ICON,
   grip: '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
 };
 
@@ -813,8 +814,8 @@ function shell() {
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
       ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('schedule', 'Schedule') + icon('day', 'Day') + icon('week', 'The Week') : ''))
-        // Admin and Staff pages: the Staff button. (A cohort's pages: Students is in the middle switch.)
-        + (['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : '')}
+        // Admin, Staff and Test Bank pages: the Test Bank and Staff buttons. (A cohort's pages: Students is in the middle switch.)
+        + (['admin', 'staff', 'testbank'].includes(S.view) ? named('testbank', 'Test Bank', 'Test Bank: quiz and exam questions, with the right answers') + named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : '')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -824,7 +825,7 @@ function shell() {
   <main class="wrap">
     ${offlineBar()}
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${COHORT_VIEWS.includes(S.view) ? removedNote() : ''}${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${COHORT_VIEWS.includes(S.view) ? removedNote() : ''}${{ admin: adminView, staff: staffView, testbank: testBankView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -870,6 +871,7 @@ function shell() {
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS Admin</h1>'; // (one line: keeps the header short)
   if (S.view === 'staff') return staffTitle();
+  if (S.view === 'testbank') return testBankTitle();
   if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
   if (COHORT_VIEWS.includes(S.view)) return sectionSwitch(); // (the day strip shows which Academy Week day you're on)
   return '';
@@ -3895,7 +3897,7 @@ async function act(a, el = {}, e) {
       case 'view': {
         // The lit Students / Staff button again: back to the page you came from (Course or Academy Week; Admin).
         let v = d.v;
-        if (v === S.view && (v === 'students' || v === 'staff')) v = S.prevView && S.prevView !== v ? S.prevView : v === 'staff' ? 'admin' : 'course';
+        if (v === S.view && (v === 'students' || v === 'staff' || v === 'testbank')) v = S.prevView && S.prevView !== v ? S.prevView : v === 'students' ? 'course' : 'admin';
         if (v === 'students' && v !== S.view) S.stuMode = ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : 'roster';
         if (v !== S.view) S.prevView = S.view;
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
@@ -4636,7 +4638,7 @@ async function act(a, el = {}, e) {
         break;
       }
       default:
-        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el, e)) && !(await staffAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
+        if (!(await scenAct(a, el, e)) && !(await emailAct(a, el, e)) && !(await adminAct(a, el, e)) && !(await tbAct(a, el)) && !(await staffAct(a, el)) && !(await packetAct(a, el)) && !(await bpAct(a, el)) && !(await shipAct(a, el)) && !(await dueAct(a, el)) && !(await rosterAct(a, el))) console.warn('Unknown action', a);
         break;
       case 'resetLayout':
         await Store.set('meta/settings', { layout: null, prepLayout: null, finalLayout: null, courseLayout: null, courseDoneLayout: null });

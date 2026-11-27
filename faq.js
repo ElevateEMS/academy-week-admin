@@ -55,6 +55,8 @@ const FAQ = [
       'Between 8 and 9 AM, only on days something’s due: emails to draft (grouped by cohort), to-dos that are due, Bulletin reminders, info-request follow-ups, book codes running low, and who to pay. Nick gets his own copy without the email drafts. Quiet days: no email.'],
   ]],
   ['Bulletin & Admin', [
+    ['How does the Test Bank work?',
+      '<b>Test Bank</b> (Admin header, next to Staff) has every chapter’s questions, grouped by module: <b>Quiz</b> (the chapter quiz, in order), <b>Specialty</b> (the 5-part NREMT-style case) and <b>All questions</b> (the chapter’s full test bank). The right answer is green with a ✓. To change it, click another choice and confirm; for select-all, drag &amp; drop and dropdown questions, use <b>Change the right answers</b>. The pencil fixes the wording or page reference. Every change shows under <b>History</b> on that question, and ⌘Z undoes it. <b>Add to quiz</b> / <b>Take off quiz</b> builds each quiz: 18 of yours + 2 specialty = 20 (the counter turns green, and the chapter gets a ✓). Questions on a module exam say so. Ride Along Readiness and Pharmacology are at the bottom of the list.'],
     ['How do "Remind me" sticky notes work?',
       'Tap the bell on a sticky note and pick a date. From that day it’s in the Morning Email every morning, and the note is highlighted, until you clear it or pick a new date.'],
     ['How do repeating and snoozed to-dos work?',

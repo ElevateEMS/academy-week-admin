@@ -168,7 +168,7 @@ const Undo = (() => {
   const NOUNS = { todos: 'to-do', shopping: 'shopping item', packing: 'packing item', adminTodos: 'Bulletin to-do', adminNotes: 'sticky note',
     adminDates: 'date', warnings: 'warning', contacts: 'patient contact note', scenarios: 'scenario', psychCands: 'candidate', privatePsych: 'private exam',
     emailTemplates: 'email template', bookCodes: 'book code', updates: 'update', days: 'day', staff: 'staffing', students: 'student info',
-    inquiryReplies: 'reply template', meta: 'settings', cohorts: 'cohort setting' };
+    inquiryReplies: 'reply template', meta: 'settings', cohorts: 'cohort setting', tbChapters: 'Test Bank question', tbSets: 'quiz list' };
   // Named after the item(s) it touched (a to-do, a sticky note…); the cohort's or settings' own bookkeeping doesn't count.
   function label(g) {
     const verb = st => st.before == null ? 'add' : st.after == null ? 'delete' : 'change';
@@ -176,7 +176,7 @@ const Undo = (() => {
     const main = g.steps.filter(st => NOUNS[col(st)] && !/^(cohorts|meta)$/.test(col(st)));
     const list = main.length ? main : g.steps, first = list[0], noun = NOUNS[col(first)];
     if (!noun) return 'your last change';
-    const v = verb(first), doc = (v === 'add' ? first.after : first.before) || {}, txt = String(doc.text || doc.name || doc.title || '');
+    const v = verb(first), doc = (v === 'add' ? first.after : first.before) || {}, txt = /^tb/.test(col(first)) ? '' : String(doc.text || doc.name || doc.title || '');
     const what = v === 'change' && doc.done !== undefined && first.after && first.before && !!first.after.done !== !!first.before.done ? (first.after.done ? 'tick' : 'untick') : v === 'change' ? 'change to' : v;
     if (list.length > 1) return list.every(x => verb(x) === v && col(x) === col(first)) ? `${v} ${list.length} ${noun}s` : 'your last change';
     return `${what} ${noun}${txt ? ' “' + (txt.length > 40 ? txt.slice(0, 40) + '…' : txt) + '”' : ''}`;
