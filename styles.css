@@ -2474,12 +2474,9 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster-main td.col-email .copy-line > span:first-child { display: inline-block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .enroll-chip { display: inline-flex; align-items: center; gap: 6px; }
 .late-dot { width: 7px; height: 7px; border-radius: 50%; background: #c9695e; display: inline-block; }
-/* Which side you're on, by Admin: a gold background on "Admin" (Admin page) or on ‹ cohort › (its pages). */
+/* Which side you're on, by Admin: a faint gold glow on "Admin" (Admin page) or on ‹ cohort › (its pages); white on Navy. */
 .top .brand { padding: 4px 12px 4px 6px; border-radius: 14px; }
-.top .brand.on { background: var(--switch-on-bg); }
-.top .brand.on b { color: var(--switch-on-ink); }
 .cohort-nav { padding: 2px 4px; border-radius: 14px; }
-.cohort-nav.here { background: var(--switch-on-bg); }
-.cohort-nav.here .cohort-name, .cohort-nav.here .cohort-step { color: var(--switch-on-ink); }
-.cohort-nav.here .cohort-step.off { opacity: .35; }
-.cohort-nav.here .cohort-name:hover, .cohort-nav.here .cohort-step:not(.off):hover { background: rgba(255, 255, 255, .25); }
+.cohort-nav.here, .top .brand.on { background: rgba(242, 193, 78, .16); box-shadow: 0 0 14px 2px rgba(242, 193, 78, .35); }
+.top .brand.on b { color: var(--head-ink); }
+:root[data-theme="navy"] .cohort-nav.here, :root[data-theme="navy"] .top .brand.on { background: rgba(255, 255, 255, .08); box-shadow: 0 0 14px 2px rgba(255, 255, 255, .18); }
