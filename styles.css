@@ -2295,7 +2295,7 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .name-link.limited { background: var(--honey-soft); color: #8a6a35; border-radius: 6px; padding: 1px 6px; margin-left: -6px; }
 .limited-pill { background: var(--honey-soft); color: #8a6a35; border-radius: 999px; padding: 1px 9px; font-size: 13px; font-weight: 500; }
 /* Dropped & withdrawn (under the roster). */
-.dropped-box { margin: -14px 0 30px; padding: 0; }
+.dropped-box { margin: 44px 0 30px; padding: 0; } /* (same gap as Additional Psychomotor Exam Candidates) */
 .dropped-box summary { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; cursor: pointer; font-family: var(--serif); font-size: 19px; font-weight: 600; }
 .dropped-list { margin: 0; padding: 0 18px 4px 36px; }
 .dropped-list li { padding: 3px 0; }
