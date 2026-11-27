@@ -2448,15 +2448,15 @@ function bookMark(s, p) {
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
-// Monitoring (the ✱ by their name on their student page): students/{sid}.watch = { on, why }. Their name gets an orange
-// highlight and a ✱ in each Students view (the note when you point at it); Watching on the Roster shows just them.
+// Monitoring (the Monitor student button by their name on their student page): students/{sid}.watch = { on, why }. Their
+// name gets an orange highlight in each Students view (the note when you point at it); Monitoring on the Roster shows just them.
 const watchOf = s => { const w = (S.studentsDoc[s.sid] || {}).watch; return w && w.on ? w : null; };
 
 // The name in a Students view: opens their page; Paused / Limited or watched shows on it. (One line: a long one ends in "…".)
 function nameCell(s) {
   const w = watchOf(s), lim = /^(paused|limited)$/i.test(s.status);
-  const tip = [s.name, lim ? 'Portal: ' + s.status : '', w ? '✱ ' + (w.why || 'Monitoring') : ''].filter(Boolean).join(' · ');
-  return `<span class="name-link ${lim ? 'limited' : ''} ${w ? 'watch' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}" title="${esc(tip)}">${w ? '<span class="watch-flag" aria-label="Monitoring">✱</span>' : ''}${esc(s.name)}</span>`;
+  const tip = [s.name, lim ? 'Portal: ' + s.status : '', w ? 'Monitoring: ' + (w.why || 'no note') : ''].filter(Boolean).join(' · ');
+  return `<span class="name-link ${lim ? 'limited' : ''} ${w ? 'watch' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}" title="${esc(tip)}">${esc(s.name)}</span>`;
 }
 // A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
@@ -2498,7 +2498,7 @@ function studentsView() {
   const mode = stuMode();
   return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re keeping an eye on">✱ Watching <b>${students().filter(watchOf).length}</b></button>` : ''}
+    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}
       <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
@@ -2649,7 +2649,7 @@ function drawer() {
   const note = S.drafts[dk('note')] ?? s.note;
   const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer ${part ? '' : 'wide'}" data-stop>
-    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}<button class="watch-btn ${watchOf(s) ? 'on' : ''}" data-act="watchAsk" data-sid="${s.sid}" title="${esc(watchOf(s) ? 'Monitoring: ' + (watchOf(s).why || 'no note') : 'Monitor this student')}" aria-label="Monitor this student">✱</button></h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
+    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}<button class="watch-btn ${watchOf(s) ? 'on' : ''}" data-act="watchAsk" data-sid="${s.sid}" title="${esc(watchOf(s) ? 'Monitoring: ' + (watchOf(s).why || 'no note') : 'Monitor this student')}">${watchOf(s) ? 'Monitoring' : 'Monitor student'}</button></h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
       ${part ? '' : studentPageTop(s)}
 

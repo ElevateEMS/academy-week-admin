@@ -78,7 +78,7 @@ const FAQ = [
     ['What counts in the Assignments column?',
       'The Student Hub’s 10 assignments: First Class Paperwork, Orientation Roster, CPR Card, Fingerprinting, Ride Along Agreement, Vital Signs Practice, Ride Along Readiness, Patient Contacts (done at 10; at least 5 to attend Academy Week), Academy Week Compliance and the Test Prep Practice Quiz. Schedule Ride Alongs is info only, so it doesn’t count.'],
     ['How do I monitor a student?',
-      'Open their student page and click the <b>✱</b> next to their name. Write what you’re monitoring them for and <b>Save</b>. The ✱ turns orange, their name turns orange with a ✱ in every Students view (point at it for your note), and <b>✱ Watching</b> at the top of the Roster shows just them. Click the ✱ again and <b>Stop monitoring</b> when they’re back on track.'],
+      'Open their student page and click <b>Monitor student</b> next to their name. Write what you’re monitoring them for and <b>Save</b>. The button turns orange and says <b>Monitoring</b>, their name turns orange in every Students view (point at it for your note), and <b>Monitoring</b> at the top of the Roster shows just them. Click <b>Monitoring</b> again and <b>Stop monitoring</b> when they’re back on track.'],
     ['Why is a Roster box rose?',
       'It’s past its deadline and not done (the Student Hub’s deadlines): First Class Paperwork after the first day of class (a late enrollee: their own orientation), Background Check after 1 month before Academy Week, Final Compliance after 8 AM the day before Academy Week, and the CPR card after the last day of Academy Week. Point at the box to see “Overdue”.'],
     ['How does psychomotor exam tracking work?',

@@ -2259,7 +2259,7 @@ span.cohort-step { cursor: default; }
 .sp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
 @media (max-width: 700px) { .sp-cards { grid-template-columns: 1fr; } }
 /* Each card: an outline and rounded corners. The orange strip runs down the left edge of the whole student page. */
-.drawer.wide { border-left: 4px solid #e0702a; }
+.drawer.wide { border: 1px solid var(--line); border-left: 4px solid #e0702a; border-radius: 12px 0 0 12px; overflow: hidden; } /* (same strip + rounding the cards had) */
 .drawer section.sp-card, .drawer.wide .drawer-body > section:not(.drop-sec) { border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 14px; background: var(--paper); }
 .drawer.wide .drawer-body > section:not(.drop-sec):not(.sp-card) { margin: 14px 0; }
 .sp-cards > .sp-card:last-child { background: var(--blush-soft); border-color: var(--blush-line); }
@@ -2366,7 +2366,6 @@ span.cohort-step { cursor: default; }
 .roster-main td.r-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Keep an eye on: an orange name with a flag. */
 .name-link.watch { background: #fde3cf; color: #9a4a17; border-radius: 6px; padding: 1px 7px 1px 5px; margin-left: -5px; }
-.watch-flag { display: inline-grid; place-items: center; margin-right: 3px; vertical-align: -2px; }
 .stu-top-right { display: inline-flex; align-items: center; gap: 12px; }
 .watch-chip.on { background: #e0702a; border-color: #e0702a; color: #fff; }
 /* Overdue (past its deadline, not done). */
@@ -2380,11 +2379,11 @@ span.cohort-step { cursor: default; }
 .phone-ed { display: inline-flex; gap: 6px; align-items: center; }
 .phone-ed input { border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; background: var(--paper); width: 150px; }
 .copy-btn svg { stroke-linecap: round; }
-/* ✱ by the name on their page: monitoring them (orange when on). */
-.watch-btn { all: unset; cursor: pointer; font-size: 20px; line-height: 1; margin-left: 10px; color: var(--muted); padding: 2px 6px; border-radius: 6px; vertical-align: 2px; }
-.watch-btn:hover { background: var(--blush-soft); color: var(--ink); }
-.watch-btn.on { color: #e0702a; }
+/* Monitor student by the name on their page (orange "Monitoring" when on). */
+.watch-btn { all: unset; cursor: pointer; font-family: Jost, system-ui, sans-serif; font-size: 13px; font-weight: 500; line-height: 1; margin-left: 12px; color: var(--muted); padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; vertical-align: 4px; white-space: nowrap; }
+.watch-btn:hover { border-color: #e0702a; color: #e0702a; }
+.watch-btn.on { background: #e0702a; border-color: #e0702a; color: #fff; }
+.watch-btn.on:hover { background: #c95f1f; border-color: #c95f1f; color: #fff; }
 .watch-modal { width: min(480px, 94vw); }
-.watch-flag { font-weight: 600; margin-right: 3px; }
 .nowrap { white-space: nowrap; }
 .roster-main td.col-ride .r-cell { padding-left: 4px; padding-right: 4px; }
