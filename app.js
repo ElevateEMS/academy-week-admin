@@ -763,11 +763,29 @@ function bootShell() {
 }
 
 // Course / Academy Week switch. Students and Setup belong to neither, so nothing is lit there.
-function sideSwitch() {
-  const side = S.view === 'course' ? 'course' : ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : null;
-  return `<div class="side-switch" role="group" aria-label="Course or Academy Week">
+// A cohort's three sections, in the middle of the header: Students · Course · Academy Week (Students in orange
+// words when you're not on it, so it's easy to find).
+const COHORT_VIEWS = ['students', 'course', 'day', 'week', 'schedule'];
+function sectionSwitch() {
+  const side = S.view === 'students' ? 'students' : S.view === 'course' ? 'course' : 'aw';
+  return `<div class="side-switch section-switch" role="group" aria-label="Students, Course or Academy Week">
+    <button class="${side === 'students' ? 'on' : 'stu-pop'}" data-act="side" data-s="students">Students</button>
     <button class="${side === 'course' ? 'on' : ''}" data-act="side" data-s="course">Course</button>
     <button class="${side === 'aw' ? 'on' : ''}" data-act="side" data-s="aw">Academy Week</button></div>`;
+}
+// Next to Admin: ‹ cohort ›. The arrows step through cohorts; the name opens the list of cohorts.
+function cohortNav() {
+  if (!S.cohortKey) return '';
+  const { prev, next } = cohortSteps();
+  const step = (k, dir) => k ? `<button class="cohort-step" data-act="cohortStep" data-k="${esc(k)}" title="${esc(k)}" aria-label="${dir}: ${esc(k)}">${dir === 'Previous' ? '‹' : '›'}</button>`
+    : `<span class="cohort-step off" aria-hidden="true">${dir === 'Previous' ? '‹' : '›'}</span>`;
+  const list = S.cohorts.filter(c => !isOldCohort(c) || c.key === S.cohortKey || S.showOld).sort((a, b) => (cohortRank(a.key) ?? 1e9) - (cohortRank(b.key) ?? 1e9));
+  const hasOld = S.cohorts.some(isOldCohort);
+  return `<div class="cohort-nav ${COHORT_VIEWS.includes(S.view) ? 'here' : ''}">${step(prev, 'Previous')}
+    <button class="cohort-name" data-act="cohortMenu" title="${COHORT_VIEWS.includes(S.view) ? 'Pick a cohort' : 'Open ' + esc(S.cohortKey)}">${esc(S.cohortKey)}</button>${step(next, 'Next')}
+    ${S.cohortMenu ? `<div class="menu cohort-menu" data-stop>${list.map(c => `<button class="menu-item ${c.key === S.cohortKey ? 'on' : ''}" data-act="cohortGo" data-k="${esc(c.key)}">${esc(c.key)}${c.status && !/active/i.test(c.status) ? ` <span class="muted small">${esc(c.status)}</span>` : ''}</button>`).join('')}
+      ${hasOld ? `<button class="menu-item muted" data-act="cohortOld">${S.showOld ? 'Hide' : 'Show'} former &amp; test cohorts</button>` : ''}
+      <button class="menu-item" data-act="newCohortOpen">+ New cohort</button></div>` : ''}</div>`;
 }
 
 function shell() {
@@ -780,13 +798,13 @@ function shell() {
     <div class="head-left">
       <button class="brand ${S.view === 'admin' ? 'on' : ''}" data-act="view" data-v="admin" title="Admin"><img src="logo.png" alt=""><b>Admin</b></button>
       <span class="head-div" aria-hidden="true"></span>
-      ${sideSwitch()}
+      ${cohortNav()}
     </div>
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
       ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('schedule', 'Schedule') + icon('day', 'Day') + icon('week', 'The Week') : ''))
-        // Admin and Staff pages: the Staff icon; a cohort's pages: the Students icon. (Settings: neither.)
-        + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : named('students', 'Students', 'Students'))}
+        // Admin and Staff pages: the Staff button. (A cohort's pages: Students is in the middle switch.)
+        + (['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : '')}
       <div class="menu-wrap">
         <button class="icon-btn ${S.menuOpen || S.view === 'settings' ? 'on' : ''}" data-act="menu" title="Settings" aria-label="Settings">${ICONS.settings}</button>
         ${S.menuOpen ? menu() : ''}
@@ -841,27 +859,9 @@ function shell() {
 function pageTitle() {
   if (S.view === 'admin') return '<h1>Elevate EMS Admin</h1>'; // (one line: keeps the header short)
   if (S.view === 'staff') return staffTitle();
-  if (S.view === 'course') {
-    return cohortTitle();
-  }
-  if (S.view === 'week') return `<h1>The Week</h1><p>Drag to-dos from one day to another · ${hideToggle('todo')}</p>`;
-  if (S.view === 'students') return cohortTitle();
   if (S.view === 'settings') return '<h1>Settings</h1><p>Shared by you and Nick</p>';
-  if (S.view === 'schedule') {
-    const d = weekDays().find(x => x.n === schedDay()) || {};
-    return `<h1>Schedule</h1><p>Day ${schedDay()}${d.iso ? ' · ' + parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''}</p>`;
-  }
-  const n = curDay();
-  if (n === PREP || n === FINAL) {
-    const days = weekDays().filter(x => x.iso);
-    const long = iso => parseIso(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    const t = todayIso(), start = days.length && days[0].iso, end = days.length && days[days.length - 1].iso;
-    const when = !days.length ? '' : n === PREP ? (t < start ? ' · starts ' : ' · started ') + long(start) : (t > end ? ' · ended ' : ' · ends ') + long(end);
-    return `<h1>${dayName(n)}</h1><p>${n === PREP ? 'Before academy week' : 'After academy week'}${when}</p>`;
-  }
-  const d = weekDays().find(x => x.n === n) || {};
-  const nice = d.iso ? parseIso(d.iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
-  return `<h1>Day ${n}${d.sub ? ` <span>· ${esc(d.sub)}</span>` : ''}</h1>${nice ? `<p>${nice}${n === currentWeekDay() ? ' · today' : ''}</p>` : ''}`;
+  if (COHORT_VIEWS.includes(S.view)) return sectionSwitch(); // (the day strip shows which Academy Week day you're on)
+  return '';
 }
 
 // The cohort's name with ‹ › either side: steps through the cohorts the menu lists, oldest to newest
@@ -871,12 +871,6 @@ function cohortSteps() {
     .sort((a, b) => (cohortRank(a.key) ?? 1e9) - (cohortRank(b.key) ?? 1e9));
   const i = list.findIndex(c => c.key === S.cohortKey);
   return { prev: i > 0 ? list[i - 1].key : null, next: i >= 0 && i < list.length - 1 ? list[i + 1].key : null };
-}
-function cohortTitle() {
-  const { prev, next } = cohortSteps();
-  const step = (k, dir) => k ? `<button class="cohort-step" data-act="cohortStep" data-k="${esc(k)}" title="${esc(k)}" aria-label="${dir}: ${esc(k)}">${dir === 'Previous' ? '‹' : '›'}</button>`
-    : `<span class="cohort-step off" aria-hidden="true">${dir === 'Previous' ? '‹' : '›'}</span>`; // (faded, so the name stays centered)
-  return `<h1 class="cohort-title">${step(prev, 'Previous')}<span>${esc(S.cohortKey || 'Course')}</span>${step(next, 'Next')}</h1>`;
 }
 
 // The cohort menu lists Active and Upcoming cohorts; Former and Test/QA ones only after
@@ -1522,6 +1516,7 @@ function weekView() {
   if (!S.sheet) return loadingView();
   const today = currentWeekDay();
   return `
+  <p class="week-hint muted small">Drag to-dos from one day to another · ${hideToggle('todo')}</p>
   <div class="week ${hidden('todo') ? 'hide-done' : ''}">
     ${weekDays().map(d => `<section class="week-col ${d.n === today ? 'today' : ''}" ${cfg().weekH ? `style="height:${cfg().weekH}px"` : ''}>
       <button class="week-head" data-act="day" data-n="${d.n}" data-open="1" title="Open Day ${d.n}">
@@ -3437,7 +3432,7 @@ document.addEventListener('keydown', e => {
     else if (S.ship) S.ship = null;
     else if (S.newCohort) { if (S.newCohort.busy) return; S.newCohort = null; } else if (S.infoEdit) { if (S.infoEdit.busy) return; S.infoEdit = null; clearCourseDrafts('ie-'); } else if (S.binderList) S.binderList = false; else if (S.bp) { if (S.bp.busy) return; bpClose(); return; }
     else if (S.skillsSheet) S.skillsSheet = false; else if (S.planClearAsk) S.planClearAsk = false; else if (S.planDelAsk != null) S.planDelAsk = null; else if (S.place) S.place = null; else if (S.match) S.match = null; else if (S.planOpen) S.planOpen = false;
-    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.fbOpen) S.fbOpen = null; else if (S.fbAdmin) S.fbAdmin = null; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.schMenu) S.schMenu = false; else return;
+    else if (S.libOpen) { act('libClose'); return; } else if (S.schTplOpen) { act('schTplClose'); return; } else if (S.bagEd) S.bagEd = false; else if (S.bagOpen !== false) S.bagOpen = false; else if (S.binderOpen) S.binderOpen = null; else if (S.tplOpen) S.tplOpen = false; else if (S.shareOpen) S.shareOpen = false; else if (S.evalQr) S.evalQr = null; else if (S.fbOpen) S.fbOpen = null; else if (S.fbAdmin) S.fbAdmin = null; else if (S.open) S.open = null; else if (S.menuOpen) S.menuOpen = false; else if (S.cohortMenu) S.cohortMenu = false; else if (S.schMenu) S.schMenu = false; else return;
     render(); return;
   }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.bag-ed input:not([data-add]), .bag-ed textarea')) { e.preventDefault(); e.target.blur(); return; } // renaming a pocket/item
@@ -3459,6 +3454,7 @@ document.addEventListener('pointerdown', e => { downOn = e.target; }, true);
 document.addEventListener('click', e => {
   if (S.menuOpen && !e.target.closest('.menu-wrap')) { S.menuOpen = false; render(); }
   if (S.schMenu && !e.target.closest('.sched-more')) { S.schMenu = false; render(); }
+  if (S.cohortMenu && !e.target.closest('.cohort-nav')) { S.cohortMenu = false; render(); }
   if (S.statusMenu && !e.target.closest('.status-wrap')) { S.statusMenu = false; render(); }
   if (S.datePick && !e.target.closest('.dp')) { S.datePick = null; render(); }
   const el = e.target.closest('[data-act]');
@@ -3564,11 +3560,19 @@ async function act(a, el = {}, e) {
         catch (e) { toast(e.message); }
         break;
       }
-      case 'side': { // Course / Academy Week switch (Academy Week opens on the page you used last); the lit one again: back to Students
-        const lit = d.s === 'course' ? S.view === 'course' : ['day', 'week', 'schedule'].includes(S.view);
-        const v = lit ? 'students' : d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
-        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; render(); window.scrollTo(0, 0); break;
+      case 'side': { // Students / Course / Academy Week (Academy Week opens on the page you used last; Students opens on
+        // Roster from Course, on its Academy Week tab from an Academy Week page)
+        if (d.s === 'students' && S.view !== 'students') S.stuMode = ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : 'roster';
+        const v = d.s === 'students' ? 'students' : d.s === 'course' ? 'course' : (['day', 'week', 'schedule'].includes(S.view) ? S.view : ['day', 'week', 'schedule'].includes(pref('awView')) ? pref('awView') : 'day');
+        S.view = v; pref('view', v); S.open = null; S.menuOpen = false; S.cohortMenu = false; render(); window.scrollTo(0, 0); break;
       }
+      // ‹ cohort › by Admin: on the Admin / Staff / Settings pages the name opens that cohort (Students → Roster);
+      // on its own pages it opens the list of cohorts.
+      case 'cohortMenu':
+        if (!COHORT_VIEWS.includes(S.view)) { S.stuMode = 'roster'; S.view = 'students'; pref('view', 'students'); render(); window.scrollTo(0, 0); break; }
+        S.cohortMenu = !S.cohortMenu; render(); break;
+      case 'cohortGo': S.cohortMenu = false; if (d.k !== S.cohortKey) selectCohort(d.k, { keepView: true }); else render(); break;
+      case 'cohortOld': S.showOld = !S.showOld; render(); break;
       case 'day':
         S.day = Number(d.n); pref('day-' + S.cohortKey, d.n);
         if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }

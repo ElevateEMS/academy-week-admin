@@ -2450,3 +2450,16 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .prep-staff b { font-weight: 500; white-space: nowrap; }
 .stf-sched-modal { width: min(1400px, 96vw); max-height: 92vh; display: flex; flex-direction: column; }
 .stf-sched-modal .modal-body { overflow: auto; }
+
+/* Header (cohort pages): Admin | ‹ cohort › on the left, Students · Course · Academy Week in the middle. */
+.cohort-nav { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+.cohort-nav .cohort-step { width: 26px; height: 26px; font-size: 22px; }
+.cohort-name { border: 0; background: transparent; cursor: pointer; font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--head-ink); padding: 2px 6px; border-radius: 8px; white-space: nowrap; }
+.cohort-name:hover { background: var(--head-hover); }
+.cohort-menu { position: absolute; top: 42px; left: 0; right: auto; min-width: 220px; z-index: 30; }
+.cohort-menu .menu-item.on { font-weight: 600; }
+.section-switch { margin: 0; }
+.top .section-switch button { padding: 8px 18px; font-size: 14px; }
+.top .section-switch button.stu-pop { color: #e0702a; font-weight: 500; }
+.top .section-switch button.stu-pop:hover { color: #c95f1f; }
+.week-hint { margin: -4px 0 10px; text-align: center; }
