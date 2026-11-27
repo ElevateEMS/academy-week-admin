@@ -489,9 +489,10 @@ function payChips(p) {
 // The textbook's book icon shows their code and when it was issued; which emails went out is on their student page.
 function emStudentsTable() {
   const q = S.search.trim().toLowerCase(), people = emPeople().filter(p => !q || p.name.toLowerCase().includes(q));
-  const rows = people.map(p => {
+  const rows = people.map((p, i) => {
     const s = studentBySid(p.sid), book = s && (p.textbook || p.bookCode) ? bookMark(s, p) : '<span class="r-no">–</span>';
     return `<tr>
+      <td class="muted">${i + 1}</td>
       <td>${s ? nameCell(s) : esc(p.name)}${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <em class="tag-soft">$ extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${S.studentsLoaded && needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
 </td>
       <td>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</td>
@@ -501,8 +502,8 @@ function emStudentsTable() {
       <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
 </tr>`;
   }).join('');
-  return `<table class="roster em-table"><colgroup><col style="width:22%"><col style="width:25%"><col style="width:13%"><col style="width:8%"><col style="width:18%"><col style="width:14%"></colgroup><thead><tr><th>Student</th><th>Email</th><th>Phone</th><th class="c">Textbook</th><th class="c">Payments</th><th class="c">Orientation</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="6" class="empty">No students match.</td></tr>'}</tbody></table>`;
+  return `<table class="roster em-table"><colgroup><col style="width:3%"><col style="width:17%"><col style="width:27%"><col style="width:14%"><col style="width:8%"><col style="width:18%"><col style="width:13%"></colgroup><thead><tr><th>#</th><th>Student</th><th>Email</th><th>Phone</th><th class="c">Textbook</th><th class="c">Payments</th><th class="c">Orientation</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" class="empty">No students match.</td></tr>'}</tbody></table>`;
 }
 // Next/Final when there's no extension: 2 and 4 weeks after a late enrollee's orientation,
 // otherwise the day before and 29 days after the cohort's.
