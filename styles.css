@@ -2435,3 +2435,5 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster.em-table td:nth-child(2), .roster.aw-table td:nth-child(2) { padding-left: 4px; padding-right: 4px; }
 .roster.aw-table thead tr:first-child > th { padding-top: 6px; padding-bottom: 2px; }
 .roster.aw-table thead tr.sub-head th { padding: 0 8px 5px; line-height: 15px; }
+
+.psy-station { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--honey-soft); font-size: 13px; margin-left: 6px; }

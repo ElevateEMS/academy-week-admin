@@ -2193,12 +2193,20 @@ function psychExtras() {
       <td>${note(r)}</td></tr>`).join('')}</tbody></table>` : `<p class="muted small pe-none">None yet.</p>`}</section>`;
 }
 // The pop-up: Medical, Retest, Trauma, Retest, Notes (S.psychEd = { row } or { sid }).
+// While someone's Testing and 2+ stations of that kind are running: which one they're at (one taken by
+// someone else can't be picked; it shows who's there).
+function stationPicker(r, st) {
+  const mine = stationOf(r, st), others = psychRows().filter(x => x.row !== r.row && isTesting(x, st));
+  return `<select class="psy-station" data-change="psyStation" data-row="${r.row}" data-st="${st}" title="Which ${PSY_LABEL[st].toLowerCase()} station">${[1, 2, 3].slice(0, stationCount(st)).map(n => {
+    const there = others.find(x => stationOf(x, st) === n);
+    return `<option value="${n}" ${n === mine ? 'selected' : ''} ${there ? 'disabled' : ''}>${PSY_LABEL[st]} ${n}${there ? ' (' + esc(shortName(there.name)) + ')' : ''}</option>`; }).join('')}</select>`;
+}
 function psychEdModal() {
   const ed = S.psychEd; if (!ed) return '';
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
   const name = s ? s.name : r ? r.name : '';
   const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? `<span class="muted small">${PSY_LABEL[st]} ${stationOf(r, st)}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? stationPicker(r, st) : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
@@ -3376,6 +3384,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
   if (t.dataset.change === 'cellSel') { setCells(t.dataset.sid, { [t.dataset.l]: t.value }); return; } // a roster dropdown (Students page)
+  if (t.dataset.change === 'psyStation') { Store.set('cohorts/' + S.cohortKey, { [stationKey(t.dataset.st)]: { [t.dataset.row]: Number(t.value) } }).then(render); return; }
   if (t.dataset.change === 'psychSel') { setPsych(Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
