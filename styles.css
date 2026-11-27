@@ -2217,6 +2217,7 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster.roster-main td { padding: 5px 4px; font-size: 14px; }
 /* Enrollment and Academy Week: the same slim rows as the Roster (more students on screen), one line each. */
 .roster.em-table td, .roster.aw-table td { padding: 5px 8px; vertical-align: middle; }
+.roster.aw-table td { font-size: 14px; } /* (same as the Roster) */
 .roster.aw-table td:nth-child(2), .roster.em-table td:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roster.em-table td { overflow-wrap: normal; white-space: nowrap; }
 .roster.aw-table .stepper button { height: 24px; width: 26px; font-size: 15px; }
