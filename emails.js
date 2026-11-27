@@ -319,6 +319,9 @@ const OLD_SIGNOFF = /\n*Best regards,\s*\n\s*\n?\s*Gabriella Brown\s*\n\s*Elevat
 function emFill(t, p, group) {
   const vals = emValues(p), missing = new Set();
   if (/^coursework-/.test(t.id || '')) t = { ...t, body: String(t.body || '').replace(/^- \[\[item\]\]$/m, '{to-do list}') };
+  // [[grade]]: their course grade from the app (Roster → Course Grade); left highlighted if it isn't in yet.
+  const st = p && students().find(x => x.sid === p.sid), gr = st ? gradeOf(st).shown : null;
+  if (gr != null) t = { ...t, subject: String(t.subject || '').replace(/\[\[grade\]\]/gi, gradeNum(gr)), body: String(t.body || '').replace(/\[\[grade\]\]/gi, gradeNum(gr)) };
   const fill = text => applyIfs(String(text || ''), expr => emTest(expr, p, group))
     .replace(/\{([^{}]+)\}/g, (m, k) => {
       const key = k.trim().toLowerCase();
