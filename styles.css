@@ -2332,6 +2332,9 @@ span.cohort-step { cursor: default; }
 .roster.em-table .copy-line { display: inline; }
 .roster.em-table .copy-btn { vertical-align: middle; }
 .roster.aw-table th:first-child { width: 5%; }
-.roster.aw-table th:nth-child(2) { width: 30%; }
+.roster.aw-table th:nth-child(2) { width: 22%; }
+.roster.aw-table th.c { width: auto; }
 /* The lit Students / Staff button: orange like the lit Course / Academy Week (gold in Warm work; Calm as before). */
 :root[data-theme="navy"] .top .icon-btn.named.on, :root[data-theme="warm"] .top .icon-btn.named.on { background: var(--switch-on-bg); color: var(--switch-on-ink); border-color: transparent; box-shadow: none; }
+/* A student's page: a thin orange line down its left edge. */
+.drawer { border-left: 3px solid #e0702a; }

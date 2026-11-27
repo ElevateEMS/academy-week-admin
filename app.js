@@ -2145,7 +2145,7 @@ function awStudentsView() {
   <section class="box table-box">
     <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : '<th class="c">Patient contacts</th><th class="c">Skills</th>'}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
+        : `<th class="c">Patient contacts</th><th class="c">Skills</th><th class="c" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" title="${ROSTER_TIPS.awW}">Final Sigs</th><th class="c" title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td><b>${esc(s.name)}</b>${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
@@ -2153,10 +2153,11 @@ function awStudentsView() {
         <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
         : `<td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
-        <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>`}
+        <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
+        <td class="c">${rosterCell(s, 'awV')}</td><td class="c">${rosterCell(s, 'awW')}</td><td class="c">${rosterCell(s, 'dispo')}</td>`}
         ${hasPeer ? `<td class="c" data-part="peers">${peerCell(peers[s.name])}</td>` : ''}
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
-      </tr>`).join('') || `<tr><td colspan="${(pre ? 8 : 5) + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${8 + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>`;
 }
