@@ -2568,3 +2568,9 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .dropped-list .rec-link { margin-left: 8px; font-size: 13px; }
 .drop-sec .btn { display: inline-flex; align-items: center; gap: 6px; }
 .drop-sec .btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+/* Remove from app (Final Steps' last line), its pop-up's nudge, and a removed cohort's note */
+.remove-btn { color: #a3625a; border-color: #d9b5b0; }
+.remove-btn:hover { background: #f6ebe9; }
+.remove-nudge { background: var(--honey-soft); color: #6e5326; border-radius: 10px; padding: 8px 12px; }
+.removed-note { background: var(--honey-soft); color: #6e5326; border-radius: 10px; padding: 8px 14px; margin: 0 0 14px; font-size: 14px; }
+.removed-note a { color: inherit; }

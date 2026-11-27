@@ -824,7 +824,7 @@ function shell() {
   <main class="wrap">
     ${offlineBar()}
     ${S.sheetErr ? `<div class="alert">Couldn’t read the Google Sheet: ${esc(S.sheetErr)} <button class="btn small" data-act="refresh">Try again</button></div>` : ''}
-    ${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
+    ${COHORT_VIEWS.includes(S.view) ? removedNote() : ''}${{ admin: adminView, staff: staffView, course: courseView, day: dayView, week: weekView, schedule: scheduleView, students: studentsView, settings: settingsView }[S.view]()}
   </main>
   ${S.open ? drawer() : ''}
   ${S.shareOpen ? shareModal() : ''}
@@ -856,6 +856,7 @@ function shell() {
   ${S.roster ? rosterModal() : ''}
   ${S.resetAsk ? resetModal() : ''}
   ${S.dropAsk ? dropModal() : ''}
+  ${S.removeAsk ? removeModal() : ''}
   ${S.renameAsk ? renameModal() : ''}
   ${S.guardianAsk ? guardianModal() : ''}
   ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
@@ -1504,7 +1505,7 @@ function box(b, n) {
     const all = docItems('final'), done = all.filter(x => x.on).length;
     body = head(`Final Steps <span class="count">${done}/${all.length}</span>`, done ? hideToggle('docs') : '')
       + `<ul class="checks">${all.map(x => `<li class="${x.on ? 'done' : ''}">
-        <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label>${isExportLine(x.text) ? exportBtn('tiny') : ''}</li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
+        <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label>${finalLineBtn(x)}</li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
   } else if (b === 'scenarios') {
     body = head('Academy Week Scenarios', `<button class="eye" data-act="libOpen" title="Scenario Library" aria-label="Scenario Library">${BOOK}</button>`) + scenBox();
   } else if (b === 'packing') {
@@ -1824,7 +1825,7 @@ function docItems(sec) {
   const hl = (S.cohortDoc && S.cohortDoc.docHl) || {};
   return (sec ? [sec] : DOC_SECTIONS).flatMap(k => (cfg().docs[k] || []).map(text => {
     const id = k + '-' + slug(text);
-    return { id, text, on: !!checks[id], hl: hl[id] };
+    return { id, text, on: !!checks[id] || (isFlipLine(text) && cohortFormer()), hl: hl[id] };
   }));
 }
 // One page like the PDF, with whatever is already checked printed as checked.
@@ -1855,12 +1856,18 @@ function printDocs() {
 const EXPORT_LINE = 'Export cohort files from app/sheets', OLD_EXPORT_LINE = 'Exported excel sheet with student tracking and pass results';
 const isExportLine = t => /^export cohort files/i.test(String(t || '').trim());
 // A checklist saved in Settings before this line existed: the old Records-for-the-Class line becomes this Final Steps one.
+// It also gets "Flip cohort to Former" (after Transfer all records) and "Remove from app" (last) if they aren't there.
 function fixDocs(d) {
-  if (!(d.class || []).includes(OLD_EXPORT_LINE)) return d;
-  const fin = [...(d.final || [])];
-  if (!fin.some(isExportLine)) { const i = fin.findIndex(x => /^transfer all records/i.test(x)); fin.splice(i < 0 ? fin.length : i, 0, EXPORT_LINE); }
-  return { ...d, class: d.class.filter(x => x !== OLD_EXPORT_LINE), final: fin };
+  const fin = [...(d.final || [])], old = (d.class || []).includes(OLD_EXPORT_LINE);
+  if (old && !fin.some(isExportLine)) { const i = fin.findIndex(x => /^transfer all records/i.test(x)); fin.splice(i < 0 ? fin.length : i, 0, EXPORT_LINE); }
+  if (!fin.some(isFlipLine)) { const i = fin.findIndex(x => /^transfer all records/i.test(x)); fin.splice(i < 0 ? fin.length : i + 1, 0, FLIP_LINE); }
+  if (!fin.some(isRemoveLine)) fin.push(REMOVE_LINE);
+  return { ...d, class: old ? d.class.filter(x => x !== OLD_EXPORT_LINE) : d.class, final: fin };
 }
+const FLIP_LINE = 'Flip cohort to Former', REMOVE_LINE = 'Remove from app';
+const isFlipLine = t => /^flip cohort to former/i.test(String(t || '').trim());
+const isRemoveLine = t => /^remove from app/i.test(String(t || '').trim());
+const cohortFormer = () => /former/i.test((S.sheet && S.sheet.status) || ((S.cohorts.find(c => c.key === S.cohortKey) || {}).status) || '');
 const EXPORT_ICON = '<svg viewBox="0 0 24 24"><path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M5 12.5v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
 const exportBtn = size => `<button class="btn ${size} export-btn" data-act="cohortExport" ${S.exportBusy ? 'disabled' : ''} title="Download the cohort’s records and an Excel copy of each of its Google Sheets (one zip, also saved in the Admin folder)">${EXPORT_ICON}${S.exportBusy ? 'Exporting…' : 'Export'}</button>`;
 
@@ -1946,11 +1953,56 @@ async function cohortExport() {
       a.href = url; a.download = out.name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } else if (out.url && Store.configured) window.open(out.url, '_blank', 'noopener');
-    await Store.set('cohorts/' + S.cohortKey, { docChecks: { ['final-' + slug(EXPORT_LINE)]: true } });
+    await Store.set('cohorts/' + S.cohortKey, { docChecks: { ['final-' + slug(EXPORT_LINE)]: true }, exportedAt: Date.now() }); // (Remove from app needs this)
     toast((out.zip ? 'Downloaded ' : 'Saved ') + out.name + ' (Course Records + ' + out.sheets + ' sheet' + (out.sheets === 1 ? '' : 's') + '; a copy is in the Admin folder).'
       + (out.skipped && out.skipped.length ? ' Left out: ' + out.skipped.join(', ') + '.' : ''));
   } catch (e) { toast('Couldn’t export: ' + e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
   S.exportBusy = false; render();
+}
+
+// The buttons on Final Steps lines: Export, Make Former (until it is), Remove from app.
+function finalLineBtn(x) {
+  if (isExportLine(x.text)) return exportBtn('tiny');
+  if (isFlipLine(x.text)) return cohortFormer() || !S.cohortKey ? '' : statusBtn(S.cohortKey, 'Former');
+  if (isRemoveLine(x.text)) return S.cohortKey && !isTestCohort(S.cohortKey) && !(S.cohortDoc || {}).removedAt ? `<button class="btn tiny remove-btn" data-act="removeAsk">Remove from app</button>` : '';
+  return '';
+}
+
+/* ---------- Remove from app (Finalize → Final Steps, last line) ----------
+   Only once the cohort's files were exported (cohorts/{key}.exportedAt, set by an Export) and it's Former. The most recent
+   finished cohort gets a nudge to keep it until the next one finishes, but can still go. The Admin Apps Script saves
+   "<cohort> app backup <date> (before removal).json" (Admin folder, or App Backups if that's gone; never trashed), clears
+   cohorts/{key} and everything under it, and leaves a note (removedAt + where the backup is, and the "already added"
+   marks so opening it never fills it with starter to-dos again). Sheets, Drive and the config row aren't touched. */
+function newestFinished() { // no newer (real) cohort is Former yet
+  const me = cohortRank(S.cohortKey);
+  return me == null || !S.cohorts.some(c => c.key !== S.cohortKey && !isTestCohort(c.key) && /former/i.test(c.status || '') && (cohortRank(c.key) ?? -1) > me);
+}
+function removeModal() {
+  const key = S.cohortKey, doc = S.cohortDoc || {}, typed = String(S.drafts['remove-name'] || '').trim();
+  const shell = (title, body, foot) => `<div class="overlay" data-act="removeClose"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>${title}</h2><button class="x big" data-act="removeClose" aria-label="Close">×</button></div>
+    <div class="modal-body">${body}</div><div class="modal-foot">${foot}</div></div></div>`;
+  const ok = '<button class="btn primary" data-act="removeClose">OK</button>';
+  if (S.removeBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>Removing ${esc(key)}…</h2></div>
+    <div class="modal-body"><p class="muted">Saving the final backup, then clearing the app’s data. This can take a minute.</p></div></div></div>`;
+  if (!doc.exportedAt) return shell('Export first', `<p>Export ${esc(key)}’s files first (the <b>Export cohort files</b> line), so there’s a copy of everything outside the app.</p>`, ok);
+  if (!cohortFormer()) return shell('Make it Former first', `<p>Flip ${esc(key)} to Former first (the <b>Flip cohort to Former</b> line). Only a finished cohort can be removed.</p>`, ok);
+  return shell(`Remove ${esc(key)} from the app?`, `
+    ${newestFinished() ? `<p class="remove-nudge">${esc(key)} is your most recent finished cohort. It’s handy to keep it in the app until the next cohort finishes (for comparing, copying templates and looking things up). You can still remove it now if you’re done with it.</p>` : ''}
+    <p>This clears everything the app keeps for ${esc(key)}: to-dos, notes, checklists, emails sent, rosters and signatures, students’ grades, warnings and monitoring notes, psychomotor results, Academy Week days and staffing.</p>
+    <p><b>Saved first:</b> a final backup, “${esc(key)} app backup ${todayIso()} (before removal).json”, in its Admin folder (or Master Keys → Admin Templates → App Backups if that folder’s already gone from Drive). It’s never trashed.</p>
+    <p><b>Not touched:</b> its Google Sheets and Drive folder, its row in the config sheet, and your exported zip (last exported ${esc(new Date(doc.exportedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}).</p>
+    <p class="muted small">There’s no undo.</p>
+    <label class="field"><span>Type <b>${esc(key)}</b> to confirm</span><input id="remove-name" data-draft="remove-name" value="${esc(S.drafts['remove-name'] || '')}" autocomplete="off"></label>`,
+    `<button class="btn" data-act="removeClose">Cancel</button><button class="btn primary danger" data-act="removeGo" ${typed === key ? '' : 'disabled'}>Remove ${esc(key)}</button>`);
+}
+// A removed cohort's pages: a note at the top saying so.
+function removedNote() {
+  const r = S.cohortKey && (S.cohortDoc || {}).removedAt;
+  if (!r) return '';
+  const b = (S.cohortDoc || {}).removedBackup || {};
+  return `<p class="removed-note">Removed from the app on ${esc(new Date(r).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}. Its final backup is ${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.name || 'in Drive')} ↗</a>` : ''}${b.where ? ' (in ' + esc(b.where) + ')' : ''}.</p>`;
 }
 
 /* ---------- A student's record (student page → Save record; Drop pop-up → Save their record now; Dropped & withdrawn
@@ -3661,6 +3713,11 @@ addEventListener('resize', fitBoard);
 document.addEventListener('change', e => { if (e.target.id === 'ql-file') adminInput(e.target); }); // (some phones only send change for a photo)
 document.addEventListener('input', e => {
   const t = e.target, k = t.dataset.draft;
+  if (t.id === 'remove-name') { // Remove from app: the same, without a re-render (so typing isn't interrupted)
+    S.drafts['remove-name'] = t.value;
+    const b = document.querySelector('[data-act="removeGo"]'); if (b) b.disabled = t.value.trim() !== S.cohortKey;
+    return;
+  }
   if (t.id === 'resetName') { // Reset test cohort: the button unlocks once the name is typed exactly
     S.drafts.resetName = t.value;
     const b = document.querySelector('[data-act="resetGo"]'); if (b) b.disabled = t.value.trim() !== S.cohortKey;
@@ -3767,6 +3824,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && e.target.dataset && e.target.dataset.chadd) { delete S.drafts[e.target.dataset.draft]; S.changesAdd = null; render(); return; }
   if (e.key === 'Escape') {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
+    if (S.removeAsk) { if (!S.removeBusy) { S.removeAsk = false; delete S.drafts['remove-name']; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
     if (S.guardianAsk) { guardianClose(); return; }
     if (S.watchAsk) { S.watchAsk = null; render(); return; }
@@ -3953,6 +4011,25 @@ async function act(a, el = {}, e) {
         if (d.open) { S.view = 'day'; pref('view', 'day'); pref('awView', 'day'); window.scrollTo(0, 0); }
         render(); break;
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
+      case 'removeAsk': S.removeAsk = true; S.drafts['remove-name'] = ''; render(); break;
+      case 'removeClose': if (S.removeBusy) return; S.removeAsk = false; delete S.drafts['remove-name']; render(); break;
+      case 'removeGo': {
+        const key = S.cohortKey, typed = String(S.drafts['remove-name'] || '').trim();
+        if (typed !== key || S.removeBusy || !(S.cohortDoc || {}).exportedAt || !cohortFormer()) return;
+        S.removeBusy = true; render();
+        unwatchCohort.forEach(u => u()); unwatchCohort = []; // (so nothing writes to it while it's being cleared)
+        try {
+          const res = await Sheets.removeCohortData(key, typed);
+          try { Object.keys(localStorage).filter(k => k.startsWith('aw-') && k.endsWith('-' + key)).forEach(k => localStorage.removeItem(k)); } catch {}
+          toast(`${key} removed from the app (${res.removed || 0} item${res.removed === 1 ? '' : 's'}). Final backup: ${res.backup ? res.backup.name : 'saved'}. Reloading…`);
+          setTimeout(() => location.reload(), 1600);
+        } catch (err) {
+          S.removeBusy = false; S.removeAsk = false; delete S.drafts['remove-name'];
+          toast(err.message + (/unknown request/i.test(err.message) ? ' (the Admin Apps Script needs its new version deployed)' : ''));
+          selectCohort(key, { keepView: true });
+        }
+        break;
+      }
       case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;
       case 'resetCancel': if (S.resetBusy) return; S.resetAsk = false; delete S.drafts.resetName; render(); break;
       case 'dropAsk': S.dropAsk = d.sid; ['drop-kind', 'drop-date', 'drop-note', 'drop-rec'].forEach(k => delete S.drafts[k]); render(); break;

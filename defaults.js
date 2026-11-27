@@ -74,8 +74,8 @@ const DEFAULTS = {
       'MCI student registrations', 'Ride Along paperwork', 'Skills Tracking sheet', 'Patient contacts'],
     skills: ['Any Assessment Sheets', '3 - airway', '3 - bleeding', '5 - splinting', '2 - traction splints', '2 - backboarding'],
     final: ['Scan instructor CEUs', 'Submit MCI rosters', 'Student final course status (mark passed with VAOEMS)', 'Download copy of CSDR',
-      'Export cohort files from app/sheets', 'Transfer all records to external drive', 'All physical copies remain in binder', 'Delete google drive/desktop copies',
-      'Submit CPR paperwork for CPR cards'],
+      'Export cohort files from app/sheets', 'Transfer all records to external drive', 'Flip cohort to Former', 'All physical copies remain in binder',
+      'Delete google drive/desktop copies', 'Submit CPR paperwork for CPR cards', 'Remove from app'],
   },
 };
 
