@@ -2210,7 +2210,7 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .stu-tabs button { all: unset; cursor: pointer; font-size: 15px; color: var(--muted); padding: 4px 2px 6px; border-bottom: 2px solid transparent; }
 .stu-tabs button:hover { color: var(--ink); }
 .stu-tabs button.on { color: var(--ink); font-weight: 500; border-bottom-color: #e0702a; }
-@media (max-width: 720px) { .stu-top { grid-template-columns: 1fr auto; } .stu-top > span:first-child { display: none; } }
+@media (max-width: 720px) { .stu-top { grid-template-columns: auto 1fr auto; } }
 .roster-box { margin-bottom: 30px; }
 .roster.roster-main th, .roster.aw-table th, .roster.em-table th { font-family: Jost, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--muted); padding: 9px 8px; line-height: 1.25; vertical-align: bottom; }
 .roster.roster-main th.c { width: auto; }
@@ -2526,3 +2526,5 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .prep-board .box.box-scenarios { flex: 0 0 auto; }
 .prep-board .box.box-shopping { flex: 0 0 var(--prep-top, auto); height: var(--prep-top, auto); min-height: 0; overflow-y: auto; }
 .prep-board .box.box-notes, .prep-board .box.box-packing { flex: 1 1 0; min-height: 220px; }
+
+.stu-top .stu-top-left { justify-self: start; }

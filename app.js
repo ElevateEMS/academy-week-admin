@@ -2704,9 +2704,9 @@ function awTopRight() {
 function studentsView() {
   if (!S.sheet) return loadingView();
   const mode = stuMode();
-  return `<div class="stu-top"><span></span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
+  return `<div class="stu-top"><span class="stu-top-left">${mode === 'roster' ? enrollToggle() : ''}</span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" role="tab" aria-selected="${mode === k}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'aw' ? awTopRight() : enrollToggle()}</span></div>
+    <span class="stu-top-right">${mode === 'aw' ? awTopRight() : ''}</span></div>
   ${mode === 'roster' ? rosterStudentsView() : awStudentsView()}`;
 }
 
