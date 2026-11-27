@@ -835,6 +835,7 @@ function shell() {
   ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
   ${S.psychEd && S.sheet ? psychEdModal() : ''}
   ${S.stationAsk && S.sheet ? stationAskModal() : ''}
+  ${S.watchAsk && S.sheet ? watchAskModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
@@ -2161,6 +2162,15 @@ function psychEdModal() {
     <div class="modal-head"><h2>Psychomotor exam <span class="muted small">${esc(name)}</span></h2><button class="x big" data-act="psychClose" aria-label="Close">×</button></div>
     <div class="modal-body">${body}</div></div></div>`;
 }
+function watchAskModal() {
+  const s = studentBySid(S.watchAsk); if (!s) return '';
+  const w = watchOf(s), k = 'wy-' + s.sid;
+  return `<div class="overlay" data-act="watchClose"><div class="modal confirm watch-modal" data-stop>
+    <div class="modal-head"><h2>What is ${esc(firstName(s.name))} being monitored for?</h2><button class="x big" data-act="watchClose" aria-label="Close">×</button></div>
+    <div class="modal-body"><textarea id="${k}" data-draft="${k}" rows="4" class="ce-note" placeholder="Waiting on their CPR card, behind on contacts…">${esc(S.drafts[k] ?? (w && w.why) ?? '')}</textarea></div>
+    <div class="modal-foot">${w ? `<button class="btn" data-act="watchStop" data-sid="${s.sid}">Stop monitoring</button>` : ''}<button class="btn primary" data-act="watchSave" data-sid="${s.sid}">Save</button></div>
+  </div></div>`;
+}
 function stationAskModal() {
   const a = S.stationAsk; if (!a) return '';
   const r = psychRows().find(x => x.row === a.row);
@@ -2404,9 +2414,9 @@ const ROSTER_TIPS = {
 const BOOK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/></svg>';
 const BOOK_OK_ICON = '<svg viewBox="0 0 24 24"><path d="M6.5 3.5H18a1 1 0 0 1 1 1v13H6.5A1.5 1.5 0 0 0 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M5 19a1.5 1.5 0 0 0 1.5 1.5H19v-3"/><path d="M8.5 3.5v14"/><path d="M11 10.3l1.8 1.8 3.4-3.6"/></svg>';
 // When their book code was given out ('' if it's not in the codes list).
-function bookIssued(s, p) {
+function bookIssued(s, p, short = false) {
   const code = p.bookCode && (S.bookCodes || []).find(x => x.sid === s.sid && String(x.code) === String(p.bookCode));
-  return code && code.at ? new Date(code.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  return code && code.at ? new Date(code.at).toLocaleDateString('en-US', short ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' }) : '';
 }
 function bookMark(s, p) {
   if (!cellsOf(s).D && !p.bookCode) return '';
@@ -2414,15 +2424,15 @@ function bookMark(s, p) {
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
-// Keep an eye on (their student page → Overview): students/{sid}.watch = { on, why }. Their name gets an orange
-// highlight and a ⚑ in each Students view (the reason when you point at it); Watching on the Roster shows just them.
+// Monitoring (the ✱ by their name on their student page): students/{sid}.watch = { on, why }. Their name gets an orange
+// highlight and a ✱ in each Students view (the note when you point at it); Watching on the Roster shows just them.
 const watchOf = s => { const w = (S.studentsDoc[s.sid] || {}).watch; return w && w.on ? w : null; };
-const FLAG_ICON = '<svg viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 4.5h10.5l-2 3.75 2 3.75H6"/></svg>';
+
 // The name in a Students view: opens their page; Paused / Limited or watched shows on it. (One line: a long one ends in "…".)
 function nameCell(s) {
   const w = watchOf(s), lim = /^(paused|limited)$/i.test(s.status);
-  const tip = [s.name, lim ? 'Portal: ' + s.status : '', w ? '⚑ ' + (w.why || 'Keeping an eye on them') : ''].filter(Boolean).join(' · ');
-  return `<span class="name-link ${lim ? 'limited' : ''} ${w ? 'watch' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}" title="${esc(tip)}">${w ? `<span class="watch-flag" aria-label="Keeping an eye on them">${FLAG_ICON}</span>` : ''}${esc(s.name)}</span>`;
+  const tip = [s.name, lim ? 'Portal: ' + s.status : '', w ? '✱ ' + (w.why || 'Monitoring') : ''].filter(Boolean).join(' · ');
+  return `<span class="name-link ${lim ? 'limited' : ''} ${w ? 'watch' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}" title="${esc(tip)}">${w ? '<span class="watch-flag" aria-label="Monitoring">✱</span>' : ''}${esc(s.name)}</span>`;
 }
 // A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
@@ -2463,7 +2473,7 @@ function studentsView() {
   const mode = stuMode();
   return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re keeping an eye on">⚑ Watching <b>${students().filter(watchOf).length}</b></button>` : ''}
+    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re keeping an eye on">✱ Watching <b>${students().filter(watchOf).length}</b></button>` : ''}
       <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
@@ -2508,8 +2518,6 @@ function studentPageTop(s) {
   const tabs = `<nav class="sp-tabs" role="tablist">${SP_SECTIONS.map(([id, l]) => `<button class="${tab === id ? 'on' : ''}" role="tab" data-act="spTab" data-id="${id}">${l}</button>`).join('')}</nav>`;
   if (tab === 'overview') return tabs + `<div class="sp-cards">
       <section class="sp-card"><h3>Contact</h3>
-        <div class="watch-line">${circle(!!watchOf(s), `data-act="watchToggle" data-sid="${s.sid}"`)}<span>Keep an eye on</span>
-          ${watchOf(s) ? `<input id="wy-${s.sid}" data-draft="wy-${s.sid}" placeholder="Why? (shows when you point at their ⚑)" value="${esc(S.drafts['wy-' + s.sid] ?? watchOf(s).why ?? '')}" autocomplete="off"><button class="btn tiny" data-act="watchSave" data-sid="${s.sid}">Save</button>` : ''}</div>
         <dl class="sp-kv">
           <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
           <dt>Phone</dt><dd>${S.phoneEd === s.sid
@@ -2521,7 +2529,7 @@ function studentPageTop(s) {
         </dl></section>
       <section class="sp-card"><h3>Enrollment &amp; payments</h3>
         <dl class="sp-kv">
-          <dt>Textbook</dt><dd><button class="cell-link" data-act="cellEd" data-sid="${s.sid}" data-k="book">${p.bookCode ? esc(p.bookCode) : c.D ? 'Bought · no code yet' : 'Not through us'}</button>${p.bookCode ? `<button class="copy-btn" data-act="copyText" data-text="${esc(p.bookCode)}" data-what="Book code" title="Copy book code" aria-label="Copy book code">${COPY_ICON}</button>${bookIssued(s, p) ? ` <span class="muted small">issued ${bookIssued(s, p)}</span>` : ''}` : ''}</dd>
+          <dt>Textbook</dt><dd><button class="cell-link" data-act="cellEd" data-sid="${s.sid}" data-k="book">${p.bookCode ? esc(p.bookCode) : c.D ? 'Bought · no code yet' : 'Not through us'}</button>${p.bookCode ? `<button class="copy-btn" data-act="copyText" data-text="${esc(p.bookCode)}" data-what="Book code" title="Copy book code" aria-label="Copy book code">${COPY_ICON}</button>${bookIssued(s, p) ? ` <span class="muted small nowrap">issued ${bookIssued(s, p, true)}</span>` : ''}` : ''}</dd>
           <dt>Payments</dt><dd>${payChips(p)}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <span class="tag-soft">$ extension</span>' : ''}</dd>
           <dt>Orientation</dt><dd><button class="cell-link" data-act="emLateOpen" data-sid="${s.sid}">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button>${p.late ? ` <span class="tag-soft">${p.makeup ? 'make-up' : 'late enrollee'}</span>` : ''}</dd>
           <dt>VAOEMS #</dt><dd>${(lateNo || info.courseNo) ? esc(lateNo || info.courseNo) : '<span class="muted">–</span>'}${lateNo ? ' <span class="muted small">(late enrollment course)</span>' : ''}</dd>
@@ -2616,7 +2624,7 @@ function drawer() {
   const note = S.drafts[dk('note')] ?? s.note;
   const allC = !!S.drafts[dk('call')]; // "All contacts" picked: a note for every contact, no number
   return `<div class="overlay side" data-act="closeStudent"><aside class="drawer ${part ? '' : 'wide'}" data-stop>
-    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}</h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
+    <div class="drawer-head"><h2><button class="name-edit" data-act="renameAsk" data-sid="${s.sid}" title="Change name, email or cohort">${esc(s.name)}<span class="name-pencil" aria-hidden="true">${ICONS.pencil}</span></button>${minorTag(s)}<button class="watch-btn ${watchOf(s) ? 'on' : ''}" data-act="watchAsk" data-sid="${s.sid}" title="${esc(watchOf(s) ? 'Monitoring: ' + (watchOf(s).why || 'no note') : 'Monitor this student')}" aria-label="Monitor this student">✱</button></h2><button class="x big" data-act="closeStudent" aria-label="Close">×</button></div>
     <div class="drawer-body" data-keep-scroll="drawer">
       ${part ? '' : studentPageTop(s)}
 
@@ -3328,6 +3336,7 @@ document.addEventListener('keydown', e => {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
     if (S.guardianAsk) { guardianClose(); return; }
+    if (S.watchAsk) { S.watchAsk = null; render(); return; }
     if (S.stationAsk) { S.stationAsk = null; render(); return; }
     if (S.psychEd) { S.psychEd = null; render(); return; }
     if (S.cellEd && !S.emailStu) { cellEdClose(); return; }
@@ -3419,9 +3428,11 @@ async function act(a, el = {}, e) {
         break;
       }
       case 'copyText': try { await navigator.clipboard.writeText(d.text); toast((d.what || 'Text') + ' copied.'); } catch { toast('Couldn’t copy it. Select it and copy instead.'); } break;
-      case 'watchToggle': { const st = studentBySid(d.sid), on = !(st && watchOf(st));
-        await Store.set(P('students/' + d.sid), { watch: { on, why: on ? '' : ((st && watchOf(st)) || {}).why || '' } }); delete S.drafts['wy-' + d.sid]; break; }
-      case 'watchSave': await Store.set(P('students/' + d.sid), { watch: { on: true, why: String(S.drafts['wy-' + d.sid] ?? '').trim() } }); delete S.drafts['wy-' + d.sid]; toast('Saved.'); break;
+      case 'watchAsk': S.watchAsk = d.sid; render(); { const el = document.getElementById('wy-' + d.sid); if (el) el.focus(); } break;
+      case 'watchClose': delete S.drafts['wy-' + S.watchAsk]; S.watchAsk = null; render(); break;
+      case 'watchSave': { const st = studentBySid(d.sid), why = String(S.drafts['wy-' + d.sid] ?? ((st && watchOf(st)) || {}).why ?? '').trim();
+        await Store.set(P('students/' + d.sid), { watch: { on: true, why } }); delete S.drafts['wy-' + d.sid]; S.watchAsk = null; render(); toast('Monitoring ' + (st ? firstName(st.name) : 'them') + '.'); break; }
+      case 'watchStop': await Store.set(P('students/' + d.sid), { watch: { on: false, why: '' } }); delete S.drafts['wy-' + d.sid]; S.watchAsk = null; render(); toast('Stopped monitoring.'); break;
       case 'phoneEdit': S.phoneEd = d.sid; render(); { const el = document.getElementById('ph-' + d.sid); if (el) el.focus(); } break;
       case 'phoneCancel': S.phoneEd = null; delete S.drafts['ph-' + d.sid]; render(); break;
       case 'phoneSave': { // into the note on their name in the cohort sheet (where the Tally form puts it)
