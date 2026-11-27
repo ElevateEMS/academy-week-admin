@@ -2408,7 +2408,7 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .r-cell.overdue { background: var(--rose-soft); color: #8d4f48; border-color: transparent; }
 .r-cell.overdue:hover { border-color: #e4bdb6; }
 /* Academy Week view: Psychomotor over its Medical / Trauma sub-columns. */
-.roster.aw-table thead th[rowspan] { vertical-align: middle; }
+.roster.aw-table thead th[rowspan] { vertical-align: bottom; padding-bottom: 9px; } /* (same spot as the Roster's headers) */
 .roster.aw-table thead th.psy-head { padding-bottom: 2px; }
 .roster.aw-table tr.sub-head th { padding-top: 0; font-size: 13px; opacity: .8; }
 .roster-main .pc-chip { margin-left: 0; }
@@ -2480,3 +2480,6 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .cohort-nav.here, .top .brand.on { background: rgba(242, 193, 78, .16); box-shadow: 0 0 14px 2px rgba(242, 193, 78, .35); }
 .top .brand.on b { color: var(--head-ink); }
 :root[data-theme="navy"] .cohort-nav.here, :root[data-theme="navy"] .top .brand.on { background: rgba(255, 255, 255, .08); box-shadow: 0 0 14px 2px rgba(255, 255, 255, .18); }
+
+.roster.aw-table thead th:first-child { padding-left: 12px; }
+.roster.aw-table thead tr:first-child > th[rowspan] { padding-top: 9px; padding-bottom: 9px; }
