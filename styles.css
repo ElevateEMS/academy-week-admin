@@ -2205,7 +2205,7 @@ span.cohort-step { cursor: default; }
 .stu-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
 .stu-seg button { padding: 6px 16px; font-size: 14px; }
 .roster-box { margin-bottom: 30px; }
-.roster.roster-main th { font-family: Jost, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--muted); padding: 9px 8px; line-height: 1.25; vertical-align: bottom; }
+.roster.roster-main th, .roster.aw-table th { font-family: Jost, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; letter-spacing: .02em; color: var(--muted); padding: 9px 8px; line-height: 1.25; vertical-align: bottom; }
 .roster.roster-main th.c { width: auto; }
 .roster.roster-main td { padding: 5px 4px; font-size: 14px; }
 /* Wider than the window: it scrolls sideways inside its box, with # and the names staying put. */

@@ -785,8 +785,6 @@ function shell() {
     <div class="page-title">${pageTitle()}</div>
     <nav class="icons">
       ${(S.view === 'admin' ? adminHeaderLinks() : S.view === 'staff' ? staffTabs() : (aw ? icon('day', 'Day') + icon('schedule', 'Schedule') : ''))
-        // Students page: Find a student sits up here, left of the Students icon.
-        + (S.view === 'students' && S.sheet ? `<input id="searchIn" class="search head-search" data-draft="search" placeholder="Find a student" value="${esc(S.search)}">` : '')
         // Admin and Staff pages: the Staff icon; a cohort's pages: the Students icon. (Settings: neither.)
         + (S.view === 'settings' ? '' : ['admin', 'staff'].includes(S.view) ? named('staff', 'Staff', 'Staff: pay, timesheets, the staff list') : named('students', 'Students', 'Students'))}
       <div class="menu-wrap">
@@ -2215,10 +2213,10 @@ function awStudentsView() {
   const suggestions = peerEvals.filter(e => String(e.suggestions || '').trim()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
   const flagged = everyone.filter(s => peers[s.name] && peers[s.name].zeroCount).length;
   const cf = courseFeedback(); // the Student Feedback form's course questions and comments
-  const q = S.search.trim().toLowerCase();
+  // A filter whose count dropped to 0 shows everyone again.
+  const on = (filter === 'behind' && counts.behind) || (filter === 'fixes' && counts.fixes) ? filter : 'all';
   const shown = [...all, ...everyone.filter(s => s.out)].filter(s =>
-    (filter === 'all' || (filter === 'behind' && s.skill === 'behind') || (filter === 'fixes' && s.fixes))
-    && (!q || s.name.toLowerCase().includes(q)));
+    on === 'all' || (on === 'behind' && s.skill === 'behind') || (on === 'fixes' && s.fixes));
 
   // Who's behind on what, grouped by skill (for planning the next day).
   const bySkill = {};
@@ -2226,16 +2224,11 @@ function awStudentsView() {
   const order = DEFAULTS.skills.flatMap(g => g.items);
   const skillRows = Object.keys(bySkill).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
-  const chip = (k, l) => `<button class="chip ${filter === k ? 'on' : ''}" data-act="filter" data-f="${k}">${l} <b>${counts[k]}</b></button>`;
   const yes = v => v ? '<span class="em-yes">✓</span>' : '<span class="r-no">–</span>';
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
-  // (Before the flip there's no filter row at all: search is in the header, and the Skills Tracking sheet waits for Academy Week.)
+  // (Its filters and the Skills Tracking sheet button are up beside the view switcher: awTopRight().)
   return `${psychStrip()}
-  ${pre ? '' : `<div class="students-top">
-    <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}</div>
-    <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button></div>
-  </div>`}
   ${!pre && skillRows.length ? `<section class="box shaded behind-card"><div class="box-head static"><h2>Behind by Skill</h2><span class="head-actions"><span class="muted small">for picking tomorrow’s scenarios</span> <button class="btn tiny" data-act="matchOpen">+ Additional Scenarios</button></span></div>
     <div class="behind-list">${skillRows.map(k => `<div><b>${esc(k)}</b> <span class="n">${bySkill[k].length}</span><span class="who">${bySkill[k].map(s => `<button class="link" data-act="openStudent" data-sid="${s.sid}">${esc(firstName(s.name))}</button>`).join(', ')}</span></div>`).join('')}</div>
   </section>` : ''}
@@ -2503,12 +2496,20 @@ function droppedList() {
     <ul class="dropped-list">${list.map(l => { const [name, ...rest] = l.split(' - '); return `<li><b>${esc(name)}</b>${rest.length ? ` <span class="muted">${esc(rest.join(' - '))}</span>` : ''}</li>`; }).join('')}</ul>
   </details>`;
 }
+// The Academy Week view's tools, on the switcher's line: a filter only when it has someone in it (click again
+// to show everyone), and the Skills Tracking sheet.
+function awTopRight() {
+  const all = students().filter(s => !s.out), counts = { behind: all.filter(s => s.skill === 'behind').length, fixes: all.filter(s => s.fixes).length };
+  const chip = (k, l) => counts[k] ? `<button class="chip ${S.filter === k ? 'on' : ''}" data-act="filter" data-f="${S.filter === k ? 'all' : k}">${l} <b>${counts[k]}</b></button>` : '';
+  return chip('behind', 'Behind on skills') + chip('fixes', 'Contacts to fix')
+    + `<button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button>`;
+}
 function studentsView() {
   if (!S.sheet) return loadingView();
   const mode = stuMode();
   return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}
+    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}${mode === 'aw' ? awTopRight() : ''}
       <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
@@ -3697,7 +3698,7 @@ async function act(a, el = {}, e) {
       case 'makeDocs': await makeCohortDocs(); break;
       case 'outboxRetry': await Sheets.flushOutbox(); break;
       case 'outboxDrop': if (confirm('Discard the change that couldn’t sync? It won’t be sent to the Google Sheet.')) { Sheets.dropFirstOutbox(); Sheets.flushOutbox(); } break;
-      case 'goStudents': S.view = 'students'; S.filter = d.f; pref('view', 'students'); render(); break;
+      case 'goStudents': S.view = 'students'; S.filter = d.f; S.stuMode = 'aw'; pref('view', 'students'); render(); break;
       case 'filter': S.filter = d.f; render(); break;
       case 'hideDone': pref('hide-' + d.k, hidden(d.k) ? '0' : '1'); render(); break;
       case 'setupShow': S.setupShow = S.setupShow === S.cohortKey ? null : S.cohortKey; render(); break; // a finished checklist, opened for a look
