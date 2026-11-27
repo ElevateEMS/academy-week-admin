@@ -2483,3 +2483,6 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 
 .roster.aw-table thead th:first-child { padding-left: 12px; }
 .roster.aw-table thead tr:first-child > th[rowspan] { padding-top: 9px; padding-bottom: 9px; }
+/* In-Person: the Psychomotor Exam header sets the stations. */
+.psy-head-btn { all: unset; cursor: pointer; padding: 1px 6px; border-radius: 6px; }
+.psy-head-btn:hover { text-decoration: underline; text-underline-offset: 3px; color: var(--ink); }

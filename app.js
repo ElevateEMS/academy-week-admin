@@ -2158,8 +2158,7 @@ function psychStrip() {
   const slot = (label, list, st) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list, st)}</span>`;
   const slots = st => { const n = stationCount(st), list = rows.filter(r => isTesting(r, st));
     return n === 1 ? slot(PSY_LABEL[st], list, st) : [1, 2, 3].slice(0, n).map(i => slot(PSY_LABEL[st] + ' ' + i, list.filter(r => stationOf(r, st) === i), st)).join(''); };
-  return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slots('med')}${slots('trauma')}
-    <button class="btn small ps-stations" data-act="stationsOpen" title="How many Medical and Trauma stations are running">Stations: ${stationCount('med')} Medical · ${stationCount('trauma')} Trauma</button></div>`;
+  return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slots('med')}${slots('trauma')}</div>`; // (stations: click Psychomotor Exam over the In-Person table)
 }
 // The Stations pop-up: how many Medical and Trauma stations (separate rooms) are running, 1-3 each.
 function stationsModal() {
@@ -2288,8 +2287,8 @@ function awStudentsView() {
   <section class="box table-box">
     <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
       <thead>${(rs => `<tr><th ${rs}>#</th><th ${rs}>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : `<th class="c" ${rs}>Patient contacts</th><th class="c" ${rs}>Skills</th><th class="c psy-head" colspan="2" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" ${rs} title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" ${rs} title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? `<th class="c" ${rs}>Peer evals</th>` : ''}<th class="c" ${rs}>Conduct</th></tr>
-      ${pre ? '' : '<tr class="sub-head"><th class="c">Medical</th><th class="c">Trauma</th></tr>'}`)(pre ? '' : 'rowspan="2"')}</thead>
+        : `<th class="c" ${rs}>Patient contacts</th><th class="c" ${rs}>Skills</th><th class="c psy-head" colspan="2"><button class="psy-head-btn" data-act="stationsOpen" title="Set stations: how many Medical and Trauma stations are running">Psychomotor Exam</button></th><th class="c" ${rs} title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" ${rs} title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? `<th class="c" ${rs}>Peer evals</th>` : ''}<th class="c" ${rs}>Conduct</th></tr>
+      ${pre ? '' : `<tr class="sub-head"><th class="c">Medical${stationCount('med') > 1 ? ` (${stationCount('med')})` : ''}</th><th class="c">Trauma${stationCount('trauma') > 1 ? ` (${stationCount('trauma')})` : ''}</th></tr>`}`)(pre ? '' : 'rowspan="2"')}</thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td>${nameCell(s)}${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
