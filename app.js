@@ -2348,7 +2348,7 @@ const stuMode = () => STU_MODES.some(([k]) => k === S.stuMode) ? S.stuMode : 'ro
 // The Student Hub's assignments (the ones that count), by the roster column each one ticks. P is a number: done at 10.
 const PORTAL_ASSIGNMENTS = [['G', 'First Class Paperwork'], ['H', 'Orientation Roster'], ['I', 'CPR Card'], ['K', 'Fingerprinting'],
   ['L', 'Ride Along Agreement'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness'], ['P', 'Ride Along Paperwork & Patient Contacts'],
-  ['Q', 'Academy Week Compliance'], ['R', 'Test Prep Practice Quiz']];
+  ['Q', 'Academy Week Attestation'], ['R', 'Test Prep Practice Quiz']];
 const CONTACTS_DONE = 10, CONTACTS_MIN = 5; // 10 = the assignment's done; at least 5 to attend Academy Week
 // The patient contact counts only turn colors (red under 5, yellow 5–9, green 10) from 2 weeks before Academy Week.
 const CONTACTS_COLOR_DAYS = 14;
@@ -2397,7 +2397,7 @@ async function saveGrade(sid, g) {
 }
 
 // Past its deadline and not done (the Student Hub's deadlines): First Class Paperwork the first day of class (a late
-// enrollee: their own orientation), Background Check a month before Academy Week, Final Compliance 8 AM the day before
+// enrollee: their own orientation), Background Check a month before Academy Week, Academy Week Attestation 8 AM the day before
 // it, CPR card its last day. Vital Signs, Readiness and Test Prep have no set date.
 // (The Morning Email's "Overdue paperwork & assignments" uses the same rules: keep the two in sync.)
 function overdueCells(s) {
@@ -2465,7 +2465,7 @@ function rosterCell(s, k) {
 // All the same width (after # 3 and Student 17), so the columns are evenly spaced.
 const ROSTER_W = Object.fromEntries(['cpr', 'fp', 'ride', 'pc', 'assign', 'comp', 'grade', 'nremt'].map(k => [k, 80 / 8]));
 const ROSTER_COLS = [['cpr', 'CPR'], ['fp', 'Background<br>Check'],
-  ['ride', 'Clinical<br>Clearance'], ['pc', 'Patient<br>Contacts'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
+  ['ride', 'Clinical<br>Clearance'], ['pc', 'Patient<br>Contacts'], ['assign', 'Assignments'], ['comp', 'Academy Week<br>Attestation'], ['grade', 'Course<br>Grade'],
   ['nremt', 'NREMT<br>Exam']]; // (Last Class Paperwork, Final Disposition, Skills and Psychomotor: the In-Person view)
 // Enrollment (folds open right after Student; the rest slides off to the right): px widths while it's open.
 const ENROLL_COLS = [['email', 'Email', 250], ['book', 'Textbook', 84], ['pay', 'Payments', 170], ['orient', 'Orientation', 140], ['paper', 'First Class<br>Paperwork', 104]];
@@ -2489,7 +2489,7 @@ function enrollCell(s, k) {
 const ROSTER_TIPS = {
   paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
   cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'Background check: FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation', pc: 'Patient contacts: 10 to finish, 5 to attend Academy Week',
-  assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Compliance attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
+  assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Readiness & Compliance Attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
 // The Enrollment view's textbook: a book = bought it through us (D); with a check once their access code is issued.
@@ -2582,7 +2582,7 @@ const CELL_EDITS = {
   fp: ['Fingerprinting', [['K', 'FieldPrint scheduled']]],
   ride: ['Clinical Clearance', [['M', 'Ride alongs requested'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness (attestation)']]],
   assign: ['Assignments', PORTAL_ASSIGNMENTS],
-  comp: ['Academy Week Compliance', [['Q', 'Academy Week Compliance (attestation)']]],
+  comp: ['Academy Week Attestation', [['Q', 'Academy Week Attestation']]],
   aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last Class Paperwork']]],
   dispo: ['Disposition', [['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']]],
   nremt: ['NREMT exam', [['Z', '1st attempt', 'select'], ['AA', '2nd attempt', 'select'], ['AB', '3rd attempt', 'select']]],
