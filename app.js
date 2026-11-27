@@ -1272,7 +1272,7 @@ function statusAskModal() {
       <button class="btn primary ${status === 'Former' ? 'danger' : ''}" data-act="setStatusGo" ${busy ? 'disabled' : ''}>${busy ? 'Saving…' : 'Make ' + esc(status)}</button></div>
   </div></div>`;
 }
-function dropClose() { S.dropAsk = null; S.datePick = null; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); }
+function dropClose() { S.dropAsk = null; S.datePick = null; ['drop-kind', 'drop-date', 'drop-note', 'drop-rec'].forEach(k => delete S.drafts[k]); render(); }
 // Reset test cohort (Test/QA cohorts only; the Admin Apps Script checks again, and checks the folder and sheet names).
 function resetModal() {
   const key = S.cohortKey, typed = String(S.drafts.resetName || '').trim();
@@ -1951,6 +1951,67 @@ async function cohortExport() {
       + (out.skipped && out.skipped.length ? ' Left out: ' + out.skipped.join(', ') + '.' : ''));
   } catch (e) { toast('Couldn’t export: ' + e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
   S.exportBusy = false; render();
+}
+
+/* ---------- A student's record (student page → Save record; Drop pop-up → Save their record now; Dropped & withdrawn
+   list → Save record) ----------
+   One PDF, "<Name> - Student Record (<date>).pdf" in the Admin folder (Sheets.saveStudentRecord turns this page into it).
+   Everything the app has about them, incl. monitoring notes (only here, never in the cohort export); no sticky notes.
+   After a drop their roster row is gone, so a record made then has only what the app keeps (grades, notes, warnings…). */
+function studentRecordHtml(s, { drop = null, after = '' } = {}) {
+  const e = v => esc(v == null ? '' : String(v)), c = cellsOf(s), doc = S.studentsDoc[s.sid] || {}, gd = doc.guardian || {}, p = emPerson(s), g = gradeOf(s);
+  const info = cohortInfo(), yn = v => v === true || /^(true|yes)$/i.test(String(v)) ? 'Yes' : v === false || v == null || v === '' ? '–' : e(v);
+  const fullDate = d => isIsoDate(d) ? parseIso(d).toLocaleDateString('en-US') : String(d || '');
+  const md = d => isIsoDate(d) ? e(longDate(d)) : e(d || '–'), has = !after;
+  const kv = rows => `<table class="kv">${rows.filter(Boolean).map(([k, v]) => `<tr><th>${e(k)}</th><td>${v === '' || v == null ? '–' : v}</td></tr>`).join('')}</table>`;
+  const sec = (t, body) => `<h2>${t}</h2>${body}`;
+  const r = psychRowOf(s), psy = st => { if (!r) return '–'; const v = psychNow(r, st), n = retestsOf(r, st); return v ? e(v) + (n ? ' (retest' + (n > 1 ? ' ' + n : '') + ')' : '') + (r[st] && r[st + 'Re'] ? ' · first try ' + e(r[st]) : '') : '–'; };
+  const warns = S.warnings.filter(w => w.sid === s.sid).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const pcs = S.contacts.filter(x => x.sid === s.sid).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const w = doc.watch;
+  const css = `body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;color:#1d2939;margin:0}h1{font-size:18pt;margin:0 0 2pt}
+    .sub{color:#667085;margin:0 0 10pt}h2{font-size:12pt;color:#7d6558;border-bottom:1px solid #ddcfc5;margin:14pt 0 5pt;padding-bottom:2pt}
+    table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:2.5pt 6pt 2.5pt 0}.kv th{width:34%;font-weight:normal;color:#667085}
+    .list th{font-weight:bold;border-bottom:1px solid #ddcfc5}.list td{border-bottom:1px solid #f0e8e2}.note{background:#faf6f3;padding:5pt 7pt;margin:0 0 5pt;white-space:pre-wrap}
+    .flag{background:#fdf0e6;border-left:3pt solid #e0702a;padding:5pt 7pt}`;
+  const body = `<h1>${e(s.name)}</h1>
+    <p class="sub">${e(S.cohortKey)} · Student Record · made ${e(new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }))}${drop ? ` · <b>${e(drop.kind)} ${e(fullDate(drop.date))}</b>` : ''}${after ? ` · ${e(after)}` : ''}</p>
+    ${after ? `<p class="flag">Made after they came off the roster, so their roster items (paperwork, CPR, assignments, Academy Week, NREMT) aren’t here. A record saved before the drop has them.</p>` : ''}
+    ${sec('Contact', kv([['Email', e(p.email || '–')], ['Phone', e(s.phone || '–')], ['Portal status', e(s.status || (after ? 'Blocked' : 'Active'))],
+      s.minor || doc.minor ? ['Under 18', 'Yes'] : null, gd.name ? ['Parent/Guardian', e([gd.name, gd.relation, gd.email, gd.phone].filter(Boolean).join(' · '))] : null]))}
+    ${sec('Enrollment &amp; payments', kv([['Orientation', p.orient ? md(p.orient) + (p.late ? ' · ' + e(p.time || '') + (p.makeup ? ' (make-up)' : ' (late enrollee)') : '') : '–'],
+      ['VAOEMS Course No.', e(info.courseNos ? courseNoText(info.courseNos) : '–')],
+      has ? ['Textbook', c.D ? 'Bought through us' + (p.bookCode ? ' · code ' + e(p.bookCode) + (bookIssued(s, p) ? ' (issued ' + e(bookIssued(s, p)) + ')' : '') : ' · no code yet') : 'Not through us'] : p.bookCode ? ['Book code', e(p.bookCode)] : null,
+      ['Deposit', e(usd(DEPOSIT))],
+      has ? ['Next installment', e(usd(p.payAmt)) + (p.next ? ' · due ' + e(fullDate(p.next)) : '') + ' · ' + (p.paidNext ? 'paid' : 'not paid')] : null,
+      has ? ['Final installment', e(usd(p.payAmt)) + (p.final ? ' · due ' + e(fullDate(p.final)) : '') + ' · ' + (p.paidFinal ? 'paid' : 'not paid')] : null,
+      p.disc ? ['Discount', e(usd(p.disc) + ' off each installment' + (p.discNote ? ' · ' + p.discNote : ''))] : null]))}
+    ${has ? sec('Paperwork &amp; assignments', `<table class="list"><tr><th>Item</th><th>Done</th></tr>${PORTAL_ASSIGNMENTS.map(([L, label]) => `<tr><td>${e(label)}</td><td>${L === 'P' ? e((s.contacts || 0) + ' of ' + CONTACTS_DONE + ' patient contacts') : yn(c[L])}</td></tr>`).join('')}
+      <tr><td>CPR</td><td>${c.I ? 'Card uploaded' : c.J ? 'Class ' + e(c.J) : '–'}</td></tr><tr><td>Clinical Clearance</td><td>${c.O ? 'Eligible' : 'Not attested'}</td></tr></table>`) : ''}
+    ${sec('Grades', kv([['Coursework', e(gradeNum(g.coursework))], ['Final exam', e(gradeNum(g.final))], g.retake != null ? ['Final retake', e(gradeNum(g.retake))] : null,
+      ['Course grade', '<b>' + e(gradeNum(g.shown)) + '</b>' + (g.override != null ? ' (typed from JBL)' : '')]]))}
+    ${has ? sec('Academy Week &amp; exams', kv([['Academy Week', s.out ? e(outLabel(s)) : 'Attending'], ['Skills', (s.skill === 'behind' ? 'Behind' : 'On track') + ((s.behind || []).length ? ' · ' + e(s.behind.join(', ')) : '') + ' · all signed off: ' + yn(c.U)],
+      ['Psychomotor Medical', psy('med')], ['Psychomotor Trauma', psy('trauma')], ['Psychomotor Exam', yn(c.V)], r && r.notes ? ['Psychomotor notes', e(r.notes)] : null,
+      ['Last Class Paperwork', yn(c.W)], ['VAOEMS disposition', yn(c.X)], ['NREMT disposition', yn(c.Y)],
+      ['NREMT attempts', ['Z', 'AA', 'AB'].map((L, i) => c[L] ? ['1st', '2nd', '3rd'][i] + ': ' + e(c[L]) : '').filter(Boolean).join(' · ') || '–']])) : ''}
+    ${pcs.length ? sec('Patient contact notes', `<table class="list"><tr><th>Date</th><th>Contact</th><th>Fixes</th><th>Fixed</th></tr>${pcs.map(x => `<tr><td>${e(fullDate(x.date))}</td><td>${x.num === 'all' ? 'All contacts' : '#' + e(x.num)}</td><td>${e(x.fix || 'No fixes needed')}</td><td>${x.fix ? (x.fixed ? 'Yes' : 'No') : ''}</td></tr>`).join('')}</table>`) : ''}
+    ${sec('Warnings &amp; conduct', warns.length ? `<table class="list"><tr><th>Date</th><th>Type</th><th>Note</th></tr>${warns.map(x => `<tr><td>${e(fullDate(x.date))}</td><td>${e(x.type)}</td><td>${e(x.note || '')}</td></tr>`).join('')}</table>` : '<p>Nothing recorded.</p>')}
+    ${w && (w.on || w.why) ? sec('Monitoring', `<p class="note">${w.on ? 'Being monitored' : 'Was monitored'}${w.why ? ': ' + e(w.why) : ''}</p>`) : ''}
+    ${c.AC || s.note || doc.note ? sec('Notes', (c.AC ? `<p class="note"><b>Sheet:</b> ${e(c.AC)}</p>` : '') + ((s.note || doc.note) ? `<p class="note"><b>App:</b> ${e(s.note || doc.note)}</p>` : '')) : ''}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${e(s.name)} - Student Record</title><style>${css}</style></head><body>${body}</body></html>`;
+}
+// Student page / dropped list: save it now. sid: on the roster; name: off it (the dropped list).
+async function saveRecord(sid, name) {
+  if (S.recordBusy) return;
+  let s = sid ? studentBySid(sid) : null, after = '';
+  if (!s && name) { const id = slug(name), doc = S.studentsDoc[id] || {}; s = { sid: id, name, cells: {}, contacts: 0, status: 'Blocked', minor: !!doc.minor, note: doc.note || '', behind: [] }; after = 'off the roster'; }
+  if (!s) return;
+  S.recordBusy = s.sid; render();
+  try {
+    const out = await Sheets.saveStudentRecord(S.cohortKey, s.name, studentRecordHtml(s, { after }));
+    toast('Saved ' + out.name + ' in the Admin folder.');
+  } catch (e) { toast('Couldn’t save their record: ' + e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
+  S.recordBusy = null; render();
 }
 
 /* ---------- Binder covers (from a "binder cover" to-do) ---------- */
@@ -2803,7 +2864,8 @@ function droppedList() {
   const list = (S.sheet && S.sheet.dropped) || [];
   if (!list.length) return '';
   return `<details class="box dropped-box" ${S.droppedOpen ? 'open' : ''}><summary data-act="droppedToggle"><span>Dropped &amp; withdrawn</span><span class="muted small">${list.length}</span></summary>
-    <ul class="dropped-list">${list.map(l => { const [name, ...rest] = l.split(' - '); return `<li><b>${esc(name)}</b>${rest.length ? ` <span class="muted">${esc(rest.join(' - '))}</span>` : ''}</li>`; }).join('')}</ul>
+    <ul class="dropped-list">${list.map(l => { const [name, ...rest] = l.split(' - '); return `<li><b>${esc(name)}</b>${rest.length ? ` <span class="muted">${esc(rest.join(' - '))}</span>` : ''}
+      <button class="link rec-link" data-act="recordSave" data-name="${esc(name.trim())}" ${S.recordBusy ? 'disabled' : ''} title="Save a PDF of what the app still has for them (their roster row is gone)">${S.recordBusy === slug(name.trim()) ? 'Saving…' : 'Save record'}</button></li>`; }).join('')}</ul>
   </details>`;
 }
 // The Academy Week view's tools, on the switcher's line: a filter only when it has someone in it (click again
@@ -3032,6 +3094,7 @@ function drawer() {
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
+        <button class="btn small" data-act="recordSave" data-sid="${s.sid}" ${S.recordBusy ? 'disabled' : ''} title="Save a PDF of everything about ${esc(firstName(s.name))} (incl. monitoring notes) in the Admin folder">${S.recordBusy === s.sid ? 'Saving…' : 'Save record'}</button>
         <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? 'Unpause portal' : 'Pause portal'}</button>
         <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
       </section>`}
@@ -3123,7 +3186,7 @@ function dropModal() {
   if (!s) return '';
   const kind = S.drafts['drop-kind'] || '', date = S.drafts['drop-date'] || todayIso();
   if (S.dropBusy) return `<div class="overlay"><div class="modal confirm"><div class="modal-head"><h2>${kind === 'Dropped' ? 'Dropping' : 'Withdrawing'} ${esc(s.name)}…</h2></div>
-    <div class="modal-body"><p class="muted">Updating the roster, the Dropped Students Record and the Course To-Do. This takes a few seconds.</p></div></div></div>`;
+    <div class="modal-body"><p class="muted">${S.dropBusy === 'record' ? 'Saving their record first…' : 'Updating the roster, the Dropped Students Record and the Course To-Do. This takes a few seconds.'}</p></div></div></div>`;
   const when = parseIso(date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   return `<div class="overlay" data-act="dropCancel"><div class="modal confirm" data-stop>
     <div class="modal-head"><h2>Drop / Withdraw</h2><button class="x big" data-act="dropCancel" aria-label="Close">×</button></div>
@@ -3132,6 +3195,7 @@ function dropModal() {
       <div class="seg wide">${['Dropped', 'Withdrawn'].map(k => `<button class="${kind === k ? 'on' : ''}" data-act="dropKind" data-k="${k}">${k}</button>`).join('')}</div>
       <div class="lbl drop-date">Date${datePicker('drop-date')}</div>
       <textarea id="drop-note" data-draft="drop-note" rows="2" placeholder="Note for the Dropped Students Record (optional)">${esc(S.drafts['drop-note'] || '')}</textarea>
+      <label class="drop-rec">${circle(S.drafts['drop-rec'] !== false, 'data-act="dropRec"')} Save their record now <span class="muted small">(a PDF in the Admin folder, made before anything changes)</span></label>
       ${kind ? `<p>This will:</p>
       <ul class="reset-list">
         <li>Take them off the roster (everyone under them moves up a row) and put <b>${esc(s.name)} - ${kind} ${esc(when)}</b> under “Dropped/withdrawn students”, marked <b>Blocked</b>.</li>
@@ -3884,7 +3948,9 @@ async function act(a, el = {}, e) {
       case 'statusMenu': S.statusMenu = !S.statusMenu; render(); break;
       case 'resetAsk': if (!isTestCohort(S.cohortKey)) return; S.statusMenu = false; S.resetAsk = true; S.drafts.resetName = ''; render(); break;
       case 'resetCancel': if (S.resetBusy) return; S.resetAsk = false; delete S.drafts.resetName; render(); break;
-      case 'dropAsk': S.dropAsk = d.sid; ['drop-kind', 'drop-date', 'drop-note'].forEach(k => delete S.drafts[k]); render(); break;
+      case 'dropAsk': S.dropAsk = d.sid; ['drop-kind', 'drop-date', 'drop-note', 'drop-rec'].forEach(k => delete S.drafts[k]); render(); break;
+      case 'dropRec': S.drafts['drop-rec'] = S.drafts['drop-rec'] === false; render(); break;
+      case 'recordSave': saveRecord(d.sid, d.name); break;
       case 'dropKind': S.drafts['drop-kind'] = d.k; render(); break;
       case 'payEmail': {
         if (!tplById('pay-overdue')) { toast('The Payment overdue email template is turned off or missing.'); return; }
@@ -3957,7 +4023,15 @@ async function act(a, el = {}, e) {
         if (!s || !kind || S.dropBusy) return;
         S.dropBusy = true; render();
         try {
+          let rec = null;
+          if (S.drafts['drop-rec'] !== false) { // (their record first, while the roster still has their row)
+            S.dropBusy = 'record'; render();
+            try { rec = await Sheets.saveStudentRecord(key, s.name, studentRecordHtml(s, { drop: { kind, date: S.drafts['drop-date'] || todayIso() } })); }
+            catch (e) { throw new Error('Their record couldn’t be saved, so nothing was changed: ' + e.message + ' (Untick “Save their record now” to drop without it.)'); }
+            S.dropBusy = true; render();
+          }
           const res = await Sheets.dropStudent(key, s, { kind, date: S.drafts['drop-date'] || todayIso(), note: (S.drafts['drop-note'] || '').trim() });
+          if (rec) res.warnings = [...(res.warnings || []), 'Their record is in the Admin folder (' + rec.name + ').'];
           S.dropBusy = false; dropClose(); S.open = null; S.openPart = null;
           toast(`${s.name}: ${kind.toLowerCase()}.` + (res.warnings && res.warnings.length ? ' ' + res.warnings.join(' ') : ' Their JBL and VAOEMS to-dos are on the Course To-Do.'));
           if (key === S.cohortKey) loadSheet();

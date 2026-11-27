@@ -11,6 +11,7 @@
      psychExport(key, person, info) -> their results PDF for VAOEMS, saved in that folder ({ pdfUrl, folderUrl })
      exportCohort(key, tabs)     -> "<cohort> Cohort Files (exported <date>).zip" in the Admin folder: the app's Course Records .xlsx
                                     (tabs) + an Excel copy of every Google Sheet in the cohort folder ({ name, url, sheets, skipped, zip (base64, '' if huge) })
+     saveStudentRecord(key, name, html) -> "<Name> - Student Record (<date>).pdf" in the Admin folder, made from html ({ name, url })
      psychMove(from, to, person) -> a tester between a cohort's exam and a private one ("" = private): Drive folder + Psychomotor Exam tab row ({ folderUrl, row })
      setPhone(key, s, phone)     -> their phone, as the note on their name (B) on the roster
      evalLinks(key)              -> the cohort's Peer Evaluation / Student Feedback form link codes (eval.html, QR codes)
@@ -181,6 +182,7 @@ const Sheets = (() => {
     psychExport: (key, person, info) => call('psychExport', { cohort: key, person, info }),
     psychMove: (from, to, person) => call('psychMove', { from, to, person }),
     exportCohort: (key, tabs) => call('exportCohort', { cohort: key, tabs }),
+    saveStudentRecord: (key, name, html) => call('saveStudentRecord', { cohort: key, name, html }),
     setPhone: (key, student, phone) => call('setPhone', { cohort: key, row: student.row, name: student.name, phone }), // the note on their name
     evalLinks: key => call('evalLinks', { cohort: key }).then(o => o.links), // { peer, feedback }: the eval.html link codes
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
@@ -385,6 +387,7 @@ function sampleSheets() {
     async setPhone(key, student, phone) { console.log('Sample mode: phone for', student.name, 'would be', phone); return wait({ phone }); },
     async psychFile(key, person, kind, f) { return wait({ file: { id: 'sample-' + Date.now(), url: 'https://drive.google.com/', name: (kind === 'letter' ? 'Eligibility letter - ' : 'Scenario - ') + f.name }, folderUrl: 'https://drive.google.com/' }); },
     async psychMove(from, to, person) { const r = to ? await this.addPsychTester(to, person) : { row: 0 }; return wait({ folderUrl: 'https://drive.google.com/', row: r.row }); },
+    async saveStudentRecord(key, name, html) { console.log('Sample mode: the record PDF would be made for', name); window.__lastRecord = html; return wait({ name: name + ' - Student Record (sample).pdf', url: 'https://drive.google.com/' }); },
     async exportCohort(key, tabs) { console.log('Sample mode: the export would have these tabs', tabs); window.__lastExport = tabs; return wait({ name: key + ' Cohort Files (sample).zip', url: 'https://drive.google.com/', sheets: 0, skipped: [], zip: '' }); },
     async psychExport(key, person, info) { console.log('Sample mode: the results PDF would be made with', info); return wait({ pdfUrl: 'https://drive.google.com/', folderUrl: 'https://drive.google.com/' }); },
     async addPsychTester(key, name) { const row = 24 + Object.keys(samplePsych).filter(r => Number(r) > 23).length; samplePsych[row] = { name }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row, name }); },
