@@ -2561,3 +2561,5 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 /* Student record: the Drop pop-up's "Save their record now", and Save record on the dropped list */
 .drop-rec { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; cursor: pointer; flex-wrap: wrap; }
 .dropped-list .rec-link { margin-left: 8px; font-size: 13px; }
+.drop-sec .btn { display: inline-flex; align-items: center; gap: 6px; }
+.drop-sec .btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }

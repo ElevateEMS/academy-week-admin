@@ -3017,6 +3017,13 @@ async function changePc(sid, by) {
   delete S.pcBusy[sid]; render();
 }
 
+// The student page's bottom buttons: a page being saved, pause / play, a door with an arrow leaving.
+const SP_ICONS = {
+  record: '<svg viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M14 3.5v5h5"/><path d="M12 11v6M9.5 14.5 12 17l2.5-2.5"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>',
+  play: '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></svg>',
+  leave: '<svg viewBox="0 0 24 24"><path d="M13 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H13"/><path d="M10 12h10M16.5 8.5 20 12l-3.5 3.5"/></svg>',
+};
 function drawer() {
   const s = studentBySid(S.open);
   if (!s) return '';
@@ -3094,9 +3101,9 @@ function drawer() {
           <button class="x" data-act="delWarning" data-id="${w.id}" aria-label="Delete">×</button></li>`).join('') || '<li class="empty">Nothing recorded.</li>'}</ul>
       </section>` : ''}
       ${part ? '<button class="link show-all" data-act="openAll">Show everything</button>' : `<section class="drop-sec">
-        <button class="btn small" data-act="recordSave" data-sid="${s.sid}" ${S.recordBusy ? 'disabled' : ''} title="Save a PDF of everything about ${esc(firstName(s.name))} (incl. monitoring notes) in the Admin folder">${S.recordBusy === s.sid ? 'Saving…' : 'Save record'}</button>
-        <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? 'Unpause portal' : 'Pause portal'}</button>
-        <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">Drop / Withdraw</button>
+        <button class="btn small" data-act="recordSave" data-sid="${s.sid}" ${S.recordBusy ? 'disabled' : ''} title="Save a PDF of everything about ${esc(firstName(s.name))} (incl. monitoring notes) in the Admin folder">${SP_ICONS.record}${S.recordBusy === s.sid ? 'Saving…' : 'Save record'}</button>
+        <button class="btn small" data-act="portalStatus" data-sid="${s.sid}" ${S.portalBusy === s.sid ? 'disabled' : ''}>${/^paused$/i.test(s.status) ? SP_ICONS.play + 'Unpause portal' : SP_ICONS.pause + 'Pause portal'}</button>
+        <button class="btn small drop-btn" data-act="dropAsk" data-sid="${s.sid}">${SP_ICONS.leave}Drop / Withdraw</button>
       </section>`}
     </div>
   </aside></div>`;
