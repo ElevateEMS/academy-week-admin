@@ -68,13 +68,13 @@ const DEFAULTS = {
   docChecklist: {
     class: ['VAOEMS Course Approval pdf', 'Course syllabus', 'Course schedule', 'Academy Week daily schedule',
       'Ride along agreement excel sheet', 'Orientation roster', 'Academy Week rosters', 'MCIM roster',
-      'Exported JBL grade reports for all students', 'Exported excel sheet with student tracking and pass results',
+      'Exported JBL grade reports for all students',
       'Dropped students doc and records (activity logs if applicable)', 'Copy of student disposition report (VAOEMS portal)'],
     student: ['VAOEMS First class signatures (& parental permission forms)', 'Syllabus signatures', 'CPR copies',
       'MCI student registrations', 'Ride Along paperwork', 'Skills Tracking sheet', 'Patient contacts'],
     skills: ['Any Assessment Sheets', '3 - airway', '3 - bleeding', '5 - splinting', '2 - traction splints', '2 - backboarding'],
     final: ['Scan instructor CEUs', 'Submit MCI rosters', 'Student final course status (mark passed with VAOEMS)', 'Download copy of CSDR',
-      'Transfer all records to external drive', 'All physical copies remain in binder', 'Delete google drive/desktop copies',
+      'Export cohort files from app/sheets', 'Transfer all records to external drive', 'All physical copies remain in binder', 'Delete google drive/desktop copies',
       'Submit CPR paperwork for CPR cards'],
   },
 };

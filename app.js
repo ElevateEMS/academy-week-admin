@@ -140,7 +140,7 @@ function cfg() {
     courseTodo: withDefaultDue('ctodo-', s.courseTodoList || DEFAULTS.courseTodoList),
     binder: s.binderList || DEFAULTS.binderList,
     packet: binderPacket(s.binderCopies),
-    docs: { ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) },
+    docs: fixDocs({ ...DEFAULTS.docChecklist, ...(s.docChecklist || {}) }),
     weekH: s.weekH || null,
     bag: s.bag || DEFAULTS.bag,
     someBags: s.someBags || {},
@@ -1324,6 +1324,7 @@ function infoBox() {
   <div class="info-links">
     ${S.sheet.folderUrl ? `<a class="btn small" href="${esc(S.sheet.folderUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Folder">Cohort folder ↗</a>` : ''}
     ${S.sheet.sheetUrl ? `<a class="btn small" href="${esc(S.sheet.sheetUrl)}" target="_blank" rel="noopener" data-name="${esc(S.cohortKey)} Sheet">Cohort sheet ↗</a>` : ''}
+    ${exportBtn('small')}
   </div>`;
 }
 
@@ -1503,7 +1504,7 @@ function box(b, n) {
     const all = docItems('final'), done = all.filter(x => x.on).length;
     body = head(`Final Steps <span class="count">${done}/${all.length}</span>`, done ? hideToggle('docs') : '')
       + `<ul class="checks">${all.map(x => `<li class="${x.on ? 'done' : ''}">
-        <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
+        <label>${circle(x.on, `data-act="doc" data-id="${x.id}"`)}<span>${hlTxt('doc', x.id, x.text, x.hl)}</span></label>${isExportLine(x.text) ? exportBtn('tiny') : ''}</li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>`;
   } else if (b === 'scenarios') {
     body = head('Academy Week Scenarios', `<button class="eye" data-act="libOpen" title="Scenario Library" aria-label="Scenario Library">${BOOK}</button>`) + scenBox();
   } else if (b === 'packing') {
@@ -1844,6 +1845,112 @@ function docPageHtml() {
 function printDocs() {
   document.getElementById('print-root').innerHTML = docPageHtml();
   window.print();
+}
+
+/* ---------- Export cohort files (Course Details → Export, and the Final Steps line) ----------
+   Sheets.exportCohort makes "<cohort> Cohort Files (exported <date>).zip" in the Admin folder: Course Records.xlsx
+   (the tabs below) + an Excel copy of every Google Sheet in the cohort folder. It downloads here, and ticks the
+   Final Steps line "Export cohort files from app/sheets". In it: warnings/conduct and the notes; not in it: sticky
+   notes and monitoring reasons (those go only in a dropped student's own record). */
+const EXPORT_LINE = 'Export cohort files from app/sheets', OLD_EXPORT_LINE = 'Exported excel sheet with student tracking and pass results';
+const isExportLine = t => /^export cohort files/i.test(String(t || '').trim());
+// A checklist saved in Settings before this line existed: the old Records-for-the-Class line becomes this Final Steps one.
+function fixDocs(d) {
+  if (!(d.class || []).includes(OLD_EXPORT_LINE)) return d;
+  const fin = [...(d.final || [])];
+  if (!fin.some(isExportLine)) { const i = fin.findIndex(x => /^transfer all records/i.test(x)); fin.splice(i < 0 ? fin.length : i, 0, EXPORT_LINE); }
+  return { ...d, class: d.class.filter(x => x !== OLD_EXPORT_LINE), final: fin };
+}
+const EXPORT_ICON = '<svg viewBox="0 0 24 24"><path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M5 12.5v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+const exportBtn = size => `<button class="btn ${size} export-btn" data-act="cohortExport" ${S.exportBusy ? 'disabled' : ''} title="Download the cohort’s records and an Excel copy of each of its Google Sheets (one zip, also saved in the Admin folder)">${EXPORT_ICON}${S.exportBusy ? 'Exporting…' : 'Export'}</button>`;
+
+function exportTabs() {
+  const info = cohortInfo(), x = courseExtra(), all = students(), yn = v => v === true || /^(true|yes)$/i.test(String(v)) ? 'Yes' : v === false ? '' : String(v ?? '');
+  const num = n => n == null ? '' : gradeNum(n), md = d => isIsoDate(d) ? longDate(d) : (d || '');
+  const warnsOf = sid => S.warnings.filter(w => w.sid === sid).sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    .map(w => [w.date ? shortDate(w.date) : '', w.type, w.note].filter(Boolean).join(' · ')).join('\n');
+  const nremt = c => { const t = ['Z', 'AA', 'AB'].map(L => c[L] || ''), i = t.findIndex(v => /pass/i.test(v)); return i >= 0 ? 'Passed (' + ['1st', '2nd', '3rd'][i] + ')' : t.some(v => /fail/i.test(v)) ? 'Failed' : ''; };
+  const psy = (s, st) => { const r = psychRowOf(s); if (!r) return ''; const v = psychNow(r, st), n = retestsOf(r, st); return v ? v + (n ? ' (retest' + (n > 1 ? ' ' + n : '') + ')' : '') : ''; };
+  const dropped = ((S.sheet && S.sheet.dropped) || []).map(l => { const [name, ...rest] = l.split(' - '); return { name: name.trim(), sid: slug(name.trim()), why: rest.join(' - ').trim() }; });
+  const gradeBy = sid => gradeOf({ sid, cells: {} });
+
+  // Summary
+  const done = all.filter(s => !s.out), passPsy = all.filter(s => /^pass$/i.test(cellsOf(s).V || '')).length;
+  const nre = k => all.filter(s => nremt(cellsOf(s)) === k).length, passGrade = all.filter(s => { const g = gradeOf(s).shown; return g != null && g >= PASS_MARK; }).length;
+  const summary = [['Cohort', S.cohortKey], ['Status', S.sheet.status || ''], ['VAOEMS Course No.', info.courseNos ? courseNoText(info.courseNos) : ''],
+    ['Orientation', md(info.firstDay)], ['Full CPR course', md(info.cpr)], ['Academy Week', md(info.academyStart)], ['Academy Week location', x.awLocation || ''],
+    ['JBL course code', info.jbl || ''], [],
+    ['Students', 'Count'], ['Enrolled', all.length], ['Attending Academy Week', done.length], ['Not attending', all.length - done.length], ['Dropped / withdrawn', dropped.length],
+    ['Course grade ' + PASS_MARK + '+', passGrade], ['Psychomotor exam passed', passPsy],
+    ['NREMT passed on the 1st attempt', nre('Passed (1st)')], ['NREMT passed on the 2nd attempt', nre('Passed (2nd)')], ['NREMT passed on the 3rd attempt', nre('Passed (3rd)')],
+    ['NREMT failed (not passed yet)', nre('Failed')], ['NREMT not tested yet', all.filter(s => !nremt(cellsOf(s))).length], [],
+    ['Exported', new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })]];
+
+  // Students
+  const stuHead = ['#', 'Student', 'Portal status', 'Academy Week', 'CPR', 'Background Check', 'Clinical Clearance', 'Patient Contacts', 'Assignments',
+    'Academy Week Attestation', 'Coursework', 'Final exam', 'Final retake', 'Course Grade', 'Skills signed off', 'Psychomotor Medical', 'Psychomotor Trauma',
+    'Psychomotor Exam', 'Last Class Paperwork', 'VAOEMS disposition', 'NREMT disposition', 'NREMT 1st', 'NREMT 2nd', 'NREMT 3rd', 'NREMT', 'Notes (sheet)', 'Notes (app)', 'Warnings / conduct'];
+  const stuRows = all.map((s, i) => { const c = cellsOf(s), g = gradeOf(s);
+    return [i + 1, s.name, s.status || 'Active', s.out ? outLabel(s) : 'Attending', c.I ? 'Card uploaded' : c.J ? 'Class ' + c.J : '', yn(c.K), c.O ? 'Eligible' : 'Not attested',
+      s.contacts || 0, PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length + ' of ' + PORTAL_ASSIGNMENTS.length, yn(c.Q),
+      num(g.coursework), num(g.final), num(g.retake), num(g.shown), yn(c.U), psy(s, 'med'), psy(s, 'trauma'), c.V || '', yn(c.W), c.X || '', c.Y || '',
+      c.Z || '', c.AA || '', c.AB || '', nremt(c), c.AC || '', s.note || '', warnsOf(s.sid)]; });
+  const dropHead = ['', 'Dropped / withdrawn', 'When', '', '', '', '', '', '', '', 'Coursework', 'Final exam', 'Final retake', 'Course Grade'];
+  const dropRows = dropped.map((d, i) => { const g = gradeBy(d.sid); const r = [i + 1, d.name, d.why, '', '', '', '', '', '', '', num(g.coursework), num(g.final), num(g.retake), num(g.shown)];
+    r[27] = warnsOf(d.sid); r[26] = (S.studentsDoc[d.sid] || {}).note || ''; return r; });
+  const stu = [stuHead, ...stuRows, ...(dropRows.length ? [[], dropHead, ...dropRows] : [])];
+
+  // Enrollment & Payments
+  const enHead = ['#', 'Student', 'Email', 'Phone', 'Under 18', 'Parent/Guardian', 'Guardian email', 'Guardian phone', 'Textbook', 'Book code', 'Book code issued',
+    'Deposit', 'Next installment', 'Next due', 'Next paid', 'Final installment', 'Final due', 'Final paid', 'Discount', 'Orientation', 'Late enrollee',
+    'First Class Paperwork', 'Orientation Roster', 'Ride Along Agreement'];
+  const en = [enHead, ...all.map((s, i) => { const p = emPerson(s), c = cellsOf(s), doc = S.studentsDoc[s.sid] || {}, gd = doc.guardian || {};
+    return [i + 1, s.name, p.email, s.phone || '', s.minor ? 'Yes' : '', [gd.name, gd.relation].filter(Boolean).join(' · '), gd.email || '', gd.phone || '',
+      c.D ? 'Bought through us' : '', p.bookCode, p.bookCode ? bookIssued(s, p) : '', usd(DEPOSIT), usd(p.payAmt), p.next ? shortDate(p.next) : '', yn(p.paidNext),
+      usd(p.payAmt), p.final ? shortDate(p.final) : '', yn(p.paidFinal), p.disc ? usd(p.disc) + ' off each' + (p.discNote ? ' · ' + p.discNote : '') : '',
+      p.orient ? shortDate(p.orient) + (p.late ? ' ' + (p.time || '') : '') : '', p.late ? (p.makeup ? 'Make-up orientation' : 'Yes') : '', yn(c.G), yn(c.H), yn(c.L)]; })];
+
+  // Academy Week: each student, then the Additional Psychomotor Exam Candidates
+  const awHead = ['#', 'Student', 'Academy Week', 'Skills', 'Behind on', 'Skills signed off', 'Medical (1st try)', 'Medical retest', 'Medical retests used',
+    'Trauma (1st try)', 'Trauma retest', 'Trauma retests used', 'Psychomotor Exam', 'Psychomotor notes', 'Last Class Paperwork'];
+  const awRows = all.map((s, i) => { const r = psychRowOf(s) || {}, c = cellsOf(s);
+    return [i + 1, s.name, s.out ? outLabel(s) : 'Attending', s.skill === 'behind' ? 'Behind' : 'On track', (s.behind || []).join(', '), yn(c.U),
+      r.med || '', r.medRe || '', r.row ? String(retestsOf(r, 'med')) : '', r.trauma || '', r.traumaRe || '', r.row ? String(retestsOf(r, 'trauma')) : '', c.V || '', r.notes || '', yn(c.W)]; });
+  const extras = psychRows().filter(r => !all.some(s => psychRowOf(s) === r));
+  const candHead = ['', 'Additional Psychomotor Exam Candidate', 'Email', 'Phone', 'VAOEMS #', 'Reason', 'Test date', 'Medical attempts', 'Trauma attempts', 'Notes'];
+  const tries = (c, st) => Object.entries((c.attempts || {})[st] || {}).sort(([a], [b]) => a - b)
+    .map(([n, a]) => '#' + n + ' ' + (a.result || '') + (a.evaluator ? ' (' + a.evaluator + ')' : '') + (a.date ? ' ' + shortDate(a.date) : '')).join('\n');
+  const candRows = extras.map((r, i) => { const c = candOf(r);
+    return [i + 1, r.name, c.email || '', c.phone || '', c.vaoems || '', c.reason || '', c.testDate ? shortDate(c.testDate) : '',
+      tries(c, 'med') || [r.med, r.medRe].filter(Boolean).join(' → '), tries(c, 'trauma') || [r.trauma, r.traumaRe].filter(Boolean).join(' → '), r.notes || '']; });
+  const aw = [awHead, ...awRows, ...(candRows.length ? [[], candHead, ...candRows] : [])];
+
+  const heads = (rows, extra) => [1, ...(extra ? [rows.indexOf(extra) + 1] : [])].filter(n => n > 0);
+  const w = (...a) => a;
+  return [
+    { name: 'Summary', rows: summary, heads: [summary.findIndex(r => r[0] === 'Students') + 1].filter(n => n > 0), widths: w(240, 260) },
+    { name: 'Students', rows: stu, heads: heads(stu, dropRows.length ? dropHead : null), widths: w(36, 200, 90, 130, 110, 90, 100, 80, 90, 100, 85, 80, 80, 85, 80, 120, 120, 100, 90, 110, 110, 80, 80, 80, 100, 220, 220, 300) },
+    { name: 'Enrollment & Payments', rows: en, heads: [1], widths: w(36, 200, 220, 110, 70, 180, 200, 110, 120, 110, 110, 80, 100, 80, 70, 100, 80, 70, 200, 110, 110, 100, 100, 100) },
+    { name: 'Academy Week', rows: aw, heads: heads(aw, candRows.length ? candHead : null), widths: w(36, 220, 120, 80, 200, 90, 110, 110, 90, 110, 110, 90, 100, 260, 100) },
+  ];
+}
+async function cohortExport() {
+  if (S.exportBusy || !S.sheet) return;
+  S.exportBusy = true; render();
+  try {
+    const out = await Sheets.exportCohort(S.cohortKey, exportTabs());
+    if (out.zip) {
+      const bin = atob(out.zip), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })), a = document.createElement('a');
+      a.href = url; a.download = out.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } else if (out.url && Store.configured) window.open(out.url, '_blank', 'noopener');
+    await Store.set('cohorts/' + S.cohortKey, { docChecks: { ['final-' + slug(EXPORT_LINE)]: true } });
+    toast((out.zip ? 'Downloaded ' : 'Saved ') + out.name + ' (Course Records + ' + out.sheets + ' sheet' + (out.sheets === 1 ? '' : 's') + '; a copy is in the Admin folder).'
+      + (out.skipped && out.skipped.length ? ' Left out: ' + out.skipped.join(', ') + '.' : ''));
+  } catch (e) { toast('Couldn’t export: ' + e.message + (/unknown request/i.test(e.message) ? ' (the Admin Apps Script needs its new version deployed)' : '')); }
+  S.exportBusy = false; render();
 }
 
 /* ---------- Binder covers (from a "binder cover" to-do) ---------- */
@@ -4022,6 +4129,7 @@ async function act(a, el = {}, e) {
         await Store.set('cohorts/' + S.cohortKey, { docChecks: { [d.id]: !on } }); break;
       }
       case 'printDocs': printDocs(); break;
+      case 'cohortExport': cohortExport(); break;
       case 'binderOpen': S.binderOpen = d.id; render(); break;
       case 'binderClose': S.binderOpen = null; render(); break;
       case 'attend': {

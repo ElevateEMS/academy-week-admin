@@ -2553,3 +2553,8 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster.aw-table tr:first-child > th.psy-head { width: 18%; }
 .roster.aw-table .psy-col { background: rgba(242, 193, 78, .09); }
 .roster.aw-table thead .psy-col { background: rgba(242, 193, 78, .2); }
+
+/* Export (Course Details + the Final Steps line): icon before the word */
+.btn.export-btn { display: inline-flex; align-items: center; gap: 6px; }
+.btn.export-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.checks li > .export-btn { margin-left: auto; align-self: center; }
