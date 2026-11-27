@@ -2343,12 +2343,13 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .roster.aw-table tr:first-child > th:first-child { width: 3%; }
 .roster.aw-table tr:first-child > th:nth-child(2) { width: 17%; }
 .roster.aw-table th.c { width: auto; }
-/* Students / Staff: always orange (easy to find); the one you're on gets a ring around it (navy on the light
-   headers, white on the Navy header). */
+/* Students / Staff: always orange (easy to find), a compact rounded rectangle; the one you're on has a white line inside. */
 .top .icon-btn.named, :root[data-theme] .top .icon-btn.named { background: #e0702a; color: #fff; border-color: #e0702a; box-shadow: none; }
 .top .icon-btn.named:hover { background: #c95f1f; border-color: #c95f1f; color: #fff; }
-.top .icon-btn.named.on, :root[data-theme] .top .icon-btn.named.on { background: #e0702a; color: #fff; border-color: #e0702a; box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px #0c2a43; }
-:root[data-theme="navy"] .top .icon-btn.named.on { box-shadow: 0 0 0 2px #0c2a43, 0 0 0 4px #fff; }
+.top .icon-btn.named, :root[data-theme] .top .icon-btn.named { height: 34px; border-radius: 10px; padding: 0 12px 0 9px; }
+.top .icon-btn.named svg { width: 19px; height: 19px; }
+/* The page you're on: a thin white line just inside the edge (no extra size). */
+.top .icon-btn.named.on, :root[data-theme] .top .icon-btn.named.on { background: #e0702a; color: #fff; border-color: #e0702a; box-shadow: inset 0 0 0 2px #fff; }
 
 /* ---------- Psychomotor exam ---------- */
 .psy-pair { white-space: nowrap; }
