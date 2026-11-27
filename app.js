@@ -2515,7 +2515,7 @@ function nameMarks(s) {
 }
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
-  const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)) && (!S.watchOnly || watchOf(s)));
+  const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
       <colgroup><col style="width:3%"><col style="width:17%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
@@ -2550,7 +2550,7 @@ function studentsView() {
   const mode = stuMode();
   return `<div class="stu-top"><span></span><div class="stu-tabs" role="tablist" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" role="tab" aria-selected="${mode === k}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re monitoring">Monitoring <b>${students().filter(watchOf).length}</b></button>` : ''}${mode === 'aw' ? awTopRight() : ''}
+    <span class="stu-top-right">${mode === 'aw' ? awTopRight() : ''}
 </span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
@@ -3547,7 +3547,6 @@ async function act(a, el = {}, e) {
         catch (e) { toast(e.message); }
         break;
       }
-      case 'watchOnly': S.watchOnly = !S.watchOnly; render(); break;
       case 'spTab': S.spTab = d.id; render(); { const b = document.querySelector('.drawer-body'); if (b) b.scrollTop = 0; } break;
       case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }
       case 'cellTick': { const s = studentBySid(d.sid); if (s) await setCells(d.sid, { [d.l]: !cellsOf(s)[d.l] }); break; }
