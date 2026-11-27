@@ -598,7 +598,7 @@ function pickSide(key) {
 }
 
 async function selectCohort(key, { keepView = false } = {}) {
-  S.cohortKey = key; pref('cohort', key);
+  S.cohortKey = key; pref('cohort', key); S.stuMode = 'roster';
   unwatchCohort.forEach(u => u()); unwatchCohort = [];
   Object.assign(S, { sheet: null, cohortDoc: null, studentsDoc: {}, contacts: [], warnings: [], days: {}, staff: {}, todos: [], packing: [], schedule: {}, open: null, day: null,
     evals: [], emailLog: [], emailDraft: null, emailPick: null, emailStu: null, rosterDocs: {}, rosterSigs: {}, roster: null, todosLoaded: false,
@@ -875,7 +875,7 @@ function cohortSteps() {
 function cohortTitle() {
   const { prev, next } = cohortSteps();
   const step = (k, dir) => k ? `<button class="cohort-step" data-act="cohortStep" data-k="${esc(k)}" title="${esc(k)}" aria-label="${dir}: ${esc(k)}">${dir === 'Previous' ? '‹' : '›'}</button>`
-    : '<span class="cohort-step" aria-hidden="true"></span>';
+    : `<span class="cohort-step off" aria-hidden="true">${dir === 'Previous' ? '‹' : '›'}</span>`; // (faded, so the name stays centered)
   return `<h1 class="cohort-title">${step(prev, 'Previous')}<span>${esc(S.cohortKey || 'Course')}</span>${step(next, 'Next')}</h1>`;
 }
 
@@ -2338,7 +2338,8 @@ function pcStepper(s, { row = false } = {}) {
    sheet (Sheets.setCells), so the sheet stays the full backup. Enrollment: the Student Emails table. Academy Week:
    patient contacts, skills, conduct, peer evals. Clicking a name opens their student page (drawer()). */
 const STU_MODES = [['roster', 'Roster'], ['enroll', 'Enrollment'], ['aw', 'Academy Week']];
-const stuMode = () => STU_MODES.some(([k]) => k === S.stuMode) ? S.stuMode : STU_MODES.some(([k]) => k === pref('stuMode')) ? pref('stuMode') : 'roster';
+// Which tab: Roster when a cohort opens and from Course; Academy Week from an Academy Week page (the Students button).
+const stuMode = () => STU_MODES.some(([k]) => k === S.stuMode) ? S.stuMode : 'roster';
 // The Student Hub's assignments (the ones that count), by the roster column each one ticks. P is a number: done at 10.
 const PORTAL_ASSIGNMENTS = [['G', 'First Class Paperwork'], ['H', 'Orientation Roster'], ['I', 'CPR Card'], ['K', 'Fingerprinting'],
   ['L', 'Ride Along Agreement'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness'], ['P', 'Ride Along Paperwork & Patient Contacts'],
@@ -3475,13 +3476,14 @@ async function act(a, el = {}, e) {
         // The lit Students / Staff button again: back to the page you came from (Course or Academy Week; Admin).
         let v = d.v;
         if (v === S.view && (v === 'students' || v === 'staff')) v = S.prevView && S.prevView !== v ? S.prevView : v === 'staff' ? 'admin' : 'course';
+        if (v === 'students' && v !== S.view) S.stuMode = ['day', 'week', 'schedule'].includes(S.view) ? 'aw' : 'roster';
         if (v !== S.view) S.prevView = S.view;
         S.view = v; pref('view', v); S.open = null; S.menuOpen = false;
         if (['day', 'week', 'schedule'].includes(v)) pref('awView', v);
         render(); window.scrollTo(0, 0); break;
       }
       case 'cohortStep': selectCohort(d.k, { keepView: true }); window.scrollTo(0, 0); break;
-      case 'stuMode': S.stuMode = d.v; pref('stuMode', d.v); render(); break;
+      case 'stuMode': S.stuMode = d.v; render(); break;
       case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;

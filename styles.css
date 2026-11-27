@@ -2192,7 +2192,8 @@ header.top .icons > [data-tip]:last-child:hover::after, header.top .icons > .men
 .cohort-step { width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--head-muted); font-family: Jost, system-ui, sans-serif;
   font-size: 26px; line-height: 1; padding: 0 0 3px; cursor: pointer; display: inline-grid; place-items: center; flex: none; }
 .cohort-step:hover { background: var(--head-hover); color: var(--head-ink); }
-span.cohort-step { cursor: default; }
+span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
+.cohort-step.off, .cohort-step.off:hover { opacity: .25; background: transparent; color: var(--head-muted); }
 .page-title .cohort-title > span:not(.cohort-step) { color: inherit; font-weight: inherit; } /* (not the faded “· Scenarios” look) */
 /* Navy header: the shield in light lines (logo-light.png), like the app icon. */
 :root[data-theme="navy"] .top .brand img { content: url(logo-light.png); }
