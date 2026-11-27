@@ -833,6 +833,8 @@ function shell() {
   ${S.renameAsk ? renameModal() : ''}
   ${S.guardianAsk ? guardianModal() : ''}
   ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
+  ${S.psychEd && S.sheet ? psychEdModal() : ''}
+  ${S.stationAsk && S.sheet ? stationAskModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
 
@@ -2085,6 +2087,89 @@ function fbPdfRow() {
   return `<div class="fb-pdf-row"><span class="muted small">${f ? `Saved ${when}${f.by === 'auto' ? ' (on its own)' : ''}${links ? ' · ' + links : ''}` : 'PDFs save to the Admin folder on their own at 7 PM the day answers come in.'}</span>
     <button class="btn tiny" data-act="fbPdfSave" ${S.fbPdfBusy ? 'disabled' : ''}>${S.fbPdfBusy ? 'Saving…' : f ? 'Save PDFs again' : 'Save PDFs'}</button></div>`;
 }
+/* ---------- Psychomotor exam (the cohort sheet's "Psychotor Exam" tab, S.sheet.psych) ----------
+   Medical, Retest, Trauma, Retest (Testing / Pass / Fail) and Notes per row; read and written there (Sheets.setPsych).
+   One person tests at a time per station: Medical, and Trauma 1 (and Trauma 2 when two are running: cohort doc
+   psychTrauma = 1 | 2, and which station each tester is at in psychStations = { row: 1 | 2 }, app only).
+   Both stations passed (or their retests) sets the roster's Psychomotor Exam (V) to Pass; it can still be changed by hand. */
+const psychRows = () => (S.sheet && S.sheet.psych && S.sheet.psych.rows) || [];
+const psychRowOf = s => psychRows().find(r => r.name.trim().toLowerCase() === s.name.trim().toLowerCase()) || psychRows().find(r => slug(r.name) === s.sid);
+const psychNow = (r, k) => (r[k + 'Re'] || r[k] || ''); // the retest once it's filled in, otherwise the first try
+const psychMark = v => /^pass$/i.test(v) ? '<span class="psy pass">✓</span>' : /^fail$/i.test(v) ? '<span class="psy fail">✗</span>' : /^testing$/i.test(v) ? '<span class="psy testing">Testing</span>' : '<span class="r-no">–</span>';
+const traumaStations = () => Number((S.cohortDoc && S.cohortDoc.psychTrauma) || 1) === 2 ? 2 : 1;
+const stationOf = r => Number(((S.cohortDoc && S.cohortDoc.psychStations) || {})[r.row]) === 2 && traumaStations() === 2 ? 2 : 1;
+const isTesting = (r, k) => /^testing$/i.test(r[k] || '') || /^testing$/i.test(r[k + 'Re'] || '');
+const shortName = n => { const [last, first = ''] = String(n).split(','); return (first.trim().split(/\s+/)[0] || '') + (first ? ' ' : '') + last.trim(); };
+async function setPsych(row, cells, station) {
+  const r = psychRows().find(x => x.row === row); if (!r) return;
+  for (const [k, v] of Object.entries(cells)) {
+    if (!/^testing$/i.test(v)) continue;
+    const st = k.startsWith('med') ? 'med' : 'trauma', others = psychRows().filter(x => x.row !== row && isTesting(x, st));
+    if (st === 'med' && others.length) { toast(`Medical is in use: ${shortName(others[0].name)}. Set them to Pass or Fail first.`); render(); return; }
+    if (st === 'trauma') {
+      const taken = others.map(stationOf), free = [1, 2].slice(0, traumaStations()).filter(n => !taken.includes(n));
+      if (!free.length) { toast(`Trauma is in use: ${others.map(x => shortName(x.name)).join(' and ')}. Set one to Pass or Fail first.`); render(); return; }
+      if (station == null && free.length > 1) { S.stationAsk = { row, cells }; render(); return; } // which trauma station?
+      await Store.set('cohorts/' + S.cohortKey, { psychStations: { [row]: station ?? free[0] } });
+    }
+  }
+  const before = { ...r };
+  Object.assign(r, cells); render();
+  try { await Sheets.setPsych(S.cohortKey, row, r.name, cells); }
+  catch (e) { Object.assign(r, before); toast(e.message); render(); return; }
+  // Both stations passed: the roster's Psychomotor Exam to Pass (a class student only).
+  const s = students().find(x => psychRowOf(x) === r);
+  if (s && /^pass$/i.test(psychNow(r, 'med')) && /^pass$/i.test(psychNow(r, 'trauma')) && !/^pass$/i.test(cellsOf(s).V || '')) {
+    await setCells(s.sid, { V: 'Pass' }); toast(`${firstName(s.name)} passed both stations: Psychomotor Exam set to Pass.`);
+  }
+}
+// "Now testing" (Academy Week view): who's at each station, and 1 or 2 trauma stations.
+function psychStrip() {
+  if (!S.sheet || !S.sheet.psych) return '';
+  const rows = psychRows(), who = list => list.length ? list.map(r => `<button class="link" data-act="psychOpen" data-row="${r.row}">${esc(shortName(r.name))}</button>`).join(', ') : '<span class="r-no">open</span>';
+  const med = rows.filter(r => isTesting(r, 'med')), tr = rows.filter(r => isTesting(r, 'trauma')), n = traumaStations();
+  const slot = (label, list) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list)}</span>`;
+  return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slot('Medical', med)}${n === 2 ? slot('Trauma 1', tr.filter(r => stationOf(r) === 1)) + slot('Trauma 2', tr.filter(r => stationOf(r) === 2)) : slot('Trauma', tr)}
+    <span class="seg ps-seg" title="Trauma stations running">${[1, 2].map(x => `<button class="${n === x ? 'on' : ''}" data-act="psychStations" data-v="${x}">${x} trauma</button>`).join('')}</span></div>`;
+}
+// Everyone on the Psychomotor Exam tab who isn't in the class (people who only come to test), kept to the side.
+function psychExtras() {
+  if (!S.sheet || !S.sheet.psych) return '';
+  const all = students(), extras = psychRows().filter(r => !all.some(s => psychRowOf(s) === r));
+  const sel = (r, k) => `<select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o => `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>`;
+  return `<section class="box psych-extras"><div class="pe-head"><h3>Also testing</h3><span class="muted small">Not in the class: here for the psychomotor exam only</span></div>
+    ${extras.length ? `<table class="pe-table"><thead><tr><th>Name</th><th>Medical</th><th>Retest</th><th>Trauma</th><th>Retest</th><th>Notes</th></tr></thead><tbody>${extras.map(r => `<tr>
+      <td><button class="name-link" data-act="psychOpen" data-row="${r.row}">${esc(r.name)}</button></td>${['med', 'medRe', 'trauma', 'traumaRe'].map(k => `<td>${sel(r, k)}</td>`).join('')}
+      <td class="muted small">${esc(r.notes || '')}</td></tr>`).join('')}</tbody></table>` : ''}
+    <div class="pe-add"><input id="pe-add" data-draft="pe-add" placeholder="Last, First" value="${esc(S.drafts['pe-add'] || '')}" autocomplete="off"><button class="btn small" data-act="psychAdd">+ Add a tester</button></div></section>`;
+}
+// The pop-up: Medical, Retest, Trauma, Retest, Notes (S.psychEd = { row } or { sid }).
+function psychEdModal() {
+  const ed = S.psychEd; if (!ed) return '';
+  const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
+  const name = s ? s.name : r ? r.name : '';
+  const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${k.startsWith('trauma') && isTesting(r, 'trauma') && traumaStations() === 2 && /^testing$/i.test(r[k] || '') ? `<span class="muted small">Trauma ${stationOf(r)}</span>` : ''}</label>`;
+  const dk = 'psy-notes-' + (r ? r.row : 0);
+  const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
+    : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
+    : `<div class="psy-grid">${sel('med', 'Medical')}${sel('medRe', 'Retest')}${sel('trauma', 'Trauma')}${sel('traumaRe', 'Retest')}</div>
+      <label class="sp-note-label">Notes</label><textarea id="${dk}" data-draft="${dk}" rows="3" class="ce-note">${esc(S.drafts[dk] ?? r.notes ?? '')}</textarea>
+      <div class="ce-save"><button class="btn small" data-act="psychNoteSave" data-row="${r.row}">Save note</button></div>
+      ${s ? `<div class="psy-result">${ceLine(s, ['V', 'Psychomotor Exam (roster)', 'select'])}<p class="muted small">Sets itself to Pass once both stations pass. Change it here if needed.</p></div>` : ''}`;
+  return `<div class="overlay" data-act="psychClose"><div class="modal confirm cell-ed" data-stop>
+    <div class="modal-head"><h2>Psychomotor exam <span class="muted small">${esc(name)}</span></h2><button class="x big" data-act="psychClose" aria-label="Close">×</button></div>
+    <div class="modal-body">${body}</div></div></div>`;
+}
+function stationAskModal() {
+  const a = S.stationAsk; if (!a) return '';
+  const r = psychRows().find(x => x.row === a.row);
+  return `<div class="overlay" data-act="stationCancel"><div class="modal confirm" data-stop>
+    <div class="modal-head"><h2>Which trauma station?</h2><button class="x big" data-act="stationCancel" aria-label="Close">×</button></div>
+    <div class="modal-body"><p>${esc(r ? shortName(r.name) : '')} is testing at:</p></div>
+    <div class="modal-foot">${[1, 2].map(n => `<button class="btn primary" data-act="stationPick" data-n="${n}">Trauma ${n}</button>`).join('')}</div></div></div>`;
+}
+
 function awStudentsView() {
   const everyone = students();
   const all = everyone.filter(s => !s.out); // counts and "behind" leave out students not attending
@@ -2116,7 +2201,7 @@ function awStudentsView() {
   const skillLabel = { on: 'On track', behind: 'Behind', done: 'Done' };
 
   // (Before the flip there's no filter row at all: search is in the header, and the Skills Tracking sheet waits for Academy Week.)
-  return `
+  return `${psychStrip()}
   ${pre ? '' : `<div class="students-top">
     <div class="chips">${chip('all', 'All')}${chip('behind', 'Behind on skills')}${chip('fixes', 'Contacts to fix')}</div>
     <div class="students-tools"><button class="eye" data-act="skillsSheet" title="Skills Tracking sheet" aria-label="Skills Tracking sheet">${SHEET}</button></div>
@@ -2148,7 +2233,7 @@ function awStudentsView() {
         : `<th class="c">Patient contacts</th><th class="c">Skills</th><th class="c" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" title="${ROSTER_TIPS.awW}">Final Sigs</th><th class="c" title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td><b>${esc(s.name)}</b>${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
+        <td>${nameCell(s)}${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
         ${pre ? (p => `<td class="c">${yes(p.textbook)}</td><td class="c">${yes(p.paidNext)}</td><td class="c">${yes(p.paidFinal)}</td>
         <td class="c"><button class="cell-link" data-act="emLateOpen" data-sid="${p.sid}" title="Late enrollee: their own orientation">${p.orient ? monthDay(p.orient) + (p.late ? ' · ' + esc(p.time || 'time?') : '') : 'TBD'}</button></td>
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
@@ -2159,7 +2244,8 @@ function awStudentsView() {
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
       </tr>`).join('') || `<tr><td colspan="${8 + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
-  </section>`;
+  </section>
+  ${psychExtras()}`;
 }
 
 // Under a name on the Students page (each one opens its pop-up): needs orientation date, late enrollee (the whole
@@ -2249,17 +2335,34 @@ async function saveGrade(sid, g) {
   await setCells(sid, { S: now.counted ?? '', T: now.shown ?? '' });
 }
 
+// Past its deadline and not done (the Student Hub's deadlines): First Class Paperwork the first day of class (a late
+// enrollee: their own orientation), Background Check a month before Academy Week, Final Compliance 8 AM the day before
+// it, CPR card its last day. Vital Signs, Readiness and Test Prep have no set date.
+function overdueCells(s) {
+  const c = cellsOf(s), p = emPerson(s), t = todayIso(), aw = (S.sheet && S.sheet.academyStart) || cohortInfo().academyStart, out = {};
+  const first = p.late && !p.makeup ? p.orient : cohortInfo().firstDay;
+  if (isIsoDate(first) && t > first && !['G', 'H', 'L'].every(L => c[L])) out.paper = true;
+  if (isIsoDate(aw)) {
+    const month = parseIso(aw); month.setMonth(month.getMonth() - 1);
+    if (t > isoOf(month) && !c.K) out.fp = true;
+    const eve = addDays(aw, -1);
+    if ((t > eve || (t === eve && new Date().getHours() >= 8)) && !c.Q) out.comp = true;
+    if (t > addDays(aw, 4) && !c.I) out.cpr = true;
+  }
+  return out;
+}
 // One roster cell: what it says, and the pop-up it opens.
 function rosterCell(s, k) {
   const c = cellsOf(s), yes = '<span class="em-yes">✓</span>', no = '<span class="r-no">–</span>';
   const ed = /^aw[UVW]$/.test(k) ? 'aw' : k; // (the three Academy Week cells share one pop-up)
-  const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
+  const late = overdueCells(s)[k];
+  const btn = (inner, cls = '', tip = '') => `<button class="r-cell ${cls} ${late ? 'overdue' : ''}" data-act="cellEd" data-sid="${s.sid}" data-k="${ed}" title="${esc((late ? 'Overdue · ' : '') + (tip || ''))}">${inner}</button>`;
   if (k === 'paper') { const n = ['G', 'H', 'L'].filter(L => c[L]).length; return btn(n === 3 ? yes : n + ' of 3', n === 3 ? '' : 'soft', 'First Class Paperwork, Orientation Roster, Ride Along Agreement'); }
   if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
     const n = s.contacts || 0, cls = !contactsCrunch() ? '' : n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return btn(`${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>'} <span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span>`, '', 'Ride Along Readiness attestation · patient contacts');
+    return btn(`<span class="ride-wrap"><span>${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>'}</span><span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span></span>`, '', 'Ride Along Readiness attestation · patient contacts');
   }
   if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
@@ -2268,7 +2371,12 @@ function rosterCell(s, k) {
     return btn(g.shown == null ? no : `<b class="${low(g.shown) ? 'low' : ''}">${gradeNum(g.shown)}</b>${g.counted != null ? ` <span class="muted small ${low(g.counted) ? 'low' : ''}">final ${gradeNum(g.counted)}</span>` : ''}`);
   }
   if (k === 'awU') return btn(c.U ? yes : no, '', 'All skills');
-  if (k === 'awV') return btn(c.V ? esc(c.V) : no, '', 'Psychomotor exam');
+  if (k === 'awV') { // both stations at a glance (from the Psychomotor Exam tab); ✓ Pass once the roster says so
+    const r = psychRowOf(s), open = inner => `<button class="r-cell" data-act="psychOpen" data-sid="${s.sid}" title="Psychomotor exam: Medical and Trauma">${inner}</button>`;
+    if (/^pass$/i.test(c.V || '')) return open(yes + ' Pass');
+    if (r && (psychNow(r, 'med') || psychNow(r, 'trauma'))) return open(`<span class="psy-pair">Med ${psychMark(psychNow(r, 'med'))} · Trauma ${psychMark(psychNow(r, 'trauma'))}</span>`);
+    return open(c.V ? esc(c.V) : no);
+  }
   if (k === 'awW') return btn(c.W ? yes : no, '', 'Last class signatures');
   if (k === 'dispo') return btn(c.X || c.Y ? `<span class="aw-marks"><span title="VAOEMS">${esc(c.X || '–')}</span><span title="NREMT">${esc(c.Y || '–')}</span></span>` : no);
   if (k === 'nremt') {
@@ -2278,13 +2386,13 @@ function rosterCell(s, k) {
   }
   return '';
 }
-// Roster columns, left to right. Academy Week is one heading over three (its sub-headings sit in a second row).
-// Notes and Portal status are on each student's page instead (a Paused / Limited student's name is highlighted here).
-// Each column's share of the table (%, after # 3 and Student 13), so every cohort's columns sit in the same places.
-const ROSTER_W = { paper: 6.5, cpr: 8, fp: 6.5, ride: 10, assign: 6.5, comp: 6.5, grade: 7.5, awU: 5, awV: 6.5, awW: 5.5, dispo: 7, nremt: 8.5 };
+// Roster columns, left to right. Notes and Portal status are on each student's page instead (a Paused / Limited
+// student's name is highlighted here; so is one you're keeping an eye on).
+// Each column's share of the table (%, after # 3 and Student 19), so every cohort's columns sit in the same places.
+const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 11, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
-  ['awU', 'Skills', 'aw'], ['awV', 'Psychomotor', 'aw'], ['awW', 'Final Sigs', 'aw'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']];
+  ['awW', 'Final<br>Sigs'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
@@ -2306,8 +2414,16 @@ function bookMark(s, p) {
   const tip = p.bookCode ? `Textbook code ${p.bookCode} issued${when ? ' ' + when : ''}` : 'Bought the textbook · code not issued yet';
   return `<button class="name-mark book-mark ${p.bookCode ? '' : 'soft'}" data-act="cellEd" data-sid="${s.sid}" data-k="book" title="${esc(tip)}">${p.bookCode ? BOOK_OK_ICON : BOOK_ICON}</button>`;
 }
-// "Thompson, Matthew (Matt)" → ["Thompson, Matthew ", "(Matt)"], so a dot after the name never wraps onto a line by itself.
-const splitLastWord = name => { const m = String(name).match(/^(.*\s)?(\S+)$/); return m ? [m[1] || '', m[2]] : ['', String(name)]; };
+// Keep an eye on (their student page → Overview): students/{sid}.watch = { on, why }. Their name gets an orange
+// highlight and a ⚑ in each Students view (the reason when you point at it); Watching on the Roster shows just them.
+const watchOf = s => { const w = (S.studentsDoc[s.sid] || {}).watch; return w && w.on ? w : null; };
+const FLAG_ICON = '<svg viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 4.5h10.5l-2 3.75 2 3.75H6"/></svg>';
+// The name in a Students view: opens their page; Paused / Limited or watched shows on it. (One line: a long one ends in "…".)
+function nameCell(s) {
+  const w = watchOf(s), lim = /^(paused|limited)$/i.test(s.status);
+  const tip = [s.name, lim ? 'Portal: ' + s.status : '', w ? '⚑ ' + (w.why || 'Keeping an eye on them') : ''].filter(Boolean).join(' · ');
+  return `<span class="name-link ${lim ? 'limited' : ''} ${w ? 'watch' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}" title="${esc(tip)}">${w ? `<span class="watch-flag" aria-label="Keeping an eye on them">${FLAG_ICON}</span>` : ''}${esc(s.name)}</span>`;
+}
 // A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
   const p = emPerson(s), i = cohortInfo(), out = [];
@@ -2320,18 +2436,15 @@ function nameMarks(s) {
 }
 function rosterStudentsView() {
   const everyone = students(), q = S.search.trim().toLowerCase();
-  const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => !q || s.name.toLowerCase().includes(q));
+  const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)) && (!S.watchOnly || watchOf(s)));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
-      <colgroup><col style="width:3%"><col style="width:13%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
-      <thead><tr><th rowspan="2">#</th><th rowspan="2">Student</th>${ROSTER_COLS.map(([k, l, grp], i) => grp
-        ? (ROSTER_COLS[i - 1][2] === grp ? '' : `<th class="c th-group aw-col aw-first" colspan="${ROSTER_COLS.filter(x => x[2] === grp).length}" title="${ROSTER_TIPS[grp]}">Academy Week</th>`)
-        : `<th class="c col-${k}" rowspan="2" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr>
-        <tr>${ROSTER_COLS.filter(x => x[2]).map(([k, l], i) => `<th class="c th-sub-row aw-col col-${k} ${i === 0 ? 'aw-first' : ''}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
+      <colgroup><col style="width:3%"><col style="width:19%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
+      <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([k, l]) => `<th class="c col-${k}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
-        <td class="r-name"><span class="name-link ${/^(paused|limited)$/i.test(s.status) ? 'limited' : ''}" role="button" tabindex="0" data-act="openStudent" data-sid="${s.sid}"${/^(paused|limited)$/i.test(s.status) ? ` title="Portal: ${esc(s.status)}"` : ''}>${(([first, last]) => `${esc(first)}<span class="nowrap">${esc(last)}${s.out ? '' : nameMarks(s)}</span>`)(splitLastWord(s.name))}</span>${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}</td>
-        ${ROSTER_COLS.map(([k, , grp], i) => `<td class="c col-${k}${grp ? ' aw-col' + (ROSTER_COLS[i - 1][2] === grp ? '' : ' aw-first') : ''}">${rosterCell(s, k)}</td>`).join('')}
+        <td class="r-name">${nameCell(s)}${minorTag(s)}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : nameMarks(s)}</td>
+        ${ROSTER_COLS.map(([k]) => `<td class="c col-${k}">${rosterCell(s, k)}</td>`).join('')}
       </tr>`).join('') || `<tr><td colspan="${ROSTER_COLS.length + 2}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>
@@ -2350,7 +2463,8 @@ function studentsView() {
   const mode = stuMode();
   return `<div class="stu-top"><div class="seg stu-seg" role="group" aria-label="Students view">${STU_MODES.map(([k, l]) =>
       `<button class="${mode === k ? 'on' : ''}" data-act="stuMode" data-v="${k}">${l}</button>`).join('')}</div>
-    <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></div>
+    <span class="stu-top-right">${mode === 'roster' && (S.watchOnly || students().some(watchOf)) ? `<button class="chip watch-chip ${S.watchOnly ? 'on' : ''}" data-act="watchOnly" title="Just the students you’re keeping an eye on">⚑ Watching <b>${students().filter(watchOf).length}</b></button>` : ''}
+      <span class="muted small">${attending().length} students${students().some(s => s.out) ? ` · ${students().filter(s => s.out).length} not attending` : ''}</span></span></div>
   ${mode === 'roster' ? rosterStudentsView() : mode === 'enroll' ? `<section class="box table-box">${emStudentsTable()}</section>` : awStudentsView()}`;
 }
 
@@ -2394,6 +2508,8 @@ function studentPageTop(s) {
   const tabs = `<nav class="sp-tabs" role="tablist">${SP_SECTIONS.map(([id, l]) => `<button class="${tab === id ? 'on' : ''}" role="tab" data-act="spTab" data-id="${id}">${l}</button>`).join('')}</nav>`;
   if (tab === 'overview') return tabs + `<div class="sp-cards">
       <section class="sp-card"><h3>Contact</h3>
+        <div class="watch-line">${circle(!!watchOf(s), `data-act="watchToggle" data-sid="${s.sid}"`)}<span>Keep an eye on</span>
+          ${watchOf(s) ? `<input id="wy-${s.sid}" data-draft="wy-${s.sid}" placeholder="Why? (shows when you point at their ⚑)" value="${esc(S.drafts['wy-' + s.sid] ?? watchOf(s).why ?? '')}" autocomplete="off"><button class="btn tiny" data-act="watchSave" data-sid="${s.sid}">Save</button>` : ''}</div>
         <dl class="sp-kv">
           <dt>Email</dt><dd>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</dd>
           <dt>Phone</dt><dd>${s.phone ? copyLine(s.phone, 'Phone') : '<span class="muted">Not in the sheet (it goes in the note on their name)</span>'}</dd>
@@ -2431,7 +2547,7 @@ function studentPageTop(s) {
 function spAwRows(s) {
   const row = (title, cells) => `<div class="sp-row"><span class="sp-row-title">${title}</span>${cells.map(r => ceLine(s, r)).join('')}</div>`;
   return `<section><h3>Exams &amp; disposition</h3>
-    ${row('Psychomotor', [['V', 'Exam', 'select']])}
+    <div class="sp-row"><span class="sp-row-title">Psychomotor</span>${rosterCell(s, 'awV')}${ceLine(s, ['V', 'Result', 'select'])}</div>
     ${row('Disposition', [['W', 'Final Sigs'], ['X', 'VAOEMS', 'select'], ['Y', 'NREMT', 'select']])}
     ${row('NREMT exam', [['Z', '1st', 'select'], ['AA', '2nd', 'select'], ['AB', '3rd', 'select']])}
   </section>`;
@@ -3182,6 +3298,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.change === 'cohort') { S.menuOpen = false; selectCohort(t.value); return; }
   if (t.dataset.change === 'cellSel') { setCells(t.dataset.sid, { [t.dataset.l]: t.value }); return; } // a roster dropdown (Students page)
+  if (t.dataset.change === 'psychSel') { setPsych(Number(t.dataset.row), { [t.dataset.k]: t.value }); return; } // the Psychomotor Exam tab
   if (/^(plan|libEvery|addonNeed|addonMinus)/.test(t.dataset.change || '')) { try { await scenChange(t); } catch (err) { toast(err.message); } return; }
   if (t.dataset.sch) { schChange(t); return; }
   if (t.dataset.bagname != null || t.dataset.bagitem != null) { try { await bagRename(t); } catch (err) { toast(err.message); } return; }
@@ -3208,6 +3325,8 @@ document.addEventListener('keydown', e => {
     if (S.resetAsk) { if (!S.resetBusy) { S.resetAsk = false; delete S.drafts.resetName; render(); } return; }
     if (S.dropAsk && !S.datePick) { if (!S.dropBusy) dropClose(); return; }
     if (S.guardianAsk) { guardianClose(); return; }
+    if (S.stationAsk) { S.stationAsk = null; render(); return; }
+    if (S.psychEd) { S.psychEd = null; render(); return; }
     if (S.cellEd && !S.emailStu) { cellEdClose(); return; }
     if (S.renameAsk) { if (!S.renameBusy) { if (S.renameConfirm) { S.renameConfirm = false; render(); } else renameClose(); } return; }
     if (S.statusAsk) { if (!S.statusAsk.busy) { S.statusAsk = null; render(); } return; }
@@ -3280,7 +3399,27 @@ async function act(a, el = {}, e) {
       case 'droppedToggle': if (e) e.preventDefault(); S.droppedOpen = !S.droppedOpen; render(); break;
       case 'cellEd': S.cellEd = { sid: d.sid, k: d.k }; render(); break;
       case 'cellEdClose': cellEdClose(); break;
+      case 'psychOpen': S.psychEd = d.sid ? { sid: d.sid } : { row: Number(d.row) }; render(); break;
+      case 'psychClose': S.psychEd = null; Object.keys(S.drafts).filter(k => /^psy-notes-/.test(k)).forEach(k => delete S.drafts[k]); render(); break;
+      case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
+      case 'psychStations': await Store.set('cohorts/' + S.cohortKey, { psychTrauma: Number(d.v) }); break;
+      case 'stationPick': { const a = S.stationAsk; S.stationAsk = null; if (a) await setPsych(a.row, a.cells, Number(d.n)); break; }
+      case 'stationCancel': S.stationAsk = null; render(); break;
+      case 'psychAdd': case 'psychAddMe': {
+        const name = a === 'psychAddMe' ? (studentBySid(d.sid) || {}).name : String(S.drafts['pe-add'] || '').trim();
+        if (!name) { toast('Type their name first.'); break; }
+        try {
+          const out = await Sheets.addPsychTester(S.cohortKey, name);
+          S.sheet.psych.rows.push({ row: out.row, name: out.name, med: '', medRe: '', trauma: '', traumaRe: '', notes: '' });
+          delete S.drafts['pe-add']; toast(name + ' added to the Psychomotor Exam tab.'); render();
+        } catch (e) { toast(e.message); }
+        break;
+      }
       case 'copyText': try { await navigator.clipboard.writeText(d.text); toast((d.what || 'Text') + ' copied.'); } catch { toast('Couldn’t copy it. Select it and copy instead.'); } break;
+      case 'watchToggle': { const st = studentBySid(d.sid), on = !(st && watchOf(st));
+        await Store.set(P('students/' + d.sid), { watch: { on, why: on ? '' : ((st && watchOf(st)) || {}).why || '' } }); delete S.drafts['wy-' + d.sid]; break; }
+      case 'watchSave': await Store.set(P('students/' + d.sid), { watch: { on: true, why: String(S.drafts['wy-' + d.sid] ?? '').trim() } }); delete S.drafts['wy-' + d.sid]; toast('Saved.'); break;
+      case 'watchOnly': S.watchOnly = !S.watchOnly; render(); break;
       case 'spTab': S.spTab = d.id; render(); { const b = document.querySelector('.drawer-body'); if (b) b.scrollTop = 0; } break;
       case 'spNoteSave': { const key = 'sp-AC-' + d.sid; await setCells(d.sid, { AC: String(S.drafts[key] ?? '').trim() }); delete S.drafts[key]; render(); toast('Note saved to the cohort sheet.'); break; }
       case 'cellTick': { const s = studentBySid(d.sid); if (s) await setCells(d.sid, { [d.l]: !cellsOf(s)[d.l] }); break; }

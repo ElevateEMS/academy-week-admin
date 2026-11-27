@@ -2215,7 +2215,6 @@ span.cohort-step { cursor: default; }
 .roster-main th:first-child, .roster-main td:first-child { padding-left: 12px; }
 .roster.roster-main tbody tr { cursor: default; }
 .roster-main .th-sub { display: block; font-size: 10.5px; color: var(--muted); opacity: .85; }
-.roster-main .r-name { min-width: 170px; max-width: 230px; }
 .name-link { all: unset; cursor: pointer; font-weight: 500; }
 .name-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .r-cell { border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 3px 6px; cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); white-space: nowrap; }
@@ -2275,8 +2274,6 @@ span.cohort-step { cursor: default; }
 .sp-row .ce-row select { min-width: 110px; }
 
 /* Roster headings: Academy Week over its three columns; small lead-in words above a heading. */
-.roster-main th.th-group { padding-bottom: 0; color: var(--ink); }
-.roster-main th.th-sub-row { padding-top: 2px; white-space: nowrap; } /* (same size and bottom as the other headings, so they line up) */
 .roster-main th .th-sub { display: block; font-size: 10.5px; letter-spacing: .03em; }
 /* Paused / Limited portal access: the name is highlighted. */
 .name-link.limited { background: var(--honey-soft); color: #8a6a35; border-radius: 6px; padding: 1px 6px; margin-left: -6px; }
@@ -2288,13 +2285,9 @@ span.cohort-step { cursor: default; }
 .dropped-list li { padding: 3px 0; }
 .dropped-box > p { padding: 0 18px 12px; margin: 4px 0 0; }
 /* Academy Week's three columns: a soft tint and a line before them, set apart from the rest; even widths. */
-.roster-main .aw-col { background: #fffbf3; }
-.roster-main th.aw-col { background: #f7ecd6; }
-.roster-main .aw-first { border-left: 1px solid var(--blush-line); }
 
 /* Columns only as wide as they need, with the same space on each side, so the gaps between them are even. */
 .roster.roster-main td.c, .roster.roster-main th.c { padding-left: 5px; padding-right: 5px; }
-.roster-main .col-dispo { border-left: 1px solid var(--blush-line); }
 .roster-main th[title] { cursor: help; }
 /* The little mark after a name (late enrollee, make-up orientation, needs an orientation date). */
 .name-mark { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; vertical-align: -5px; border-radius: 6px; color: var(--taupe-dark); }
@@ -2338,3 +2331,46 @@ span.cohort-step { cursor: default; }
 :root[data-theme="navy"] .top .icon-btn.named.on, :root[data-theme="warm"] .top .icon-btn.named.on { background: var(--switch-on-bg); color: var(--switch-on-ink); border-color: transparent; box-shadow: none; }
 /* A student's page: a thin orange line down its left edge. */
 .drawer { border-left: 3px solid #e0702a; }
+
+/* ---------- Psychomotor exam ---------- */
+.psy-pair { white-space: nowrap; }
+.psy { font-weight: 500; }
+.psy.pass { color: #3f5c3b; }
+.psy.fail { color: #a33a2f; }
+.psy.testing { color: #8a6a35; background: var(--honey-soft); border-radius: 999px; padding: 0 6px; font-size: 12px; }
+.psych-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 0 0 14px; }
+.ps-title { font-family: var(--serif); font-size: 18px; font-weight: 600; margin-right: 4px; }
+.ps-slot { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 10px; border-radius: 999px; background: var(--bg); font-size: 14px; }
+.ps-slot b { font-weight: 500; color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; }
+.ps-slot.busy { background: var(--honey-soft); }
+.ps-slot .link { font-size: 14px; color: var(--ink); }
+.ps-seg { margin-left: auto; }
+.psych-extras { margin: 0 0 30px; padding: 12px 18px 14px; }
+.pe-head { display: flex; align-items: baseline; gap: 12px; }
+.pe-head h3 { margin: 0 0 6px; }
+.pe-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 10px; }
+.pe-table th { text-align: left; font-weight: 500; font-size: 12.5px; color: var(--muted); padding: 4px 6px; }
+.pe-table td { padding: 4px 6px; border-top: 1px dotted var(--line); }
+.pe-table select { border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; background: var(--paper); }
+.pe-add { display: flex; gap: 8px; align-items: center; }
+.pe-add input { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; background: var(--paper); width: 220px; }
+.psy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.psy-grid .ce-row > span:first-child { min-width: 70px; }
+.psy-result { border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 6px; }
+
+/* Names on one line (a long one ends in "…"; the whole name shows when you point at it). */
+.roster-main td.r-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Keep an eye on: an orange name with a flag. */
+.name-link.watch { background: #fde3cf; color: #9a4a17; border-radius: 6px; padding: 1px 7px 1px 5px; margin-left: -5px; }
+.watch-flag { display: inline-grid; place-items: center; margin-right: 3px; vertical-align: -2px; }
+.watch-flag svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.watch-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line-soft); }
+.watch-line input:not([type=checkbox]) { flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: var(--paper); }
+.stu-top-right { display: inline-flex; align-items: center; gap: 12px; }
+.watch-chip.on { background: #e0702a; border-color: #e0702a; color: #fff; }
+/* Overdue (past its deadline, not done). */
+.r-cell.overdue { background: var(--rose-soft); color: #8d4f48; border-color: transparent; }
+.r-cell.overdue:hover { border-color: #e4bdb6; }
+/* Ride-alongs: the words and the count each in their own spot, so every row lines up. */
+.ride-wrap { display: inline-grid; grid-template-columns: 96px 52px; align-items: center; justify-items: start; }
+.ride-wrap .pc-chip { justify-self: end; margin-left: 0; }

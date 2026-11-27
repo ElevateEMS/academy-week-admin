@@ -4,6 +4,8 @@
                                     and its Staffing tab (who works which day)
      changeContacts(key, s, by)  -> adds/subtracts from that student's column P
      setCells(key, s, cells)     -> changes their roster boxes, { letter: value } (Students page; outbox when offline)
+     setPsych(key, row, name, cells) -> the Psychomotor Exam tab's row: { med, medRe, trauma, traumaRe, notes } (outbox when offline)
+     addPsychTester(key, name)   -> someone outside the class onto that tab ({ row, name })
      evalLinks(key)              -> the cohort's Peer Evaluation / Student Feedback form link codes (eval.html, QR codes)
      setPortalStatus(key, s, status, todo) -> Active / Paused in their AD (Portal Status); from an overdue payment to-do,
                                     the to-do remembers the pause so paying unpauses them
@@ -166,6 +168,8 @@ const Sheets = (() => {
       const r = await viaOutbox('setRosterCells', { cohort: key, row: student.row, name: student.name, cells }, () => ({ queued: true }));
       return r.live || r.queued;
     },
+    setPsych: async (key, row, name, cells) => { const r = await viaOutbox('setPsychCells', { cohort: key, row, name, cells }, () => ({ queued: true })); return r.live || r.queued; },
+    addPsychTester: (key, name) => call('addPsychTester', { cohort: key, name }),
     evalLinks: key => call('evalLinks', { cohort: key }).then(o => o.links), // { peer, feedback }: the eval.html link codes
     setPortalStatus: (key, student, status, todo) => call('setPortalStatus', { cohort: key, name: student.name, email: student.email, status, todo }), // { status }
     dropStudent: (key, student, drop) => call('dropStudent', { cohort: key, name: student.name, email: student.email, ...drop }), // { line, docUrl, warnings }
@@ -233,6 +237,7 @@ function sampleSheets() {
   const KEY = 'academy-week-sample-pc';
   const sampleSigs = {}; // sample mode: no student signs (Copy signing link opens nothing real)
   const counts = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+  const samplePsych = (() => { try { return JSON.parse(localStorage.getItem(KEY + '-psych')) || {}; } catch { return {}; } })();
   // Pretend roster boxes (D–AC) for the Students page, plus whatever's been changed here.
   const sampleCellStore = (() => { try { return JSON.parse(localStorage.getItem(KEY + '-cells')) || {}; } catch { return {}; } })();
   const sampleCells = (name, i) => ({
@@ -300,6 +305,9 @@ function sampleSheets() {
       students: names.map((name, i) => ({ row: i + 5, name, status: 'Active', contacts: counts[name] ?? (i % 4 === 0 ? 3 : 5),
         email: i === 6 ? '' : slug(name).replace(/-/g, '.') + '@example.com', textbook: i % 3 === 0, paidNext: i % 4 !== 1, paidFinal: i % 5 === 0,
         fcp: i % 3 !== 1, orientRoster: !!sampleSigs[name], rideAgreement: i % 4 !== 2, cells: sampleCells(name, i), phone: i === 6 ? '' : '(804) 555-01' + String(10 + i) })),
+      psych: { choices: ['Testing', 'Pass', 'Fail'], rows: [...names.map((name, i) => ({ row: i + 5, name, med: '', medRe: '', trauma: '', traumaRe: '', notes: '', ...(samplePsych[i + 5] || {}) })),
+        { row: 23, name: 'Redden, Scarlet', med: '', medRe: '', trauma: '', traumaRe: '', notes: 'Registered to join testing day', ...(samplePsych[23] || {}) },
+        ...Object.entries(samplePsych).filter(([r, o]) => o.name && Number(r) > 23).map(([r, o]) => ({ row: Number(r), med: '', medRe: '', trauma: '', traumaRe: '', notes: '', ...o }))] },
       choices: { V: ['Pass', 'Fail', 'Retest'], X: ['Pending', 'Submitted', 'Complete'], Y: ['Pending', 'Submitted', 'Complete'],
         Z: ['Pass', 'Fail', 'Scheduled'], AA: ['Pass', 'Fail', 'Scheduled'], AB: ['Pass', 'Fail', 'Scheduled'] },
       days: labels.map((label, i) => ({ n: i + 1, label, sub: subs[i] })),
@@ -361,6 +369,8 @@ function sampleSheets() {
     async deleteInquiry(id) { sampleInquiries.items = sampleInquiries.items.filter(x => x.id !== id); return wait({ deleted: true }); },
     async makeCohortDocs(key, fills) { console.log('Sample mode: syllabus fill-ins', fills); const u = 'https://drive.google.com/'; return wait({ made: [key + ' Hybrid EMT Syllabus', key + ' Suggested Schedule', key + ' Dropped Students Record'], found: [], docs: { syllabus: u, schedule: u, adminFolder: u, dropped: u } }); },
     listScenarios: () => wait(SCEN.SEED.map(x => ({ id: x.id, title: x.title, cat: x.cat, url: 'https://docs.google.com/document/d/' + x.id + '/edit' }))),
+    async setPsych(key, row, name, cells) { samplePsych[row] = { ...(samplePsych[row] || {}), ...cells }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row }); },
+    async addPsychTester(key, name) { const row = 24 + Object.keys(samplePsych).filter(r => Number(r) > 23).length; samplePsych[row] = { name }; try { localStorage.setItem(KEY + '-psych', JSON.stringify(samplePsych)); } catch {} return wait({ row, name }); },
     async setCells(key, student, cells) { const c = sampleCellStore[student.name] = { ...(sampleCellStore[student.name] || {}), ...cells };
       try { localStorage.setItem(KEY + '-cells', JSON.stringify(sampleCellStore)); } catch {} return wait({ cells: c }); },
     async changeContacts(key, student, by) {
