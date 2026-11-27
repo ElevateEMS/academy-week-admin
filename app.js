@@ -2262,6 +2262,7 @@ function awStudentsView() {
 // course), make-up orientation (until it's happened), $ overdue (a deadline passed, box not ticked in the sheet),
 // $ extension (until the extended payments are ticked). From a month before Academy Week (enroll: false) only $ overdue.
 function enrollTags(s, { enroll = true } = {}) {
+  if (!S.studentsLoaded) return ''; // (until their saved dates are in, everyone would look overdue / undated)
   const p = emPerson(s), t = todayIso(), out = [];
   const tag = (label, act, cls = '') => out.push(`<button class="enroll-tag ${cls}" data-act="${act}" data-sid="${s.sid}">${label}</button>`);
   if (enroll && needsOrientDate(p)) tag('needs orientation date', 'emLateOpen', 'warn');
@@ -2349,6 +2350,7 @@ async function saveGrade(sid, g) {
 // enrollee: their own orientation), Background Check a month before Academy Week, Final Compliance 8 AM the day before
 // it, CPR card its last day. Vital Signs, Readiness and Test Prep have no set date.
 function overdueCells(s) {
+  if (!S.studentsLoaded) return {}; // (a late enrollee's own orientation date isn't in yet)
   const c = cellsOf(s), p = emPerson(s), t = todayIso(), aw = (S.sheet && S.sheet.academyStart) || cohortInfo().academyStart, out = {};
   const first = p.late && !p.makeup ? p.orient : cohortInfo().firstDay;
   if (isIsoDate(first) && t > first && !['G', 'H', 'L'].every(L => c[L])) out.paper = true;
@@ -2398,8 +2400,8 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Notes and Portal status are on each student's page instead (a Paused / Limited
 // student's name is highlighted here; so is one you're keeping an eye on).
-// Each column's share of the table (%, after # 3 and Student 19), so every cohort's columns sit in the same places.
-const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 11, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
+// Each column's share of the table (%, after # 3 and Student 17.5), so every cohort's columns sit in the same places.
+const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 12.5, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
   ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awW', 'Last Class<br>Paperwork'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
@@ -2436,6 +2438,7 @@ function nameCell(s) {
 }
 // A little dot after a name on the Roster (the words are in its hover text and on their student page).
 function nameMarks(s) {
+  if (!S.studentsLoaded) return ''; // (not until their saved details are in: otherwise everyone flashes "needs an orientation date")
   const p = emPerson(s), i = cohortInfo(), out = [];
   // A small dot: yellow = late enrollee, gray = make-up orientation, rose = needs their own orientation date.
   const mark = (tip, act, cls = '') => out.push(`<span class="name-dot ${cls}" role="button" data-act="${act}" data-sid="${s.sid}" title="${esc(tip)}" aria-label="${esc(tip)}"></span>`);
@@ -2449,7 +2452,7 @@ function rosterStudentsView() {
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)) && (!S.watchOnly || watchOf(s)));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
-      <colgroup><col style="width:3%"><col style="width:19%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
+      <colgroup><col style="width:3%"><col style="width:17.5%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
       <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([k, l]) => `<th class="c col-${k}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>

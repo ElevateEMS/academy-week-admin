@@ -467,7 +467,7 @@ function emStudentsTable() {
   const rows = people.map(p => {
     const s = studentBySid(p.sid), book = s && (p.textbook || p.bookCode) ? bookMark(s, p) : '<span class="r-no">–</span>';
     return `<tr>
-      <td>${s ? nameCell(s) : esc(p.name)}${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <em class="tag-soft">$ extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
+      <td>${s ? nameCell(s) : esc(p.name)}${p.late ? ` <em class="tag-soft">${p.makeup ? 'make-up orientation' : 'late enrollee'}</em>` : ''}${(p.ext.next || p.ext.final) && !(p.paidNext && p.paidFinal) ? ' <em class="tag-soft">$ extension</em>' : ''}${p.disc ? ` <em class="tag-soft" title="${esc(p.discNote || 'Discount')}">${esc(p.discNote || 'discount')}</em>` : ''}${S.studentsLoaded && needsOrientDate(p) ? ' <em class="tag-soft warn">needs orientation date</em>' : ''}
 </td>
       <td>${validEmail(p.email) ? copyLine(p.email, 'Email') : '<span class="tbd">no email in the sheet</span>'}</td>
       <td>${s && s.phone ? copyLine(s.phone, 'Phone') : '<span class="r-no">–</span>'}</td>
