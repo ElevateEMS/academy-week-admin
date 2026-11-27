@@ -2092,7 +2092,10 @@ function fbPdfRow() {
    One person tests at a time per station. How many Medical and Trauma stations are running (1-3 each, separate rooms):
    cohort doc psychCounts = { med, trauma } (older cohorts: psychTrauma = trauma). Which station each tester is at,
    app only: psychMedStations / psychStations (trauma) = { row: 1 | 2 | 3 }.
-   Both stations passed (or their retests) sets the roster's Psychomotor Exam (V) to Pass; it can still be changed by hand. */
+   Both stations passed (or their retests) sets the roster's Psychomotor Exam (V) to Pass; it can still be changed by hand.
+   Attempts (syllabus: 3 per station = the first try + 2 retests): the sheet has one Retest box per station, so the app
+   counts retests itself, app only: cohort doc psychRetests = { row: { med, trauma } } (1 | 2). A retest starts when the
+   Retest box goes to Testing after a Fail; a 4th attempt is refused. */
 const psychRows = () => (S.sheet && S.sheet.psych && S.sheet.psych.rows) || [];
 const psychRowOf = s => psychRows().find(r => r.name.trim().toLowerCase() === s.name.trim().toLowerCase()) || psychRows().find(r => slug(r.name) === s.sid);
 const psychNow = (r, k) => (r[k + 'Re'] || r[k] || ''); // the retest once it's filled in, otherwise the first try
@@ -2102,17 +2105,37 @@ const stationCount = st => { const cd = S.cohortDoc || {}, n = Number((cd.psychC
 const stationKey = st => st === 'med' ? 'psychMedStations' : 'psychStations';
 const stationOf = (r, st = 'trauma') => { const n = Number(((S.cohortDoc || {})[stationKey(st)] || {})[r.row]); return n >= 1 && n <= stationCount(st) ? n : 1; };
 const isTesting = (r, k) => /^testing$/i.test(r[k] || '') || /^testing$/i.test(r[k + 'Re'] || '');
+const PSY_RETESTS = 2; // 3 attempts in all
+const retestsOf = (r, st) => Math.min(PSY_RETESTS, Math.max(Number((((S.cohortDoc || {}).psychRetests || {})[r.row] || {})[st]) || 0, r[st + 'Re'] ? 1 : 0));
+// One station's result for the Academy Week view: Testing / Retesting / Retesting (final), Pass / Fail with which retest under it.
+function psyLabel(r, st, { inline = false } = {}) {
+  const v = psychNow(r, st), n = retestsOf(r, st);
+  if (!v) return '<span class="r-no">–</span>';
+  const sub = t => t ? (inline ? ` <span class="psy-sub">(${t})</span>` : `<span class="psy-sub">${t}</span>`) : '';
+  if (/^testing$/i.test(v)) return `<span class="psy testing">${!n ? 'Testing' : n === 1 ? 'Retesting' : 'Retesting (final)'}</span>`;
+  if (/^pass$/i.test(v)) return psychMark(v) + sub(n === 1 ? 'retest' : n === 2 ? 'retest 2' : '');
+  if (/^fail$/i.test(v)) return psychMark(v) + sub(n === PSY_RETESTS ? 'no attempts left' : n === 1 ? 'retest' : '');
+  return psychMark(v);
+}
 const shortName = n => { const [last, first = ''] = String(n).split(','); return (first.trim().split(/\s+/)[0] || '') + (first ? ' ' : '') + last.trim(); };
 async function setPsych(row, cells, station) {
   const r = psychRows().find(x => x.row === row); if (!r) return;
+  const retest = {}; // a retest starting: { med | trauma: its number }
   for (const [k, v] of Object.entries(cells)) {
     if (!/^testing$/i.test(v)) continue;
-    const st = k.startsWith('med') ? 'med' : 'trauma', others = psychRows().filter(x => x.row !== row && isTesting(x, st));
+    const st = k.startsWith('med') ? 'med' : 'trauma';
+    if (k.endsWith('Re') && /^fail$/i.test(psychNow(r, st))) {
+      const n = (r[st + 'Re'] ? retestsOf(r, st) : 0) + 1;
+      if (n > PSY_RETESTS) { toast(`${shortName(r.name)} has used all 3 ${PSY_LABEL[st]} attempts (syllabus limit).`); render(); return; }
+      retest[st] = n;
+    }
+    const others = psychRows().filter(x => x.row !== row && isTesting(x, st));
     const taken = others.map(x => stationOf(x, st)), free = [1, 2, 3].slice(0, stationCount(st)).filter(n => !taken.includes(n));
     if (!free.length) { toast(`${PSY_LABEL[st]} ${free.length || stationCount(st) === 1 ? 'is' : 'stations are all'} in use: ${others.map(x => shortName(x.name)).join(', ')}. Set one to Pass or Fail first.`); render(); return; }
     if (station == null && free.length > 1) { S.stationAsk = { row, cells, st, free }; render(); return; } // which station?
     await Store.set('cohorts/' + S.cohortKey, { [stationKey(st)]: { [row]: station ?? free[0] } });
   }
+  for (const [st, n] of Object.entries(retest)) await Store.set('cohorts/' + S.cohortKey, { psychRetests: { [row]: { [st]: n } } });
   const before = { ...r };
   Object.assign(r, cells); render();
   try { await Sheets.setPsych(S.cohortKey, row, r.name, cells); }
@@ -2133,10 +2156,11 @@ function psychStrip() {
   if (!S.sheet || !S.sheet.psych) return '';
   // Only on exam day (or while anyone is still marked Testing).
   if (todayIso() !== psychDayIso() && !psychRows().some(r => isTesting(r, 'med') || isTesting(r, 'trauma'))) return '';
-  const rows = psychRows(), who = list => list.length ? list.map(r => `<button class="link" data-act="psychOpen" data-row="${r.row}">${esc(shortName(r.name))}</button>`).join(', ') : '<span class="r-no">open</span>';
-  const slot = (label, list) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list)}</span>`;
+  const rows = psychRows(), tag = (r, st) => { const n = /^testing$/i.test(r[st + 'Re'] || '') ? retestsOf(r, st) : 0; return n ? ` <span class="ps-re">(${n === PSY_RETESTS ? 'final retest' : 'retest'})</span>` : ''; };
+  const who = (list, st) => list.length ? list.map(r => `<button class="link" data-act="psychOpen" data-row="${r.row}">${esc(shortName(r.name))}</button>${tag(r, st)}`).join(', ') : '<span class="r-no">open</span>';
+  const slot = (label, list, st) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list, st)}</span>`;
   const slots = st => { const n = stationCount(st), list = rows.filter(r => isTesting(r, st));
-    return n === 1 ? slot(PSY_LABEL[st], list) : [1, 2, 3].slice(0, n).map(i => slot(PSY_LABEL[st] + ' ' + i, list.filter(r => stationOf(r, st) === i))).join(''); };
+    return n === 1 ? slot(PSY_LABEL[st], list, st) : [1, 2, 3].slice(0, n).map(i => slot(PSY_LABEL[st] + ' ' + i, list.filter(r => stationOf(r, st) === i), st)).join(''); };
   return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slots('med')}${slots('trauma')}
     <button class="btn small ps-stations" data-act="stationsOpen" title="How many Medical and Trauma stations are running">Stations: ${stationCount('med')} Medical · ${stationCount('trauma')} Trauma</button></div>`;
 }
@@ -2156,11 +2180,17 @@ function psychExtras() {
   if (!S.sheet || !S.sheet.psych) return '';
   const all = students(), extras = psychRows().filter(r => !all.some(s => psychRowOf(s) === r));
   const sel = (r, k) => `<select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o => `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>`;
-  return `<section class="box psych-extras"><div class="pe-head"><h3>Also testing</h3><span class="muted small">Not in the class: here for the psychomotor exam only</span></div>
-    ${extras.length ? `<table class="pe-table"><thead><tr><th>Name</th><th>Medical</th><th>Retest</th><th>Trauma</th><th>Retest</th><th>Notes</th></tr></thead><tbody>${extras.map(r => `<tr>
+  // Notes: click to type right there (Enter or Save keeps it, Esc cancels). + by the title adds someone.
+  const note = r => { const k = 'psy-notes-' + r.row;
+    return S.peNoteEd === r.row ? `<span class="pe-note-ed"><input id="${k}" class="pe-note-in" data-draft="${k}" data-row="${r.row}" value="${esc(S.drafts[k] ?? r.notes ?? '')}" placeholder="Add a note" autocomplete="off"><button class="btn tiny" data-act="peNoteSave" data-row="${r.row}">Save</button></span>`
+      : `<button class="pe-note ${r.notes ? '' : 'empty'}" data-act="peNoteEd" data-row="${r.row}" title="Click to edit the note">${r.notes ? esc(r.notes) : 'Add a note'}</button>`; };
+  // Collapsed except on psychomotor exam day (click the title to open or close it); the + works either way.
+  const open = S.peOpen ?? (todayIso() === psychDayIso());
+  return `<section class="box psych-extras ${open ? 'open' : ''}"><div class="pe-head"><button class="pe-toggle" data-act="peToggle" aria-expanded="${open}"><h3>Additional Psychomotor Exam Candidates</h3><span class="muted small">${extras.length}</span></button><button class="pe-plus" data-act="peAddToggle" title="Add a candidate" aria-label="Add a candidate">+</button></div>
+    ${S.peAddOpen ? `<div class="pe-add"><input id="pe-add" data-draft="pe-add" placeholder="Last, First" value="${esc(S.drafts['pe-add'] || '')}" autocomplete="off"><button class="btn small primary" data-act="psychAdd">Add</button><button class="link" data-act="peAddToggle">Cancel</button></div>` : ''}
+    ${!open ? '' : extras.length ? `<table class="pe-table"><thead><tr><th>Name</th><th>Medical</th><th>Retest</th><th>Trauma</th><th>Retest</th><th>Notes</th></tr></thead><tbody>${extras.map(r => `<tr>
       <td><button class="name-link" data-act="psychOpen" data-row="${r.row}">${esc(r.name)}</button></td>${['med', 'medRe', 'trauma', 'traumaRe'].map(k => `<td>${sel(r, k)}</td>`).join('')}
-      <td class="muted small">${esc(r.notes || '')}</td></tr>`).join('')}</tbody></table>` : ''}
-    <div class="pe-add"><input id="pe-add" data-draft="pe-add" placeholder="Last, First" value="${esc(S.drafts['pe-add'] || '')}" autocomplete="off"><button class="btn small" data-act="psychAdd">+ Add a tester</button></div></section>`;
+      <td>${note(r)}</td></tr>`).join('')}</tbody></table>` : `<p class="muted small pe-none">None yet.</p>`}</section>`;
 }
 // The pop-up: Medical, Retest, Trauma, Retest, Notes (S.psychEd = { row } or { sid }).
 function psychEdModal() {
@@ -2168,7 +2198,7 @@ function psychEdModal() {
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
   const name = s ? s.name : r ? r.name : '';
   const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? `<span class="muted small">${PSY_LABEL[st]} ${stationOf(r, st)}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? `<span class="muted small">${PSY_LABEL[st]} ${stationOf(r, st)}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}${(st => k.endsWith('Re') && retestsOf(r, st) ? `<span class="psy-try muted small">Attempt ${retestsOf(r, st) + 1} of 3${retestsOf(r, st) > 1 ? ` <button class="link" data-act="psyRetestDown" data-row="${r.row}" data-st="${st}" title="Counted one too many? Take one off">−</button>` : ''}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
@@ -2404,12 +2434,12 @@ function rosterCell(s, k) {
   if (k === 'awV') { // both stations at a glance (from the Psychomotor Exam tab); ✓ Pass once the roster says so
     const r = psychRowOf(s), open = inner => `<button class="r-cell" data-act="psychOpen" data-sid="${s.sid}" title="Psychomotor exam: Medical and Trauma">${inner}</button>`;
     if (/^pass$/i.test(c.V || '')) return open(yes + ' Pass');
-    if (r && (psychNow(r, 'med') || psychNow(r, 'trauma'))) return open(`<span class="psy-pair">Med ${psychMark(psychNow(r, 'med'))} · Trauma ${psychMark(psychNow(r, 'trauma'))}</span>`);
+    if (r && (psychNow(r, 'med') || psychNow(r, 'trauma'))) return open(`<span class="psy-pair">Med ${psyLabel(r, 'med', { inline: true })} · Trauma ${psyLabel(r, 'trauma', { inline: true })}</span>`);
     return open(c.V ? esc(c.V) : no);
   }
   if (k === 'psyMed' || k === 'psyTrauma') { // the Academy Week view: one station per column
     const r = psychRowOf(s), st = k === 'psyMed' ? 'med' : 'trauma', v = r ? psychNow(r, st) : '';
-    const inner = v ? psychMark(v) : /^pass$/i.test(c.V || '') ? psychMark('Pass') : no;
+    const inner = v ? psyLabel(r, st) : /^pass$/i.test(c.V || '') ? psychMark('Pass') : no;
     return `<button class="r-cell" data-act="psychOpen" data-sid="${s.sid}" title="Psychomotor exam: ${st === 'med' ? 'Medical' : 'Trauma'}">${inner}</button>`;
   }
   if (k === 'awW') return btn(c.W ? yes : no, '', 'Last class signatures');
@@ -3363,6 +3393,11 @@ document.addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
+  // Additional Psychomotor Exam Candidates: Enter adds / saves the note, Esc closes.
+  if (e.target.id === 'pe-add' && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); if (e.key === 'Enter') act('psychAdd'); else act('peAddToggle'); return; }
+  if (e.target.classList && e.target.classList.contains('pe-note-in') && (e.key === 'Enter' || e.key === 'Escape')) {
+    e.preventDefault(); if (e.key === 'Enter') act('peNoteSave', e.target); else { delete S.drafts[e.target.id]; S.peNoteEd = null; render(); } return;
+  }
   if (e.target.dataset && e.target.dataset.edit) {
     if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
     if (e.key === 'Escape') { delete S.drafts[e.target.id]; S.editItem = null; render(); return; }
@@ -3450,6 +3485,11 @@ async function act(a, el = {}, e) {
       case 'cellEdClose': cellEdClose(); break;
       case 'psychOpen': S.psychEd = d.sid ? { sid: d.sid } : { row: Number(d.row) }; render(); break;
       case 'psychClose': S.psychEd = null; Object.keys(S.drafts).filter(k => /^psy-notes-/.test(k)).forEach(k => delete S.drafts[k]); render(); break;
+      case 'peToggle': S.peOpen = !(S.peOpen ?? (todayIso() === psychDayIso())); render(); break;
+      case 'peAddToggle': S.peAddOpen = !S.peAddOpen; if (!S.peAddOpen) delete S.drafts['pe-add']; render(); if (S.peAddOpen) setTimeout(() => { const i = document.getElementById('pe-add'); if (i) i.focus(); }); break;
+      case 'peNoteEd': S.peNoteEd = Number(d.row); render(); setTimeout(() => { const i = document.getElementById('psy-notes-' + d.row); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }); break;
+      case 'peNoteSave': { const k = 'psy-notes-' + d.row; S.peNoteEd = null; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); break; }
+      case 'psyRetestDown': { const r = psychRows().find(x => x.row === Number(d.row)); if (r) await Store.set('cohorts/' + S.cohortKey, { psychRetests: { [r.row]: { [d.st]: Math.max(1, retestsOf(r, d.st) - 1) } } }); render(); break; }
       case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
       case 'stationsOpen': S.stationsEd = { med: stationCount('med'), trauma: stationCount('trauma') }; render(); break;
       case 'stationsClose': S.stationsEd = null; render(); break;
@@ -3473,7 +3513,7 @@ async function act(a, el = {}, e) {
         try {
           const out = await Sheets.addPsychTester(S.cohortKey, name);
           S.sheet.psych.rows.push({ row: out.row, name: out.name, med: '', medRe: '', trauma: '', traumaRe: '', notes: '' });
-          delete S.drafts['pe-add']; toast(name + ' added to the Psychomotor Exam tab.'); render();
+          delete S.drafts['pe-add']; S.peAddOpen = false; toast(name + ' added to the Psychomotor Exam tab.'); render();
         } catch (e) { toast(e.message); }
         break;
       }
