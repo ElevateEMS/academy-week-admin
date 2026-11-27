@@ -2258,8 +2258,9 @@ span.cohort-step { cursor: default; }
 /* Student page cards: two side by side (one column when narrow), and full-width ones under them. */
 .sp-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
 @media (max-width: 700px) { .sp-cards { grid-template-columns: 1fr; } }
-/* Each card: an outline, rounded corners and an orange strip down its left edge (like CertKeeper's cards). */
-.drawer section.sp-card, .drawer.wide .drawer-body > section:not(.drop-sec) { border: 1px solid var(--line); border-left: 4px solid #e0702a; border-radius: 12px; padding: 4px 16px 14px; background: var(--paper); }
+/* Each card: an outline and rounded corners. The orange strip runs down the left edge of the whole student page. */
+.drawer.wide { border-left: 4px solid #e0702a; }
+.drawer section.sp-card, .drawer.wide .drawer-body > section:not(.drop-sec) { border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 14px; background: var(--paper); }
 .drawer.wide .drawer-body > section:not(.drop-sec):not(.sp-card) { margin: 14px 0; }
 .sp-cards > .sp-card:last-child { background: var(--blush-soft); border-color: var(--blush-line); }
 .sp-card.sp-wide { margin: 0 0 14px; }
