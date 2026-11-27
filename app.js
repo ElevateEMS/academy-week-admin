@@ -835,6 +835,7 @@ function shell() {
   ${S.cellEd && !S.emailStu && !S.guardianAsk ? cellEdModal() : ''}
   ${S.psychEd && S.sheet ? psychEdModal() : ''}
   ${S.stationAsk && S.sheet ? stationAskModal() : ''}
+  ${S.stationsEd ? stationsModal() : ''}
   ${S.watchAsk && S.sheet ? watchAskModal() : ''}
   ${S.statusAsk ? statusAskModal() : ''}`;
 }
@@ -2090,15 +2091,18 @@ function fbPdfRow() {
 }
 /* ---------- Psychomotor exam (the cohort sheet's "Psychotor Exam" tab, S.sheet.psych) ----------
    Medical, Retest, Trauma, Retest (Testing / Pass / Fail) and Notes per row; read and written there (Sheets.setPsych).
-   One person tests at a time per station: Medical, and Trauma 1 (and Trauma 2 when two are running: cohort doc
-   psychTrauma = 1 | 2, and which station each tester is at in psychStations = { row: 1 | 2 }, app only).
+   One person tests at a time per station. How many Medical and Trauma stations are running (1-3 each, separate rooms):
+   cohort doc psychCounts = { med, trauma } (older cohorts: psychTrauma = trauma). Which station each tester is at,
+   app only: psychMedStations / psychStations (trauma) = { row: 1 | 2 | 3 }.
    Both stations passed (or their retests) sets the roster's Psychomotor Exam (V) to Pass; it can still be changed by hand. */
 const psychRows = () => (S.sheet && S.sheet.psych && S.sheet.psych.rows) || [];
 const psychRowOf = s => psychRows().find(r => r.name.trim().toLowerCase() === s.name.trim().toLowerCase()) || psychRows().find(r => slug(r.name) === s.sid);
 const psychNow = (r, k) => (r[k + 'Re'] || r[k] || ''); // the retest once it's filled in, otherwise the first try
 const psychMark = v => /^pass$/i.test(v) ? '<span class="psy pass">✓</span>' : /^fail$/i.test(v) ? '<span class="psy fail">✗</span>' : /^testing$/i.test(v) ? '<span class="psy testing">Testing</span>' : '<span class="r-no">–</span>';
-const traumaStations = () => Number((S.cohortDoc && S.cohortDoc.psychTrauma) || 1) === 2 ? 2 : 1;
-const stationOf = r => Number(((S.cohortDoc && S.cohortDoc.psychStations) || {})[r.row]) === 2 && traumaStations() === 2 ? 2 : 1;
+const PSY_MAX = 3, PSY_LABEL = { med: 'Medical', trauma: 'Trauma' };
+const stationCount = st => { const cd = S.cohortDoc || {}, n = Number((cd.psychCounts || {})[st] || (st === 'trauma' ? cd.psychTrauma : 0) || 1); return Math.min(PSY_MAX, Math.max(1, n)); };
+const stationKey = st => st === 'med' ? 'psychMedStations' : 'psychStations';
+const stationOf = (r, st = 'trauma') => { const n = Number(((S.cohortDoc || {})[stationKey(st)] || {})[r.row]); return n >= 1 && n <= stationCount(st) ? n : 1; };
 const isTesting = (r, k) => /^testing$/i.test(r[k] || '') || /^testing$/i.test(r[k + 'Re'] || '');
 const shortName = n => { const [last, first = ''] = String(n).split(','); return (first.trim().split(/\s+/)[0] || '') + (first ? ' ' : '') + last.trim(); };
 async function setPsych(row, cells, station) {
@@ -2106,13 +2110,10 @@ async function setPsych(row, cells, station) {
   for (const [k, v] of Object.entries(cells)) {
     if (!/^testing$/i.test(v)) continue;
     const st = k.startsWith('med') ? 'med' : 'trauma', others = psychRows().filter(x => x.row !== row && isTesting(x, st));
-    if (st === 'med' && others.length) { toast(`Medical is in use: ${shortName(others[0].name)}. Set them to Pass or Fail first.`); render(); return; }
-    if (st === 'trauma') {
-      const taken = others.map(stationOf), free = [1, 2].slice(0, traumaStations()).filter(n => !taken.includes(n));
-      if (!free.length) { toast(`Trauma is in use: ${others.map(x => shortName(x.name)).join(' and ')}. Set one to Pass or Fail first.`); render(); return; }
-      if (station == null && free.length > 1) { S.stationAsk = { row, cells }; render(); return; } // which trauma station?
-      await Store.set('cohorts/' + S.cohortKey, { psychStations: { [row]: station ?? free[0] } });
-    }
+    const taken = others.map(x => stationOf(x, st)), free = [1, 2, 3].slice(0, stationCount(st)).filter(n => !taken.includes(n));
+    if (!free.length) { toast(`${PSY_LABEL[st]} ${free.length || stationCount(st) === 1 ? 'is' : 'stations are all'} in use: ${others.map(x => shortName(x.name)).join(', ')}. Set one to Pass or Fail first.`); render(); return; }
+    if (station == null && free.length > 1) { S.stationAsk = { row, cells, st, free }; render(); return; } // which station?
+    await Store.set('cohorts/' + S.cohortKey, { [stationKey(st)]: { [row]: station ?? free[0] } });
   }
   const before = { ...r };
   Object.assign(r, cells); render();
@@ -2128,10 +2129,22 @@ async function setPsych(row, cells, station) {
 function psychStrip() {
   if (!S.sheet || !S.sheet.psych) return '';
   const rows = psychRows(), who = list => list.length ? list.map(r => `<button class="link" data-act="psychOpen" data-row="${r.row}">${esc(shortName(r.name))}</button>`).join(', ') : '<span class="r-no">open</span>';
-  const med = rows.filter(r => isTesting(r, 'med')), tr = rows.filter(r => isTesting(r, 'trauma')), n = traumaStations();
   const slot = (label, list) => `<span class="ps-slot ${list.length ? 'busy' : ''}"><b>${label}</b> ${who(list)}</span>`;
-  return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slot('Medical', med)}${n === 2 ? slot('Trauma 1', tr.filter(r => stationOf(r) === 1)) + slot('Trauma 2', tr.filter(r => stationOf(r) === 2)) : slot('Trauma', tr)}
-    <span class="seg ps-seg" title="Trauma stations running">${[1, 2].map(x => `<button class="${n === x ? 'on' : ''}" data-act="psychStations" data-v="${x}">${x} trauma</button>`).join('')}</span></div>`;
+  const slots = st => { const n = stationCount(st), list = rows.filter(r => isTesting(r, st));
+    return n === 1 ? slot(PSY_LABEL[st], list) : [1, 2, 3].slice(0, n).map(i => slot(PSY_LABEL[st] + ' ' + i, list.filter(r => stationOf(r, st) === i))).join(''); };
+  return `<div class="psych-strip"><span class="ps-title">Now testing</span>${slots('med')}${slots('trauma')}
+    <button class="btn small ps-stations" data-act="stationsOpen" title="How many Medical and Trauma stations are running">Stations: ${stationCount('med')} Medical · ${stationCount('trauma')} Trauma</button></div>`;
+}
+// The Stations pop-up: how many Medical and Trauma stations (separate rooms) are running, 1-3 each.
+function stationsModal() {
+  const d = S.stationsEd; if (!d) return '';
+  const row = st => `<div class="ce-row"><span>${PSY_LABEL[st]}</span><span class="stepper">
+    <button data-act="stationsStep" data-st="${st}" data-by="-1" ${d[st] <= 1 ? 'disabled' : ''} aria-label="One less">−</button><b>${d[st]}</b>
+    <button data-act="stationsStep" data-st="${st}" data-by="1" ${d[st] >= PSY_MAX ? 'disabled' : ''} aria-label="One more">+</button></span></div>`;
+  return `<div class="overlay" data-act="stationsClose"><div class="modal confirm stations-modal" data-stop>
+    <div class="modal-head"><h2>Stations</h2><button class="x big" data-act="stationsClose" aria-label="Close">×</button></div>
+    <div class="modal-body">${row('med')}${row('trauma')}<p class="muted small">Each station is its own room. With more than one open, it asks which station a student is going to.</p></div>
+    <div class="modal-foot"><button class="btn primary" data-act="stationsSave">Save</button></div></div></div>`;
 }
 // Everyone on the Psychomotor Exam tab who isn't in the class (people who only come to test), kept to the side.
 function psychExtras() {
@@ -2150,7 +2163,7 @@ function psychEdModal() {
   const s = ed.sid ? studentBySid(ed.sid) : null, r = s ? psychRowOf(s) : psychRows().find(x => x.row === ed.row);
   const name = s ? s.name : r ? r.name : '';
   const sel = (k, label) => `<label class="ce-row"><span>${label}</span><select data-change="psychSel" data-row="${r.row}" data-k="${k}">${['', ...((S.sheet.psych && S.sheet.psych.choices) || ['Testing', 'Pass', 'Fail'])].map(o =>
-    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${k.startsWith('trauma') && isTesting(r, 'trauma') && traumaStations() === 2 && /^testing$/i.test(r[k] || '') ? `<span class="muted small">Trauma ${stationOf(r)}</span>` : ''}</label>`;
+    `<option value="${esc(o)}" ${o === (r[k] || '') ? 'selected' : ''}>${o ? esc(o) : '–'}</option>`).join('')}</select>${(st => /^testing$/i.test(r[k] || '') && stationCount(st) > 1 ? `<span class="muted small">${PSY_LABEL[st]} ${stationOf(r, st)}</span>` : '')(k.startsWith('med') ? 'med' : 'trauma')}</label>`;
   const dk = 'psy-notes-' + (r ? r.row : 0);
   const body = !S.sheet.psych ? '<p class="muted">This cohort’s sheet has no Psychomotor Exam tab.</p>'
     : !r ? `<p class="muted">${esc(name)} isn’t on the Psychomotor Exam tab.</p><div class="ce-save"><button class="btn small primary" data-act="psychAddMe" data-sid="${s.sid}">Add them to it</button></div>`
@@ -2175,9 +2188,9 @@ function stationAskModal() {
   const a = S.stationAsk; if (!a) return '';
   const r = psychRows().find(x => x.row === a.row);
   return `<div class="overlay" data-act="stationCancel"><div class="modal confirm" data-stop>
-    <div class="modal-head"><h2>Which trauma station?</h2><button class="x big" data-act="stationCancel" aria-label="Close">×</button></div>
+    <div class="modal-head"><h2>Which ${PSY_LABEL[a.st].toLowerCase()} station?</h2><button class="x big" data-act="stationCancel" aria-label="Close">×</button></div>
     <div class="modal-body"><p>${esc(r ? shortName(r.name) : '')} is testing at:</p></div>
-    <div class="modal-foot">${[1, 2].map(n => `<button class="btn primary" data-act="stationPick" data-n="${n}">Trauma ${n}</button>`).join('')}</div></div></div>`;
+    <div class="modal-foot">${a.free.map(n => `<button class="btn primary" data-act="stationPick" data-n="${n}">${PSY_LABEL[a.st]} ${n}</button>`).join('')}</div></div></div>`;
 }
 
 function awStudentsView() {
@@ -2239,8 +2252,9 @@ function awStudentsView() {
   </section>` : ''}
   <section class="box table-box">
     <table class="roster aw-table ${pre ? 'enroll-table' : ''} ${hasPeer ? 'has-peer' : ''}">
-      <thead><tr><th>#</th><th>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
-        : `<th class="c">Patient contacts</th><th class="c">Skills</th><th class="c" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? '<th class="c">Peer evals</th>' : ''}<th class="c">Conduct</th></tr></thead>
+      <thead>${(rs => `<tr><th ${rs}>#</th><th ${rs}>Student</th>${pre ? '<th class="c">Textbook</th><th class="c">Next</th><th class="c">Final</th><th class="c">Orientation</th><th class="c">Due: Next / Final</th>'
+        : `<th class="c" ${rs}>Patient contacts</th><th class="c" ${rs}>Skills</th><th class="c psy-head" colspan="2" title="${ROSTER_TIPS.awV}">Psychomotor</th><th class="c" ${rs} title="${ROSTER_TIPS.awW}">Last Class Paperwork</th><th class="c" ${rs} title="${ROSTER_TIPS.dispo}">Final Disposition</th>`}${hasPeer ? `<th class="c" ${rs}>Peer evals</th>` : ''}<th class="c" ${rs}>Conduct</th></tr>
+      ${pre ? '' : '<tr class="sub-head"><th class="c">Medical</th><th class="c">Trauma</th></tr>'}`)(pre ? '' : 'rowspan="2"')}</thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}" data-act="openStudent" data-sid="${s.sid}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
         <td>${nameCell(s)}${minorTag(s)}${/paused/i.test(s.status) ? ' <span class="tag">Paused</span>' : ''}${s.out ? ` <span class="tag">${outLabel(s)}</span>` : ''}${s.out ? '' : enrollTags(s, { enroll: pre })}</td>
@@ -2249,10 +2263,10 @@ function awStudentsView() {
         <td class="c"><button class="cell-link" data-act="emExtOpen" data-sid="${p.sid}" title="Extension: different payment deadlines">${p.next ? monthDay(p.next) : 'TBD'} / ${p.final ? monthDay(p.final) : 'TBD'}</button></td>`)(emPerson(s))
         : `<td class="c"><span class="pc-cell"><span></span>${pcStepper(s, { row: true })}${s.fixes ? `<span class="to-fix" data-part="fix" title="Open their patient contacts">To fix: ${s.fixes}</span>` : '<span></span>'}</span></td>
         <td class="c" data-part="skills"><span class="status ${s.skill}">${skillLabel[s.skill]}</span>${s.skill === 'behind' && s.behind.length ? `<span class="muted small"> ${esc(s.behind.join(', '))}</span>` : ''}</td>
-        <td class="c">${rosterCell(s, 'awV')}</td><td class="c">${rosterCell(s, 'awW')}</td><td class="c">${rosterCell(s, 'dispo')}</td>`}
+        <td class="c">${rosterCell(s, 'psyMed')}</td><td class="c">${rosterCell(s, 'psyTrauma')}</td><td class="c">${rosterCell(s, 'awW')}</td><td class="c">${rosterCell(s, 'dispo')}</td>`}
         ${hasPeer ? `<td class="c" data-part="peers">${peerCell(peers[s.name])}</td>` : ''}
         <td class="c" data-part="attendance">${s.warns ? `<span class="badge">${s.warns}</span>` : '<span class="muted">–</span>'}</td>
-      </tr>`).join('') || `<tr><td colspan="${8 + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
+      </tr>`).join('') || `<tr><td colspan="${(pre ? 8 : 9) + (hasPeer ? 1 : 0)}" class="empty">No students match.</td></tr>`}</tbody>
     </table>
   </section>
   ${psychExtras()}`;
@@ -2373,8 +2387,11 @@ function rosterCell(s, k) {
   if (k === 'cpr') return btn(c.I ? yes + ' Card' : c.J ? 'Class ' + esc(c.J.replace(/\/20(\d\d)$/, '/$1')) : no);
   if (k === 'fp') return btn(c.K ? yes : no);
   if (k === 'ride') {
+    return btn(c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>', '', 'Ride Along Readiness attestation');
+  }
+  if (k === 'pc') { // patient contacts: opens their contacts on the student page
     const n = s.contacts || 0, cls = !contactsCrunch() ? '' : n >= CONTACTS_DONE ? 'pc-done' : n >= CONTACTS_MIN ? 'pc-mid' : 'pc-low';
-    return btn(`<span class="ride-wrap"><span>${c.O ? '<span class="em-yes">✓</span> Eligible' : '<span class="r-no">Not attested</span>'}</span><span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span></span>`, '', 'Ride Along Readiness attestation · patient contacts');
+    return `<button class="r-cell" data-act="openStudent" data-sid="${s.sid}" data-part="contacts" title="Patient contacts"><span class="pc-chip ${cls}">${n} / ${CONTACTS_DONE}</span></button>`;
   }
   if (k === 'assign') { const n = PORTAL_ASSIGNMENTS.filter(([L]) => assignDone(s, L)).length; return btn(n === PORTAL_ASSIGNMENTS.length ? yes : n + ' of ' + PORTAL_ASSIGNMENTS.length, n === PORTAL_ASSIGNMENTS.length ? '' : 'soft'); }
   if (k === 'comp') return btn(c.Q ? yes : no);
@@ -2389,6 +2406,11 @@ function rosterCell(s, k) {
     if (r && (psychNow(r, 'med') || psychNow(r, 'trauma'))) return open(`<span class="psy-pair">Med ${psychMark(psychNow(r, 'med'))} · Trauma ${psychMark(psychNow(r, 'trauma'))}</span>`);
     return open(c.V ? esc(c.V) : no);
   }
+  if (k === 'psyMed' || k === 'psyTrauma') { // the Academy Week view: one station per column
+    const r = psychRowOf(s), st = k === 'psyMed' ? 'med' : 'trauma', v = r ? psychNow(r, st) : '';
+    const inner = v ? psychMark(v) : /^pass$/i.test(c.V || '') ? yes : no;
+    return `<button class="r-cell" data-act="psychOpen" data-sid="${s.sid}" title="Psychomotor exam: ${st === 'med' ? 'Medical' : 'Trauma'}">${inner}</button>`;
+  }
   if (k === 'awW') return btn(c.W ? yes : no, '', 'Last class signatures');
   if (k === 'dispo') return btn(c.X || c.Y ? `<span class="aw-marks"><span title="VAOEMS">${esc(c.X || '–')}</span><span title="NREMT">${esc(c.Y || '–')}</span></span>` : no);
   if (k === 'nremt') {
@@ -2400,15 +2422,15 @@ function rosterCell(s, k) {
 }
 // Roster columns, left to right. Notes and Portal status are on each student's page instead (a Paused / Limited
 // student's name is highlighted here; so is one you're keeping an eye on).
-// Each column's share of the table (%, after # 3 and Student 17.5), so every cohort's columns sit in the same places.
-const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 12.5, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
+// Each column's share of the table (%, after # 3 and Student 17), so every cohort's columns sit in the same places.
+const ROSTER_W = { paper: 7, cpr: 8.5, fp: 7, ride: 7.5, pc: 5.5, assign: 7, comp: 7, grade: 8, awW: 6, dispo: 8.5, nremt: 8 };
 const ROSTER_COLS = [['paper', 'First Class<br>Paperwork'], ['cpr', 'CPR'], ['fp', 'Background<br>Check'],
-  ['ride', 'Ride-alongs'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
+  ['ride', 'Clinical<br>Clearance'], ['pc', 'Patient<br>Contacts'], ['assign', 'Assignments'], ['comp', 'Final<br>Compliance'], ['grade', 'Course<br>Grade'],
   ['awW', 'Last Class<br>Paperwork'], ['dispo', 'Final<br>Disposition'], ['nremt', 'NREMT<br>Exam']]; // (Skills and Psychomotor: the Academy Week view)
 // What each heading is for (shown when you point at it).
 const ROSTER_TIPS = {
   paper: 'First Class Paperwork, Orientation Roster and Ride Along Agreement',
-  cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'Background check: FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation; then patient contacts (10 to finish, 5 to attend Academy Week)',
+  cpr: 'CPR card uploaded, or their CPR class sign-up', fp: 'Background check: FieldPrint fingerprinting scheduled', ride: 'Eligible = Ride Along Readiness attestation', pc: 'Patient contacts: 10 to finish, 5 to attend Academy Week',
   assign: 'The Student Hub’s 10 assignments', comp: 'Their Academy Week Compliance attestation: confirms they’ve completed everything needed to attend Academy Week', grade: 'Coursework from JBL, then the course grade with the final exam',
   awU: 'All skills signed off', awV: 'Psychomotor exam result', awW: 'Last class signatures', dispo: 'VAOEMS and NREMT dispositions', nremt: 'NREMT exam attempts', aw: 'Academy Week',
 };
@@ -2452,7 +2474,7 @@ function rosterStudentsView() {
   const all = everyone.filter(s => !s.out), shown = [...all, ...everyone.filter(s => s.out)].filter(s => (!q || s.name.toLowerCase().includes(q)) && (!S.watchOnly || watchOf(s)));
   return `<section class="box table-box roster-box">
     <table class="roster roster-main">
-      <colgroup><col style="width:3%"><col style="width:17.5%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
+      <colgroup><col style="width:3%"><col style="width:17%">${ROSTER_COLS.map(([k]) => `<col style="width:${ROSTER_W[k]}%">`).join('')}</colgroup>
       <thead><tr><th>#</th><th>Student</th>${ROSTER_COLS.map(([k, l]) => `<th class="c col-${k}" title="${esc(ROSTER_TIPS[k] || '')}">${l}</th>`).join('')}</tr></thead>
       <tbody>${shown.map(s => `<tr class="${s.out ? 'out' : ''}">
         <td class="muted">${s.out ? '' : all.indexOf(s) + 1}</td>
@@ -2488,7 +2510,7 @@ const CELL_EDITS = {
   paper: ['Paperwork', [['G', 'First Class Paperwork'], ['H', 'Orientation Roster'], ['L', 'Ride Along Agreement']]],
   cpr: ['CPR', [['I', 'CPR card uploaded']]],
   fp: ['Fingerprinting', [['K', 'FieldPrint scheduled']]],
-  ride: ['Ride-alongs', [['M', 'Ride alongs requested'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness (attestation)']]],
+  ride: ['Clinical Clearance', [['M', 'Ride alongs requested'], ['N', 'Vital Signs Practice'], ['O', 'Ride Along Readiness (attestation)']]],
   assign: ['Assignments', PORTAL_ASSIGNMENTS],
   comp: ['Academy Week Compliance', [['Q', 'Academy Week Compliance (attestation)']]],
   aw: ['Academy Week', [['U', 'All skills'], ['V', 'Psychomotor exam', 'select'], ['W', 'Last Class Paperwork']]],
@@ -3341,6 +3363,7 @@ document.addEventListener('keydown', e => {
     if (S.guardianAsk) { guardianClose(); return; }
     if (S.watchAsk) { S.watchAsk = null; render(); return; }
     if (S.stationAsk) { S.stationAsk = null; render(); return; }
+    if (S.stationsEd) { S.stationsEd = null; render(); return; }
     if (S.psychEd) { S.psychEd = null; render(); return; }
     if (S.cellEd && !S.emailStu) { cellEdClose(); return; }
     if (S.renameAsk) { if (!S.renameBusy) { if (S.renameConfirm) { S.renameConfirm = false; render(); } else renameClose(); } return; }
@@ -3417,7 +3440,20 @@ async function act(a, el = {}, e) {
       case 'psychOpen': S.psychEd = d.sid ? { sid: d.sid } : { row: Number(d.row) }; render(); break;
       case 'psychClose': S.psychEd = null; Object.keys(S.drafts).filter(k => /^psy-notes-/.test(k)).forEach(k => delete S.drafts[k]); render(); break;
       case 'psychNoteSave': { const k = 'psy-notes-' + d.row; if (S.drafts[k] !== undefined) await setPsych(Number(d.row), { notes: String(S.drafts[k]).trim() }); delete S.drafts[k]; render(); toast('Note saved to the Psychomotor Exam tab.'); break; }
-      case 'psychStations': await Store.set('cohorts/' + S.cohortKey, { psychTrauma: Number(d.v) }); break;
+      case 'stationsOpen': S.stationsEd = { med: stationCount('med'), trauma: stationCount('trauma') }; render(); break;
+      case 'stationsClose': S.stationsEd = null; render(); break;
+      case 'stationsStep': { const e = S.stationsEd; if (e) { e[d.st] = Math.min(PSY_MAX, Math.max(1, e[d.st] + Number(d.by))); render(); } break; }
+      case 'stationsSave': {
+        const e = S.stationsEd; if (!e) break;
+        // Not below a station someone is still testing at.
+        for (const st of ['med', 'trauma']) {
+          const busy = psychRows().filter(r => isTesting(r, st) && (e[st] === 1 ? psychRows().filter(x => isTesting(x, st)).length > 1 : stationOf(r, st) > e[st]));
+          if (busy.length && e[st] < stationCount(st)) { toast(`${busy.map(r => shortName(r.name)).join(', ')} ${busy.length === 1 ? 'is' : 'are'} still testing at a ${PSY_LABEL[st].toLowerCase()} station you’re closing. Set them to Pass or Fail first.`); return; }
+        }
+        S.stationsEd = null;
+        await Store.set('cohorts/' + S.cohortKey, { psychCounts: { med: e.med, trauma: e.trauma } });
+        toast(`Stations: ${e.med} Medical · ${e.trauma} Trauma.`); render(); break;
+      }
       case 'stationPick': { const a = S.stationAsk; S.stationAsk = null; if (a) await setPsych(a.row, a.cells, Number(d.n)); break; }
       case 'stationCancel': S.stationAsk = null; render(); break;
       case 'psychAdd': case 'psychAddMe': {

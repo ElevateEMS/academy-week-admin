@@ -2326,8 +2326,8 @@ span.cohort-step { cursor: default; }
 .roster.em-table td { overflow-wrap: anywhere; }
 .roster.em-table .copy-line { display: inline; }
 .roster.em-table .copy-btn { vertical-align: middle; }
-.roster.aw-table th:first-child { width: 5%; }
-.roster.aw-table th:nth-child(2) { width: 22%; }
+.roster.aw-table tr:first-child > th:first-child { width: 5%; }
+.roster.aw-table tr:first-child > th:nth-child(2) { width: 22%; }
 .roster.aw-table th.c { width: auto; }
 /* The lit Students / Staff button: orange like the lit Course / Academy Week (gold in Warm work; Calm as before). */
 :root[data-theme="navy"] .top .icon-btn.named.on, :root[data-theme="warm"] .top .icon-btn.named.on { background: var(--switch-on-bg); color: var(--switch-on-ink); border-color: transparent; box-shadow: none; }
@@ -2344,7 +2344,10 @@ span.cohort-step { cursor: default; }
 .ps-slot b { font-weight: 500; color: var(--muted); font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; }
 .ps-slot.busy { background: var(--honey-soft); }
 .ps-slot .link { font-size: 14px; color: var(--ink); }
-.ps-seg { margin-left: auto; }
+.ps-stations { margin-left: auto; }
+.stations-modal { width: min(380px, 94vw); }
+.stations-modal .ce-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.stations-modal .stepper b { min-width: 22px; text-align: center; }
 .psych-extras { margin: 0 0 30px; padding: 12px 18px 14px; }
 .pe-head { display: flex; align-items: baseline; gap: 12px; }
 .pe-head h3 { margin: 0 0 6px; }
@@ -2368,9 +2371,11 @@ span.cohort-step { cursor: default; }
 /* Overdue (past its deadline, not done). */
 .r-cell.overdue { background: var(--rose-soft); color: #8d4f48; border-color: transparent; }
 .r-cell.overdue:hover { border-color: #e4bdb6; }
-/* Ride-alongs: the words and the count each in their own spot, so every row lines up. */
-.ride-wrap { display: inline-grid; grid-template-columns: 96px 52px; align-items: center; justify-items: start; }
-.ride-wrap .pc-chip { justify-self: end; margin-left: 0; }
+/* Academy Week view: Psychomotor over its Medical / Trauma sub-columns. */
+.roster.aw-table thead th[rowspan] { vertical-align: middle; }
+.roster.aw-table thead th.psy-head { padding-bottom: 2px; }
+.roster.aw-table tr.sub-head th { padding-top: 0; font-size: 13px; opacity: .8; }
+.roster-main .pc-chip { margin-left: 0; }
 .phone-ed { display: inline-flex; gap: 6px; align-items: center; }
 .phone-ed input { border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; background: var(--paper); width: 150px; }
 .copy-btn svg { stroke-linecap: round; }
@@ -2381,3 +2386,4 @@ span.cohort-step { cursor: default; }
 .watch-modal { width: min(480px, 94vw); }
 .watch-flag { font-weight: 600; margin-right: 3px; }
 .nowrap { white-space: nowrap; }
+.roster-main td.col-ride .r-cell { padding-left: 4px; padding-right: 4px; }
