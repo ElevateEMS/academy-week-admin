@@ -346,7 +346,7 @@ Don't hesitate to reach out if you have any questions or need anything as we app
     when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
 
 As we approach Academy Week in just 1 week, I wanted to send out a to-do list for you to make sure nothing gets missed. You've been keeping a steady pace on your coursework and are doing a great job so far, so this is just a quick reminder of what's still outstanding on your end:
-- [[item]]
+{to-do list}
 
 As a reminder, all coursework is due **{coursework deadline}**, and you need to finish the course with an 80% average as well as score 80% or higher on the final exam, which we'll take in person during Academy Week. This email is just a courtesy reminder and isn't something required by the syllabus, so if there's an item you still owe that isn't listed here, you're still responsible for completing it per the syllabus and course requirements.
 
@@ -356,7 +356,7 @@ We look forward to seeing you at Academy Week, keep up the good work!` },
     when: { from: 'academy', days: -7 }, who: 'pick', send: 'each', body: `Good afternoon,
 
 This is a reminder notice that you have 1 week left to complete all of your coursework before the **{coursework deadline}** deadline, and right now you still have the following outstanding:
-- [[item]]
+{to-do list}
 
 You also need to finish the course with an 80% average and score 80% or higher on the final exam (which we'll take in person during Academy Week) in order to be successful in the course and be eligible to sit for the NREMT exam. If you don't think you'll be able to get everything done in time and with the minimum grade requirements, please reach out to staff to discuss your options.
 

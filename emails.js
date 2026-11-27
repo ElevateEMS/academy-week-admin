@@ -288,15 +288,37 @@ function emValues(p) {
     'meet link': meet, 'jbl code': i.jbl || '',
     'referral code': p ? referralCode(p.name) : '', 'book code': p ? (p.code || p.bookCode || '') : '',
     'missing items': p && p.missing ? andList(p.missing) : '', 'sign link': p ? p.signLink || '' : '',
+    'to-do list': p ? courseworkTodo(p) : '',
   };
   [1, 2, 3, 4, 5].forEach(n => { const d = days.find(x => x.n === n); v['day ' + n] = d ? emDate(d.iso, { short: true }) : ''; });
   return v;
 }
-const EM_PERSONAL = ['first name', 'full name', 'referral code', 'book code', 'missing items', 'sign link'];
+const EM_PERSONAL = ['first name', 'full name', 'referral code', 'book code', 'missing items', 'sign link', 'to-do list'];
+// {to-do list}: the Coursework reminders' bullets (a week before Academy Week), from their roster row. JBL can't be seen
+// from here, so the JBL rows come highlighted: type which ones, or delete the line (Readiness Quiz: delete the
+// highlight to keep it). Only what isn't ticked shows up.
+const TODO_BEFORE = 'which was to be completed before beginning any patient contacts.';
+function courseworkTodo(p) {
+  const s = students().find(x => x.sid === p.sid); if (!s) return '';
+  const c = cellsOf(s), n = s.contacts || 0, out = [];
+  out.push('Chapter quizzes: [[which ones, or delete this line]]');
+  out.push('Module exams: [[which ones, or delete this line]]');
+  if (!c.I) out.push('**CPR card** upload');
+  if (!c.N) out.push('**Vital Signs Practice Assignment**, which was to be submitted before beginning any patient contacts.');
+  if (!c.O) {
+    out.push('**Ride Along Readiness Quiz**, ' + TODO_BEFORE + ' [[check JBL: delete this line if it’s done]]');
+    out.push('**Clinical Clearance Attestation**, ' + TODO_BEFORE);
+  }
+  if (n < CONTACTS_MIN) out.push(`**Patient contacts:** the Student Portal currently shows **${n} of ${CONTACTS_DONE}**. You must have a minimum of ${CONTACTS_MIN} by Academy Week, and as your patient contact instructions explain, they need to be uploaded to the Student Portal for us to review before we can clear you for Academy Week.`);
+  if (!c.R) out.push('**Test Prep Practice Quiz**');
+  if (!c.Q) out.push('**Academy Week Readiness & Compliance Attestation**');
+  return out.map(x => '- ' + x).join('\n');
+}
 // → { subject, body, missing: [fill-ins that came out TBD] }
 const OLD_SIGNOFF = /\n*Best regards,\s*\n\s*\n?\s*Gabriella Brown\s*\n\s*Elevate EMS, LLC\s*$/;
 function emFill(t, p, group) {
   const vals = emValues(p), missing = new Set();
+  if (/^coursework-/.test(t.id || '')) t = { ...t, body: String(t.body || '').replace(/^- \[\[item\]\]$/m, '{to-do list}') };
   const fill = text => applyIfs(String(text || ''), expr => emTest(expr, p, group))
     .replace(/\{([^{}]+)\}/g, (m, k) => {
       const key = k.trim().toLowerCase();
@@ -576,7 +598,7 @@ function bookCodesModal() {
 
 /* ---------- Setup → Email Templates ---------- */
 const EM_HELP = `<details class="em-help"><summary>Formatting</summary>
-  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {overdue payment} {overdue date} (the payment they’re late on: “next tuition installment” / “final tuition payment”, and when it was due) {sign link} (their orientation roster signing link)</p>
+  <p><b>Fill-ins</b> (a course detail left blank in Course Details says TBD; a student’s own name, referral code or book code shows highlighted when you preview the group email): {first name} {full name} {cohort} {orientation date} {orientation time} {next due} {final due} {CPR date} {CPR time} {academy week start} {academy week dates} {day 1} … {day 5} {academy week location} {academy week instructions} {coursework deadline} {fingerprinting deadline} {meet link} {JBL code} {referral code} {book code} {missing items} (their first class assignments not ticked in the sheet) {to-do list} (the Coursework reminders’ bullets: what they still owe from the roster, plus JBL lines to fill in or delete) {overdue payment} {overdue date} (the payment they’re late on: “next tuition installment” / “final tuition payment”, and when it was due) {sign link} (their orientation roster signing link)</p>
   <p><b>Only for some students:</b> {if late}…{else}…{end}. Words you can use: late, group (the To: Nick email), before orientation (their Next payment is due before their orientation), owes next, owes final, owes tuition, paid in full, has book, needs book, extension, one missing (one first class assignment left), signing (their signing link is in), cpr time (a CPR class time is in Course Details). Join with “and”; put “not” in front to flip one.</p>
   <p><b>Formatting:</b> **bold**, *italic*, [words](https://link), a line starting with “- ” is a bullet, a blank line starts a new paragraph. [[like this]] marks something you type in before the draft can be made.</p></details>`;
 /* ---------- Inquiry replies (in the same editor) ----------
