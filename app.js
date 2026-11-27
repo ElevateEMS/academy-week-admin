@@ -110,7 +110,9 @@ const BOXES = { priorities: 'Priorities', todo: 'To Do', shopping: 'Shopping Lis
 // Finalize: the Documentation Checklist across the left two-thirds, Final Steps over Notes on the right (no To Do).
 const BOARDS = {
   day: { key: 'layout', boxes: ['priorities', 'todo', 'shopping', 'notes'], def: [['priorities', 'shopping'], ['todo'], ['notes']] },
-  prep: { key: 'prepLayout', v: 4, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['shopping', 'notes'], ['todo', 'scenarios'], ['packing']] },
+  // Prep (v6): Scenarios over Staffing (the Notes slot) on the left, To Do down the middle, Shopping over Packing on the
+  // right; Shopping is as tall as Scenarios so the two line up (prepEven).
+  prep: { key: 'prepLayout', v: 6, boxes: ['shopping', 'notes', 'todo', 'packing', 'scenarios'], def: [['scenarios', 'notes'], ['todo'], ['shopping', 'packing']] },
   final: { key: 'finalLayout', v: 3, boxes: ['docs', 'finalsteps', 'notes'], def: [['docs'], ['finalsteps', 'notes']], wideLeft: true },
   // Course page: Course Details + Notes on the left, Emails down the middle, the Setup Checklist down the right.
   // (Changes for Future Classes lives on the Admin page.)
@@ -118,9 +120,15 @@ const BOARDS = {
   // Once every Setup Checklist item is checked: Course To-Do fills the right, the checklist shrinks to a bar under it.
   courseDone: { key: 'courseDoneLayout', v: 3, boxes: ['info', 'setup', 'emails', 'notes', 'ctodo'], def: [['info', 'notes'], ['emails'], ['ctodo', 'setup']] },
 };
+// Prep: the Shopping List gets the Academy Week Scenarios box's height, so the two line up across the page.
+function prepEven() {
+  const b = document.querySelector('.prep-board'); if (!b) return;
+  const sc = b.querySelector('.box-scenarios'); if (!sc) return;
+  b.style.setProperty('--prep-top', Math.round(sc.getBoundingClientRect().height) + 'px');
+}
 const boardOf = n => BOARDS[n === PREP ? 'prep' : n === FINAL ? 'final' : 'day'];
 const LAYOUT_VERSION = 2; // bumped when the default changes, so an older saved layout doesn't stick
-const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v4 = scenarios fit + notes match)
+const layoutV = board => board.v || LAYOUT_VERSION; // a board can bump its own (Prep v6 = Scenarios/Staffing · To Do · Shopping/Packing)
 function cfg() {
   const s = S.settings || {};
   const board = S.view === 'course' ? (setupComplete() ? BOARDS.courseDone : BOARDS.course) : boardOf(curDay()), saved = s[board.key];
@@ -3453,6 +3461,7 @@ function grow(t) { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2
 
 function fitBoard() {
   if (typeof layoutStickies === 'function') layoutStickies(); // (Bulletin: Pinterest-style)
+  prepEven();
   const board = document.querySelector('.board');
   if (!board) return;
   const fill = innerWidth >= 1100 ? Math.max(520, innerHeight - board.getBoundingClientRect().top - window.scrollY - 24) + 'px' : '';
@@ -3460,11 +3469,7 @@ function fitBoard() {
   // The Course page stays one screen tall: each column stops at the bottom of the window and its boxes scroll inside.
   const fit = !!fill && innerWidth > 1100 && (board.classList.contains('course-board') || board.classList.contains('staff-board')); // (Staff page too)
   board.classList.toggle('fit', fit); board.style.height = fit ? fill : '';
-  // Prep: the scenarios box is only as tall as the plan, and Notes matches it (unless either was drag-sized).
-  const scen = board.querySelector('.box-scenarios'), notes = board.querySelector('.box-notes'), h = cfg().heights;
-  if (scen && notes && !h.notes && !h.scenarios && innerWidth >= 1100) {
-    notes.style.flex = '0 0 auto'; notes.style.height = scen.offsetHeight + 'px';
-  }
+  // (Prep: Shopping matches Scenarios' height: prepEven above; Staffing and Packing fill the rest.)
 }
 addEventListener('resize', fitBoard);
 

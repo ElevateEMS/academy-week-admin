@@ -1400,10 +1400,10 @@ li.done .x.due-add { display: none; }
   .course-board .box-notes { order: 4; }
   .course-board .box-setup.setup-bar { order: 5; } /* done and collapsed: at the bottom */
   .prep-board .box-todo { order: 1; }
-  .prep-board .box-notes { order: 2; }
-  .prep-board .box-shopping { order: 3; }
-  .prep-board .box-packing { order: 4; }
-  .prep-board .box-scenarios { order: 5; }
+  .prep-board .box-notes { order: 3; }
+  .prep-board .box-shopping { order: 4; }
+  .prep-board .box-packing { order: 5; }
+  .prep-board .box-scenarios { order: 2; }
 }
 
 /* Ship student shirts: the icons, Pirate Ship and the due chip stay on the item's row; the words wrap instead. */
@@ -2520,3 +2520,9 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .cand-move { max-width: 340px; margin-bottom: 6px; }
 .cand-move select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--paper); font: inherit; font-size: 14px; }
 .psy-station.unset { background: var(--paper); color: var(--muted); }
+
+/* Prep: Scenarios over Staffing, Shopping over Packing. Scenarios fits its content; Shopping takes that same height
+   (--prep-top, set by prepEven) and scrolls if longer; Staffing and Packing fill the rest. */
+.prep-board .box.box-scenarios { flex: 0 0 auto; }
+.prep-board .box.box-shopping { flex: 0 0 var(--prep-top, auto); height: var(--prep-top, auto); min-height: 0; overflow-y: auto; }
+.prep-board .box.box-notes, .prep-board .box.box-packing { flex: 1 1 0; min-height: 220px; }
