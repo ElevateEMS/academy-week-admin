@@ -5,11 +5,13 @@
    ExamPlayer.open({
      title, kind: 'quiz' | 'exam', limitMin (exams: 120; quizzes: none, a running clock instead),
      intro (text shown before starting), passMark (optional %), preview (Admin only: says so on screen),
-     questions: [{ id, type: mc|multi|tf|drag|dropdown, stem (html), choices: [html], groups, gapCount }],
+     questions: [{ id, type: mc|multi|tf|drag|dropdown, stem (html), choices: [html], groups, gapCount,
+                   group (a case's parts share one), part (their order), caseText (the scene, shown above Parts 2–5) }],
      onSubmit: async answers => ({ score, total, pct, passed, review }),   // answers = { id: value }
    })
    value: mc / tf = the choice's index; multi = [indexes]; drag / dropdown = [choice index per blank] (null = empty).
-   Question order is shuffled; choices are shuffled too, except true / false and ones like "All of the above". */
+   Question order is shuffled, except a case's parts stay back to back, in order, at a random spot. Choices are shuffled
+   too, except true / false and ones like "All of the above". */
 const ExamPlayer = (() => {
   let st = null, root = null, tick = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,7 +23,11 @@ const ExamPlayer = (() => {
 
   function open(cfg) {
     close();
-    const qs = shuffle(cfg.questions).map(q => ({ ...q, order: (q.type === 'mc' || q.type === 'multi') && !keepOrder(q) ? shuffle(q.choices.map((c, i) => i)) : q.choices.map((c, i) => i) }));
+    // Shuffle whole units: each question on its own, or a case's parts together (Part 1, 2, …).
+    const units = [], byGroup = {};
+    cfg.questions.forEach(q => { if (!q.group) units.push([q]); else if (byGroup[q.group]) byGroup[q.group].push(q); else units.push(byGroup[q.group] = [q]); });
+    Object.values(byGroup).forEach(u => u.sort((a, b) => (a.part || 0) - (b.part || 0)));
+    const qs = [].concat(...shuffle(units)).map(q => ({ ...q, order: (q.type === 'mc' || q.type === 'multi') && !keepOrder(q) ? shuffle(q.choices.map((c, i) => i)) : q.choices.map((c, i) => i) }));
     st = { cfg, qs, i: 0, ans: {}, flags: new Set(), notes: '', hide: false, phase: 'intro', agree: false, pop: null, calc: { show: '0', acc: null, op: null, fresh: true }, pickChip: null };
     root = document.createElement('div');
     root.className = 'xp-root';
@@ -99,7 +105,7 @@ const ExamPlayer = (() => {
     const v = st.ans[q.id];
     if (q.type === 'drag' || q.type === 'dropdown') return gapView(q, v || []);
     const multi = q.type === 'multi';
-    return `<div class="xp-stem">${q.stem}</div>${multi ? '<p class="xp-hint">Select all that apply.</p>' : ''}
+    return `${caseBox(q)}<div class="xp-stem">${q.stem}</div>${multi ? '<p class="xp-hint">Select all that apply.</p>' : ''}
       <div class="xp-choices">${q.order.map((ci, k) => {
         const on = multi ? (v || []).includes(ci) : v === ci;
         return `<label class="xp-choice ${on ? 'on' : ''}"><input type="${multi ? 'checkbox' : 'radio'}" name="xp-${esc(q.id)}" data-x="pick" data-c="${ci}" ${on ? 'checked' : ''}><span class="xp-letter">${L(k)})</span><span>${q.choices[ci]}</span></label>`;
@@ -117,10 +123,11 @@ const ExamPlayer = (() => {
       }
       return `<span class="xp-blank ${cur != null ? 'full' : ''} ${st.pickChip != null ? 'ready' : ''}" data-blank="${b}" data-x="blank" title="${cur != null ? 'Tap to empty' : 'Drop an option here'}">${cur != null ? esc(plain(q.choices[cur])) : '&nbsp;'}</span>`;
     });
-    return `<div class="xp-stem">${stem}</div>
+    return `${caseBox(q)}<div class="xp-stem">${stem}</div>
       ${q.type === 'drag' ? `<p class="xp-hint">Drag each option into the answer area (or tap an option, then tap a blank). Tap a filled blank to empty it.</p>
         <div class="xp-pool">${q.choices.map((c, j) => `<span class="xp-chip ${st.pickChip === j ? 'on' : ''}" draggable="true" data-chip="${j}" data-x="chip">${esc(plain(c))}</span>`).join('')}</div>` : ''}`;
   }
+  const caseBox = q => q.caseText ? `<div class="xp-case"><b>Continuing the scenario</b><p>${esc(q.caseText)}</p></div>` : '';
   function calcView() {
     const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', '.', '=', '+'];
     return `<div class="xp-pop xp-calc"><div class="xp-pop-head">Calculator<button data-x="pop" aria-label="Close">×</button></div>

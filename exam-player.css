@@ -114,3 +114,6 @@ body.xp-open { overflow: hidden; }
   .xp-btn { min-width: 0; padding: 12px 14px; }
   .xp-stem, .xp-choice { font-size: 18px; }
 }
+.xp-case { background: #f1f4f8; border-left: 4px solid #8aa4c4; border-radius: 6px; padding: 12px 16px; margin: 0 0 18px; max-width: 1400px; font-size: 17px; line-height: 1.5; color: #2d3a48; }
+.xp-case b { display: block; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; color: #4a627e; margin-bottom: 4px; }
+.xp-case p { margin: 0; font-family: Georgia, 'Times New Roman', serif; }
