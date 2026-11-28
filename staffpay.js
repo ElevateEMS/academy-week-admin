@@ -64,7 +64,8 @@ function staffPayFor(staffName) {
 const staffCohortData = () => (S.staffCo && S.staffCo[S.cohortKey]) || null;
 
 /* ---------- Staff page ---------- */
-function staffView() {
+function staffView() { return staffReady() ? staffSwitch() + staffPage() : staffPage(); }
+function staffPage() {
   if (!staffReady()) return `<section class="box"><p class="empty">The Staff page needs the Staff Apps Script connected (STAFF_SCRIPT_URL in config.js).</p></section>`;
   if (!staffFresh.all && !staffLoading.all && !S.staffAllErr) setTimeout(() => loadStaffAll(), 0);
   const a = S.staffAll || keepCopy('staffall');
@@ -107,9 +108,12 @@ function staffTabs() {
   return `<button class="icon-btn ql-icon" data-act="staffQrOpen" title="Staff Portal link and QR code" aria-label="Staff Portal link and QR code">${QR_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="dir" title="Staff Directory" aria-label="Staff Directory">${PEOPLE_ICON}</button>`
     + `<button class="icon-btn ql-icon" data-act="payLink" data-k="docs" title="Payroll Documents" aria-label="Payroll Documents">${LINK_ICONS.folder}</button>`
-    + '<span class="head-div ql-div" aria-hidden="true"></span>'
-    + `<div class="side-switch staff-switch" role="group" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
-    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div>`;
+    + '<span class="head-div ql-div" aria-hidden="true"></span>';
+}
+// Staff & Pay | Scheduling: under the header, the same toggle as the Students page's Roster | In-Person (centered).
+function staffSwitch() {
+  return `<div class="stu-top"><span class="stu-top-left"></span><div class="stu-tabs" role="tablist" aria-label="Staff page">${[['pay', 'Staff & Pay'], ['stf', 'Scheduling']]
+    .map(([k, l]) => `<button class="${staffTab() === k ? 'on' : ''}" role="tab" aria-selected="${staffTab() === k}" data-act="stfTab" data-t="${k}">${l}</button>`).join('')}</div><span class="stu-top-right"></span></div>`;
 }
 // The Staff list and the Academy Week Pay card: grouped by role (the pay scale's order), A–Z by first name in each.
 // Volunteers go with EC & Equivalent (ours is an EC: the app only knows "Volunteer", not their level).
