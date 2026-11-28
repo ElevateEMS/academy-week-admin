@@ -12,6 +12,16 @@
      tbImages/{id}                   { data: data URL }  (a picture in a question: <img data-img="id">)
    The first time, the page asks for the import file (made from the Navigate export; it stays on your Mac, never on GitHub). */
 
+// Chapter names: the same as the Student Portal's chapter list (Student Hub index.html), not JBL's tags.
+const TB_TITLES = ['', 'EMS Systems/Public Health', 'Workforce Safety and Wellness', 'Medical, Legal, and Ethical Issues', 'Communications and Documentation',
+  'Medical Terminology', 'The Human Body', 'Life Span Development', 'Lifting and Moving Patients', 'Team Approach', 'Patient Assessment',
+  'Airway and Ventilation Management', 'Principles of Pharmacology', 'Shock', 'BLS Resuscitation', 'Medical Overview', 'Respiratory Emergencies',
+  'Cardiovascular Emergencies', 'Neurologic Emergencies', 'Gastrointestinal and Urologic Emergencies', 'Endocrine and Hematologic Emergencies',
+  'Allergy and Anaphylaxis', 'Toxicology', 'Behavioral Health Emergencies', 'Trauma Overview', 'Bleeding', 'Soft-Tissue Injuries',
+  'Face and Neck Injuries', 'Head and Spine Injuries', 'Chest Injuries', 'Abdominal and Genitourinary Injuries', 'Orthopaedic Injuries',
+  'Environmental Emergencies', 'Gynecologic Emergencies', 'OB and Neonatal Care Series', 'Patients With Special Challenges', 'Transport Operations',
+  'Vehicle Extrication and Special Rescue', 'Incident Management / MCIM I', 'Terrorism Response and Disaster Management'];
+const tbTitle = cid => /^\d+$/.test(cid) ? TB_TITLES[Number(cid)] || 'Chapter ' + Number(cid) : ((tb().chapters || {})[cid] || {}).title || '';
 const TB_MODULES = { 1: [1, 8], 2: [9, 15], 3: [16, 23], 4: [24, 31], 5: [32, 39] };
 const TB_OTHER = [['ride', 'Ride Along Readiness'], ['pharm', 'Pharmacology']];
 const TB_TABS = [['quiz', 'Quiz'], ['spec', 'Specialty'], ['all', 'All questions']];
@@ -70,7 +80,7 @@ function tbSide() {
     return `<button class="tb-ch ${t.ch === cid ? 'on' : ''}" data-act="tbCh" data-ch="${cid}"><span class="tb-ch-n">${esc(sub)}</span><span class="tb-ch-t">${esc(label)}</span>${done ? '<span class="tb-ch-done" title="18 + 2 specialty">✓</span>' : ''}</button>`;
   };
   return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => `<p class="tb-mod">Module ${m} <span class="muted">· Ch ${a}–${b}</span></p>`
-    + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, (t.chapters[cid] || {}).title || 'Chapter ' + n, n); }).join('')).join('')}
+    + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('')).join('')}
     <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
 }
 function tbMain() {
@@ -86,7 +96,7 @@ function tbMain() {
   const spec = set ? set.qids.filter(id => (q[id] || {}).kind === 'specialty').length : 0;
   const counter = !set ? '' : set.counts === false && other ? `<span class="tb-count">${set.qids.length} questions${set.pass ? ' · pass ' + set.pass + '%' : ''}</span>`
     : `<span class="tb-count ${set.qids.length === TB_QUIZ_SIZE && spec === TB_SPEC_PICKS ? 'ok' : ''}">Quiz: ${set.qids.length - spec} + ${spec} specialty = ${set.qids.length}${set.counts === false ? ' · not graded' : ' of ' + TB_QUIZ_SIZE}${set.qids.length > TB_QUIZ_SIZE ? ` · take ${set.qids.length - TB_QUIZ_SIZE} off` : ''}</span>`;
-  return `<div class="tb-head"><div><h2>${other ? '' : 'Chapter ' + Number(cid) + ' · '}${esc(ch.title || '')}</h2>${ch.module ? `<span class="muted small">Module ${ch.module}</span>` : ''}</div>${counter}</div>
+  return `<div class="tb-head"><div><h2>${other ? '' : 'Chapter ' + Number(cid) + ' · '}${esc(tbTitle(cid))}</h2>${ch.module ? `<span class="muted small">Module ${ch.module}</span>` : ''}</div>${counter}</div>
     ${set && set.intro ? `<p class="tb-intro">${esc(set.intro).replace(/\n/g, '<br>')}</p>` : ''}
     <div class="tb-bar"><nav class="tb-tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="tbTab" data-tab="${k}">${l} <span>${counts[k]}</span></button>`).join('')}</nav>
       <input class="tb-find" id="tb-find" placeholder="Search this chapter" value="${esc(t.q)}" autocomplete="off"></div>
