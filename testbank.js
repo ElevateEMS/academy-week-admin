@@ -71,10 +71,19 @@ function testBankView() {
   if (!t.setsIn || !t.chIn) return '<p class="muted tb-loading">Loading the Test Bank…</p>';
   if (!Object.keys(t.sets || {}).length) return tbImportView();
   setTimeout(tbPairsOnce, 0);
+  if (!t.sideShown) { t.sideShown = true; setTimeout(tbSideToCurrent, 0); }
   const exam = /^exam-/.test(t.ch);
   if (exam ? !t.sets[t.ch] : !t.chapters[t.ch]) t.ch = '01';
   if (!/^exam-/.test(t.ch)) tbHistoryWatch(t.ch);
   return `<div class="tb">${tbSide()}<section class="tb-main box">${/^exam-/.test(t.ch) ? tbExamMain() : tbMain()}</section></div>`;
+}
+const tbFolded = () => new Set(String(pref('tbFold') || '').split(',').filter(Boolean).map(Number));
+// Keep the open chapter in view inside the side list (only the list scrolls, not the page).
+function tbSideToCurrent() {
+  const side = document.querySelector('.tb-side'), on = side && side.querySelector('.tb-ch.on');
+  if (!on) return;
+  const top = on.offsetTop - side.offsetTop, bottom = top + on.offsetHeight;
+  if (top < side.scrollTop + 8) side.scrollTop = top - 40; else if (bottom > side.scrollTop + side.clientHeight - 8) side.scrollTop = bottom - side.clientHeight + 40;
 }
 function tbQuizSet(cid) { return (tb().sets || {})[/^\d+$/.test(cid) ? 'quiz-' + cid : cid] || null; }
 function tbSide() {
@@ -89,8 +98,16 @@ function tbSide() {
   const examRow = m => { const set = t.sets['exam-m' + m]; if (!set) return '';
     const spec = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length, done = set.qids.length === TB_EXAM_SIZE && spec === TB_EXAM_SPEC;
     return `<button class="tb-ch tb-ch-exam ${t.ch === 'exam-m' + m ? 'on' : ''}" data-act="tbCh" data-ch="exam-m${m}"><span class="tb-ch-n">${TB_EXAM_ICON}</span><span class="tb-ch-t">Module ${m} Exam</span>${done ? '<span class="tb-ch-done" title="65 + 5 specialty">✓</span>' : ''}</button>`; };
-  return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => `<p class="tb-mod">Module ${m} <span class="muted">· Ch ${a}–${b}</span></p>`
-    + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m)).join('')}
+  // A module folds to its heading (remembered on this computer); the one you're in stays open. ✓ = all its quizzes + its exam done.
+  const fold = tbFolded(), here = /^exam-m/.test(t.ch) ? Number(t.ch.slice(6)) : /^\d+$/.test(t.ch) ? tbModuleOf(t.ch) : 0;
+  const modDone = (m, a, b) => { const ex = t.sets['exam-m' + m]; if (!ex) return false;
+    const exSpec = ex.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length;
+    return ex.qids.length === TB_EXAM_SIZE && exSpec === TB_EXAM_SPEC && Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')).every(cid => {
+      const set = tbQuizSet(cid); if (!set || set.counts === false) return true;
+      const sp = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length; return set.qids.length === TB_QUIZ_SIZE && sp === TB_SPEC_PICKS; }); };
+  return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
+    return `<button class="tb-mod tb-mod-btn" data-act="tbFold" data-m="${m}" aria-expanded="${open}"><span class="tb-caret">${open ? '▾' : '▸'}</span>Module ${m} <span class="muted">· Ch ${a}–${b}</span>${modDone(m, a, b) ? '<span class="tb-ch-done" title="All its quizzes and its exam are done">✓</span>' : ''}</button>`
+    + (open ? Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m) : ''); }).join('')}
     <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
 }
 function tbMain() {
@@ -445,7 +462,8 @@ async function tbAct(a, el) {
   const d = el.dataset || {}, t = tb();
   const chq = () => ((t.chapters[d.ch] || {}).q || {})[d.q];
   switch (a) {
-    case 'tbCh': t.ch = d.ch; pref('tbCh', d.ch); t.q = ''; t.edit = t.ask = t.pick = null; render(); window.scrollTo(0, 0); return true;
+    case 'tbCh': t.ch = d.ch; pref('tbCh', d.ch); t.q = ''; t.edit = t.ask = t.pick = null; render(); window.scrollTo(0, 0); tbSideToCurrent(); return true;
+    case 'tbFold': { const f = tbFolded(), m = Number(d.m); f.has(m) ? f.delete(m) : f.add(m); pref('tbFold', [...f].join(',')); render(); return true; }
     case 'tbTab': t.tab = d.tab; pref('tbTab', d.tab); t.ask = t.pick = null; render(); return true;
     case 'tbAsk': { const q = chq(); if (!q || (q.correct || []).length === 1 && q.correct[0] === Number(d.i)) return true; t.ask = { key: d.ch + '/' + d.q, ch: d.ch, q: d.q, i: Number(d.i) }; t.pick = null; render(); return true; }
     case 'tbAskNo': t.ask = null; render(); return true;

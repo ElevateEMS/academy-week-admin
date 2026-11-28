@@ -2577,7 +2577,7 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 
 /* ---------- Test Bank (testbank.js) ---------- */
 .tb { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 18px; align-items: start; }
-.tb-side { position: sticky; top: 12px; max-height: calc(100vh - 140px); overflow: auto; padding: 10px 8px; }
+.tb-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 10px 8px; }
 .tb-mod { margin: 12px 8px 4px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--taupe-dark); font-weight: 500; }
 .tb-mod:first-child { margin-top: 2px; }
 .tb-ch { all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; }
@@ -2677,3 +2677,9 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .tb-case-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 0; padding: 10px 14px; background: var(--honey-soft); border-radius: 10px; }
 .tb-case-pick label { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .tb-case-pick select { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: #fff; max-width: 360px; }
+/* Test Bank side list: module headings fold */
+.tb-mod-btn { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; margin: 12px 0 4px; padding: 4px 8px; border-radius: 8px; cursor: pointer; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--taupe-dark); font-weight: 500; }
+.tb-mod-btn:first-child { margin-top: 2px; }
+.tb-mod-btn:hover { background: var(--blush-soft); }
+.tb-mod-btn .tb-ch-done { margin-left: auto; }
+.tb-caret { width: 12px; font-size: 11px; color: var(--muted); }
