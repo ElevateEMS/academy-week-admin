@@ -25,6 +25,7 @@ const tbTitle = cid => /^\d+$/.test(cid) ? TB_TITLES[Number(cid)] || 'Chapter ' 
 const TB_MODULES = { 1: [1, 8], 2: [9, 15], 3: [16, 23], 4: [24, 31], 5: [32, 39] };
 const TB_OTHER = [['ride', 'Ride Along Readiness'], ['pharm', 'Pharmacology']];
 const TB_TABS = [['quiz', 'Quiz'], ['spec', 'Specialty'], ['all', 'All questions']];
+const TB_EXAM_ICON = '<svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg>';
 const TB_QUIZ_SIZE = 20, TB_SPEC_PICKS = 2, TB_EXAM_SIZE = 70, TB_EXAM_SPEC = 5;
 const tbModuleOf = cid => Number(Object.keys(TB_MODULES).find(m => Number(cid) >= TB_MODULES[m][0] && Number(cid) <= TB_MODULES[m][1]));
 const tbExamSet = cid => /^\d+$/.test(cid) ? (tb().sets || {})['exam-m' + tbModuleOf(cid)] || null : null;
@@ -83,11 +84,12 @@ function tbSide() {
     const done = set && set.counts !== false && set.qids.length === TB_QUIZ_SIZE && spec === TB_SPEC_PICKS;
     return `<button class="tb-ch ${t.ch === cid ? 'on' : ''}" data-act="tbCh" data-ch="${cid}"><span class="tb-ch-n">${esc(sub)}</span><span class="tb-ch-t">${esc(label)}</span>${done ? '<span class="tb-ch-done" title="18 + 2 specialty">✓</span>' : ''}</button>`;
   };
+  // Each module: its chapters, then its exam (like the JBL course, where the exam sits under the module's last chapter).
+  const examRow = m => { const set = t.sets['exam-m' + m]; if (!set) return '';
+    const spec = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length, done = set.qids.length === TB_EXAM_SIZE && spec === TB_EXAM_SPEC;
+    return `<button class="tb-ch tb-ch-exam ${t.ch === 'exam-m' + m ? 'on' : ''}" data-act="tbCh" data-ch="exam-m${m}"><span class="tb-ch-n">${TB_EXAM_ICON}</span><span class="tb-ch-t">Module ${m} Exam</span>${done ? '<span class="tb-ch-done" title="65 + 5 specialty">✓</span>' : ''}</button>`; };
   return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => `<p class="tb-mod">Module ${m} <span class="muted">· Ch ${a}–${b}</span></p>`
-    + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('')).join('')}
-    <p class="tb-mod">Module exams</p>${Object.keys(TB_MODULES).map(m => { const set = t.sets['exam-m' + m]; if (!set) return '';
-      const spec = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length, done = set.qids.length === TB_EXAM_SIZE && spec === TB_EXAM_SPEC;
-      return `<button class="tb-ch ${t.ch === 'exam-m' + m ? 'on' : ''}" data-act="tbCh" data-ch="exam-m${m}"><span class="tb-ch-n">•</span><span class="tb-ch-t">Module ${m} Exam</span>${done ? '<span class="tb-ch-done" title="65 + 5 specialty">✓</span>' : ''}</button>`; }).join('')}
+    + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m)).join('')}
     <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
 }
 function tbMain() {
