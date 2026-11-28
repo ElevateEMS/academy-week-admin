@@ -2577,7 +2577,8 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 
 /* ---------- Test Bank (testbank.js) ---------- */
 .tb { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 18px; align-items: start; }
-.tb-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 10px 8px; }
+.tb-side { position: sticky; top: 12px; max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain; padding: 10px 8px; }
+.tb-side-sep { border-top: 1px solid var(--line); margin: 8px 6px 4px; }
 .tb-mod { margin: 12px 8px 4px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--taupe-dark); font-weight: 500; }
 .tb-mod:first-child { margin-top: 2px; }
 .tb-ch { all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; }

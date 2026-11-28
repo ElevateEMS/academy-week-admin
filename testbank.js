@@ -105,11 +105,10 @@ function tbSide() {
     return ex.qids.length === TB_EXAM_SIZE && exSpec === TB_EXAM_SPEC && Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')).every(cid => {
       const set = tbQuizSet(cid); if (!set || set.counts === false) return true;
       const sp = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length; return set.qids.length === TB_QUIZ_SIZE && sp === TB_SPEC_PICKS; }); };
-  return `<aside class="tb-side box" data-keep-scroll="tb-side">${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
+  return `<aside class="tb-side box" data-keep-scroll="tb-side"><p class="tb-mod">Students</p><button class="tb-ch ${t.ch === 'practice' ? 'on' : ''}" data-act="tbCh" data-ch="practice"><span class="tb-ch-n">${TB_PRAC_ICON}</span><span class="tb-ch-t">NREMT Practice</span></button><div class="tb-side-sep"></div>${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
     return `<button class="tb-mod tb-mod-btn" data-act="tbFold" data-m="${m}" aria-expanded="${open}"><span class="tb-caret">${open ? '▾' : '▸'}</span>Module ${m} <span class="muted">· Ch ${a}–${b}</span>${modDone(m, a, b) ? '<span class="tb-ch-done" title="All its quizzes and its exam are done">✓</span>' : ''}</button>`
     + (open ? Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m) : ''); }).join('')}
-    <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}
-    <p class="tb-mod">Students</p><button class="tb-ch ${t.ch === 'practice' ? 'on' : ''}" data-act="tbCh" data-ch="practice"><span class="tb-ch-n">${TB_PRAC_ICON}</span><span class="tb-ch-t">NREMT Practice</span></button></aside>`;
+    <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
 }
 function tbMain() {
   const t = tb(), cid = t.ch, ch = t.chapters[cid] || {}, q = ch.q || {}, set = tbQuizSet(cid), other = !/^\d+$/.test(cid);
