@@ -17,7 +17,7 @@ const Practice = (() => {
   const num = n => Number(n || 0).toLocaleString();
   const clock = s => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
   const day = t => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  const COUNTS = [10, 25, 50, 100, 0];
+  const COUNTS = [10, 25, 50, 70, 100, 120, 0];
 
   function open(cfg) {
     close();
@@ -27,6 +27,10 @@ const Practice = (() => {
     document.body.appendChild(root);
     document.body.classList.add('pr-open');
     root.addEventListener('click', onClick);
+    // Custom number: just the Start button changes while typing (a redraw would take the cursor away).
+    root.addEventListener('input', e => { if (e.target.id !== 'pr-custom' || !st) return;
+      st.s.customN = Math.max(0, Math.floor(Number(e.target.value) || 0));
+      const go = root.querySelector('[data-p="gostudy"]'), n = howMany(); if (go) { go.disabled = !n; go.textContent = startLabel(n); } });
     document.addEventListener('keydown', onKey, true);
     draw();
   }
@@ -37,7 +41,8 @@ const Practice = (() => {
     document.removeEventListener('keydown', onKey, true);
   }
   // Escape closes the ⓘ pop-up (not while a test is open on top).
-  function onKey(e) { if (e.key === 'Escape' && st && st.info && !(window.ExamPlayer && ExamPlayer.isOpen())) { st.info = false; draw(); e.stopPropagation(); } }
+  function onKey(e) { if (e.key === 'Enter' && e.target && e.target.id === 'pr-custom') { const go = root.querySelector('[data-p="gostudy"]'); if (go && !go.disabled) go.click(); return; }
+    if (e.key === 'Escape' && st && st.info && !(window.ExamPlayer && ExamPlayer.isOpen())) { st.info = false; draw(); e.stopPropagation(); } }
   function refresh(data) { if (!st) return; Object.assign(st.cfg, data); if (st.page !== 'past') st.page = 'home'; draw(); } // (after a session: back to the home page, with the new score)
   function draw() {
     if (!root) return;
@@ -82,7 +87,7 @@ const Practice = (() => {
     return c.modules.flatMap(m => m.chapters).filter(x => s.chapters.has(x.cid)).reduce((a, x) => a + take(x), 0);
   };
   function studyView() {
-    const c = st.cfg, s = st.s, have = avail(), n = s.count ? Math.min(s.count, have) : have;
+    const c = st.cfg, s = st.s, n = howMany();
     const box = (on, p, attrs, label, counts) => `<label class="pr-check ${on ? 'on' : ''}"><input type="checkbox" data-p="${p}" ${attrs} ${on ? 'checked' : ''}><span>${label}</span>${counts ? `<span class="pr-count">${counts}</span>` : ''}</label>`;
     const cnt = x => `${num(x.fresh)} new / ${num(x.total)}`;
     const allCats = c.cats.every(x => s.cats.has(x.key));
@@ -93,19 +98,24 @@ const Practice = (() => {
           return `<div class="pr-mod"><div class="pr-mod-row">${box(on, 'mod', `data-m="${m.m}" ${!on && some ? 'data-some="1"' : ''}`, `<b>Module ${m.m}</b> <span class="pr-muted">Ch ${m.chapters[0].n}–${m.chapters[m.chapters.length - 1].n}</span>`, cnt({ fresh: m.chapters.reduce((a, x) => a + x.fresh, 0), total: m.chapters.reduce((a, x) => a + x.total, 0) }))}
             <button class="pr-fold" data-p="fold" data-m="${m.m}" aria-expanded="${open}">${open ? 'Hide chapters' : (some && !on ? ids.filter(id => s.chapters.has(id)).length + ' picked · ' : '') + 'Pick chapters'}</button></div>
             ${open ? `<div class="pr-grid chs">${m.chapters.map(x => box(s.chapters.has(x.cid), 'ch', `data-c="${x.cid}"`, `${x.n}. ${esc(x.title)}`, cnt(x))).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
-    return `<div class="pr-wrap narrow"><section class="pr-card">
+    // Two columns (what to study | how many + Start), so it fits one screen; phones stack them.
+    return `<div class="pr-wrap pr-study"><section class="pr-card pr-pick">
       <div class="pr-card-head"><h2>What to study</h2><span class="xp-seg"><button data-p="by" data-v="cat" class="${s.by === 'cat' ? 'on' : ''}">By category</button><button data-p="by" data-v="ch" class="${s.by === 'ch' ? 'on' : ''}">By module &amp; chapter</button></span></div>
       <p class="pr-muted small">“New” = questions you haven’t answered yet. New ones come first.</p>
       ${pick}</section>
-      <section class="pr-card"><h2>How many questions</h2>
-        <div class="pr-chips">${COUNTS.map(k => `<button class="${s.count === k ? 'on' : ''}" data-p="count" data-v="${k}">${k || 'All'}</button>`).join('')}</div>
+      <section class="pr-card pr-side"><h2>How many questions</h2>
+        <div class="pr-chips">${COUNTS.map(k => `<button class="${!s.custom && s.count === k ? 'on' : ''}" data-p="count" data-v="${k}">${k || 'All'}</button>`).join('')}${s.custom
+          ? `<input class="pr-custom" id="pr-custom" type="number" inputmode="numeric" min="1" max="${avail()}" placeholder="How many?" value="${s.customN || ''}" data-p="customn" aria-label="How many questions">`
+          : `<button data-p="custom">Custom</button>`}</div>
         <div class="pr-opts">
-          ${toggle('cases', s.cases, 'Specialty cases', 'NREMT-style case studies; a case’s parts come back to back.')}
-          ${toggle('wrong', s.wrong, 'Include questions I got wrong before', 'Mixed in with the new ones.')}
-          ${toggle('timer', s.timer, 'Timer', 'One minute per question, like the real exam’s pace.')}
-        </div></section>
-      <div class="pr-go"><button class="xp-btn" data-p="home">Back</button><button class="xp-btn primary" data-p="gostudy" ${n ? '' : 'disabled'}>${n ? `Start (${num(n)} question${n === 1 ? '' : 's'})` : 'Pick something to study'}</button></div></div>`;
+          ${toggle('cases', s.cases, 'Specialty cases', 'Case parts come back to back.')}
+          ${toggle('wrong', s.wrong, 'Include questions I got wrong before', 'Mixed in with new ones.')}
+          ${toggle('timer', s.timer, 'Timer', '1 minute per question.')}
+        </div>
+        <button class="xp-btn primary pr-start" data-p="gostudy" ${n ? '' : 'disabled'}>${startLabel(n)}</button></section></div>`;
   }
+  const howMany = () => { const s = st.s, have = avail(); return s.custom ? Math.min(s.customN || 0, have) : s.count ? Math.min(s.count, have) : have; };
+  const startLabel = n => n ? `Start (${num(n)} question${n === 1 ? '' : 's'})` : st.s.custom && avail() ? 'Type how many' : 'Pick something to study';
   const toggle = (k, on, label, sub) => `<label class="pr-tog"><input type="checkbox" data-p="opt" data-k="${k}" ${on ? 'checked' : ''}><span class="pr-sw"></span><span><b>${label}</b><small>${sub}</small></span></label>`;
 
   /* ---------- Simulation start ---------- */
@@ -154,6 +164,7 @@ const Practice = (() => {
     const b = e.target.closest('[data-p]');
     if (!b || !st) return;
     const p = b.dataset.p, s = st.s, c = st.cfg;
+    if (p === 'customn') return;
     if (b.tagName === 'INPUT') {
       if (p === 'allcats') { s.cats = b.checked ? new Set(c.cats.map(x => x.key)) : new Set(); }
       else if (p === 'cat') b.checked ? s.cats.add(b.dataset.k) : s.cats.delete(b.dataset.k);
@@ -167,9 +178,11 @@ const Practice = (() => {
     if (p === 'close') { const done = c.onClose; close(); if (done) done(); return; }
     if (p === 'home' || p === 'study' || p === 'sim' || p === 'past') { st.page = p; draw(); root.querySelector('.pr-main').scrollTop = 0; return; }
     if (p === 'by') s.by = b.dataset.v;
-    else if (p === 'count') s.count = Number(b.dataset.v);
+    else if (p === 'count') { s.count = Number(b.dataset.v); s.custom = false; }
+    else if (p === 'custom') { s.custom = true; keep(); const f = root.querySelector('#pr-custom'); if (f) f.focus(); return; }
+    else if (p === 'customn') return;
     else if (p === 'fold') st.openMods.has(Number(b.dataset.m)) ? st.openMods.delete(Number(b.dataset.m)) : st.openMods.add(Number(b.dataset.m));
-    else if (p === 'gostudy') { if (avail()) c.onStudy({ by: s.by, cats: [...s.cats], chapters: [...s.chapters], count: s.count, cases: s.cases, wrong: s.wrong, timer: s.timer }); return; }
+    else if (p === 'gostudy') { if (avail()) c.onStudy({ by: s.by, cats: [...s.cats], chapters: [...s.chapters], count: howMany(), cases: s.cases, wrong: s.wrong, timer: s.timer }); return; }
     else if (p === 'gosim') { c.onSim(); return; }
     else if (p === 'rev') { c.onReview(Number(b.dataset.i)); return; }
     keep();
