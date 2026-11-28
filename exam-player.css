@@ -1,0 +1,116 @@
+/* The quiz / exam screen (exam-player.js): full screen, NREMT / JBL TestPrep layout. Its own colors, so it looks the
+   same in the Admin preview and in the Student Portal. */
+body.xp-open { overflow: hidden; }
+.xp-root { position: fixed; inset: 0; z-index: 9999; background: #eef1f5; color: #1d2733; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+.xp-root * { box-sizing: border-box; }
+.xp-root h1, .xp-root h2, .xp-root h3, .xp-root button, .xp-root input, .xp-root select, .xp-root textarea { font-family: Arial, Helvetica, sans-serif; letter-spacing: normal; }
+.xp-root .xp-stem, .xp-root .xp-choice, .xp-root .xp-nav-list button { font-family: Georgia, 'Times New Roman', serif; }
+.xp-root svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.xp-btn { font: inherit; font-size: 15px; letter-spacing: .02em; border: 0; border-radius: 4px; padding: 14px 22px; min-width: 190px; background: #d9dee5; color: #1d2733; cursor: pointer; }
+.xp-btn:hover:not(:disabled) { background: #cbd2db; }
+.xp-btn.primary { background: #0b4f9c; color: #fff; }
+.xp-btn.primary:hover:not(:disabled) { background: #083f7e; }
+.xp-btn:disabled { opacity: .45; cursor: default; }
+
+/* Start and score pages */
+.xp-intro { height: 100%; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 48px 20px; }
+.xp-intro-card { background: #fff; border-radius: 10px; box-shadow: 0 6px 30px rgba(10, 40, 80, .12); max-width: 680px; width: 100%; padding: 32px 36px; }
+.xp-intro-card h1 { margin: 0 0 6px; font-size: 26px; color: #0b4f9c; font-weight: 600; }
+.xp-meta { color: #5b6878; margin: 0 0 16px; }
+.xp-intro-text { background: #f4f7fb; border-left: 4px solid #0b4f9c; padding: 12px 16px; margin: 0 0 18px; line-height: 1.5; }
+.xp-before { border: 1px solid #d6dde6; border-radius: 8px; padding: 12px 18px; margin: 0 0 16px; }
+.xp-before h2 { margin: 0 0 6px; font-size: 18px; }
+.xp-before ul { margin: 0; padding-left: 20px; line-height: 1.7; }
+.xp-honest { font-style: italic; line-height: 1.55; color: #2d3a48; margin: 0 0 14px; }
+.xp-agree { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; cursor: pointer; font-weight: 600; }
+.xp-agree input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.xp-intro-btns { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.xp-preview-tag { background: #fff4d6; color: #7a5a12; border-radius: 6px; padding: 6px 12px; font-size: 14px; margin: 0 0 14px; }
+.xp-score { display: grid; gap: 4px; text-align: center; padding: 18px; border-radius: 10px; background: #f4f7fb; margin: 8px 0 12px; }
+.xp-score b { font-size: 44px; color: #0b4f9c; }
+.xp-score.pass b { color: #2e7d4f; }
+.xp-score.fail b { color: #b3402f; }
+.xp-review { margin-top: 10px; }
+.xp-review summary { cursor: pointer; color: #0b4f9c; }
+.xp-rev { border-top: 1px solid #e3e8ee; padding: 10px 0; }
+.xp-rev .ok { color: #2e7d4f; font-weight: 600; }
+.xp-rev .no { color: #b3402f; font-weight: 600; }
+
+/* The test */
+.xp { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+.xp-head { background: #0b4f9c; color: #fff; }
+.xp-head-in { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px 10px 120px; }
+.xp-title { font-size: 26px; font-weight: 300; }
+.xp-pv { font-size: 13px; background: #fff4d6; color: #7a5a12; border-radius: 4px; padding: 2px 8px; vertical-align: middle; margin-left: 8px; font-weight: 600; }
+.xp-of { font-size: 19px; font-weight: 300; opacity: .95; margin-top: 4px; }
+.xp-time { font-size: 24px; font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, .12); border-radius: 6px; padding: 4px 12px; }
+.xp-time.low { background: #c0392b; }
+.xp-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 1000px; margin-left: 100px; }
+.xp-tools button { font: inherit; font-size: 15px; letter-spacing: .02em; color: #fff; background: #0a468b; border: 0; border-right: 1px solid #1e5fa8; padding: 14px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; text-align: left; }
+.xp-tools button:hover, .xp-tools button.on { background: #083a73; }
+.xp-tools button:nth-child(3) svg { color: #ff6b5a; }
+.xp-tools button:nth-child(4) svg { color: #4fd18b; }
+.xp-show { display: block; margin: 0 0 6px 120px; font: inherit; font-size: 13px; background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, .5); border-radius: 4px; padding: 4px 12px; cursor: pointer; }
+.xp-body { display: grid; grid-template-columns: 80px minmax(0, 1fr); min-height: 0; }
+.xp-nav { background: #0b4f9c; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
+.xp-nav-arrow { background: none; border: 0; color: #fff; font-size: 18px; padding: 12px 0; cursor: pointer; }
+.xp-nav-list { overflow-y: auto; scrollbar-width: thin; }
+.xp-nav-list button { position: relative; display: block; width: 100%; text-align: left; font: inherit; font-size: 20px; font-family: Georgia, 'Times New Roman', serif; color: #fff; background: none; border: 0; border-bottom: 1px solid #1e5fa8; padding: 12px 16px; cursor: pointer; }
+.xp-nav-list button.done::after { content: ''; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: #9cc7ff; transform: translateY(-50%); }
+.xp-nav-list button.cur { background: #1b67c0; }
+.xp-fl { color: #ff6b5a; font-size: 13px; position: absolute; right: 22px; top: 8px; }
+.xp-main { overflow-y: auto; background: #fff; padding: 32px 48px 40px; }
+.xp-stem { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; line-height: 1.6; margin-bottom: 22px; max-width: 1400px; }
+.xp-stem p { margin: 0 0 12px; }
+.xp-stem img, .xp-stem .tb-img { display: block; max-width: min(100%, 520px); margin: 12px 0; border-radius: 6px; }
+.xp-stem table { border-collapse: collapse; margin: 10px 0; font-size: 18px; }
+.xp-stem td, .xp-stem th { border: 1px solid #c8d1dc; padding: 6px 12px; vertical-align: middle; }
+.xp-stem td p { margin: 0; }
+.xp-hint { color: #5b6878; font-style: italic; margin: -10px 0 14px; }
+.xp-choices { background: #f3f4f6; max-width: 1400px; }
+.xp-choice { display: flex; gap: 14px; align-items: flex-start; padding: 22px 18px; border-bottom: 1px solid #fff; cursor: pointer; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; line-height: 1.45; }
+.xp-choice:hover { background: #e9ecf0; }
+.xp-choice.on { background: #dbe8f7; }
+.xp-choice input { width: 20px; height: 20px; margin: 4px 6px 0 0; flex-shrink: 0; accent-color: #0b4f9c; }
+.xp-letter { flex-shrink: 0; }
+.xp-blank { display: inline-block; min-width: 150px; min-height: 34px; border: 2px dashed #9fb3c8; border-radius: 6px; padding: 2px 10px; vertical-align: middle; background: #f7f9fc; cursor: pointer; font-size: 18px; }
+.xp-blank.ready { border-color: #0b4f9c; background: #eaf2fc; }
+.xp-blank.full { border-style: solid; border-color: #0b4f9c; background: #dbe8f7; }
+.xp-sel { font: inherit; font-size: 17px; padding: 4px 8px; border: 1px solid #9fb3c8; border-radius: 6px; background: #fff; }
+.xp-pool { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px; background: #f3f4f6; border-radius: 8px; max-width: 1400px; }
+.xp-chip { background: #fff; border: 1px solid #9fb3c8; border-radius: 6px; padding: 8px 14px; cursor: grab; font-size: 17px; user-select: none; }
+.xp-chip.on { border-color: #0b4f9c; background: #0b4f9c; color: #fff; }
+.xp-foot { background: #f3f4f6; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 48px 18px 128px; border-top: 1px solid #dde2e8; }
+
+/* Pop-ups: calculator, notes, submit */
+.xp-pop { position: fixed; right: 28px; top: 150px; width: 300px; background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(10, 40, 80, .25); z-index: 2; overflow: hidden; }
+.xp-pop-head { display: flex; justify-content: space-between; align-items: center; background: #0b4f9c; color: #fff; padding: 8px 12px; font-size: 15px; }
+.xp-pop-head button { background: none; border: 0; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+.xp-calc-screen { font-size: 28px; text-align: right; padding: 12px 14px; background: #f3f4f6; font-variant-numeric: tabular-nums; overflow: hidden; }
+.xp-calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #dde2e8; }
+.xp-calc-keys button { font: inherit; font-size: 18px; border: 0; background: #fff; padding: 14px 0; cursor: pointer; }
+.xp-calc-keys button:hover { background: #eef1f5; }
+.xp-calc-keys button.op { background: #e7eef8; color: #0b4f9c; }
+.xp-calc-keys button.wide { grid-column: span 2; }
+.xp-notes { width: 380px; }
+.xp-notes textarea { width: 100%; height: 280px; border: 0; padding: 12px; font: inherit; font-size: 15px; resize: vertical; outline: none; }
+.xp-veil { position: fixed; inset: 0; background: rgba(10, 30, 60, .45); display: flex; align-items: center; justify-content: center; z-index: 3; padding: 20px; }
+.xp-confirm { background: #fff; border-radius: 10px; padding: 24px 28px; max-width: 520px; width: 100%; }
+.xp-confirm h2 { margin: 0 0 10px; font-size: 21px; }
+.xp-miss { display: flex; flex-wrap: wrap; gap: 6px; }
+.xp-miss button { font: inherit; border: 1px solid #0b4f9c; color: #0b4f9c; background: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.xp-muted { color: #5b6878; }
+.xp-confirm .xp-btn { min-width: 150px; }
+
+/* Hidden menu: the toolbar folds away */
+.xp.menu-hidden .xp-head-in { padding-bottom: 4px; }
+@media (max-width: 900px) {
+  .xp-head-in { padding: 14px 16px 8px; }
+  .xp-tools { margin-left: 0; grid-template-columns: repeat(2, 1fr); }
+  .xp-show { margin-left: 16px; }
+  .xp-body { grid-template-columns: 56px minmax(0, 1fr); }
+  .xp-main { padding: 20px; }
+  .xp-foot { padding: 12px 16px; }
+  .xp-btn { min-width: 0; padding: 12px 14px; }
+  .xp-stem, .xp-choice { font-size: 18px; }
+}

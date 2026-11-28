@@ -103,7 +103,8 @@ function tbMain() {
   const spec = set ? set.qids.filter(id => (q[id] || {}).kind === 'specialty').length : 0;
   const counter = !set ? '' : set.counts === false && other ? `<span class="tb-count">${set.qids.length} questions${set.pass ? ' · pass ' + set.pass + '%' : ''}</span>`
     : `<span class="tb-count ${set.qids.length === TB_QUIZ_SIZE && spec === TB_SPEC_PICKS ? 'ok' : ''}">Quiz: ${set.qids.length - spec} + ${spec} specialty = ${set.qids.length}${set.counts === false ? ' · not graded' : ' of ' + TB_QUIZ_SIZE}${set.qids.length > TB_QUIZ_SIZE ? ` · take ${set.qids.length - TB_QUIZ_SIZE} off` : ''}</span>`;
-  return `<div class="tb-head"><div><h2>${other ? '' : 'Chapter ' + Number(cid) + ' · '}${esc(tbTitle(cid))}</h2>${ch.module ? `<span class="muted small">Module ${ch.module}</span>` : ''}</div>${counter}</div>
+  const pv = set ? `<button class="btn tiny" data-act="tbPreview" data-set="${/^\d+$/.test(cid) ? 'quiz-' + cid : cid}">Preview as student</button>` : '';
+  return `<div class="tb-head"><div><h2>${other ? '' : 'Chapter ' + Number(cid) + ' · '}${esc(tbTitle(cid))}</h2>${ch.module ? `<span class="muted small">Module ${ch.module}</span>` : ''}</div><div class="tb-head-right">${counter}${pv}</div></div>
     ${set && set.intro ? `<p class="tb-intro">${esc(set.intro).replace(/\n/g, '<br>')}</p>` : ''}
     <div class="tb-bar"><nav class="tb-tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="tbTab" data-tab="${k}">${l} <span>${counts[k]}</span></button>`).join('')}</nav>
       <span class="tb-bar-right">${t.newQ ? '' : `<button class="btn tiny" data-act="tbNew" data-ch="${cid}">+ New question</button>`}<input class="tb-find" id="tb-find" placeholder="Search this chapter" value="${esc(t.q)}" autocomplete="off"></span></div>
@@ -255,7 +256,8 @@ function tbExamMain() {
       + mine.map(x => tbCard(cid, x.id, x.q, { exam: true, inQuiz: quiz.has(x.id), tab: 'exam' })).join('');
   }).join('');
   return `<div class="tb-head"><div><h2>Module ${m} Exam</h2><span class="muted small">Chapters ${a}–${b} · 2 hours · ${TB_EXAM_SIZE} questions</span></div>
-      <span class="tb-count ${ok ? 'ok' : ''}">Exam: ${total - spec} + ${spec} specialty = ${total} of ${TB_EXAM_SIZE}${total > TB_EXAM_SIZE ? ` · take ${total - TB_EXAM_SIZE} off` : total < TB_EXAM_SIZE ? ` · add ${TB_EXAM_SIZE - total}` : ''}${spec !== TB_EXAM_SPEC ? ` · ${TB_EXAM_SPEC} specialty to pick` : ''}</span></div>
+      <div class="tb-head-right"><span class="tb-count ${ok ? 'ok' : ''}">Exam: ${total - spec} + ${spec} specialty = ${total} of ${TB_EXAM_SIZE}${total > TB_EXAM_SIZE ? ` · take ${total - TB_EXAM_SIZE} off` : total < TB_EXAM_SIZE ? ` · add ${TB_EXAM_SIZE - total}` : ''}${spec !== TB_EXAM_SPEC ? ` · ${TB_EXAM_SPEC} specialty to pick` : ''}</span>
+        <button class="btn tiny" data-act="tbPreview" data-set="${t.ch}">Preview as student</button></div></div>
     <div class="tb-bar"><span class="muted small tb-exam-tip">Add questions from any Module ${m} chapter with <b>+ Module ${m} exam</b> on its card (5 of them specialty).</span>
       <input class="tb-find" id="tb-find" placeholder="Search this exam" value="${esc(t.q)}" autocomplete="off"></div>
     <div class="tb-cards">${groups || `<p class="muted">${find ? 'Nothing matches.' : 'No questions yet.'}</p>`}</div>`;
@@ -303,6 +305,56 @@ async function tbNewSave() {
   if (numeric && !nq.quiz) { t.tab = 'all'; pref('tbTab', 'all'); }
   toast('Question saved' + (nq.quiz ? ' and put on the quiz' : '') + (nq.exam ? (nq.quiz ? ' and the exam' : ' and put on the exam') : '') + '.');
   render();
+}
+
+/* ---------- Preview as student (exam-player.js): the real screen, graded here, nothing saved ---------- */
+// The chapter quizzes' start-screen note (Ride Along Readiness and Pharmacology have their own).
+const TB_QUIZ_INTRO = 'Open note. You can take this quiz as many times as you like; your highest score counts.';
+async function tbPictures(html) {
+  const t = tb(), ids = [...String(html || '').matchAll(/<img data-img="([^"]+)">/g)].map(m => m[1]);
+  for (const id of ids) if (!t.imgs[id]) { const d = await Store.get('tbImages/' + id); if (d && d.data) t.imgs[id] = d.data; }
+  return String(html || '').replace(/<img data-img="([^"]+)">/g, (m, id) => t.imgs[id] ? `<img src="${t.imgs[id]}" alt="">` : '');
+}
+// Right or wrong, all or nothing: every box of a select-all, every blank of a drag & drop / dropdown.
+function tbGrade(q, v) {
+  if (q.type === 'drag' || q.type === 'dropdown') return Array.isArray(v) && (q.gaps || []).every((g, i) => v[i] === g);
+  if (q.type === 'multi') return Array.isArray(v) && JSON.stringify([...v].sort()) === JSON.stringify([...(q.correct || [])].sort());
+  return v === (q.correct || [])[0];
+}
+function tbShown(q, v) {
+  if (v == null || (Array.isArray(v) && !v.length)) return '<i>No answer</i>';
+  if (q.type === 'drag' || q.type === 'dropdown') return v.map((c, i) => (i + 1) + ': ' + esc(c == null ? '–' : tbPlain(q.choices[c]))).join(' · ');
+  return (Array.isArray(v) ? v : [v]).map(i => esc(tbPlain(q.choices[i]))).join(' + ');
+}
+async function tbPreview(setId) {
+  const t = tb(), set = t.sets[setId];
+  if (!set || typeof ExamPlayer === 'undefined') return;
+  const items = set.qids.map(id => ({ id, q: tbQ(id) })).filter(x => x.q && !x.q.deleted);
+  if (!items.length) { toast('Nothing on it yet.'); return; }
+  toast('Opening the preview…');
+  const questions = [];
+  for (const { id, q } of items) {
+    const gaps = q.type === 'drag' || q.type === 'dropdown';
+    questions.push({ id, type: q.type, stem: await tbPictures(q.stem), choices: await Promise.all(q.choices.map(tbPictures)), groups: q.groups || null,
+      gapCount: gaps ? (q.gaps || []).length : 0, gapGroups: gaps ? (q.gaps || []).map(g => (q.groups || [])[g] || 1) : null });
+  }
+  const exam = set.kind === 'exam', cid = set.ch;
+  const title = exam ? set.title : /^\d+$/.test(cid || '') ? `Chapter ${Number(cid)} Quiz: ${tbTitle(cid)}` : set.title;
+  ExamPlayer.open({
+    title, kind: exam ? 'exam' : 'quiz', limitMin: exam ? 120 : 0, preview: true, passMark: set.pass || null,
+    intro: exam ? '' : set.intro || (set.counts === false ? '' : TB_QUIZ_INTRO), questions,
+    onSubmit: async answers => {
+      let score = 0;
+      const review = items.map(({ id, q }, i) => {
+        const ok = tbGrade(q, answers[id]); if (ok) score++;
+        const right = q.type === 'drag' || q.type === 'dropdown' ? q.gaps : q.type === 'multi' ? q.correct : (q.correct || [])[0];
+        return `<div class="xp-rev"><span class="${ok ? 'ok' : 'no'}">${ok ? '✓ Right' : '✗ Wrong'}</span> · ${esc(tbPlain(q.stem).slice(0, 140))}${tbPlain(q.stem).length > 140 ? '…' : ''}
+          ${ok ? '' : `<br><span class="xp-muted">Picked:</span> ${tbShown(q, answers[id])}<br><span class="xp-muted">Right:</span> ${tbShown(q, right)}`}</div>`;
+      }).join('');
+      const pct = Math.round(score / items.length * 100);
+      return { score, total: items.length, pct, passed: set.pass ? pct >= set.pass : null, review };
+    },
+  });
 }
 
 /* ---------- First time: the import file ---------- */
@@ -399,6 +451,7 @@ async function tbAct(a, el) {
     case 'tbNewFlag': if (t.newQ) { t.newQ[d.k] = !t.newQ[d.k]; render(); } return true;
     case 'tbNewNo': t.newQ = null; Object.keys(S.drafts).filter(k => k.startsWith('tbn-')).forEach(k => delete S.drafts[k]); render(); return true;
     case 'tbNewSave': await tbNewSave(); return true;
+    case 'tbPreview': await tbPreview(d.set); return true;
     case 'tbHist': t.histOpen = t.histOpen === d.key ? null : d.key; render(); return true;
   }
   return false;

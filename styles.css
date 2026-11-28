@@ -2664,3 +2664,4 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .tb-right.on { background: var(--sage); border-color: var(--sage); }
 .tb-new-flags { display: flex; gap: 22px; flex-wrap: wrap; }
 .tb-new-flags label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.tb-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
