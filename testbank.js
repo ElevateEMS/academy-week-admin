@@ -25,7 +25,10 @@ const tbTitle = cid => /^\d+$/.test(cid) ? TB_TITLES[Number(cid)] || 'Chapter ' 
 const TB_MODULES = { 1: [1, 8], 2: [9, 15], 3: [16, 23], 4: [24, 31], 5: [32, 39] };
 const TB_OTHER = [['ride', 'Ride Along Readiness'], ['pharm', 'Pharmacology']];
 const TB_TABS = [['quiz', 'Quiz'], ['spec', 'Specialty'], ['all', 'All questions']];
-const TB_QUIZ_SIZE = 20, TB_SPEC_PICKS = 2;
+const TB_QUIZ_SIZE = 20, TB_SPEC_PICKS = 2, TB_EXAM_SIZE = 70, TB_EXAM_SPEC = 5;
+const tbModuleOf = cid => Number(Object.keys(TB_MODULES).find(m => Number(cid) >= TB_MODULES[m][0] && Number(cid) <= TB_MODULES[m][1]));
+const tbExamSet = cid => /^\d+$/.test(cid) ? (tb().sets || {})['exam-m' + tbModuleOf(cid)] || null : null;
+const tbQ = id => (((tb().chapters || {})[id.split('-')[0]] || {}).q || {})[id];
 const TB_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h11.5a2 2 0 0 1 2 2V20H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h11.5"/><path d="M8.5 8.5h6M8.5 11.5h4"/></svg>';
 const tb = () => S.tb || (S.tb = { ch: pref('tbCh') || '01', tab: pref('tbTab') || 'quiz', q: '', imgs: {}, imgWant: new Set() });
 const tbLetter = i => String.fromCharCode(65 + i);
@@ -66,9 +69,10 @@ function testBankView() {
   const t = tb();
   if (!t.setsIn || !t.chIn) return '<p class="muted tb-loading">Loading the Test Bank…</p>';
   if (!Object.keys(t.sets || {}).length) return tbImportView();
-  if (!t.chapters[t.ch]) t.ch = '01';
-  tbHistoryWatch(t.ch);
-  return `<div class="tb">${tbSide()}<section class="tb-main box">${tbMain()}</section></div>`;
+  const exam = /^exam-/.test(t.ch);
+  if (exam ? !t.sets[t.ch] : !t.chapters[t.ch]) t.ch = '01';
+  if (!/^exam-/.test(t.ch)) tbHistoryWatch(t.ch);
+  return `<div class="tb">${tbSide()}<section class="tb-main box">${/^exam-/.test(t.ch) ? tbExamMain() : tbMain()}</section></div>`;
 }
 function tbQuizSet(cid) { return (tb().sets || {})[/^\d+$/.test(cid) ? 'quiz-' + cid : cid] || null; }
 function tbSide() {
@@ -81,6 +85,9 @@ function tbSide() {
   };
   return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => `<p class="tb-mod">Module ${m} <span class="muted">· Ch ${a}–${b}</span></p>`
     + Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('')).join('')}
+    <p class="tb-mod">Module exams</p>${Object.keys(TB_MODULES).map(m => { const set = t.sets['exam-m' + m]; if (!set) return '';
+      const spec = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length, done = set.qids.length === TB_EXAM_SIZE && spec === TB_EXAM_SPEC;
+      return `<button class="tb-ch ${t.ch === 'exam-m' + m ? 'on' : ''}" data-act="tbCh" data-ch="exam-m${m}"><span class="tb-ch-n">•</span><span class="tb-ch-t">Module ${m} Exam</span>${done ? '<span class="tb-ch-done" title="65 + 5 specialty">✓</span>' : ''}</button>`; }).join('')}
     <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
 }
 function tbMain() {
@@ -99,27 +106,32 @@ function tbMain() {
   return `<div class="tb-head"><div><h2>${other ? '' : 'Chapter ' + Number(cid) + ' · '}${esc(tbTitle(cid))}</h2>${ch.module ? `<span class="muted small">Module ${ch.module}</span>` : ''}</div>${counter}</div>
     ${set && set.intro ? `<p class="tb-intro">${esc(set.intro).replace(/\n/g, '<br>')}</p>` : ''}
     <div class="tb-bar"><nav class="tb-tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="tbTab" data-tab="${k}">${l} <span>${counts[k]}</span></button>`).join('')}</nav>
-      <input class="tb-find" id="tb-find" placeholder="Search this chapter" value="${esc(t.q)}" autocomplete="off"></div>
+      <span class="tb-bar-right">${t.newQ ? '' : `<button class="btn tiny" data-act="tbNew" data-ch="${cid}">+ New question</button>`}<input class="tb-find" id="tb-find" placeholder="Search this chapter" value="${esc(t.q)}" autocomplete="off"></span></div>
+    ${t.newQ && t.newQ.ch === cid ? tbNewForm(cid) : ''}
     ${tab === 'spec' ? `<p class="muted small tb-note">A 5-part case: Part 1 sets the scene and the later parts build on it. Pick ${TB_SPEC_PICKS} for the quiz.</p>` : ''}
     <div class="tb-cards">${list.map((id, i) => tbCard(cid, id, q[id], { n: tab === 'quiz' ? i + 1 : null, inQuiz: inQuiz.has(id), tab, spec })).join('') || `<p class="muted">${find ? 'Nothing matches.' : 'None.'}</p>`}</div>`;
 }
 
 /* ---------- One question ---------- */
-function tbExamsOf(qid) {
-  return Object.values(tb().sets || {}).filter(s => s.kind === 'exam' && s.qids.includes(qid)).map(s => s.title);
-}
 function tbCard(cid, qid, q, o) {
   const t = tb(), key = cid + '/' + qid, edit = t.edit === key, ask = t.ask && t.ask.key === key ? t.ask : null, pick = t.pick && t.pick.key === key ? t.pick : null;
   const hist = (t.hist || []).filter(h => h.qid === qid), histOpen = t.histOpen === key;
   const tags = [q.kind === 'specialty' ? `<span class="tb-tag spec">Specialty${q.part ? ' · Part ' + q.part : ''}</span>` : '', q.type === 'multi' ? '<span class="tb-tag">Select all</span>' : '',
     q.type === 'drag' ? '<span class="tb-tag">Drag &amp; drop</span>' : '', q.type === 'dropdown' ? '<span class="tb-tag">Dropdowns</span>' : '', q.type === 'tf' ? '<span class="tb-tag">True / False</span>' : '',
-    ...tbExamsOf(qid).map(x => `<span class="tb-tag exam">On ${esc(x)}</span>`)].join('');
-  const quizBtn = !/^\d+$/.test(cid) ? '' : o.inQuiz ? `<button class="btn tiny" data-act="tbQuiz" data-ch="${cid}" data-q="${qid}" data-on="0" title="Take it off the Chapter ${Number(cid)} quiz">Take off quiz</button>`
+    q.mine ? '<span class="tb-tag mine">Yours</span>' : '', o.exam && o.inQuiz ? `<span class="tb-tag ok">Also on the Chapter ${Number(cid)} quiz</span>` : ''].join('');
+  const numeric = /^\d+$/.test(cid), exSet = tbExamSet(cid), onExam = !!(exSet && exSet.qids.includes(qid)), m = numeric ? tbModuleOf(cid) : 0;
+  const quizBtn = !numeric || o.exam ? '' : o.inQuiz ? `<button class="btn tiny" data-act="tbQuiz" data-ch="${cid}" data-q="${qid}" data-on="0" title="Take it off the Chapter ${Number(cid)} quiz">Take off quiz</button>`
     : `<button class="btn tiny" data-act="tbQuiz" data-ch="${cid}" data-q="${qid}" data-on="1">Add to quiz</button>`;
+  const examBtn = !exSet ? '' : o.exam ? `<button class="btn tiny" data-act="tbExam" data-ch="${cid}" data-q="${qid}" data-on="0">Take off exam</button>`
+    : onExam ? `<button class="btn tiny on-exam" data-act="tbExam" data-ch="${cid}" data-q="${qid}" data-on="0" title="Click to take it off the Module ${m} exam">✓ On Module ${m} exam</button>`
+    : `<button class="btn tiny" data-act="tbExam" data-ch="${cid}" data-q="${qid}" data-on="1">+ Module ${m} exam</button>`;
+  const qx = t.qx && t.qx.key === key ? t.qx : null, del = t.del === key;
   const body = edit ? tbEditBody(cid, qid, q) : tbShowBody(cid, qid, q, ask, pick);
-  return `<article class="tb-card ${o.inQuiz && o.tab !== 'quiz' ? 'in-quiz' : ''}">
-    <div class="tb-card-top">${o.n ? `<span class="tb-num">${o.n}</span>` : ''}<span class="tb-tags">${o.inQuiz && o.tab !== 'quiz' ? '<span class="tb-tag ok">✓ On quiz</span>' : ''}${tags}</span>
-      <span class="tb-card-btns">${edit ? '' : `${quizBtn}<button class="copy-btn" data-act="tbEdit" data-ch="${cid}" data-q="${qid}" title="Fix the wording" aria-label="Fix the wording">${ICONS.pencil}</button>`}</span></div>
+  return `<article class="tb-card ${o.inQuiz && o.tab !== 'quiz' && !o.exam ? 'in-quiz' : ''}">
+    <div class="tb-card-top">${o.n ? `<span class="tb-num">${o.n}</span>` : ''}<span class="tb-tags">${o.inQuiz && o.tab !== 'quiz' && !o.exam ? '<span class="tb-tag ok">✓ On quiz</span>' : ''}${tags}</span>
+      <span class="tb-card-btns">${edit ? '' : `${quizBtn}${examBtn}<button class="copy-btn" data-act="tbEdit" data-ch="${cid}" data-q="${qid}" title="Fix the wording" aria-label="Fix the wording">${ICONS.pencil}</button>${q.mine ? `<button class="copy-btn" data-act="tbDel" data-key="${key}" title="Delete this question" aria-label="Delete this question">${ICONS.trash}</button>` : ''}`}</span></div>
+    ${qx ? `<div class="tb-ask">This one is also on the <b>Module ${qx.m} exam</b>. Take it off the exam too? <button class="btn tiny primary" data-act="tbQx" data-both="1">Take off both</button><button class="btn tiny" data-act="tbQx" data-both="0">Just the quiz</button><button class="link" data-act="tbQxNo">Cancel</button></div>` : ''}
+    ${del ? `<div class="tb-ask">Delete this question? It comes off any quiz or exam it’s on. <button class="btn tiny primary danger" data-act="tbDelYes" data-ch="${cid}" data-q="${qid}">Delete</button><button class="link" data-act="tbDelNo">Cancel</button></div>` : ''}
     ${body}
     <div class="tb-card-foot">${q.ref ? `<span class="muted small">${esc(q.ref)}</span>` : '<span></span>'}
       ${hist.length ? `<button class="link small" data-act="tbHist" data-key="${key}">History (${hist.length})</button>` : ''}</div>
@@ -132,6 +144,8 @@ function tbAnswerText(q, v) {
 }
 function tbHistText(h, q) {
   if (h.what === 'answer') return `Right answer: ${esc(tbAnswerText(q, h.before))} → <b>${esc(tbAnswerText(q, h.after))}</b>`;
+  if (h.what === 'added') return 'Added';
+  if (h.what === 'deleted') return 'Deleted';
   if (h.what === 'wording') return `Wording changed <details><summary class="link small">Before</summary><div class="tb-before">${tbImgs(h.before && h.before.stem)}${(h.before && h.before.choices || []).map((c, i) => `<p>${tbLetter(i)}. ${c}</p>`).join('')}</div></details>`;
   return esc(h.what || '');
 }
@@ -213,6 +227,84 @@ async function tbQuizToggle(cid, qid, on) {
   await Store.set('tbSets/' + (/^\d+$/.test(cid) ? 'quiz-' + cid : cid), { qids });
 }
 
+// On / off a module exam (the module the chapter is in). Up to 5 specialty questions; it can go over 70 while you swap.
+async function tbExamToggle(cid, qid, on) {
+  const set = tbExamSet(cid), q = tbQ(qid);
+  if (!set || !q) return;
+  let qids = set.qids.filter(x => x !== qid);
+  if (on) {
+    if (q.kind === 'specialty' && qids.filter(x => (tbQ(x) || {}).kind === 'specialty').length >= TB_EXAM_SPEC) { toast(`The exam already has ${TB_EXAM_SPEC} specialty questions. Take one off first.`); return; }
+    qids = [...qids, qid];
+  }
+  await Store.set('tbSets/exam-m' + tbModuleOf(cid), { qids });
+}
+
+/* ---------- A module exam: its questions by chapter, with the counter (65 of yours + 5 specialty = 70) ---------- */
+function tbExamMain() {
+  const t = tb(), set = t.sets[t.ch], m = set.module, [a, b] = TB_MODULES[m];
+  const items = set.qids.map(id => ({ id, cid: id.split('-')[0], q: tbQ(id) })).filter(x => x.q && !x.q.deleted);
+  const spec = items.filter(x => x.q.kind === 'specialty').length, total = items.length;
+  const find = t.q.trim().toLowerCase();
+  const shown = find ? items.filter(x => (tbPlain(x.q.stem) + ' ' + x.q.choices.map(tbPlain).join(' ')).toLowerCase().includes(find)) : items;
+  const ok = total === TB_EXAM_SIZE && spec === TB_EXAM_SPEC;
+  const groups = Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')).map(cid => {
+    const mine = shown.filter(x => x.cid === cid);
+    if (!mine.length) return '';
+    const quiz = new Set((tbQuizSet(cid) || {}).qids || []);
+    return `<h3 class="tb-exam-ch">Chapter ${Number(cid)} · ${esc(tbTitle(cid))} <span class="muted small">${mine.length}</span></h3>`
+      + mine.map(x => tbCard(cid, x.id, x.q, { exam: true, inQuiz: quiz.has(x.id), tab: 'exam' })).join('');
+  }).join('');
+  return `<div class="tb-head"><div><h2>Module ${m} Exam</h2><span class="muted small">Chapters ${a}–${b} · 2 hours · ${TB_EXAM_SIZE} questions</span></div>
+      <span class="tb-count ${ok ? 'ok' : ''}">Exam: ${total - spec} + ${spec} specialty = ${total} of ${TB_EXAM_SIZE}${total > TB_EXAM_SIZE ? ` · take ${total - TB_EXAM_SIZE} off` : total < TB_EXAM_SIZE ? ` · add ${TB_EXAM_SIZE - total}` : ''}${spec !== TB_EXAM_SPEC ? ` · ${TB_EXAM_SPEC} specialty to pick` : ''}</span></div>
+    <div class="tb-bar"><span class="muted small tb-exam-tip">Add questions from any Module ${m} chapter with <b>+ Module ${m} exam</b> on its card (5 of them specialty).</span>
+      <input class="tb-find" id="tb-find" placeholder="Search this exam" value="${esc(t.q)}" autocomplete="off"></div>
+    <div class="tb-cards">${groups || `<p class="muted">${find ? 'Nothing matches.' : 'No questions yet.'}</p>`}</div>`;
+}
+
+/* ---------- + New question (multiple choice, select all, or true / false) ---------- */
+function tbNewForm(cid) {
+  const t = tb(), nq = t.newQ, numeric = /^\d+$/.test(cid), m = numeric ? tbModuleOf(cid) : 0;
+  const dv = k => esc(S.drafts[k] || '');
+  const types = [['mc', 'Multiple choice'], ['multi', 'Select all'], ['tf', 'True / False']];
+  const choice = i => {
+    const on = nq.correct.includes(i), mark = `<button class="tb-right ${nq.type === 'multi' ? 'sq' : ''} ${on ? 'on' : ''}" data-act="tbNewRight" data-i="${i}" title="${on ? 'Right answer' : 'Make this a right answer'}" aria-label="Right answer">${on ? '✓' : ''}</button>`;
+    if (nq.type === 'tf') return `<div class="tb-new-choice">${mark}<span class="tb-letter">${tbLetter(i)}</span><span>${i ? 'False' : 'True'}</span></div>`;
+    return `<div class="tb-new-choice">${mark}<span class="tb-letter">${tbLetter(i)}</span><input id="tbn-c${i}" data-draft="tbn-c${i}" value="${dv('tbn-c' + i)}" placeholder="Choice ${tbLetter(i)}" autocomplete="off">${nq.n > 2 ? `<button class="x" data-act="tbNewLess" data-i="${i}" aria-label="Remove this choice">×</button>` : ''}</div>`;
+  };
+  return `<article class="tb-card tb-new"><div class="tb-new-head"><b>New question</b><div class="seg">${types.map(([k, l]) => `<button class="${nq.type === k ? 'on' : ''}" data-act="tbNewType" data-v="${k}">${l}</button>`).join('')}</div></div>
+    <textarea id="tbn-stem" data-draft="tbn-stem" rows="3" placeholder="Type the question">${dv('tbn-stem')}</textarea>
+    <p class="muted small">${nq.type === 'multi' ? 'Tick every right answer (students must get all of them).' : 'Tick the right answer.'}</p>
+    ${Array.from({ length: nq.type === 'tf' ? 2 : nq.n }, (_, i) => choice(i)).join('')}
+    ${nq.type !== 'tf' && nq.n < 6 ? '<button class="link small" data-act="tbNewMore">+ Add a choice</button>' : ''}
+    <input id="tbn-ref" data-draft="tbn-ref" value="${dv('tbn-ref')}" placeholder="Page reference (e.g. Chapter ${numeric ? Number(cid) : 2}, Page 53)" autocomplete="off">
+    <div class="tb-new-flags">${numeric ? `<label>${circle(nq.quiz, 'data-act="tbNewFlag" data-k="quiz"')} Put it on the Chapter ${Number(cid)} quiz</label>
+      <label>${circle(nq.exam, 'data-act="tbNewFlag" data-k="exam"')} Put it on the Module ${m} exam</label>` : `<span class="muted small">It goes on the ${esc(tbTitle(cid))} quiz.</span>`}</div>
+    <div class="tb-ask"><button class="btn tiny primary" data-act="tbNewSave">Save question</button><button class="link" data-act="tbNewNo">Cancel</button></div></article>`;
+}
+async function tbNewSave() {
+  const t = tb(), nq = t.newQ;
+  if (!nq) return;
+  const cid = nq.ch, numeric = /^\d+$/.test(cid), q = (t.chapters[cid] || {}).q || {};
+  const stem = tbFromText(S.drafts['tbn-stem'] || '');
+  if (!tbPlain(stem)) { toast('Type the question first.'); return; }
+  const choices = nq.type === 'tf' ? ['True', 'False'] : Array.from({ length: nq.n }, (_, i) => tbFromText(S.drafts['tbn-c' + i] || ''));
+  if (choices.some(c => !tbPlain(c))) { toast('Every choice needs words (or remove it with ×).'); return; }
+  if (!nq.correct.length) { toast('Tick the right answer.'); return; }
+  if (nq.type === 'multi' && nq.correct.length < 2) { toast('A select-all question needs at least 2 right answers (or make it multiple choice).'); return; }
+  let n = 1; while (q[cid + '-m' + String(n).padStart(2, '0')]) n++;
+  const qid = cid + '-m' + String(n).padStart(2, '0'), now = Date.now(), by = S.user && S.user.email || '';
+  const doc = { kind: numeric ? 'bank' : 'quiz', mine: true, type: nq.type, name: tbPlain(stem).slice(0, 80), stem, choices, correct: nq.correct,
+    ref: String(S.drafts['tbn-ref'] || '').trim(), order: 100000 + n, created: now, updated: now, by };
+  t.newQ = null; Object.keys(S.drafts).filter(k => k.startsWith('tbn-')).forEach(k => delete S.drafts[k]);
+  await Store.set('tbChapters/' + cid, { q: { [qid]: doc } });
+  await Store.add('tbChapters/' + cid + '/history', { qid, at: now, by, what: 'added' });
+  if (nq.quiz) { const set = tbQuizSet(cid); if (set) await Store.set('tbSets/' + (numeric ? 'quiz-' + cid : cid), { qids: [...set.qids, qid] }); }
+  if (nq.exam && numeric) await tbExamToggle(cid, qid, true);
+  if (numeric && !nq.quiz) { t.tab = 'all'; pref('tbTab', 'all'); }
+  toast('Question saved' + (nq.quiz ? ' and put on the quiz' : '') + (nq.exam ? (nq.quiz ? ' and the exam' : ' and put on the exam') : '') + '.');
+  render();
+}
+
 /* ---------- First time: the import file ---------- */
 function tbImportView() {
   const t = tb();
@@ -279,7 +371,34 @@ async function tbAct(a, el) {
       await tbSaveQ(d.ch, d.q, { stem, choices, ref }, 'wording', { stem: q.stem, choices: q.choices, ref: q.ref || '' }, { stem, choices, ref });
       toast('Saved.'); return true;
     }
-    case 'tbQuiz': await tbQuizToggle(d.ch, d.q, d.on === '1'); return true;
+    case 'tbQuiz': {
+      const ex = tbExamSet(d.ch);
+      if (d.on === '0' && ex && ex.qids.includes(d.q)) { t.qx = { key: d.ch + '/' + d.q, ch: d.ch, q: d.q, m: tbModuleOf(d.ch) }; render(); return true; }
+      await tbQuizToggle(d.ch, d.q, d.on === '1'); return true;
+    }
+    case 'tbQxNo': t.qx = null; render(); return true;
+    case 'tbQx': { const k = t.qx; t.qx = null; if (!k) return true; await tbQuizToggle(k.ch, k.q, false); if (d.both === '1') await tbExamToggle(k.ch, k.q, false); render(); return true; }
+    case 'tbExam': await tbExamToggle(d.ch, d.q, d.on === '1'); return true;
+    case 'tbDel': t.del = t.del === d.key ? null : d.key; render(); return true;
+    case 'tbDelNo': t.del = null; render(); return true;
+    case 'tbDelYes': {
+      t.del = null; const q = chq(); if (!q || !q.mine) return true;
+      await Store.set('tbChapters/' + d.ch, { q: { [d.q]: { deleted: true, updated: Date.now() } } });
+      for (const [id, set] of Object.entries(t.sets)) if (set.qids.includes(d.q)) await Store.set('tbSets/' + id, { qids: set.qids.filter(x => x !== d.q) });
+      await Store.add('tbChapters/' + d.ch + '/history', { qid: d.q, at: Date.now(), by: S.user && S.user.email || '', what: 'deleted' });
+      toast('Deleted.'); return true;
+    }
+    case 'tbNew': t.newQ = { ch: d.ch, type: 'mc', n: 4, correct: [], quiz: !/^\d+$/.test(d.ch), exam: false }; render(); { const f = document.getElementById('tbn-stem'); if (f) f.focus(); } return true;
+    case 'tbNewType': { const nq = t.newQ; if (!nq) return true; nq.type = d.v; nq.correct = []; if (d.v === 'tf') nq.n = 2; else if (nq.n < 3) nq.n = 4; render(); return true; }
+    case 'tbNewMore': if (t.newQ && t.newQ.n < 6) { t.newQ.n++; render(); } return true;
+    case 'tbNewLess': { const nq = t.newQ, i = Number(d.i); if (!nq || nq.n <= 2) return true;
+      for (let j = i; j < nq.n - 1; j++) S.drafts['tbn-c' + j] = S.drafts['tbn-c' + (j + 1)] || ''; delete S.drafts['tbn-c' + (nq.n - 1)];
+      nq.correct = nq.correct.filter(x => x !== i).map(x => x > i ? x - 1 : x); nq.n--; render(); return true; }
+    case 'tbNewRight': { const nq = t.newQ, i = Number(d.i); if (!nq) return true;
+      nq.correct = nq.type === 'multi' ? (nq.correct.includes(i) ? nq.correct.filter(x => x !== i) : [...nq.correct, i].sort((a, b) => a - b)) : [i]; render(); return true; }
+    case 'tbNewFlag': if (t.newQ) { t.newQ[d.k] = !t.newQ[d.k]; render(); } return true;
+    case 'tbNewNo': t.newQ = null; Object.keys(S.drafts).filter(k => k.startsWith('tbn-')).forEach(k => delete S.drafts[k]); render(); return true;
+    case 'tbNewSave': await tbNewSave(); return true;
     case 'tbHist': t.histOpen = t.histOpen === d.key ? null : d.key; render(); return true;
   }
   return false;

@@ -2646,3 +2646,21 @@ span.cohort-step { cursor: default; display: inline-grid; place-items: center; }
 .tb-import { max-width: 640px; margin: 24px auto; padding: 22px 26px; }
 .tb-loading { text-align: center; margin: 40px 0; }
 @media (max-width: 900px) { .tb { grid-template-columns: 1fr; } .tb-side { position: static; max-height: 260px; } }
+/* Test Bank, Phase 2: exam buttons, exam page, new question */
+.tb-bar-right { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.tb-bar-right .tb-find { margin-bottom: 0; }
+.btn.on-exam { background: var(--honey-soft); border-color: #e2cfa9; color: #6e5326; }
+.tb-tag.mine { background: #dfeaf3; color: #2f5571; }
+.tb-exam-ch { margin: 10px 0 0; font-size: 16px; color: var(--taupe-dark); font-weight: 600; }
+.tb-exam-ch:first-child { margin-top: 0; }
+.tb-exam-tip { margin-bottom: 8px; }
+.tb-new { border-color: #e0702a; display: grid; gap: 8px; }
+.tb-new-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tb-new textarea, .tb-new input { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; background: #fff; font: inherit; }
+.tb-new p { margin: 0; }
+.tb-new-choice { display: flex; align-items: center; gap: 8px; }
+.tb-right { all: unset; box-sizing: border-box; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--taupe); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; color: #fff; flex-shrink: 0; }
+.tb-right.sq { border-radius: 5px; }
+.tb-right.on { background: var(--sage); border-color: var(--sage); }
+.tb-new-flags { display: flex; gap: 22px; flex-wrap: wrap; }
+.tb-new-flags label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
