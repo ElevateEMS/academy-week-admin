@@ -28,7 +28,7 @@ const ExamPlayer = (() => {
     cfg.questions.forEach(q => { if (!q.group) units.push([q]); else if (byGroup[q.group]) byGroup[q.group].push(q); else units.push(byGroup[q.group] = [q]); });
     Object.values(byGroup).forEach(u => u.sort((a, b) => (a.part || 0) - (b.part || 0)));
     const qs = [].concat(...shuffle(units)).map(q => ({ ...q, order: (q.type === 'mc' || q.type === 'multi') && !keepOrder(q) ? shuffle(q.choices.map((c, i) => i)) : q.choices.map((c, i) => i) }));
-    st = { cfg, qs, i: 0, ans: {}, flags: new Set(), notes: '', hide: false, phase: 'intro', agree: false, pop: null, calc: { show: '0', acc: null, op: null, fresh: true }, pickChip: null };
+    st = { cfg, qs, i: 0, ans: {}, flags: new Set(), notes: '', hide: false, phase: 'intro', agree: false, pop: null, tools: { calc: false, notes: false }, at: { calc: null, notes: null }, calc: { show: '0', acc: null, op: null, fresh: true }, pickChip: null };
     root = document.createElement('div');
     root.className = 'xp-root';
     document.body.appendChild(root);
@@ -40,6 +40,7 @@ const ExamPlayer = (() => {
     root.addEventListener('dragover', e => { if (e.target.closest('[data-blank]')) e.preventDefault(); });
     root.addEventListener('drop', e => { const b = e.target.closest('[data-blank]'); if (!b) return; e.preventDefault(); place(Number(b.dataset.blank), Number(e.dataTransfer.getData('text/plain'))); });
     document.addEventListener('keydown', onKey, true);
+    root.addEventListener('pointerdown', dragStart);
     draw();
   }
   function close() {
@@ -84,21 +85,22 @@ const ExamPlayer = (() => {
       <header class="xp-head"><div class="xp-head-in">
         <div class="xp-titles"><div class="xp-title">${esc(c.title)}${c.preview ? ' <span class="xp-pv">Preview</span>' : ''}</div><div class="xp-of">Question ${st.i + 1} of ${n}</div></div>${time}</div>
         ${st.hide ? `<button class="xp-show" data-x="menu">SHOW MENU</button>` : `<nav class="xp-tools">
-          <button data-x="calc" class="${st.pop === 'calc' ? 'on' : ''}">${ICON.calc}CALCULATOR</button>
-          <button data-x="notes" class="${st.pop === 'notes' ? 'on' : ''}">${ICON.notes}MY NOTES</button>
+          <button data-x="calc" class="${st.tools.calc ? 'on' : ''}">${ICON.calc}CALCULATOR</button>
+          <button data-x="notes" class="${st.tools.notes ? 'on' : ''}">${ICON.notes}MY NOTES</button>
           <button data-x="flag" class="${st.flags.has(q.id) ? 'on' : ''}">${ICON.flag}${st.flags.has(q.id) ? 'UNFLAG QUESTION' : 'FLAG QUESTION'}</button>
           <button data-x="menu">${ICON.up}HIDE THIS MENU</button></nav>`}
       </header>
-      <div class="xp-body">
+      <div class="xp-body ${docked().length ? 'with-dock' : ''}">
         <nav class="xp-nav"><button class="xp-nav-arrow" data-x="up" aria-label="Previous question">▲</button><div class="xp-nav-list">${st.qs.map((x, j) =>
-          `<button class="${j === st.i ? 'cur' : ''} ${answered(x) ? 'done' : ''}" data-x="go" data-i="${j}">${j + 1}${st.flags.has(x.id) ? '<span class="xp-fl">⚑</span>' : ''}</button>`).join('')}</div>
+          `<button class="${j === st.i ? 'cur' : ''} ${answered(x) ? 'done' : ''}" data-x="go" data-i="${j}"><span class="xp-n">${j + 1}</span>${st.flags.has(x.id) ? `<span class="xp-fl" aria-label="Flagged">${ICON.flagFill}</span>` : ''}</button>`).join('')}</div>
           <button class="xp-nav-arrow" data-x="down" aria-label="Next question">▼</button></nav>
         <main class="xp-main">${questionView(q)}</main>
+        ${docked().length ? `<aside class="xp-dock">${docked().map(toolView).join('')}</aside>` : ''}
       </div>
       <footer class="xp-foot"><button class="xp-btn" data-x="prev" ${st.i ? '' : 'disabled'}>← PREVIOUS</button>
         <button class="xp-btn" data-x="submit">SUBMIT</button>
         <button class="xp-btn primary" data-x="next" ${st.i < n - 1 ? '' : 'disabled'}>NEXT →</button></footer>
-      ${st.pop === 'calc' ? calcView() : ''}${st.pop === 'notes' ? notesView() : ''}${st.pop === 'confirm' ? confirmView() : ''}
+      ${['calc', 'notes'].filter(k => st.tools[k] && st.at[k]).map(toolView).join('')}${st.pop === 'confirm' ? confirmView() : ''}
     </div>`;
   }
   function questionView(q) {
@@ -128,15 +130,23 @@ const ExamPlayer = (() => {
         <div class="xp-pool">${q.choices.map((c, j) => `<span class="xp-chip ${st.pickChip === j ? 'on' : ''}" draggable="true" data-chip="${j}" data-x="chip">${esc(plain(c))}</span>`).join('')}</div>` : ''}`;
   }
   const caseBox = q => q.caseText ? `<div class="xp-case"><b>Continuing the scenario</b><p>${esc(q.caseText)}</p></div>` : '';
-  function calcView() {
+  // Calculator and My Notes: docked on the right (the question gets narrower, nothing is covered), or dragged anywhere by
+  // the blue bar; dragging one back to the right edge docks it again. Where it is stays for the rest of the test.
+  const docked = () => ['calc', 'notes'].filter(k => st.tools[k] && !st.at[k]);
+  const toolView = k => {
+    const a = st.at[k], style = a ? ` style="left:${a.x}px;top:${a.y}px"` : '';
+    return (k === 'calc' ? calcView : notesView)(a ? 'xp-pop float' : 'xp-pop', style);
+  };
+  const toolHead = (k, label) => `<div class="xp-pop-head" data-drag="${k}" title="Drag to move it">${ICON.grip}${label}<button data-x="pop" data-w="${k}" aria-label="Close">×</button></div>`;
+  function calcView(cls, style) {
     const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', '.', '=', '+'];
-    return `<div class="xp-pop xp-calc"><div class="xp-pop-head">Calculator<button data-x="pop" aria-label="Close">×</button></div>
+    return `<div class="${cls} xp-calc" data-tool="calc"${style}>${toolHead('calc', 'Calculator')}
       <div class="xp-calc-screen">${esc(st.calc.show)}</div>
       <div class="xp-calc-keys"><button data-x="key" data-k="C" class="wide">C</button><button data-x="key" data-k="±">±</button><button data-x="key" data-k="%">%</button>${keys.map(k => `<button data-x="key" data-k="${k}" class="${/[÷×−+=]/.test(k) ? 'op' : ''}">${k}</button>`).join('')}</div></div>`;
   }
-  function notesView() {
-    return `<div class="xp-pop xp-notes"><div class="xp-pop-head">My Notes<button data-x="pop" aria-label="Close">×</button></div>
-      <textarea id="xp-notes" placeholder="Scratch paper: only you see this, and it isn’t saved.">${esc(st.notes)}</textarea></div>`;
+  function notesView(cls, style) {
+    return `<div class="${cls} xp-notes" data-tool="notes"${style}>${toolHead('notes', 'My Notes')}
+      <textarea id="xp-notes" placeholder="Scratch paper for the whole test: only you see it, and it isn’t saved.">${esc(st.notes)}</textarea></div>`;
   }
   function confirmView() {
     const miss = st.qs.map((q, j) => answered(q) ? null : j).filter(x => x != null), fl = st.qs.filter(q => st.flags.has(q.id)).length;
@@ -212,8 +222,8 @@ const ExamPlayer = (() => {
     else if (x === 'up' || x === 'down') { const l = root.querySelector('.xp-nav-list'); if (l) l.scrollBy({ top: x === 'up' ? -200 : 200, behavior: 'smooth' }); return; }
     else if (x === 'flag') st.flags.has(q.id) ? st.flags.delete(q.id) : st.flags.add(q.id);
     else if (x === 'menu') st.hide = !st.hide;
-    else if (x === 'calc' || x === 'notes') st.pop = st.pop === x ? null : x;
-    else if (x === 'pop') st.pop = null;
+    else if (x === 'calc' || x === 'notes') st.tools[x] = !st.tools[x];
+    else if (x === 'pop') { if (b.dataset.w) st.tools[b.dataset.w] = false; else st.pop = null; }
     else if (x === 'key') { calcKey(b.dataset.k); return; }
     else if (x === 'submit') st.pop = 'confirm';
     else if (x === 'send') { send(); return; }
@@ -225,6 +235,26 @@ const ExamPlayer = (() => {
     }
     draw();
     if (x === 'next' || x === 'prev' || x === 'go') { const cur = root.querySelector('.xp-nav-list .cur'); if (cur) cur.scrollIntoView({ block: 'nearest' }); const m = root.querySelector('.xp-main'); if (m) m.scrollTop = 0; }
+  }
+  function dragStart(e) {
+    const head = e.target.closest('[data-drag]');
+    if (!head || e.target.closest('button')) return;
+    const k = head.dataset.drag, box = head.closest('[data-tool]'), r = box.getBoundingClientRect();
+    const dx = e.clientX - r.left, dy = e.clientY - r.top;
+    e.preventDefault();
+    box.classList.add('float', 'dragging'); box.style.width = r.width + 'px';
+    const move = ev => {
+      const x = Math.min(innerWidth - 60, Math.max(0, ev.clientX - dx)), y = Math.min(innerHeight - r.height - 8, Math.max(0, ev.clientY - dy)); // (the whole box stays on screen)
+      if (box.parentElement.classList.contains('xp-dock')) root.querySelector('.xp').appendChild(box);
+      box.style.left = x + 'px'; box.style.top = y + 'px';
+    };
+    const up = ev => {
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+      const b = box.getBoundingClientRect();
+      st.at[k] = b.right > innerWidth - 30 || ev.clientX > innerWidth - 40 ? null : { x: Math.round(b.left), y: Math.round(b.top) }; // (back at the right edge: docked)
+      draw();
+    };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
   }
   function onChange(e) {
     const t = e.target, q = st && st.qs[st.i];
@@ -247,6 +277,7 @@ const ExamPlayer = (() => {
     if (!st || st.phase !== 'test') return;
     if (e.target && /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName) && e.target.type !== 'radio' && e.target.type !== 'checkbox') return;
     if (e.key === 'Escape' && st.pop) { st.pop = null; draw(); e.stopPropagation(); return; }
+    if (e.key === 'Escape' && (st.tools.calc || st.tools.notes)) { st.tools.calc = st.tools.notes = false; draw(); e.stopPropagation(); return; }
     if (st.pop) return;
     if (e.key === 'ArrowRight' && st.i < st.qs.length - 1) { st.i++; draw(); e.preventDefault(); e.stopPropagation(); }
     if (e.key === 'ArrowLeft' && st.i > 0) { st.i--; draw(); e.preventDefault(); e.stopPropagation(); }
@@ -256,6 +287,8 @@ const ExamPlayer = (() => {
     notes: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/></svg>',
     flag: '<svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg>',
     up: '<svg viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6"/></svg>',
+    flagFill: '<svg viewBox="0 0 24 24"><path d="M6 21V4" stroke-width="2.2"/><path d="M6 4h11l-2.5 4.2L17 12.4H6z" fill="currentColor"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" class="xp-grip"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
   };
   return { open, close, isOpen: () => !!st };
 })();

@@ -55,10 +55,11 @@ body.xp-open { overflow: hidden; }
 .xp-nav { background: #0b4f9c; display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
 .xp-nav-arrow { background: none; border: 0; color: #fff; font-size: 18px; padding: 12px 0; cursor: pointer; }
 .xp-nav-list { overflow-y: auto; scrollbar-width: thin; }
-.xp-nav-list button { position: relative; display: block; width: 100%; text-align: left; font: inherit; font-size: 20px; font-family: Georgia, 'Times New Roman', serif; color: #fff; background: none; border: 0; border-bottom: 1px solid #1e5fa8; padding: 12px 16px; cursor: pointer; }
-.xp-nav-list button.done::after { content: ''; position: absolute; right: 12px; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: #9cc7ff; transform: translateY(-50%); }
+.xp-nav-list button { position: relative; display: flex; align-items: center; width: 100%; text-align: left; font: inherit; font-size: 20px; font-family: Georgia, 'Times New Roman', serif; color: #fff; background: none; border: 0; border-bottom: 1px solid #1e5fa8; padding: 12px 16px; cursor: pointer; }
+.xp-nav-list button.done::after { content: ''; position: absolute; right: 7px; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: #9cc7ff; transform: translateY(-50%); }
 .xp-nav-list button.cur { background: #1b67c0; }
-.xp-fl { color: #ff6b5a; font-size: 13px; position: absolute; right: 22px; top: 8px; }
+.xp-fl { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #ff5a46; display: flex; }
+.xp-root .xp-fl svg { width: 22px; height: 22px; stroke: currentColor; }
 .xp-main { overflow-y: auto; background: #fff; padding: 32px 48px 40px; }
 .xp-stem { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; line-height: 1.6; margin-bottom: 22px; max-width: 1400px; }
 .xp-stem p { margin: 0 0 12px; }
@@ -83,8 +84,17 @@ body.xp-open { overflow: hidden; }
 .xp-foot { background: #f3f4f6; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 48px 18px 128px; border-top: 1px solid #dde2e8; }
 
 /* Pop-ups: calculator, notes, submit */
-.xp-pop { position: fixed; right: 28px; top: 150px; width: 300px; background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(10, 40, 80, .25); z-index: 2; overflow: hidden; }
-.xp-pop-head { display: flex; justify-content: space-between; align-items: center; background: #0b4f9c; color: #fff; padding: 8px 12px; font-size: 15px; }
+/* Calculator / My Notes: docked in a right-hand panel (the question narrows), or floating where they were dragged */
+.xp-body.with-dock { grid-template-columns: 80px minmax(0, 1fr) 330px; }
+.xp-dock { background: #e9edf2; border-left: 1px solid #d6dde6; padding: 14px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0; }
+.xp-pop { width: 100%; background: #fff; border-radius: 10px; box-shadow: 0 4px 16px rgba(10, 40, 80, .12); overflow: hidden; flex-shrink: 0; }
+.xp-pop.float { position: fixed; width: 300px; z-index: 4; box-shadow: 0 10px 40px rgba(10, 40, 80, .28); }
+.xp-pop.float.xp-notes { width: 360px; }
+.xp-pop.dragging { opacity: .92; }
+.xp-pop-head { display: flex; align-items: center; gap: 6px; background: #0b4f9c; color: #fff; padding: 8px 12px; font-size: 15px; cursor: grab; user-select: none; touch-action: none; }
+.xp-pop.dragging .xp-pop-head { cursor: grabbing; }
+.xp-pop-head button { margin-left: auto; }
+.xp-root .xp-grip { width: 16px; height: 16px; fill: currentColor; stroke: none; opacity: .7; }
 .xp-pop-head button { background: none; border: 0; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
 .xp-calc-screen { font-size: 28px; text-align: right; padding: 12px 14px; background: #f3f4f6; font-variant-numeric: tabular-nums; overflow: hidden; }
 .xp-calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #dde2e8; }
@@ -92,8 +102,8 @@ body.xp-open { overflow: hidden; }
 .xp-calc-keys button:hover { background: #eef1f5; }
 .xp-calc-keys button.op { background: #e7eef8; color: #0b4f9c; }
 .xp-calc-keys button.wide { grid-column: span 2; }
-.xp-notes { width: 380px; }
-.xp-notes textarea { width: 100%; height: 280px; border: 0; padding: 12px; font: inherit; font-size: 15px; resize: vertical; outline: none; }
+
+.xp-notes textarea { width: 100%; height: 260px; border: 0; padding: 12px; font: inherit; font-size: 15px; resize: vertical; outline: none; }
 .xp-veil { position: fixed; inset: 0; background: rgba(10, 30, 60, .45); display: flex; align-items: center; justify-content: center; z-index: 3; padding: 20px; }
 .xp-confirm { background: #fff; border-radius: 10px; padding: 24px 28px; max-width: 520px; width: 100%; }
 .xp-confirm h2 { margin: 0 0 10px; font-size: 21px; }
@@ -105,6 +115,12 @@ body.xp-open { overflow: hidden; }
 /* Hidden menu: the toolbar folds away */
 .xp.menu-hidden .xp-head-in { padding-bottom: 4px; }
 @media (max-width: 900px) {
+  .xp-body.with-dock { grid-template-columns: 56px minmax(0, 1fr); }
+  .xp-nav-list button { padding: 12px 8px; font-size: 18px; }
+  .xp-fl { right: 6px; }
+  .xp-root .xp-fl svg { width: 17px; height: 17px; }
+  .xp-nav-list button.done::after { right: 2px; width: 5px; height: 5px; }
+  .xp-dock { position: fixed; left: 0; right: 0; bottom: 0; max-height: 50vh; z-index: 4; border-left: 0; border-top: 1px solid #d6dde6; box-shadow: 0 -8px 30px rgba(10, 40, 80, .2); }
   .xp-head-in { padding: 14px 16px 8px; }
   .xp-tools { margin-left: 0; grid-template-columns: repeat(2, 1fr); }
   .xp-show { margin-left: 16px; }
