@@ -60,7 +60,9 @@ const ExamPlayer = (() => {
   function draw() {
     if (!root) return;
     const keepNotes = document.activeElement && document.activeElement.id === 'xp-notes';
+    const scrolls = ['.xp-main', '.xp-nav-list', '.xp-dock'].map(s => { const el = root.querySelector(s); return el ? el.scrollTop : 0; }); // (picking an answer keeps your place)
     root.innerHTML = st.phase === 'intro' ? introView() : st.phase === 'done' ? doneView() : testView();
+    ['.xp-main', '.xp-nav-list', '.xp-dock'].forEach((s, i) => { const el = root.querySelector(s); if (el && scrolls[i]) el.scrollTop = scrolls[i]; });
     if (keepNotes) { const n = root.querySelector('#xp-notes'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = n.value.length; } }
   }
   function introView() {
