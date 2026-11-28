@@ -18,7 +18,8 @@
                       the right answer is only handed over after the student commits to theirs.
      mode: 'sim'    → no going back, no list, no flags; each NEXT sends the answer: onAnswer(id, value) → { stop } (the
                       grader decides when it knows enough); keepOrder: true keeps the grader's question order.
-     autoStart: true skips the start page. limitMin > 0 = a countdown that ends the test at 0 (any kind).
+     autoStart: true skips the start page. limitMin > 0 = a countdown that ends the test at 0 (any kind); otherwise a
+     stopwatch counts up, unless noClock: true (Study Mode with its Timer switch off).
    onSubmit's result can carry review: [{ id, ok, right, ref }] (shown with the student's answers), breakdown:
    [{ label, right, total }], note, passed. ExamPlayer.review({ title, questions, answers, result, onClose }) opens a
    finished attempt straight to its results (Past attempts). */
@@ -106,7 +107,7 @@ const ExamPlayer = (() => {
   }
   function testView() {
     const q = st.qs[st.i], c = st.cfg, n = st.qs.length, ck = st.checked[q.id];
-    const time = countdown() ? `<span class="xp-time ${left() < 300 ? 'low' : ''}" title="Time left">${clock(left())}</span>` : `<span class="xp-time" title="Time so far">${clock(elapsed())}</span>`;
+    const time = !countdown() && c.noClock ? '' : countdown() ? `<span class="xp-time ${left() < 300 ? 'low' : ''}" title="Time left">${clock(left())}</span>` : `<span class="xp-time" title="Time so far">${clock(elapsed())}</span>`;
     // The simulation shows no list and no count (like the NREMT, it doesn't say how many are coming) and can't flag.
     const tools = [['calc', ICON.calc, 'CALCULATOR'], ['notes', ICON.notes, 'MY NOTES']];
     if (!c.mode) tools.push(['flag', ICON.flag, st.flags.has(q.id) ? 'UNFLAG QUESTION' : 'FLAG QUESTION']);

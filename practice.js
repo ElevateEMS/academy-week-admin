@@ -4,12 +4,12 @@
 
    Practice.open({
      preview, info (html),                       // Admin only: says so on screen, nothing saved; ⓘ shows info
-     cats: [{ key, label, total, spec, fresh }], // fresh = not answered yet; spec = specialty case parts in total
+     cats: [{ key, label, total, spec, fresh }], // fresh = not answered yet; spec = specialty-style ones in total
      modules: [{ m, chapters: [{ cid, n, title, total, spec, fresh }] }],
      attempts: [{ at, mode: 'study' | 'sim', label, total, right, pct, secs, passed, sample, canReview }],
      onStudy(settings), onSim(), onReview(attemptIndex), onClose(),
    })
-   settings = { by: 'cat' | 'ch', cats: [keys], chapters: [cids], count (0 = all), cases, wrong, timer }
+   settings = { by: 'cat' | 'ch', cats: [keys], chapters: [cids], count, cases (specialty-style on), wrong, timer (stopwatch shown) }
    Practice.refresh({ cats, modules, attempts }) after a test ends. */
 const Practice = (() => {
   let st = null, root = null;
@@ -17,20 +17,16 @@ const Practice = (() => {
   const num = n => Number(n || 0).toLocaleString();
   const clock = s => { s = Math.max(0, Math.round(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
   const day = t => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-  const COUNTS = [10, 25, 50, 70, 100, 120, 0];
+  const COUNTS = [10, 25, 50, 70, 100, 120];
 
   function open(cfg) {
     close();
-    st = { cfg, page: 'home', s: { by: 'cat', cats: new Set(cfg.cats.map(c => c.key)), chapters: new Set(), count: 25, cases: true, wrong: false, timer: false }, openMods: new Set() };
+    st = { cfg, page: 'home', s: { by: 'cat', cats: new Set(cfg.cats.map(c => c.key)), chapters: new Set(), count: 10, cases: true, wrong: false, timer: true }, openMods: new Set() };
     root = document.createElement('div');
     root.className = 'xp-root pr-root';
     document.body.appendChild(root);
     document.body.classList.add('pr-open');
     root.addEventListener('click', onClick);
-    // Custom number: just the Start button changes while typing (a redraw would take the cursor away).
-    root.addEventListener('input', e => { if (e.target.id !== 'pr-custom' || !st) return;
-      st.s.customN = Math.max(0, Math.floor(Number(e.target.value) || 0));
-      const go = root.querySelector('[data-p="gostudy"]'), n = howMany(); if (go) { go.disabled = !n; go.textContent = startLabel(n); } });
     document.addEventListener('keydown', onKey, true);
     draw();
   }
@@ -41,8 +37,7 @@ const Practice = (() => {
     document.removeEventListener('keydown', onKey, true);
   }
   // Escape closes the ⓘ pop-up (not while a test is open on top).
-  function onKey(e) { if (e.key === 'Enter' && e.target && e.target.id === 'pr-custom') { const go = root.querySelector('[data-p="gostudy"]'); if (go && !go.disabled) go.click(); return; }
-    if (e.key === 'Escape' && st && st.info && !(window.ExamPlayer && ExamPlayer.isOpen())) { st.info = false; draw(); e.stopPropagation(); } }
+  function onKey(e) { if (e.key === 'Escape' && st && st.info && !(window.ExamPlayer && ExamPlayer.isOpen())) { st.info = false; draw(); e.stopPropagation(); } }
   function refresh(data) { if (!st) return; Object.assign(st.cfg, data); if (st.page !== 'past') st.page = 'home'; draw(); } // (after a session: back to the home page, with the new score)
   function draw() {
     if (!root) return;
@@ -104,26 +99,24 @@ const Practice = (() => {
       <p class="pr-muted small">“New” = questions you haven’t answered yet. New ones come first.</p>
       ${pick}</section>
       <section class="pr-card pr-side"><h2>How many questions</h2>
-        <div class="pr-chips">${COUNTS.map(k => `<button class="${!s.custom && s.count === k ? 'on' : ''}" data-p="count" data-v="${k}">${k || 'All'}</button>`).join('')}${s.custom
-          ? `<input class="pr-custom" id="pr-custom" type="number" inputmode="numeric" min="1" max="${avail()}" placeholder="How many?" value="${s.customN || ''}" data-p="customn" aria-label="How many questions">`
-          : `<button data-p="custom">Custom</button>`}</div>
+        <div class="pr-chips">${COUNTS.map(k => `<button class="${s.count === k ? 'on' : ''}" data-p="count" data-v="${k}">${k}</button>`).join('')}</div>
         <div class="pr-opts">
-          ${toggle('cases', s.cases, 'Specialty cases', 'Case parts come back to back.')}
+          ${toggle('timer', s.timer, 'Timer', '')}
+          ${toggle('cases', s.cases, 'Specialty-style questions', 'Select all that apply, drag and drop, dropdowns')}
           ${toggle('wrong', s.wrong, 'Include questions I got wrong before', 'Mixed in with new ones.')}
-          ${toggle('timer', s.timer, 'Timer', '1 minute per question.')}
         </div>
         <button class="xp-btn primary pr-start" data-p="gostudy" ${n ? '' : 'disabled'}>${startLabel(n)}</button></section></div>`;
   }
-  const howMany = () => { const s = st.s, have = avail(); return s.custom ? Math.min(s.customN || 0, have) : s.count ? Math.min(s.count, have) : have; };
-  const startLabel = n => n ? `Start (${num(n)} question${n === 1 ? '' : 's'})` : st.s.custom && avail() ? 'Type how many' : 'Pick something to study';
-  const toggle = (k, on, label, sub) => `<label class="pr-tog"><input type="checkbox" data-p="opt" data-k="${k}" ${on ? 'checked' : ''}><span class="pr-sw"></span><span><b>${label}</b><small>${sub}</small></span></label>`;
+  const howMany = () => Math.min(st.s.count, avail());
+  const startLabel = n => n ? `Start (${num(n)} question${n === 1 ? '' : 's'})` : 'Pick something to study';
+  const toggle = (k, on, label, sub) => `<label class="pr-tog"><input type="checkbox" data-p="opt" data-k="${k}" ${on ? 'checked' : ''}><span class="pr-sw"></span><span><b>${label}</b>${sub ? `<small>${sub}</small>` : ''}</span></label>`;
 
   /* ---------- Simulation start ---------- */
   function simView() {
     return `<div class="pr-wrap narrow"><section class="pr-card">
       <h2>How it works</h2>
       <ul class="pr-rules">
-        <li><b>70 to 120 questions, 2 hours.</b> Questions come from every category, in the NREMT’s mix.</li>
+        <li><b>70 to 120 questions, 2 hours.</b> Questions come from every category in your course question bank, in proportions modeled on the NREMT.</li>
         <li><b>No going back.</b> Answer each question to move on, like the real exam. Calculator and My Notes are there if you need them.</li>
         <li><b>It ends when it knows.</b> After question 70, it stops as soon as it’s clear you’re above or below 80%. Otherwise it goes to 120.</li>
         <li><b>If time runs out</b> before question 70, it counts as not passed.</li>
@@ -164,7 +157,6 @@ const Practice = (() => {
     const b = e.target.closest('[data-p]');
     if (!b || !st) return;
     const p = b.dataset.p, s = st.s, c = st.cfg;
-    if (p === 'customn') return;
     if (b.tagName === 'INPUT') {
       if (p === 'allcats') { s.cats = b.checked ? new Set(c.cats.map(x => x.key)) : new Set(); }
       else if (p === 'cat') b.checked ? s.cats.add(b.dataset.k) : s.cats.delete(b.dataset.k);
@@ -178,9 +170,7 @@ const Practice = (() => {
     if (p === 'close') { const done = c.onClose; close(); if (done) done(); return; }
     if (p === 'home' || p === 'study' || p === 'sim' || p === 'past') { st.page = p; draw(); root.querySelector('.pr-main').scrollTop = 0; return; }
     if (p === 'by') s.by = b.dataset.v;
-    else if (p === 'count') { s.count = Number(b.dataset.v); s.custom = false; }
-    else if (p === 'custom') { s.custom = true; keep(); const f = root.querySelector('#pr-custom'); if (f) f.focus(); return; }
-    else if (p === 'customn') return;
+    else if (p === 'count') s.count = Number(b.dataset.v);
     else if (p === 'fold') st.openMods.has(Number(b.dataset.m)) ? st.openMods.delete(Number(b.dataset.m)) : st.openMods.add(Number(b.dataset.m));
     else if (p === 'gostudy') { if (avail()) c.onStudy({ by: s.by, cats: [...s.cats], chapters: [...s.chapters], count: howMany(), cases: s.cases, wrong: s.wrong, timer: s.timer }); return; }
     else if (p === 'gosim') { c.onSim(); return; }

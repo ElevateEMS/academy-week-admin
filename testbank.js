@@ -463,7 +463,7 @@ function tbCatOf(id) {
 function tbPracPool() {
   const t = tb(), out = [];
   Object.entries(t.chapters || {}).forEach(([cid, ch]) => { if (!/^\d+$/.test(cid)) return;
-    Object.entries(ch.q || {}).forEach(([id, q]) => { if (!q.deleted) out.push({ id, q, cid, cat: tbCatOf(id), spec: q.kind === 'specialty' }); }); });
+    Object.entries(ch.q || {}).forEach(([id, q]) => { if (!q.deleted) out.push({ id, q, cid, cat: tbCatOf(id), spec: q.kind === 'specialty', fancy: q.kind === 'specialty' || ['multi', 'drag', 'dropdown'].includes(q.type) }); }); });
   return out;
 }
 const tbShuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
@@ -490,7 +490,7 @@ function tbPracData() {
   const P = tbPrac(), pool = tbPracPool(), cats = {}, chs = {};
   TB_CATS.forEach(c => { cats[c.key] = { key: c.key, label: c.label, total: 0, spec: 0, fresh: 0 }; });
   pool.forEach(x => { const c = cats[x.cat], h = chs[x.cid] = chs[x.cid] || { cid: x.cid, n: Number(x.cid), title: tbTitle(x.cid), total: 0, spec: 0, fresh: 0 };
-    [c, h].forEach(o => { o.total++; if (x.spec) o.spec++; if (!(x.id in P.seen)) o.fresh++; }); });
+    [c, h].forEach(o => { o.total++; if (x.fancy) o.spec++; if (!(x.id in P.seen)) o.fresh++; }); });
   const modules = Object.entries(TB_MODULES).map(([m, [a, b]]) => ({ m: Number(m), chapters: Array.from({ length: b - a + 1 }, (_, i) => chs[String(a + i).padStart(2, '0')]).filter(Boolean) })).filter(m => m.chapters.length);
   return { cats: TB_CATS.map(c => cats[c.key]), modules, attempts: P.attempts.map(a => ({ ...a, canReview: !!a.result })) };
 }
@@ -508,7 +508,7 @@ function tbPracSave(mode, label, result, answers) {
 }
 async function tbStudyStart(o) {
   const P = tbPrac(), pool = tbPracPool();
-  const chosen = pool.filter(x => (o.by === 'cat' ? o.cats.includes(x.cat) : o.chapters.includes(x.cid)) && (o.cases || !x.spec));
+  const chosen = pool.filter(x => (o.by === 'cat' ? o.cats.includes(x.cat) : o.chapters.includes(x.cid)) && (o.cases || !x.fancy)); // (Specialty-style off: no cases, select-all, drag & drop or dropdowns)
   // New ones first (plus ones missed before, if asked), then the rest.
   const units = tbUnits(chosen), first = [], rest = [];
   units.forEach(u => (u.every(x => !(x.id in P.seen)) || (o.wrong && u.some(x => P.seen[x.id] === false)) ? first : rest).push(u));
@@ -522,7 +522,7 @@ async function tbStudyStart(o) {
     : Object.entries(TB_MODULES).map(([m, [a, b]]) => { const ids = Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')), got = ids.filter(id => o.chapters.includes(id));
         return got.length === ids.length ? 'Module ' + m : got.length ? 'Ch ' + got.map(Number).join(', ') : ''; }).filter(Boolean).join(' · ');
   ExamPlayer.open({
-    title: 'Study Mode', kind: 'quiz', mode: 'study', preview: true, autoStart: true, limitMin: o.timer ? pick.length : 0, questions,
+    title: 'Study Mode', kind: 'quiz', mode: 'study', preview: true, autoStart: true, limitMin: 0, noClock: !o.timer, questions,
     check: async (id, v) => { const x = byId[id], ok = tbGrade(x.q, v); res[id] = ok; P.seen[id] = ok; return { ok, right: tbRight(x.q), ref: x.q.ref || '' }; },
     onSubmit: async (answers, meta) => {
       const done = meta.checked.filter(id => id in res);
@@ -598,7 +598,7 @@ function tbPracInfo() {
     <table class="pr-info-t"><thead><tr><th>Category</th><th>Chapters</th><th>Questions</th><th>Of 120 in a simulation</th></tr></thead><tbody>
       ${TB_CATS.map(c => `<tr><td><b>${esc(c.label)}</b></td><td>${c.ch.join(', ')}</td><td>${n(c.key).toLocaleString()}</td><td>${c.sim}</td></tr>`).join('')}
       <tr><td class="pr-muted">Spread across all six</td><td>${TB_CAT_SPREAD.join(', ')}</td><td class="pr-muted">(counted above)</td><td></td></tr></tbody></table>
-    <p><b>Study Mode</b>: students pick categories or modules/chapters, how many (10, 25, 50, 100 or all), specialty cases on or off, questions they got wrong before, and a timer (1 minute each). <b>Check answer</b> shows right or wrong, the right answer and the page to read. New questions come first.</p>
+    <p><b>Study Mode</b>: students pick categories or modules/chapters, how many (10, 25, 50, 70, 100 or 120), a stopwatch on or off, specialty-style questions on or off (cases, select all, drag and drop, dropdowns), and questions they got wrong before. <b>Check answer</b> shows right or wrong, the right answer and the page to read. New questions come first.</p>
     <p><b>NREMT Simulation</b>: 70–120 questions in the mix above, 2 hours, no going back. After question 70 it stops once it’s 95% sure they’re above or below ${TB_SIM_PASS}%; otherwise question 120 decides. At most one specialty case (whole, or Parts 1–3). The end shows pass / not passed, each category, and a review.</p>
     <p class="pr-muted">In this preview, Past attempts starts with sample sessions, and your own preview sessions are added until the page reloads. Nothing is saved.</p>`;
 }
