@@ -41,6 +41,8 @@ const ExamPlayer = (() => {
     root.addEventListener('drop', e => { const b = e.target.closest('[data-blank]'); if (!b) return; e.preventDefault(); place(Number(b.dataset.blank), Number(e.dataTransfer.getData('text/plain'))); });
     document.addEventListener('keydown', onKey, true);
     root.addEventListener('pointerdown', dragStart);
+    // Resizing My Notes by its corner: remember the height for the rest of the test.
+    root.addEventListener('pointerup', () => { const n = root && root.querySelector('#xp-notes'); if (n && n.style.height && st) { const h = parseInt(n.style.height, 10); if (h && h !== st.notesH) { st.notesH = h; n.closest('.xp-notes').classList.add('sized'); } } });
     draw();
   }
   function close() {
@@ -145,8 +147,9 @@ const ExamPlayer = (() => {
       <div class="xp-calc-keys"><button data-x="key" data-k="C" class="wide">C</button><button data-x="key" data-k="±">±</button><button data-x="key" data-k="%">%</button>${keys.map(k => `<button data-x="key" data-k="${k}" class="${/[÷×−+=]/.test(k) ? 'op' : ''}">${k}</button>`).join('')}</div></div>`;
   }
   function notesView(cls, style) {
-    return `<div class="${cls} xp-notes" data-tool="notes"${style}>${toolHead('notes', 'My Notes')}
-      <textarea id="xp-notes" placeholder="Scratch paper for the whole test: only you see it, and it isn’t saved.">${esc(st.notes)}</textarea></div>`;
+    // Opens tall (fills the side panel, or most of the window when floating); drag its corner to make it smaller (kept).
+    return `<div class="${cls} xp-notes ${st.notesH ? 'sized' : ''}" data-tool="notes"${style}>${toolHead('notes', 'My Notes')}
+      <textarea id="xp-notes"${st.notesH ? ` style="height:${st.notesH}px"` : ''} placeholder="Scratch paper for the whole test: only you see it, and it isn’t saved.">${esc(st.notes)}</textarea></div>`;
   }
   function confirmView() {
     const miss = st.qs.map((q, j) => answered(q) ? null : j).filter(x => x != null), fl = st.qs.filter(q => st.flags.has(q.id)).length;
