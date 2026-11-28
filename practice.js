@@ -3,7 +3,7 @@
    never sees questions or answer keys: whoever opens it picks the questions and runs the test (ExamPlayer).
 
    Practice.open({
-     preview,                                    // Admin only: says so on screen, nothing saved
+     preview, info (html),                       // Admin only: says so on screen, nothing saved; ⓘ shows info
      cats: [{ key, label, total, spec, fresh }], // fresh = not answered yet; spec = specialty case parts in total
      modules: [{ m, chapters: [{ cid, n, title, total, spec, fresh }] }],
      attempts: [{ at, mode: 'study' | 'sim', label, total, right, pct, secs, passed, sample, canReview }],
@@ -27,13 +27,17 @@ const Practice = (() => {
     document.body.appendChild(root);
     document.body.classList.add('pr-open');
     root.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey, true);
     draw();
   }
   function close() {
     if (root) root.remove();
     root = null; st = null;
     document.body.classList.remove('pr-open');
+    document.removeEventListener('keydown', onKey, true);
   }
+  // Escape closes the ⓘ pop-up (not while a test is open on top).
+  function onKey(e) { if (e.key === 'Escape' && st && st.info && !(window.ExamPlayer && ExamPlayer.isOpen())) { st.info = false; draw(); e.stopPropagation(); } }
   function refresh(data) { if (!st) return; Object.assign(st.cfg, data); if (st.page !== 'past') st.page = 'home'; draw(); } // (after a session: back to the home page, with the new score)
   function draw() {
     if (!root) return;
@@ -41,9 +45,11 @@ const Practice = (() => {
     root.innerHTML = `<div class="pr"><header class="pr-head"><div class="pr-head-in">
         ${st.page === 'home' ? '' : `<button class="pr-back" data-p="home" aria-label="Back">←</button>`}
         <div><div class="pr-title">${st.page === 'study' ? 'Study Mode' : st.page === 'sim' ? 'NREMT Simulation' : st.page === 'past' ? 'Past attempts' : 'NREMT Practice'}</div>
-          ${st.cfg.preview ? '<div class="pr-sub">Preview: what students see. Nothing is saved.</div>' : ''}</div>
-        <button class="pr-x" data-p="close" aria-label="Close">×</button></div></header>
-      <main class="pr-main">${page}</main></div>`;
+          ${st.cfg.preview ? '<div class="pr-sub">Previewing as student · nothing is saved</div>' : ''}</div>
+        <span class="pr-head-btns">${st.cfg.info ? `<button class="pr-i ${st.info ? 'on' : ''}" data-p="info" aria-label="About this page" aria-expanded="${!!st.info}">i</button>` : ''}
+        <button class="pr-x" data-p="close" aria-label="Close">×</button></span></div></header>
+      <main class="pr-main">${page}</main>
+      ${st.info ? `<div class="pr-info-veil" data-p="info"></div><div class="pr-info" role="dialog" aria-label="About NREMT Practice"><h2>About NREMT Practice</h2>${st.cfg.info}</div>` : ''}</div>`;
   }
 
   /* ---------- Home ---------- */
@@ -157,6 +163,7 @@ const Practice = (() => {
       keep(); return;
     }
     if (b.tagName === 'LABEL') return;
+    if (p === 'info') { st.info = !st.info; keep(); return; }
     if (p === 'close') { const done = c.onClose; close(); if (done) done(); return; }
     if (p === 'home' || p === 'study' || p === 'sim' || p === 'past') { st.page = p; draw(); root.querySelector('.pr-main').scrollTop = 0; return; }
     if (p === 'by') s.by = b.dataset.v;

@@ -72,10 +72,10 @@ function testBankView() {
   if (!Object.keys(t.sets || {}).length) return tbImportView();
   setTimeout(tbPairsOnce, 0);
   if (!t.sideShown) { t.sideShown = true; setTimeout(tbSideToCurrent, 0); }
-  const exam = /^exam-/.test(t.ch), prac = t.ch === 'practice';
-  if (!prac && (exam ? !t.sets[t.ch] : !t.chapters[t.ch])) t.ch = '01';
-  if (!exam && !prac) tbHistoryWatch(t.ch);
-  return `<div class="tb">${tbSide()}<section class="tb-main box">${prac ? tbPracticeMain() : exam ? tbExamMain() : tbMain()}</section></div>`;
+  const exam = /^exam-/.test(t.ch);
+  if (exam ? !t.sets[t.ch] : !t.chapters[t.ch]) t.ch = '01';
+  if (!exam) tbHistoryWatch(t.ch);
+  return `<div class="tb">${tbSide()}<section class="tb-main box">${exam ? tbExamMain() : tbMain()}</section></div>`;
 }
 const tbFolded = () => new Set(String(pref('tbFold') || '').split(',').filter(Boolean).map(Number));
 // Keep the open chapter in view inside the side list (only the list scrolls, not the page).
@@ -105,7 +105,7 @@ function tbSide() {
     return ex.qids.length === TB_EXAM_SIZE && exSpec === TB_EXAM_SPEC && Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')).every(cid => {
       const set = tbQuizSet(cid); if (!set || set.counts === false) return true;
       const sp = set.qids.filter(id => (tbQ(id) || {}).kind === 'specialty').length; return set.qids.length === TB_QUIZ_SIZE && sp === TB_SPEC_PICKS; }); };
-  return `<aside class="tb-side box" data-keep-scroll="tb-side"><p class="tb-mod">Students</p><button class="tb-ch ${t.ch === 'practice' ? 'on' : ''}" data-act="tbCh" data-ch="practice"><span class="tb-ch-n">${TB_PRAC_ICON}</span><span class="tb-ch-t">NREMT Practice</span></button><div class="tb-side-sep"></div>${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
+  return `<aside class="tb-side box" data-keep-scroll="tb-side"><button class="tb-ch tb-ch-prac" data-act="tbPractice" title="Opens the students’ practice page (preview)"><span class="tb-ch-n">${TB_PRAC_ICON}</span><span class="tb-ch-t">NREMT Practice</span></button><div class="tb-side-sep"></div>${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
     return `<button class="tb-mod tb-mod-btn" data-act="tbFold" data-m="${m}" aria-expanded="${open}"><span class="tb-caret">${open ? '▾' : '▸'}</span>Module ${m} <span class="muted">· Ch ${a}–${b}</span>${modDone(m, a, b) ? '<span class="tb-ch-done" title="All its quizzes and its exam are done">✓</span>' : ''}</button>`
     + (open ? Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m) : ''); }).join('')}
     <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
@@ -448,7 +448,7 @@ const TB_CATS = [
   { key: 'ops', label: 'Operations', ch: [1, 2, 3, 4, 8, 9, 35, 36, 37, 38, 39], sim: 14 },
 ];
 const TB_CAT_SPREAD = [5, 6, 10], TB_SIM_MAX = 120, TB_SIM_MIN = 70, TB_SIM_PASS = 80;
-const TB_PRAC_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M6 9.5V14c0 1.7 2.7 3 6 3s6-1.3 6-3V9.5M20 7v6"/></svg>';
+const TB_PRAC_ICON = '<svg viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5h6v1M9 4.5a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1"/><path d="M8.8 13.2l2.2 2.2 4.4-4.6"/></svg>';
 const tbCatLabel = k => (TB_CATS.find(c => c.key === k) || {}).label || '';
 // A question's category: by its chapter; the spread chapters land on one by a steady hash (same answer every time).
 function tbCatOf(id) {
@@ -496,7 +496,7 @@ function tbPracData() {
 }
 function tbPractice() {
   if (typeof Practice === 'undefined') return;
-  Practice.open({ preview: true, ...tbPracData(), onStudy: tbStudyStart, onSim: tbSimStart, onReview: tbPracReview, onClose: () => {} });
+  Practice.open({ preview: true, info: tbPracInfo(), ...tbPracData(), onStudy: tbStudyStart, onSim: tbSimStart, onReview: tbPracReview, onClose: () => {} });
 }
 const tbPracBack = () => Practice.refresh(tbPracData());
 function tbBreakdown(res) {
@@ -591,19 +591,16 @@ async function tbPracReview(i) {
   const questions = []; for (const r of a.result.review) { const q = tbQ(r.id); if (q) questions.push(await tbPlayerQ(r.id, q)); }
   ExamPlayer.review({ title: a.mode === 'sim' ? 'NREMT Simulation' : 'Study Mode', kind: a.mode === 'sim' ? 'exam' : 'quiz', mode: a.mode, preview: true, questions, answers: a.answers, result: a.result, onClose: tbPracBack });
 }
-// Admin's page for it: what's in each category, and the button to try it as a student.
-function tbPracticeMain() {
+// Admin's ⓘ on the practice page (students don't get it): what's in each category and how the two modes work.
+function tbPracInfo() {
   const pool = tbPracPool(), n = k => pool.filter(x => x.cat === k).length;
-  return `<div class="tb-head"><div><h2>NREMT Practice</h2><span class="muted small">Study Mode + NREMT Simulation for students · goes live with the Student Portal</span></div>
-      <div class="tb-head-right"><button class="btn tiny" data-act="tbPractice">Preview as student</button></div></div>
-    <p class="tb-intro">Uses every chapter question (quizzes, test banks, specialty cases and module exam questions): ${pool.length.toLocaleString()} now. Never Ride Along Readiness or Pharmacology. Changes you make in the Test Bank show up here on their own. Never graded.</p>
-    <table class="tb-cats"><thead><tr><th>Category</th><th>Chapters</th><th>Questions</th><th>Of 120 in a simulation</th></tr></thead><tbody>
+  return `<p>Uses every chapter question (quizzes, test banks, specialty cases and module exam questions): <b>${pool.length.toLocaleString()}</b> now. Never Ride Along Readiness or Pharmacology. Changes you make in the Test Bank show up here on their own. Never graded.</p>
+    <table class="pr-info-t"><thead><tr><th>Category</th><th>Chapters</th><th>Questions</th><th>Of 120 in a simulation</th></tr></thead><tbody>
       ${TB_CATS.map(c => `<tr><td><b>${esc(c.label)}</b></td><td>${c.ch.join(', ')}</td><td>${n(c.key).toLocaleString()}</td><td>${c.sim}</td></tr>`).join('')}
-      <tr><td class="muted">Spread across all six</td><td>${TB_CAT_SPREAD.join(', ')}</td><td class="muted">(counted above)</td><td></td></tr></tbody></table>
-    <div class="tb-prac-notes">
-      <p><b>Study Mode</b>: students pick categories or modules/chapters, how many (10, 25, 50, 100 or all), specialty cases on or off, questions they got wrong before, and a timer (1 minute each). <b>Check answer</b> shows right or wrong, the right answer and the page to read. New questions come first.</p>
-      <p><b>NREMT Simulation</b>: 70–120 questions in the mix above, 2 hours, no going back. After question 70 it stops once it’s 95% sure they’re above or below ${TB_SIM_PASS}%; otherwise question 120 decides. At most one specialty case (whole, or Parts 1–3). The end shows pass / not passed, each category, and a review.</p>
-      <p class="muted small">In this preview, the Past attempts page starts with sample sessions, and your own preview sessions are added until the page reloads. Nothing is saved.</p></div>`;
+      <tr><td class="pr-muted">Spread across all six</td><td>${TB_CAT_SPREAD.join(', ')}</td><td class="pr-muted">(counted above)</td><td></td></tr></tbody></table>
+    <p><b>Study Mode</b>: students pick categories or modules/chapters, how many (10, 25, 50, 100 or all), specialty cases on or off, questions they got wrong before, and a timer (1 minute each). <b>Check answer</b> shows right or wrong, the right answer and the page to read. New questions come first.</p>
+    <p><b>NREMT Simulation</b>: 70–120 questions in the mix above, 2 hours, no going back. After question 70 it stops once it’s 95% sure they’re above or below ${TB_SIM_PASS}%; otherwise question 120 decides. At most one specialty case (whole, or Parts 1–3). The end shows pass / not passed, each category, and a review.</p>
+    <p class="pr-muted">In this preview, Past attempts starts with sample sessions, and your own preview sessions are added until the page reloads. Nothing is saved.</p>`;
 }
 
 /* ---------- First time: the import file ---------- */

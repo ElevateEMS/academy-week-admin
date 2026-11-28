@@ -310,3 +310,16 @@ body.pr-open { overflow: hidden; }
   .xp-choices.marked .xp-choice > span:nth-child(3) { flex: 1 1 170px; min-width: 0; }
   .xp-yours { font-size: 11px; }
 }
+
+/* Admin preview: the ⓘ next to × and its pop-up */
+.pr-head-btns { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.pr-head-btns .pr-x { margin-left: 0; }
+.pr-i { font: italic 600 19px Georgia, 'Times New Roman', serif; background: rgba(255, 255, 255, .14); color: #fff; border: 0; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; }
+.pr-i:hover, .pr-i.on { background: rgba(255, 255, 255, .3); }
+.pr-info-veil { position: fixed; inset: 0; z-index: 5; }
+.pr-info { position: fixed; z-index: 6; top: 84px; right: max(16px, calc(50% - 500px)); width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow-y: auto; background: #fff; border-radius: 12px; box-shadow: 0 16px 50px rgba(10, 40, 80, .28); padding: 20px 22px; font-size: 15px; line-height: 1.55; color: #2d3a48; }
+.pr-info h2 { margin: 0 0 8px; font-size: 18px; color: #0b4f9c; }
+.pr-info p { margin: 10px 0 0; }
+.pr-info-t { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 14px; }
+.pr-info-t th { text-align: left; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: #5b6878; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid #e3e8ee; }
+.pr-info-t td { padding: 8px; border-bottom: 1px solid #edf0f4; vertical-align: top; }
