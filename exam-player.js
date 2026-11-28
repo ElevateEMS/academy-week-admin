@@ -11,7 +11,17 @@
    })
    value: mc / tf = the choice's index; multi = [indexes]; drag / dropdown = [choice index per blank] (null = empty).
    Question order is shuffled, except a case's parts stay back to back, in order, at a random spot. Choices are shuffled
-   too, except true / false and ones like "All of the above". */
+   too, except true / false and ones like "All of the above".
+
+   Practice (the Student Portal's Study Mode and NREMT Simulation) adds:
+     mode: 'study'  → CHECK ANSWER on each question: check(id, value) → { ok, right (a value, same shape as an answer), ref };
+                      the right answer is only handed over after the student commits to theirs.
+     mode: 'sim'    → no going back, no list, no flags; each NEXT sends the answer: onAnswer(id, value) → { stop } (the
+                      grader decides when it knows enough); keepOrder: true keeps the grader's question order.
+     autoStart: true skips the start page. limitMin > 0 = a countdown that ends the test at 0 (any kind).
+   onSubmit's result can carry review: [{ id, ok, right, ref }] (shown with the student's answers), breakdown:
+   [{ label, right, total }], note, passed. ExamPlayer.review({ title, questions, answers, result, onClose }) opens a
+   finished attempt straight to its results (Past attempts). */
 const ExamPlayer = (() => {
   let st = null, root = null, tick = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,8 +37,18 @@ const ExamPlayer = (() => {
     const units = [], byGroup = {};
     cfg.questions.forEach(q => { if (!q.group) units.push([q]); else if (byGroup[q.group]) byGroup[q.group].push(q); else units.push(byGroup[q.group] = [q]); });
     Object.values(byGroup).forEach(u => u.sort((a, b) => (a.part || 0) - (b.part || 0)));
-    const qs = [].concat(...shuffle(units)).map(q => ({ ...q, order: (q.type === 'mc' || q.type === 'multi') && !keepOrder(q) ? shuffle(q.choices.map((c, i) => i)) : q.choices.map((c, i) => i) }));
-    st = { cfg, qs, i: 0, ans: {}, flags: new Set(), notes: '', hide: false, phase: 'intro', agree: false, pop: null, tools: { calc: false, notes: false }, at: { calc: null, notes: null }, calc: { show: '0', acc: null, op: null, fresh: true }, pickChip: null };
+    const qs = [].concat(...(cfg.keepOrder ? units : shuffle(units))).map(q => ({ ...q, order: (q.type === 'mc' || q.type === 'multi') && !keepOrder(q) ? shuffle(q.choices.map((c, i) => i)) : q.choices.map((c, i) => i) }));
+    st = { cfg, qs, i: 0, ans: {}, flags: new Set(), notes: '', hide: false, phase: 'intro', agree: false, pop: null, tools: { calc: false, notes: false }, at: { calc: null, notes: null }, calc: { show: '0', acc: null, op: null, fresh: true }, pickChip: null, checked: {} };
+    mount();
+    if (cfg.autoStart) start(); else draw();
+  }
+  // A finished attempt, opened straight to its results and review.
+  function review(cfg) {
+    close();
+    st = { cfg, qs: cfg.questions.map(q => ({ ...q, order: q.order || q.choices.map((c, i) => i) })), i: 0, ans: cfg.answers || {}, flags: new Set(), phase: 'done', result: cfg.result, took: cfg.result.seconds || 0, tools: {}, at: {}, checked: {}, revTab: 'missed', past: true };
+    mount(); draw();
+  }
+  function mount() {
     root = document.createElement('div');
     root.className = 'xp-root';
     document.body.appendChild(root);
@@ -43,7 +63,6 @@ const ExamPlayer = (() => {
     root.addEventListener('pointerdown', dragStart);
     // Resizing My Notes by its corner: remember the height for the rest of the test.
     root.addEventListener('pointerup', () => { const n = root && root.querySelector('#xp-notes'); if (n && n.style.height && st) { const h = parseInt(n.style.height, 10); if (h && h !== st.notesH) { st.notesH = h; n.closest('.xp-notes').classList.add('sized'); } } });
-    draw();
   }
   function close() {
     clearInterval(tick); tick = null;
@@ -55,14 +74,17 @@ const ExamPlayer = (() => {
   const answered = q => { const v = st.ans[q.id]; return Array.isArray(v) ? v.length > 0 && (q.type === 'multi' || v.every(x => x != null)) : v != null; };
   const elapsed = () => (Date.now() - st.started) / 1000;
   const left = () => st.cfg.limitMin * 60 - elapsed();
+  const countdown = () => st.cfg.limitMin > 0;
+  const study = () => st.cfg.mode === 'study', sim = () => st.cfg.mode === 'sim';
+  const locked = q => study() && !!st.checked[q.id];
 
   /* ---------- Screens ---------- */
   function draw() {
     if (!root) return;
     const keepNotes = document.activeElement && document.activeElement.id === 'xp-notes';
-    const scrolls = ['.xp-main', '.xp-nav-list', '.xp-dock'].map(s => { const el = root.querySelector(s); return el ? el.scrollTop : 0; }); // (picking an answer keeps your place)
+    const scrolls = ['.xp-main', '.xp-nav-list', '.xp-dock', '.xp-intro'].map(s => { const el = root.querySelector(s); return el ? el.scrollTop : 0; }); // (picking an answer keeps your place)
     root.innerHTML = st.phase === 'intro' ? introView() : st.phase === 'done' ? doneView() : testView();
-    ['.xp-main', '.xp-nav-list', '.xp-dock'].forEach((s, i) => { const el = root.querySelector(s); if (el && scrolls[i]) el.scrollTop = scrolls[i]; });
+    ['.xp-main', '.xp-nav-list', '.xp-dock', '.xp-intro'].forEach((s, i) => { const el = root.querySelector(s); if (el && scrolls[i]) el.scrollTop = scrolls[i]; });
     if (keepNotes) { const n = root.querySelector('#xp-notes'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = n.value.length; } }
   }
   function introView() {
@@ -83,27 +105,35 @@ const ExamPlayer = (() => {
     </div></div>`;
   }
   function testView() {
-    const q = st.qs[st.i], c = st.cfg, n = st.qs.length, exam = c.kind === 'exam';
-    const time = exam ? `<span class="xp-time ${left() < 300 ? 'low' : ''}" title="Time left">${clock(left())}</span>` : `<span class="xp-time" title="Time so far">${clock(elapsed())}</span>`;
-    return `<div class="xp ${st.hide ? 'menu-hidden' : ''}">
+    const q = st.qs[st.i], c = st.cfg, n = st.qs.length, ck = st.checked[q.id];
+    const time = countdown() ? `<span class="xp-time ${left() < 300 ? 'low' : ''}" title="Time left">${clock(left())}</span>` : `<span class="xp-time" title="Time so far">${clock(elapsed())}</span>`;
+    // The simulation shows no list and no count (like the NREMT, it doesn't say how many are coming) and can't flag.
+    const tools = [['calc', ICON.calc, 'CALCULATOR'], ['notes', ICON.notes, 'MY NOTES']];
+    if (!c.mode) tools.push(['flag', ICON.flag, st.flags.has(q.id) ? 'UNFLAG QUESTION' : 'FLAG QUESTION']);
+    tools.push(['menu', ICON.up, 'HIDE THIS MENU']);
+    const foot = sim() ? `<button class="xp-btn" data-x="submit">END TEST</button><button class="xp-btn primary" data-x="simnext" ${answered(q) && !st.busy ? '' : 'disabled'}>NEXT →</button>`
+      : study() ? `<button class="xp-btn" data-x="prev" ${st.i ? '' : 'disabled'}>← PREVIOUS</button>
+        <button class="xp-btn" data-x="submit">END SESSION</button>
+        <span class="xp-foot-r">${ck ? '' : `<button class="xp-btn primary" data-x="check" ${answered(q) && !st.busy ? '' : 'disabled'}>CHECK ANSWER</button>`}
+          <button class="xp-btn ${ck ? 'primary' : ''}" data-x="${st.i < n - 1 ? 'next' : 'submit'}">${st.i < n - 1 ? (ck ? 'NEXT →' : 'SKIP →') : 'FINISH'}</button></span>`
+      : `<button class="xp-btn" data-x="prev" ${st.i ? '' : 'disabled'}>← PREVIOUS</button>
+        <button class="xp-btn" data-x="submit">SUBMIT</button>
+        <button class="xp-btn primary" data-x="next" ${st.i < n - 1 ? '' : 'disabled'}>NEXT →</button>`;
+    return `<div class="xp ${st.hide ? 'menu-hidden' : ''} ${sim() ? 'no-list' : ''}">
       <header class="xp-head"><div class="xp-head-in">
-        <div class="xp-titles"><div class="xp-title">${esc(c.title)}${c.preview ? ' <span class="xp-pv">Preview</span>' : ''}</div><div class="xp-of">Question ${st.i + 1} of ${n}</div></div>${time}</div>
-        ${st.hide ? `<button class="xp-show" data-x="menu">SHOW MENU</button>` : `<nav class="xp-tools">
-          <button data-x="calc" class="${st.tools.calc ? 'on' : ''}">${ICON.calc}CALCULATOR</button>
-          <button data-x="notes" class="${st.tools.notes ? 'on' : ''}">${ICON.notes}MY NOTES</button>
-          <button data-x="flag" class="${st.flags.has(q.id) ? 'on' : ''}">${ICON.flag}${st.flags.has(q.id) ? 'UNFLAG QUESTION' : 'FLAG QUESTION'}</button>
-          <button data-x="menu">${ICON.up}HIDE THIS MENU</button></nav>`}
+        <div class="xp-titles"><div class="xp-title">${esc(c.title)}${c.preview ? ' <span class="xp-pv">Preview</span>' : ''}</div><div class="xp-of">Question ${st.i + 1}${sim() ? '' : ' of ' + n}</div></div>${time}</div>
+        ${st.hide ? `<button class="xp-show" data-x="menu">SHOW MENU</button>` : `<nav class="xp-tools" style="--n:${tools.length}">${tools.map(([k, ic, l]) =>
+          `<button data-x="${k}" class="${(k === 'flag' ? st.flags.has(q.id) : st.tools[k]) ? 'on' : ''} t-${k}">${ic}${l}</button>`).join('')}</nav>`}
       </header>
       <div class="xp-body ${docked().length ? 'with-dock' : ''}">
-        <nav class="xp-nav"><button class="xp-nav-arrow" data-x="up" aria-label="Previous question">▲</button><div class="xp-nav-list">${st.qs.map((x, j) =>
-          `<button class="${j === st.i ? 'cur' : ''} ${answered(x) ? 'done' : ''}" data-x="go" data-i="${j}"><span class="xp-n">${j + 1}</span>${st.flags.has(x.id) ? `<span class="xp-fl" aria-label="Flagged">${ICON.flagFill}</span>` : ''}</button>`).join('')}</div>
-          <button class="xp-nav-arrow" data-x="down" aria-label="Next question">▼</button></nav>
-        <main class="xp-main">${questionView(q)}</main>
+        ${sim() ? '' : `<nav class="xp-nav"><button class="xp-nav-arrow" data-x="up" aria-label="Previous question">▲</button><div class="xp-nav-list">${st.qs.map((x, j) => {
+          const r = st.checked[x.id], mark = r ? (r.ok ? 'ok' : 'no') : answered(x) ? 'done' : '';
+          return `<button class="${j === st.i ? 'cur' : ''} ${mark}" data-x="go" data-i="${j}"><span class="xp-n">${j + 1}</span>${st.flags.has(x.id) ? `<span class="xp-fl" aria-label="Flagged">${ICON.flagFill}</span>` : ''}</button>`; }).join('')}</div>
+          <button class="xp-nav-arrow" data-x="down" aria-label="Next question">▼</button></nav>`}
+        <main class="xp-main">${ck ? markedView(q, st.ans[q.id], ck) : questionView(q)}</main>
         ${docked().length ? `<aside class="xp-dock">${docked().map(toolView).join('')}</aside>` : ''}
       </div>
-      <footer class="xp-foot"><button class="xp-btn" data-x="prev" ${st.i ? '' : 'disabled'}>← PREVIOUS</button>
-        <button class="xp-btn" data-x="submit">SUBMIT</button>
-        <button class="xp-btn primary" data-x="next" ${st.i < n - 1 ? '' : 'disabled'}>NEXT →</button></footer>
+      <footer class="xp-foot">${foot}</footer>
       ${['calc', 'notes'].filter(k => st.tools[k] && st.at[k]).map(toolView).join('')}${st.pop === 'confirm' ? confirmView() : ''}
     </div>`;
   }
@@ -133,6 +163,27 @@ const ExamPlayer = (() => {
       ${q.type === 'drag' ? `<p class="xp-hint">Drag each option into the answer area (or tap an option, then tap a blank). Tap a filled blank to empty it.</p>
         <div class="xp-pool">${q.choices.map((c, j) => `<span class="xp-chip ${st.pickChip === j ? 'on' : ''}" draggable="true" data-chip="${j}" data-x="chip">${esc(plain(c))}</span>`).join('')}</div>` : ''}`;
   }
+  // A question with its answer shown: the right choices green, a wrong pick red, then the page to read. Study Mode
+  // (after CHECK ANSWER) and every review list use it.
+  function markedView(q, v, r, inReview) {
+    const right = r.right, ok = r.ok;
+    const fill = j => j == null ? '–' : esc(plain(q.choices[j]));
+    let body;
+    if (q.type === 'drag' || q.type === 'dropdown') {
+      const mine = Array.isArray(v) ? v : [];
+      const stem = q.stem.replace(/\{\{(\d+)\}\}/g, (m, n) => { const b = Number(n), good = right && mine[b] === right[b];
+        return `<span class="xp-blank full ${good ? 'is-right' : 'is-wrong'}">${mine[b] != null ? fill(mine[b]) : '&nbsp;'}</span>`; });
+      body = `<div class="xp-stem">${stem}</div>${!ok && right ? `<p class="xp-right-line"><b>Right answer:</b> ${right.map((j, b) => (right.length > 1 ? (b + 1) + ': ' : '') + fill(j)).join(' · ')}</p>` : ''}`;
+    } else {
+      const rs = Array.isArray(right) ? right : [right], mine = Array.isArray(v) ? v : v == null ? [] : [v];
+      body = `<div class="xp-stem">${q.stem}</div>${q.type === 'multi' ? '<p class="xp-hint">Select all that apply.</p>' : ''}
+        <div class="xp-choices marked">${q.order.map((ci, k) => { const isR = rs.includes(ci), picked = mine.includes(ci);
+          return `<div class="xp-choice ${isR ? 'is-right' : picked ? 'is-wrong' : ''}"><span class="xp-mark">${isR ? '✓' : picked ? '✗' : ''}</span><span class="xp-letter">${L(k)})</span><span>${q.choices[ci]}</span>${picked ? '<span class="xp-yours">Your answer</span>' : ''}</div>`; }).join('')}</div>`;
+    }
+    const none = v == null || (Array.isArray(v) && !v.some(x => x != null));
+    return `${inReview ? '' : caseBox(q)}${body}
+      <div class="xp-fb ${ok ? 'ok' : 'no'}"><b>${ok ? '✓ Correct' : none ? 'Not answered' : '✗ Not quite'}</b>${r.ref ? `<span>Read more: ${esc(r.ref)}</span>` : ''}</div>`;
+  }
   const caseBox = q => q.caseText ? `<div class="xp-case"><b>Continuing the scenario</b><p>${esc(q.caseText)}</p></div>` : '';
   // Calculator and My Notes: docked on the right (the question gets narrower, nothing is covered), or dragged anywhere by
   // the blue bar; dragging one back to the right edge docks it again. Where it is stays for the rest of the test.
@@ -154,6 +205,13 @@ const ExamPlayer = (() => {
       <textarea id="xp-notes"${st.notesH ? ` style="height:${st.notesH}px"` : ''} placeholder="Scratch paper for the whole test: only you see it, and it isn’t saved.">${esc(st.notes)}</textarea></div>`;
   }
   function confirmView() {
+    if (sim()) return `<div class="xp-veil"><div class="xp-confirm"><h2>End the simulation now?</h2>
+        <p>It’s scored on the ${st.i} question${st.i === 1 ? '' : 's'} you’ve sent so far. Fewer than 70 counts as not passed.</p>
+        <div class="xp-intro-btns"><button class="xp-btn" data-x="pop">Keep going</button><button class="xp-btn primary" data-x="send">End it</button></div></div></div>`;
+    if (study()) { const done = Object.keys(st.checked).length;
+      return `<div class="xp-veil"><div class="xp-confirm"><h2>End this study session?</h2>
+        <p>You checked ${done} of ${st.qs.length} question${st.qs.length === 1 ? '' : 's'}. Your score counts the ones you checked.</p>
+        <div class="xp-intro-btns"><button class="xp-btn" data-x="pop">Keep going</button><button class="xp-btn primary" data-x="send">End and see my score</button></div></div></div>`; }
     const miss = st.qs.map((q, j) => answered(q) ? null : j).filter(x => x != null), fl = st.qs.filter(q => st.flags.has(q.id)).length;
     return `<div class="xp-veil"><div class="xp-confirm">
       ${miss.length ? `<h2>${miss.length} question${miss.length === 1 ? ' is' : 's are'} unanswered</h2>
@@ -164,16 +222,25 @@ const ExamPlayer = (() => {
   }
   function doneView() {
     const r = st.result || {}, c = st.cfg;
-    if (st.sending) return `<div class="xp-intro"><div class="xp-intro-card"><h1>Submitting…</h1></div></div>`;
-    return `<div class="xp-intro"><div class="xp-intro-card">
-      ${c.preview ? '<p class="xp-preview-tag">Preview: nothing was saved.</p>' : ''}
+    if (st.sending) return `<div class="xp-intro"><div class="xp-intro-card"><h1>${c.mode ? 'Scoring…' : 'Submitting…'}</h1></div></div>`;
+    const rev = Array.isArray(r.review) ? r.review : null, missed = rev ? rev.filter(x => !x.ok) : [];
+    const tab = st.revTab || 'missed', list = rev ? (tab === 'missed' ? missed : rev) : [];
+    const byId = Object.fromEntries(st.qs.map(q => [q.id, q]));
+    // Module exams: students only get their score; the review shows in Admin's preview only.
+    const revHead = c.kind === 'exam' && !c.mode ? 'Review (preview only: students only see their score)' : c.mode ? 'Review' : 'Review your answers';
+    return `<div class="xp-intro"><div class="xp-intro-card ${rev ? 'wide' : ''}">
+      ${c.preview ? `<p class="xp-preview-tag">Preview: ${c.mode ? 'kept in Past attempts until this page reloads. Nothing is saved.' : 'nothing was saved.'}</p>` : ''}
       <h1>${esc(c.title)}</h1>
-      ${st.timeUp ? '<p class="xp-meta">Time ran out, so it was submitted with your answers so far.</p>' : ''}
+      ${st.timeUp ? `<p class="xp-meta">Time ran out, so it ${c.mode ? 'ended' : 'was submitted'} with your answers so far.</p>` : ''}
       <div class="xp-score ${r.passed === false ? 'fail' : r.passed ? 'pass' : ''}"><b>${r.pct != null ? r.pct + '%' : ''}</b><span>${r.score != null ? r.score + ' of ' + r.total + ' correct' : esc(r.error || '')}</span>
-        ${r.passed != null ? `<span>${r.passed ? 'Passed' : 'Not passed yet'}${c.passMark ? ' (' + c.passMark + '% to pass)' : ''}</span>` : ''}</div>
-      <p class="xp-meta">Time: ${clock(st.took || 0)}</p>
-      ${r.review ? `<details class="xp-review"><summary>Review answers (preview only: students don’t see this)</summary>${r.review}</details>` : ''}
-      <div class="xp-intro-btns"><button class="xp-btn primary" data-x="quit">Close</button></div></div></div>`;
+        ${r.passed != null ? `<span class="xp-verdict">${r.passed ? 'Passed' : 'Not passed yet'}${c.passMark ? ' (' + c.passMark + '% to pass)' : ''}</span>` : ''}</div>
+      ${r.note ? `<p class="xp-note">${esc(r.note)}</p>` : ''}
+      <p class="xp-meta">Time: ${clock(st.took || 0)}${r.skipped ? ` · ${r.skipped} skipped` : ''}</p>
+      ${(r.breakdown || []).length ? `<div class="xp-break"><h2>By category</h2>${r.breakdown.map(b => { const p = b.total ? Math.round(b.right / b.total * 100) : 0;
+        return `<div class="xp-bar-row"><span class="xp-bar-l">${esc(b.label)}</span><span class="xp-bar"><i class="${p >= 80 ? 'hi' : p >= 65 ? 'mid' : 'lo'}" style="width:${p}%"></i></span><span class="xp-bar-n">${b.right}/${b.total}</span></div>`; }).join('')}</div>` : ''}
+      ${rev && rev.length ? `<div class="xp-revs"><div class="xp-rev-head"><h2>${revHead}</h2><span class="xp-seg"><button data-x="rev" data-t="missed" class="${tab === 'missed' ? 'on' : ''}">Missed (${missed.length})</button><button data-x="rev" data-t="all" class="${tab === 'all' ? 'on' : ''}">All (${rev.length})</button></span></div>
+        ${list.length ? list.map(x => { const q = byId[x.id]; return q ? `<div class="xp-rev-q"><p class="xp-rev-n">Question ${rev.indexOf(x) + 1}${x.cat ? ' · ' + esc(x.cat) : ''}</p>${markedView(q, st.ans[x.id], x, true)}</div>` : ''; }).join('') : '<p class="xp-muted">Nothing missed. Nice work!</p>'}</div>` : ''}
+      <div class="xp-intro-btns"><span></span><button class="xp-btn primary" data-x="quit">${c.mode ? 'Back to practice' : 'Close'}</button></div></div></div>`;
   }
 
   /* ---------- Doing things ---------- */
@@ -181,9 +248,9 @@ const ExamPlayer = (() => {
     st.phase = 'test'; st.started = Date.now();
     tick = setInterval(() => {
       if (!st || st.phase !== 'test') return;
-      if (st.cfg.kind === 'exam' && left() <= 0) { st.timeUp = true; send(); return; }
+      if (countdown() && left() <= 0) { st.timeUp = true; send(); return; }
       const t = root.querySelector('.xp-time');
-      if (t) { t.textContent = clock(st.cfg.kind === 'exam' ? left() : elapsed()); t.classList.toggle('low', st.cfg.kind === 'exam' && left() < 300); }
+      if (t) { t.textContent = clock(countdown() ? left() : elapsed()); t.classList.toggle('low', countdown() && left() < 300); }
     }, 1000);
     draw();
   }
@@ -191,9 +258,31 @@ const ExamPlayer = (() => {
     if (st.sending || st.phase === 'done') return;
     clearInterval(tick);
     st.took = elapsed(); st.phase = 'done'; st.sending = true; st.pop = null; draw();
-    try { st.result = await st.cfg.onSubmit(JSON.parse(JSON.stringify(st.ans)), { seconds: Math.round(st.took), timeUp: !!st.timeUp }); }
+    try { st.result = await st.cfg.onSubmit(JSON.parse(JSON.stringify(st.ans)), { seconds: Math.round(st.took), timeUp: !!st.timeUp, ended: !!st.ended, checked: Object.keys(st.checked), reached: st.i + 1 }); }
     catch (e) { st.result = { error: 'Couldn’t submit: ' + e.message }; }
     st.sending = false; draw();
+  }
+  // Study Mode: hand over this one answer, get back right / wrong + the right answer.
+  async function check() {
+    const q = st.qs[st.i];
+    if (!answered(q) || st.checked[q.id] || st.busy) return;
+    st.busy = true; draw();
+    try { st.checked[q.id] = await st.cfg.check(q.id, JSON.parse(JSON.stringify(st.ans[q.id]))); }
+    catch (e) { alert('Couldn’t check it: ' + e.message); }
+    st.busy = false; draw();
+  }
+  // Simulation: each NEXT sends the answer; the grader says when it knows enough (or this was the last one).
+  async function simNext() {
+    const q = st.qs[st.i];
+    if (!answered(q) || st.busy || st.phase !== 'test') return;
+    st.busy = true; draw();
+    let r = {};
+    try { r = await st.cfg.onAnswer(q.id, JSON.parse(JSON.stringify(st.ans[q.id]))) || {}; }
+    catch (e) { st.busy = false; draw(); alert('Couldn’t save that answer: ' + e.message); return; }
+    st.busy = false;
+    if (r.stop || st.i >= st.qs.length - 1) { send(); return; }
+    st.i++; st.pickChip = null; draw();
+    const m = root.querySelector('.xp-main'); if (m) m.scrollTop = 0;
   }
   function place(b, j) {
     const q = st.qs[st.i], v = (st.ans[q.id] || []).slice();
@@ -220,7 +309,11 @@ const ExamPlayer = (() => {
     if (x === 'pick' || x === 'agree' || x === 'gap') return; // (handled on change)
     e.preventDefault();
     if (x === 'start') { if (st.cfg.kind !== 'exam' || st.agree) start(); return; }
-    if (x === 'quit') { if (st.cfg.onClose) st.cfg.onClose(); close(); return; }
+    if (x === 'quit') { const done = st.cfg.onClose; close(); if (done) done(); return; }
+    if (x === 'rev') { st.revTab = b.dataset.t; draw(); return; }
+    if (x === 'check') { check(); return; }
+    if (x === 'simnext') { simNext(); return; }
+    if ((x === 'chip' || x === 'blank') && locked(q)) return;
     if (x === 'next' && st.i < st.qs.length - 1) { st.i++; st.pickChip = null; }
     else if (x === 'prev' && st.i > 0) { st.i--; st.pickChip = null; }
     else if (x === 'go') { st.i = Number(b.dataset.i); st.pickChip = null; if (st.pop === 'confirm') st.pop = null; }
@@ -231,7 +324,7 @@ const ExamPlayer = (() => {
     else if (x === 'pop') { if (b.dataset.w) st.tools[b.dataset.w] = false; else st.pop = null; }
     else if (x === 'key') { calcKey(b.dataset.k); return; }
     else if (x === 'submit') st.pop = 'confirm';
-    else if (x === 'send') { send(); return; }
+    else if (x === 'send') { if (sim()) st.ended = true; send(); return; }
     else if (x === 'chip') { const j = Number(b.dataset.chip); st.pickChip = st.pickChip === j ? null : j; }
     else if (x === 'blank') {
       const k = Number(b.dataset.blank);
@@ -265,6 +358,7 @@ const ExamPlayer = (() => {
     const t = e.target, q = st && st.qs[st.i];
     if (!t.dataset || !st) return;
     if (t.dataset.x === 'agree') { st.agree = t.checked; draw(); return; }
+    if ((t.dataset.x === 'pick' || t.dataset.x === 'gap') && locked(q)) return;
     if (t.dataset.x === 'pick') {
       const c = Number(t.dataset.c);
       if (q.type === 'multi') { const v = new Set(st.ans[q.id] || []); t.checked ? v.add(c) : v.delete(c); st.ans[q.id] = [...v].sort((a, b) => a - b); }
@@ -283,7 +377,7 @@ const ExamPlayer = (() => {
     if (e.target && /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName) && e.target.type !== 'radio' && e.target.type !== 'checkbox') return;
     if (e.key === 'Escape' && st.pop) { st.pop = null; draw(); e.stopPropagation(); return; }
     if (e.key === 'Escape' && (st.tools.calc || st.tools.notes)) { st.tools.calc = st.tools.notes = false; draw(); e.stopPropagation(); return; }
-    if (st.pop) return;
+    if (st.pop || sim()) return;
     if (e.key === 'ArrowRight' && st.i < st.qs.length - 1) { st.i++; draw(); e.preventDefault(); e.stopPropagation(); }
     if (e.key === 'ArrowLeft' && st.i > 0) { st.i--; draw(); e.preventDefault(); e.stopPropagation(); }
   }
@@ -295,5 +389,5 @@ const ExamPlayer = (() => {
     flagFill: '<svg viewBox="0 0 24 24"><path d="M6 21V4" stroke-width="2.2"/><path d="M6 4h11l-2.5 4.2L17 12.4H6z" fill="currentColor"/></svg>',
     grip: '<svg viewBox="0 0 24 24" class="xp-grip"><circle cx="9" cy="7" r="1.3"/><circle cx="15" cy="7" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="9" cy="17" r="1.3"/><circle cx="15" cy="17" r="1.3"/></svg>',
   };
-  return { open, close, isOpen: () => !!st };
+  return { open, review, close, isOpen: () => !!st };
 })();

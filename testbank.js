@@ -72,10 +72,10 @@ function testBankView() {
   if (!Object.keys(t.sets || {}).length) return tbImportView();
   setTimeout(tbPairsOnce, 0);
   if (!t.sideShown) { t.sideShown = true; setTimeout(tbSideToCurrent, 0); }
-  const exam = /^exam-/.test(t.ch);
-  if (exam ? !t.sets[t.ch] : !t.chapters[t.ch]) t.ch = '01';
-  if (!/^exam-/.test(t.ch)) tbHistoryWatch(t.ch);
-  return `<div class="tb">${tbSide()}<section class="tb-main box">${/^exam-/.test(t.ch) ? tbExamMain() : tbMain()}</section></div>`;
+  const exam = /^exam-/.test(t.ch), prac = t.ch === 'practice';
+  if (!prac && (exam ? !t.sets[t.ch] : !t.chapters[t.ch])) t.ch = '01';
+  if (!exam && !prac) tbHistoryWatch(t.ch);
+  return `<div class="tb">${tbSide()}<section class="tb-main box">${prac ? tbPracticeMain() : exam ? tbExamMain() : tbMain()}</section></div>`;
 }
 const tbFolded = () => new Set(String(pref('tbFold') || '').split(',').filter(Boolean).map(Number));
 // Keep the open chapter in view inside the side list (only the list scrolls, not the page).
@@ -108,7 +108,8 @@ function tbSide() {
   return `<aside class="tb-side box">${Object.entries(TB_MODULES).map(([m, [a, b]]) => { const open = !fold.has(Number(m)) || Number(m) === here;
     return `<button class="tb-mod tb-mod-btn" data-act="tbFold" data-m="${m}" aria-expanded="${open}"><span class="tb-caret">${open ? '▾' : '▸'}</span>Module ${m} <span class="muted">· Ch ${a}–${b}</span>${modDone(m, a, b) ? '<span class="tb-ch-done" title="All its quizzes and its exam are done">✓</span>' : ''}</button>`
     + (open ? Array.from({ length: b - a + 1 }, (_, i) => { const n = a + i, cid = String(n).padStart(2, '0'); return row(cid, tbTitle(cid), n); }).join('') + examRow(m) : ''); }).join('')}
-    <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}</aside>`;
+    <p class="tb-mod">Other quizzes</p>${TB_OTHER.map(([cid, l]) => row(cid, l, '•')).join('')}
+    <p class="tb-mod">Students</p><button class="tb-ch ${t.ch === 'practice' ? 'on' : ''}" data-act="tbCh" data-ch="practice"><span class="tb-ch-n">${TB_PRAC_ICON}</span><span class="tb-ch-t">NREMT Practice</span></button></aside>`;
 }
 function tbMain() {
   const t = tb(), cid = t.ch, ch = t.chapters[cid] || {}, q = ch.q || {}, set = tbQuizSet(cid), other = !/^\d+$/.test(cid);
@@ -404,6 +405,15 @@ function tbShown(q, v) {
   if (q.type === 'drag' || q.type === 'dropdown') return v.map((c, i) => (i + 1) + ': ' + esc(c == null ? '–' : tbPlain(q.choices[c]))).join(' · ');
   return (Array.isArray(v) ? v : [v]).map(i => esc(tbPlain(q.choices[i]))).join(' + ');
 }
+// The right answer in the same shape as a student's answer (what exam-player.js shows after checking / in a review).
+const tbRight = q => q.type === 'drag' || q.type === 'dropdown' ? (q.gaps || []) : q.type === 'multi' ? (q.correct || []) : (q.correct || [])[0];
+// One question as the student screen gets it: no answer key, pictures filled in, a case's parts tied together.
+async function tbPlayerQ(id, q) {
+  const gaps = q.type === 'drag' || q.type === 'dropdown', caseCid = q.kind === 'specialty' ? id.split('-')[0] : null;
+  return { id, type: q.type, stem: await tbPictures(q.stem), choices: await Promise.all(q.choices.map(tbPictures)), groups: q.groups || null,
+    group: caseCid ? 'case-' + caseCid : null, part: q.part || 0, caseText: caseCid && q.part > 1 ? tbCaseText(caseCid) : '',
+    gapCount: gaps ? (q.gaps || []).length : 0, gapGroups: gaps ? (q.gaps || []).map(g => (q.groups || [])[g] || 1) : null };
+}
 async function tbPreview(setId) {
   const t = tb(), set = t.sets[setId];
   if (!set || typeof ExamPlayer === 'undefined') return;
@@ -411,30 +421,190 @@ async function tbPreview(setId) {
   if (!items.length) { toast('Nothing on it yet.'); return; }
   toast('Opening the preview…');
   const questions = [];
-  for (const { id, q } of items) {
-    const gaps = q.type === 'drag' || q.type === 'dropdown';
-    const caseCid = q.kind === 'specialty' ? id.split('-')[0] : null;
-    questions.push({ id, type: q.type, stem: await tbPictures(q.stem), choices: await Promise.all(q.choices.map(tbPictures)), groups: q.groups || null,
-      group: caseCid ? 'case-' + caseCid : null, part: q.part || 0, caseText: caseCid && q.part > 1 ? tbCaseText(caseCid) : '',
-      gapCount: gaps ? (q.gaps || []).length : 0, gapGroups: gaps ? (q.gaps || []).map(g => (q.groups || [])[g] || 1) : null });
-  }
+  for (const { id, q } of items) questions.push(await tbPlayerQ(id, q));
   const exam = set.kind === 'exam', cid = set.ch;
   const title = exam ? set.title : /^\d+$/.test(cid || '') ? `Chapter ${Number(cid)} Quiz: ${tbTitle(cid)}` : set.title;
   ExamPlayer.open({
     title, kind: exam ? 'exam' : 'quiz', limitMin: exam ? 120 : 0, preview: true, passMark: set.pass || null,
     intro: exam ? '' : set.intro || (set.counts === false ? '' : TB_QUIZ_INTRO), questions,
     onSubmit: async answers => {
-      let score = 0;
-      const review = items.map(({ id, q }, i) => {
-        const ok = tbGrade(q, answers[id]); if (ok) score++;
-        const right = q.type === 'drag' || q.type === 'dropdown' ? q.gaps : q.type === 'multi' ? q.correct : (q.correct || [])[0];
-        return `<div class="xp-rev"><span class="${ok ? 'ok' : 'no'}">${ok ? '✓ Right' : '✗ Wrong'}</span> · ${esc(tbPlain(q.stem).slice(0, 140))}${tbPlain(q.stem).length > 140 ? '…' : ''}
-          ${ok ? '' : `<br><span class="xp-muted">Picked:</span> ${tbShown(q, answers[id])}<br><span class="xp-muted">Right:</span> ${tbShown(q, right)}`}</div>`;
-      }).join('');
-      const pct = Math.round(score / items.length * 100);
+      // Quizzes: students get this review after submitting. Module exams: score only (the review shows in this preview).
+      const review = items.map(({ id, q }) => ({ id, ok: tbGrade(q, answers[id]), right: tbRight(q), ref: q.ref || '' }));
+      const score = review.filter(r => r.ok).length, pct = Math.round(score / items.length * 100);
       return { score, total: items.length, pct, passed: set.pass ? pct >= set.pass : null, review };
     },
   });
+}
+
+/* ---------- NREMT Practice (practice.js + exam-player.js): Study Mode and NREMT Simulation ----------
+   Pool = every chapter question (quiz, test bank, specialty, module exams too); never Ride Along or Pharmacology.
+   Categories = JBL TestPrep's six; chapters 5, 6 and 10 (terminology, the body, patient assessment) are spread across
+   all of them. Sim = how many of 120 come from each. In Admin it's a preview: attempts live only until the page reloads. */
+const TB_CATS = [
+  { key: 'airway', label: 'Airway and Breathing', ch: [11, 16], sim: 22 },
+  { key: 'cardio', label: 'Cardiology', ch: [13, 14, 17], sim: 24 },
+  { key: 'medical', label: 'Medical', ch: [12, 15, 18, 19, 20, 21, 22, 23, 32], sim: 30 },
+  { key: 'obped', label: 'Obstetrics and Pediatrics', ch: [7, 33, 34], sim: 12 },
+  { key: 'trauma', label: 'Trauma', ch: [24, 25, 26, 27, 28, 29, 30, 31], sim: 18 },
+  { key: 'ops', label: 'Operations', ch: [1, 2, 3, 4, 8, 9, 35, 36, 37, 38, 39], sim: 14 },
+];
+const TB_CAT_SPREAD = [5, 6, 10], TB_SIM_MAX = 120, TB_SIM_MIN = 70, TB_SIM_PASS = 80;
+const TB_PRAC_ICON = '<svg viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M6 9.5V14c0 1.7 2.7 3 6 3s6-1.3 6-3V9.5M20 7v6"/></svg>';
+const tbCatLabel = k => (TB_CATS.find(c => c.key === k) || {}).label || '';
+// A question's category: by its chapter; the spread chapters land on one by a steady hash (same answer every time).
+function tbCatOf(id) {
+  const n = Number(id.slice(0, 2)), c = TB_CATS.find(x => x.ch.includes(n));
+  if (c) return c.key;
+  const key = /-s\d+$/.test(id) ? id.slice(0, 2) + '-case' : id; // (a case's parts stay together)
+  let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  let at = h % TB_SIM_MAX;
+  for (const x of TB_CATS) { if (at < x.sim) return x.key; at -= x.sim; }
+  return TB_CATS[0].key;
+}
+function tbPracPool() {
+  const t = tb(), out = [];
+  Object.entries(t.chapters || {}).forEach(([cid, ch]) => { if (!/^\d+$/.test(cid)) return;
+    Object.entries(ch.q || {}).forEach(([id, q]) => { if (!q.deleted) out.push({ id, q, cid, cat: tbCatOf(id), spec: q.kind === 'specialty' }); }); });
+  return out;
+}
+const tbShuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+// Units: one question, or one chapter's whole case (its parts in order).
+function tbUnits(list) {
+  const units = [], cases = {};
+  list.forEach(x => { if (!x.spec) units.push([x]); else (cases[x.cid] = cases[x.cid] || []).push(x); });
+  Object.values(cases).forEach(c => units.push(c.sort((a, b) => (a.q.part || 0) - (b.q.part || 0))));
+  return units;
+}
+// The preview's pretend student: sample sessions so Past attempts isn't empty, plus what was answered in this preview.
+function tbPrac() {
+  const t = tb();
+  if (!t.prac) { const d = n => Date.now() - n * 864e5;
+    t.prac = { seen: {}, attempts: [
+      { at: d(21), mode: 'study', label: 'Airway and Breathing, Cardiology', total: 25, right: 16, pct: 64, secs: 1260, sample: true },
+      { at: d(16), mode: 'study', label: 'Module 3', total: 50, right: 36, pct: 72, secs: 2580, sample: true },
+      { at: d(10), mode: 'sim', label: 'All categories', total: 120, right: 89, pct: 74, secs: 6120, passed: false, sample: true },
+      { at: d(3), mode: 'sim', label: 'All categories', total: 84, right: 74, pct: 88, secs: 4310, passed: true, sample: true },
+    ] }; }
+  return t.prac;
+}
+function tbPracData() {
+  const P = tbPrac(), pool = tbPracPool(), cats = {}, chs = {};
+  TB_CATS.forEach(c => { cats[c.key] = { key: c.key, label: c.label, total: 0, spec: 0, fresh: 0 }; });
+  pool.forEach(x => { const c = cats[x.cat], h = chs[x.cid] = chs[x.cid] || { cid: x.cid, n: Number(x.cid), title: tbTitle(x.cid), total: 0, spec: 0, fresh: 0 };
+    [c, h].forEach(o => { o.total++; if (x.spec) o.spec++; if (!(x.id in P.seen)) o.fresh++; }); });
+  const modules = Object.entries(TB_MODULES).map(([m, [a, b]]) => ({ m: Number(m), chapters: Array.from({ length: b - a + 1 }, (_, i) => chs[String(a + i).padStart(2, '0')]).filter(Boolean) })).filter(m => m.chapters.length);
+  return { cats: TB_CATS.map(c => cats[c.key]), modules, attempts: P.attempts.map(a => ({ ...a, canReview: !!a.result })) };
+}
+function tbPractice() {
+  if (typeof Practice === 'undefined') return;
+  Practice.open({ preview: true, ...tbPracData(), onStudy: tbStudyStart, onSim: tbSimStart, onReview: tbPracReview, onClose: () => {} });
+}
+const tbPracBack = () => Practice.refresh(tbPracData());
+function tbBreakdown(res) {
+  return TB_CATS.map(c => { const r = res.filter(x => x.cat === c.key); return { label: c.label, right: r.filter(x => x.ok).length, total: r.length }; }).filter(b => b.total);
+}
+function tbPracSave(mode, label, result, answers) {
+  tbPrac().attempts.push({ at: Date.now(), mode, label, total: result.total, right: result.score, pct: result.pct, secs: result.seconds, passed: result.passed,
+    result, answers: Object.fromEntries(result.review.map(r => [r.id, answers[r.id]])) });
+}
+async function tbStudyStart(o) {
+  const P = tbPrac(), pool = tbPracPool();
+  const chosen = pool.filter(x => (o.by === 'cat' ? o.cats.includes(x.cat) : o.chapters.includes(x.cid)) && (o.cases || !x.spec));
+  // New ones first (plus ones missed before, if asked), then the rest.
+  const units = tbUnits(chosen), first = [], rest = [];
+  units.forEach(u => (u.every(x => !(x.id in P.seen)) || (o.wrong && u.some(x => P.seen[x.id] === false)) ? first : rest).push(u));
+  const want = o.count || chosen.length, pick = [];
+  for (const u of [...tbShuffle(first), ...tbShuffle(rest)]) { if (pick.length + u.length <= want) pick.push(...u); if (pick.length >= want) break; }
+  if (!pick.length) { toast('Nothing to study there.'); return; }
+  toast('Getting your questions ready…');
+  const questions = []; for (const x of pick) questions.push(await tbPlayerQ(x.id, x.q));
+  const byId = Object.fromEntries(pick.map(x => [x.id, x])), res = {};
+  const label = o.by === 'cat' ? (o.cats.length === TB_CATS.length ? 'All categories' : o.cats.map(tbCatLabel).join(', '))
+    : Object.entries(TB_MODULES).map(([m, [a, b]]) => { const ids = Array.from({ length: b - a + 1 }, (_, i) => String(a + i).padStart(2, '0')), got = ids.filter(id => o.chapters.includes(id));
+        return got.length === ids.length ? 'Module ' + m : got.length ? 'Ch ' + got.map(Number).join(', ') : ''; }).filter(Boolean).join(' · ');
+  ExamPlayer.open({
+    title: 'Study Mode', kind: 'quiz', mode: 'study', preview: true, autoStart: true, limitMin: o.timer ? pick.length : 0, questions,
+    check: async (id, v) => { const x = byId[id], ok = tbGrade(x.q, v); res[id] = ok; P.seen[id] = ok; return { ok, right: tbRight(x.q), ref: x.q.ref || '' }; },
+    onSubmit: async (answers, meta) => {
+      const done = meta.checked.filter(id => id in res);
+      const review = done.map(id => ({ id, ok: res[id], right: tbRight(byId[id].q), ref: byId[id].q.ref || '', cat: tbCatLabel(byId[id].cat) }));
+      const score = review.filter(r => r.ok).length, total = review.length;
+      const result = { score, total, pct: total ? Math.round(score / total * 100) : 0, passed: null, review, seconds: meta.seconds,
+        breakdown: tbBreakdown(done.map(id => ({ cat: byId[id].cat, ok: res[id] }))), skipped: Math.max(0, meta.reached - total),
+        note: total ? '' : 'You didn’t check any answers, so there’s no score this time.' };
+      if (total) tbPracSave('study', label, result, answers);
+      return result;
+    },
+    onClose: tbPracBack,
+  });
+}
+// 95% sure the true score is above (or below) 80%? (Wilson interval.)
+function tbSimSure(k, n) {
+  const z = 1.96, p = k / n, d = 1 + z * z / n, mid = (p + z * z / (2 * n)) / d, half = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d, pass = TB_SIM_PASS / 100;
+  return mid - half > pass ? 'pass' : mid + half < pass ? 'fail' : null;
+}
+async function tbSimStart() {
+  const P = tbPrac(), pool = tbPracPool();
+  // 120 spots in the category mix, spread evenly so any first 70 are balanced too.
+  const slots = [], got = Object.fromEntries(TB_CATS.map(c => [c.key, 0]));
+  for (let i = 1; i <= TB_SIM_MAX; i++) { const c = TB_CATS.reduce((best, x) => (x.sim * i / TB_SIM_MAX - got[x.key]) > (best.sim * i / TB_SIM_MAX - got[best.key]) ? x : best); got[c.key]++; slots.push(c.key); }
+  const fresh = x => !(x.id in P.seen), byCat = {};
+  TB_CATS.forEach(c => { const l = pool.filter(x => x.cat === c.key && !x.spec); byCat[c.key] = [...tbShuffle(l.filter(fresh)), ...tbShuffle(l.filter(x => !fresh(x)))]; });
+  let list = slots.map(k => byCat[k].shift()).filter(Boolean);
+  // At most one specialty case: half the time, either a whole case or its Parts 1–3, at a random early spot.
+  if (Math.random() < .5) {
+    const cases = tbUnits(pool.filter(x => x.spec)).filter(u => u.length >= 3), u = cases[Math.floor(Math.random() * cases.length)];
+    if (u) { const parts = Math.random() < .5 ? u : u.slice(0, 3), cat = parts[0].cat;
+      let drop = parts.length; for (let j = list.length - 1; j >= 0 && drop; j--) if (list[j].cat === cat) { list.splice(j, 1); drop--; }
+      list.splice(3 + Math.floor(Math.random() * 55), 0, ...parts.map(x => ({ ...x, cat }))); }
+  }
+  toast('Getting your simulation ready…');
+  const questions = []; for (const x of list) questions.push(await tbPlayerQ(x.id, x.q));
+  const byId = Object.fromEntries(list.map(x => [x.id, x])), res = [];
+  let verdict = null;
+  ExamPlayer.open({
+    title: 'NREMT Simulation', kind: 'exam', mode: 'sim', preview: true, autoStart: true, keepOrder: true, limitMin: 120, questions,
+    onAnswer: async (id, v) => {
+      const x = byId[id], ok = tbGrade(x.q, v); res.push({ id, ok, cat: x.cat }); P.seen[id] = ok;
+      const n = res.length, k = res.filter(r => r.ok).length;
+      if (n >= TB_SIM_MIN) verdict = tbSimSure(k, n);
+      return { stop: !!verdict || n >= TB_SIM_MAX };
+    },
+    onSubmit: async (answers, meta) => {
+      const n = res.length, score = res.filter(r => r.ok).length, pct = n ? Math.round(score / n * 100) : 0;
+      const passed = verdict ? verdict === 'pass' : n < TB_SIM_MIN ? false : pct >= TB_SIM_PASS;
+      const note = verdict ? `It stopped at question ${n}: it was clear you’re ${verdict === 'pass' ? 'above' : 'below'} ${TB_SIM_PASS}%.`
+        : meta.timeUp && n < TB_SIM_MIN ? `Time ran out before question ${TB_SIM_MIN}, so it counts as not passed.`
+        : meta.ended && n < TB_SIM_MIN ? `You ended it before question ${TB_SIM_MIN}, so it counts as not passed.`
+        : meta.timeUp ? `Time ran out after ${n} questions: ${TB_SIM_PASS}% or higher passes.`
+        : meta.ended ? `You ended it after ${n} questions: ${TB_SIM_PASS}% or higher passes.` : `All ${n} questions: ${TB_SIM_PASS}% or higher passes.`;
+      const review = res.map(r => ({ id: r.id, ok: r.ok, right: tbRight(byId[r.id].q), ref: byId[r.id].q.ref || '', cat: tbCatLabel(r.cat) }));
+      const result = { score, total: n, pct, passed, note, review, breakdown: tbBreakdown(res), seconds: meta.seconds };
+      if (n) tbPracSave('sim', 'All categories', result, answers);
+      return result;
+    },
+    onClose: tbPracBack,
+  });
+}
+async function tbPracReview(i) {
+  const a = tbPrac().attempts[i];
+  if (!a || !a.result) return;
+  const questions = []; for (const r of a.result.review) { const q = tbQ(r.id); if (q) questions.push(await tbPlayerQ(r.id, q)); }
+  ExamPlayer.review({ title: a.mode === 'sim' ? 'NREMT Simulation' : 'Study Mode', kind: a.mode === 'sim' ? 'exam' : 'quiz', mode: a.mode, preview: true, questions, answers: a.answers, result: a.result, onClose: tbPracBack });
+}
+// Admin's page for it: what's in each category, and the button to try it as a student.
+function tbPracticeMain() {
+  const pool = tbPracPool(), n = k => pool.filter(x => x.cat === k).length;
+  return `<div class="tb-head"><div><h2>NREMT Practice</h2><span class="muted small">Study Mode + NREMT Simulation for students · goes live with the Student Portal</span></div>
+      <div class="tb-head-right"><button class="btn tiny" data-act="tbPractice">Preview as student</button></div></div>
+    <p class="tb-intro">Uses every chapter question (quizzes, test banks, specialty cases and module exam questions): ${pool.length.toLocaleString()} now. Never Ride Along Readiness or Pharmacology. Changes you make in the Test Bank show up here on their own. Never graded.</p>
+    <table class="tb-cats"><thead><tr><th>Category</th><th>Chapters</th><th>Questions</th><th>Of 120 in a simulation</th></tr></thead><tbody>
+      ${TB_CATS.map(c => `<tr><td><b>${esc(c.label)}</b></td><td>${c.ch.join(', ')}</td><td>${n(c.key).toLocaleString()}</td><td>${c.sim}</td></tr>`).join('')}
+      <tr><td class="muted">Spread across all six</td><td>${TB_CAT_SPREAD.join(', ')}</td><td class="muted">(counted above)</td><td></td></tr></tbody></table>
+    <div class="tb-prac-notes">
+      <p><b>Study Mode</b>: students pick categories or modules/chapters, how many (10, 25, 50, 100 or all), specialty cases on or off, questions they got wrong before, and a timer (1 minute each). <b>Check answer</b> shows right or wrong, the right answer and the page to read. New questions come first.</p>
+      <p><b>NREMT Simulation</b>: 70–120 questions in the mix above, 2 hours, no going back. After question 70 it stops once it’s 95% sure they’re above or below ${TB_SIM_PASS}%; otherwise question 120 decides. At most one specialty case (whole, or Parts 1–3). The end shows pass / not passed, each category, and a review.</p>
+      <p class="muted small">In this preview, the Past attempts page starts with sample sessions, and your own preview sessions are added until the page reloads. Nothing is saved.</p></div>`;
 }
 
 /* ---------- First time: the import file ---------- */
@@ -533,6 +703,7 @@ async function tbAct(a, el) {
     case 'tbNewNo': t.newQ = null; Object.keys(S.drafts).filter(k => k.startsWith('tbn-')).forEach(k => delete S.drafts[k]); render(); return true;
     case 'tbNewSave': await tbNewSave(); return true;
     case 'tbPreview': await tbPreview(d.set); return true;
+    case 'tbPractice': tbPractice(); return true;
     case 'tbUseCase': await tbExamCase(tbModuleOf(d.ch), d.ch); return true;
     case 'tbCaseEdit': t.caseEdit = d.ch; render(); { const f = document.getElementById('tb-case-' + d.ch); if (f) f.focus(); } return true;
     case 'tbCaseNo': t.caseEdit = null; delete S.drafts['tb-case-' + d.ch]; render(); return true;
